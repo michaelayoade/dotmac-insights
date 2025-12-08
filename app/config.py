@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     splynx_api_url: str = ""
     splynx_api_key: str = ""
     splynx_api_secret: str = ""
+    splynx_auth_basic: str = ""  # Base64 encoded "key:secret" for Basic Auth
 
     # ERPNext
     erpnext_api_url: str = ""
