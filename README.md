@@ -1,0 +1,237 @@
+# Dotmac Insights
+
+Unified data platform for Dotmac Technologies - aggregating data from Splynx, ERPNext, and Chatwoot into a single database for analysis and insights.
+
+## Features
+
+- **Data Sync**: Automated sync from Splynx (ISP billing), ERPNext (ERP), and Chatwoot (support)
+- **Unified Customer View**: Link customers across all systems
+- **Data Explorer**: Query and explore all synced data via API
+- **Analytics**: Revenue trends, churn analysis, POP performance, support metrics
+- **Real-time Updates**: Configurable sync intervals
+
+## Quick Start
+
+### 1. Prerequisites
+
+- Python 3.11+
+- PostgreSQL 15+
+- Redis (optional, for caching)
+
+### 2. Setup
+
+```bash
+# Clone and enter directory
+cd dotmac-insights
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy environment file and configure
+cp .env.example .env
+# Edit .env with your API credentials
+```
+
+### 3. Configure Environment
+
+Edit `.env` with your credentials:
+
+```env
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/dotmac_insights
+
+# API Security
+# Required in production; used for all /api/* routes via X-API-Key or api_key query param
+API_KEY=replace_me_in_prod
+ENVIRONMENT=development  # development, staging, production
+# Comma-separated list; required in production to allow browser apps
+CORS_ORIGINS=http://localhost:3000
+
+# Splynx API
+SPLYNX_API_URL=https://your-splynx.com/api/2.0
+SPLYNX_API_KEY=your_key
+SPLYNX_API_SECRET=your_secret
+
+# ERPNext API
+ERPNEXT_API_URL=https://your-erpnext.com
+ERPNEXT_API_KEY=your_key
+ERPNEXT_API_SECRET=your_secret
+
+# Chatwoot API
+CHATWOOT_API_URL=https://your-chatwoot.com/api/v1
+CHATWOOT_API_TOKEN=your_token
+CHATWOOT_ACCOUNT_ID=1
+```
+
+### 4. Initialize Database
+
+```bash
+# Create database tables
+python cli.py init-db
+```
+
+### 5. Test Connections
+
+```bash
+python cli.py test-connections
+```
+
+### 6. Run Initial Sync
+
+```bash
+# Sync all sources (full sync)
+python cli.py sync all --full
+
+# Or sync individually
+python cli.py sync splynx --full
+python cli.py sync erpnext --full
+python cli.py sync chatwoot --full
+```
+
+### 7. Start the API Server
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Access the API at: http://localhost:8000  
+API Documentation: http://localhost:8000/docs  
+Auth: click **Authorize** in Swagger UI and enter your API key in `X-API-Key` (or pass `api_key` as a query param).
+
+> In production, `API_KEY` must be set or the app will refuse to start. CORS is locked down unless `CORS_ORIGINS` is provided. Development without an API key is allowed but logged as a warning.
+
+## Using Docker
+
+```bash
+# Start all services (PostgreSQL, Redis, API)
+docker-compose up -d
+
+# View logs
+docker-compose logs -f api
+```
+
+## API Endpoints
+
+### Sync Management
+
+- `POST /api/sync/all` - Sync all sources
+- `POST /api/sync/splynx` - Sync Splynx
+- `POST /api/sync/erpnext` - Sync ERPNext
+- `POST /api/sync/chatwoot` - Sync Chatwoot
+- `GET /api/sync/status` - Get sync status
+- `GET /api/sync/logs` - View sync logs
+- `POST /api/sync/test-connections` - Test API connections
+
+### Data Explorer
+
+- `GET /api/explore/tables` - List all tables with counts
+- `GET /api/explore/tables/{table}` - Browse table data
+- `GET /api/explore/tables/{table}/stats` - Get table statistics
+- `GET /api/explore/data-quality` - Check data quality
+- `GET /api/explore/search?q=term` - Search across all tables
+- `POST /api/explore/query` - Run custom queries
+
+### Customers
+
+- `GET /api/customers` - List customers
+- `GET /api/customers/{id}` - Get customer details
+- `GET /api/customers/churned` - Get churned customers
+
+### Analytics
+
+- `GET /api/analytics/overview` - High-level metrics
+- `GET /api/analytics/revenue/trend` - Revenue trends
+- `GET /api/analytics/churn/trend` - Churn trends
+- `GET /api/analytics/pop/performance` - POP performance
+- `GET /api/analytics/support/metrics` - Support metrics
+- `GET /api/analytics/invoices/aging` - Invoice aging report
+- `GET /api/analytics/customers/by-plan` - Distribution by plan
+
+## CLI Commands
+
+```bash
+# Test connections
+python cli.py test-connections
+
+# Sync data
+python cli.py sync all           # Incremental sync all
+python cli.py sync all --full    # Full sync all
+python cli.py sync splynx        # Sync Splynx only
+python cli.py sync erpnext       # Sync ERPNext only
+python cli.py sync chatwoot      # Sync Chatwoot only
+
+# View statistics
+python cli.py stats
+
+# Initialize database
+python cli.py init-db
+```
+
+## Data Model
+
+### Core Tables
+
+- **customers** - Unified customer records linked across all systems
+- **pops** - Points of Presence / network locations
+- **subscriptions** - Customer service subscriptions
+- **invoices** - Billing invoices from Splynx and ERPNext
+- **payments** - Payment records
+- **conversations** - Support tickets from Chatwoot
+- **messages** - Individual messages in conversations
+- **employees** - Staff records from ERPNext
+- **expenses** - Expense records for cost analysis
+- **sync_logs** - Track all sync operations
+
+### Customer Linkage
+
+Customers are linked across systems using:
+- `splynx_id` - Splynx customer ID
+- `erpnext_id` - ERPNext customer name
+- `chatwoot_contact_id` - Chatwoot contact ID
+
+## Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Splynx    │     │   ERPNext   │     │  Chatwoot   │
+│  (Billing)  │     │    (ERP)    │     │  (Support)  │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       └───────────┬───────┴───────────────────┘
+                   │ REST APIs
+           ┌───────▼───────┐
+           │  Sync Engine  │
+           │   (Python)    │
+           └───────┬───────┘
+                   │
+           ┌───────▼───────┐
+           │  PostgreSQL   │
+           │   Database    │
+           └───────┬───────┘
+                   │
+           ┌───────▼───────┐
+           │  FastAPI      │
+           │   Server      │
+           └───────┬───────┘
+                   │
+           ┌───────▼───────┐
+           │  Dashboard    │
+           │  (Phase 2)    │
+           └───────────────┘
+```
+
+## Next Steps (Phase 2)
+
+1. **Web Dashboard** - Visual interface for exploring data
+2. **Churn Prediction** - ML-based customer risk scoring
+3. **Automated Reports** - Scheduled email reports
+4. **Alerts** - Notifications for critical events
+5. **Manager Views** - Role-based dashboards
+
+## Support
+
+For issues or questions, contact the development team.
