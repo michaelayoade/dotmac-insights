@@ -16,6 +16,7 @@ import {
   Activity,
   Menu,
   X,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
@@ -71,6 +72,100 @@ function SyncStatusIndicator() {
         allSynced ? 'bg-teal-electric' : 'bg-amber-warn animate-pulse'
       )} />
       <span>{allSynced ? 'Synced' : 'Syncing...'}</span>
+    </div>
+  );
+}
+
+function ApiKeyControl({ collapsed }: { collapsed: boolean }) {
+  const [value, setValue] = useState('');
+  const [saved, setSaved] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'saved' | 'cleared'>('idle');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem('dotmac_api_key');
+    if (stored) {
+      setSaved(stored);
+      setValue(stored);
+    }
+  }, []);
+
+  const handleSave = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    localStorage.setItem('dotmac_api_key', trimmed);
+    setSaved(trimmed);
+    setStatus('saved');
+    setTimeout(() => setStatus('idle'), 1800);
+  };
+
+  const handleClear = () => {
+    localStorage.removeItem('dotmac_api_key');
+    setSaved(null);
+    setValue('');
+    setStatus('cleared');
+    setTimeout(() => setStatus('idle'), 1800);
+  };
+
+  if (!mounted) return null;
+
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-slate-muted text-[10px]">
+        <div className="p-2 rounded-lg bg-slate-elevated border border-slate-border">
+          <KeyRound className="w-4 h-4" />
+        </div>
+        <span>API Key</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-border bg-slate-elevated p-3">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-md bg-teal-electric/10 flex items-center justify-center">
+          <KeyRound className="w-4 h-4 text-teal-electric" />
+        </div>
+        <div className="leading-tight">
+          <p className="text-xs font-semibold text-white">API Key</p>
+          <p className="text-[11px] text-slate-muted">Used for all backend requests (X-API-Key)</p>
+        </div>
+      </div>
+      <input
+        type="password"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Enter API key"
+        className="w-full rounded-md border border-slate-border bg-slate-card px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={handleSave}
+          className="flex-1 rounded-md bg-teal-electric text-slate-deep text-sm font-semibold py-2 hover:bg-teal-glow transition-colors"
+          disabled={!value.trim()}
+        >
+          Save
+        </button>
+        <button
+          onClick={handleClear}
+          className="px-3 py-2 rounded-md border border-slate-border text-slate-muted text-sm hover:text-white hover:border-slate-muted transition-colors"
+          disabled={!saved}
+        >
+          Clear
+        </button>
+      </div>
+      <div className="text-[11px] text-slate-muted flex items-center gap-2">
+        <span className={cn(
+          'w-2 h-2 rounded-full',
+          status === 'saved' ? 'bg-teal-electric' : status === 'cleared' ? 'bg-slate-muted' : saved ? 'bg-teal-electric' : 'bg-slate-muted'
+        )} />
+        <span>
+          {status === 'saved' && 'Saved locally'}
+          {status === 'cleared' && 'Cleared'}
+          {status === 'idle' && (saved ? `Using ${saved.slice(0, 4)}…` : 'Not set')}
+        </span>
+      </div>
     </div>
   );
 }
@@ -216,6 +311,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <SyncStatusIndicator />
             </div>
           )}
+
+          <div className="mb-3 px-3">
+            <ApiKeyControl collapsed={collapsed} />
+          </div>
 
           {/* Collapse button */}
           <button

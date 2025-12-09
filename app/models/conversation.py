@@ -1,8 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum, Boolean
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.customer import Customer
 
 
 class ConversationStatus(enum.Enum):
@@ -24,69 +30,69 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # External ID
-    chatwoot_id = Column(Integer, unique=True, index=True, nullable=True)
+    chatwoot_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
     # Customer link
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
-    chatwoot_contact_id = Column(Integer, index=True, nullable=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    chatwoot_contact_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
 
     # Conversation details
-    subject = Column(String(500), nullable=True)
-    inbox_name = Column(String(255), nullable=True)  # Which inbox/channel
-    channel = Column(String(100), nullable=True)  # email, whatsapp, web, etc.
+    subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    inbox_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    channel: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Status & Priority
-    status = Column(Enum(ConversationStatus), default=ConversationStatus.OPEN, index=True)
-    priority = Column(Enum(ConversationPriority), default=ConversationPriority.MEDIUM)
+    status: Mapped[ConversationStatus] = mapped_column(Enum(ConversationStatus), default=ConversationStatus.OPEN, index=True)
+    priority: Mapped[ConversationPriority] = mapped_column(Enum(ConversationPriority), default=ConversationPriority.MEDIUM)
 
     # Assignment
-    assigned_agent_id = Column(Integer, nullable=True)
-    assigned_agent_name = Column(String(255), nullable=True)
-    assigned_team_id = Column(Integer, nullable=True)
-    assigned_team_name = Column(String(255), nullable=True)
+    assigned_agent_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    assigned_agent_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    assigned_team_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    assigned_team_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Categorization
-    labels = Column(Text, nullable=True)  # JSON array of labels
-    category = Column(String(100), nullable=True)  # Derived category: billing, technical, general
+    labels: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Counts
-    message_count = Column(Integer, default=0)
+    message_count: Mapped[int] = mapped_column(default=0)
 
     # Dates
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    first_response_at = Column(DateTime, nullable=True)
-    resolved_at = Column(DateTime, nullable=True)
-    last_activity_at = Column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    first_response_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Metrics
-    first_response_time_seconds = Column(Integer, nullable=True)  # Time to first response
-    resolution_time_seconds = Column(Integer, nullable=True)  # Total time to resolve
+    first_response_time_seconds: Mapped[Optional[int]] = mapped_column(nullable=True)
+    resolution_time_seconds: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     # Sync metadata
-    last_synced_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer = relationship("Customer", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation")
+    customer: Mapped[Optional[Customer]] = relationship(back_populates="conversations")
+    messages: Mapped[List[Message]] = relationship(back_populates="conversation")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Conversation {self.chatwoot_id} - {self.status.value}>"
 
     @property
     def first_response_time_hours(self) -> float:
         if self.first_response_time_seconds:
             return self.first_response_time_seconds / 3600
-        return 0
+        return 0.0
 
     @property
     def resolution_time_hours(self) -> float:
         if self.resolution_time_seconds:
             return self.resolution_time_seconds / 3600
-        return 0
+        return 0.0
 
 
 class Message(Base):
@@ -94,29 +100,29 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # External ID
-    chatwoot_id = Column(Integer, unique=True, index=True, nullable=True)
+    chatwoot_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
     # Conversation link
-    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), nullable=False, index=True)
 
     # Message details
-    content = Column(Text, nullable=True)
-    message_type = Column(String(50), nullable=True)  # incoming, outgoing, activity
-    is_private = Column(Boolean, default=False)  # Internal notes
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    message_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_private: Mapped[bool] = mapped_column(default=False)
 
     # Sender info
-    sender_type = Column(String(50), nullable=True)  # contact, user, agent_bot
-    sender_id = Column(Integer, nullable=True)
-    sender_name = Column(String(255), nullable=True)
+    sender_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    sender_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    sender_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Dates
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
 
     # Relationships
-    conversation = relationship("Conversation", back_populates="messages")
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Message {self.chatwoot_id} - {self.message_type}>"

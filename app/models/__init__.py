@@ -7,6 +7,29 @@ from app.models.conversation import Conversation, Message
 from app.models.sync_log import SyncLog
 from app.models.employee import Employee
 from app.models.expense import Expense
+from app.models.credit_note import CreditNote
+from app.models.ticket import Ticket
+from app.models.project import Project
+from app.models.tariff import Tariff
+from app.models.router import Router
+from app.models.accounting import (
+    BankAccount,
+    JournalEntry,
+    PurchaseInvoice,
+    GLEntry,
+    Account,
+    BankTransaction,
+)
+from app.models.customer_note import CustomerNote
+from app.models.administrator import Administrator
+from app.models.network_monitor import NetworkMonitor
+from app.models.lead import Lead
+from app.models.ipv4_address import IPv4Address
+from app.models.ticket_message import TicketMessage
+from app.models.transaction_category import TransactionCategory
+from app.models.ipv4_network import IPv4Network
+from app.models.ipv6_network import IPv6Network
+from app.models.payment_method import PaymentMethod
 
 __all__ = [
     "Customer",
@@ -19,4 +42,25 @@ __all__ = [
     "SyncLog",
     "Employee",
     "Expense",
+    "CreditNote",
+    "Ticket",
+    "Project",
+    "Tariff",
+    "Router",
+    "BankAccount",
+    "JournalEntry",
+    "PurchaseInvoice",
+    "GLEntry",
+    "Account",
+    "BankTransaction",
+    "CustomerNote",
+    "Administrator",
+    "NetworkMonitor",
+    "Lead",
+    "IPv4Address",
+    "TicketMessage",
+    "TransactionCategory",
+    "IPv4Network",
+    "IPv6Network",
+    "PaymentMethod",
 ]

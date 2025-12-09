@@ -1,8 +1,16 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Enum, Text
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from decimal import Decimal
+from typing import Optional, TYPE_CHECKING
 import enum
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.customer import Customer
+    from app.models.invoice import Invoice
 
 
 class PaymentStatus(enum.Enum):
@@ -32,46 +40,46 @@ class Payment(Base):
 
     __tablename__ = "payments"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # External IDs
-    splynx_id = Column(Integer, index=True, nullable=True)
-    erpnext_id = Column(String(255), index=True, nullable=True)
+    splynx_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
 
     # Source system
-    source = Column(Enum(PaymentSource), nullable=False, index=True)
+    source: Mapped[PaymentSource] = mapped_column(Enum(PaymentSource), nullable=False, index=True)
 
     # Links
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True, index=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), nullable=True, index=True)
 
     # Payment details
-    receipt_number = Column(String(100), nullable=True, index=True)
-    amount = Column(Numeric(12, 2), nullable=False)
-    currency = Column(String(10), default="NGN")
+    receipt_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    amount: Mapped[Decimal] = mapped_column(nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")
 
     # Method & Status
-    payment_method = Column(Enum(PaymentMethod), default=PaymentMethod.BANK_TRANSFER)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.COMPLETED, index=True)
+    payment_method: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), default=PaymentMethod.BANK_TRANSFER)
+    status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.COMPLETED, index=True)
 
     # Transaction reference
-    transaction_reference = Column(String(255), nullable=True)
-    gateway_reference = Column(String(255), nullable=True)
+    transaction_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    gateway_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Dates
-    payment_date = Column(DateTime, nullable=False, index=True)
+    payment_date: Mapped[datetime] = mapped_column(nullable=False, index=True)
 
     # Notes
-    notes = Column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Sync metadata
-    last_synced_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer = relationship("Customer", back_populates="payments")
-    invoice = relationship("Invoice", back_populates="payments")
+    customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
+    invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Payment {self.receipt_number} - {self.amount} {self.currency}>"

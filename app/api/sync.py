@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
-from datetime import datetime
+from typing import Dict, Any, Optional, List
 import asyncio
 import structlog
 
@@ -9,23 +10,47 @@ from app.database import get_db, SessionLocal
 from app.sync.splynx import SplynxSync
 from app.sync.erpnext import ERPNextSync
 from app.sync.chatwoot import ChatwootSync
-from app.models.sync_log import SyncLog, SyncSource, SyncStatus
+from app.models.sync_log import SyncLog, SyncSource
+from app.config import settings
 
 logger = structlog.get_logger()
 router = APIRouter()
 
+# Check if Celery is available
+_celery_available = False
+try:
+    from app.tasks.sync_tasks import (
+        sync_splynx_customers,
+        sync_splynx_invoices,
+        sync_splynx_payments,
+        sync_splynx_services,
+        sync_splynx_all,
+        sync_splynx_credit_notes,
+        sync_splynx_tickets,
+        sync_splynx_tariffs,
+        sync_splynx_routers,
+        sync_erpnext_all,
+        sync_chatwoot_all,
+    )
+    _celery_available = bool(settings.redis_url)
+except ImportError:
+    pass
+
 
 def run_sync_in_background(sync_class, full_sync: bool, source_name: str):
-    """Run sync in background with its own database session."""
+    """Run sync in background with its own database session.
+
+    Fallback for when Celery is not available.
+    """
     async def _run():
         db = SessionLocal()
         try:
-            logger.info(f"background_sync_started", source=source_name, full_sync=full_sync)
+            logger.info("background_sync_started", source=source_name, full_sync=full_sync)
             sync_client = sync_class(db)
             await sync_client.sync_all(full_sync=full_sync)
-            logger.info(f"background_sync_completed", source=source_name)
+            logger.info("background_sync_completed", source=source_name)
         except Exception as e:
-            logger.error(f"background_sync_failed", source=source_name, error=str(e))
+            logger.error("background_sync_failed", source=source_name, error=str(e))
         finally:
             db.close()
 
@@ -63,7 +88,20 @@ async def get_sync_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "status": "never_synced",
             }
 
-    return status
+    # Add Celery status as separate dict entries
+    celery_status: Dict[str, Any] = {
+        "celery_enabled": _celery_available,
+        "celery_workers": 0,
+    }
+    if _celery_available:
+        try:
+            from app.worker import celery_app
+            ping = celery_app.control.ping(timeout=1.0)
+            celery_status["celery_workers"] = len(ping)
+        except Exception:
+            pass
+
+    return {**status, **celery_status}
 
 
 @router.post("/test-connections")
@@ -84,60 +122,354 @@ async def test_all_connections(db: Session = Depends(get_db)) -> Dict[str, bool]
 
 
 @router.post("/splynx")
-async def sync_splynx(full_sync: bool = False) -> Dict[str, str]:
-    """Trigger Splynx sync."""
-    run_sync_in_background(SplynxSync, full_sync, "splynx")
-    return {"message": "Splynx sync started", "full_sync": full_sync}
+async def trigger_splynx_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx sync.
+
+    If Celery is available, enqueues the task. Otherwise falls back to asyncio.
+    """
+    if _celery_available:
+        task = sync_splynx_all.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        run_sync_in_background(SplynxSync, full_sync, "splynx")
+        return {
+            "message": "Splynx sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/customers")
+async def trigger_splynx_customers_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx customers sync only."""
+    if _celery_available:
+        task = sync_splynx_customers.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx customers sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        # Fallback to direct execution
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_customers_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_customers_sync")
+        return {
+            "message": "Splynx customers sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/invoices")
+async def trigger_splynx_invoices_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx invoices sync only."""
+    if _celery_available:
+        task = sync_splynx_invoices.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx invoices sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_invoices_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_invoices_sync")
+        return {
+            "message": "Splynx invoices sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/payments")
+async def trigger_splynx_payments_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx payments sync only."""
+    if _celery_available:
+        task = sync_splynx_payments.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx payments sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_payments_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_payments_sync")
+        return {
+            "message": "Splynx payments sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/services")
+async def trigger_splynx_services_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx services sync only."""
+    if _celery_available:
+        task = sync_splynx_services.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx services sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_services_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_services_sync")
+        return {
+            "message": "Splynx services sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/credit-notes")
+async def trigger_splynx_credit_notes_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx credit notes sync only."""
+    if _celery_available:
+        task = sync_splynx_credit_notes.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx credit notes sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_credit_notes_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_credit_notes_sync")
+        return {
+            "message": "Splynx credit notes sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/tickets")
+async def trigger_splynx_tickets_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx tickets sync only."""
+    if _celery_available:
+        task = sync_splynx_tickets.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx tickets sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_tickets_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_tickets_sync")
+        return {
+            "message": "Splynx tickets sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/tariffs")
+async def trigger_splynx_tariffs_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx tariffs sync only."""
+    if _celery_available:
+        task = sync_splynx_tariffs.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx tariffs sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_tariffs_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_tariffs_sync")
+        return {
+            "message": "Splynx tariffs sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.post("/splynx/routers")
+async def trigger_splynx_routers_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger Splynx routers sync only."""
+    if _celery_available:
+        task = sync_splynx_routers.delay(full_sync=full_sync)
+        return {
+            "message": "Splynx routers sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                await sync_client.sync_routers_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="splynx_routers_sync")
+        return {
+            "message": "Splynx routers sync started",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
 
 
 @router.post("/erpnext")
-async def sync_erpnext(full_sync: bool = False) -> Dict[str, str]:
+async def trigger_erpnext_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger ERPNext sync."""
-    run_sync_in_background(ERPNextSync, full_sync, "erpnext")
-    return {"message": "ERPNext sync started", "full_sync": full_sync}
+    if _celery_available:
+        task = sync_erpnext_all.delay(full_sync=full_sync)
+        return {
+            "message": "ERPNext sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        run_sync_in_background(ERPNextSync, full_sync, "erpnext")
+        return {"message": "ERPNext sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
 @router.post("/chatwoot")
-async def sync_chatwoot(full_sync: bool = False) -> Dict[str, str]:
+async def trigger_chatwoot_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Chatwoot sync."""
-    run_sync_in_background(ChatwootSync, full_sync, "chatwoot")
-    return {"message": "Chatwoot sync started", "full_sync": full_sync}
+    if _celery_available:
+        task = sync_chatwoot_all.delay(full_sync=full_sync)
+        return {
+            "message": "Chatwoot sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        run_sync_in_background(ChatwootSync, full_sync, "chatwoot")
+        return {"message": "Chatwoot sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
 @router.post("/all")
-async def sync_all(full_sync: bool = False) -> Dict[str, str]:
+async def trigger_all_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger sync for all sources."""
-    async def run_all_syncs():
-        db = SessionLocal()
-        try:
-            logger.info("full_sync_started", full_sync=full_sync)
+    if _celery_available:
+        # Enqueue Splynx sync via Celery
+        task = sync_splynx_all.delay(full_sync=full_sync)
 
-            # Sync in order: Splynx first (master customer data), then ERPNext, then Chatwoot
-            splynx = SplynxSync(db)
-            await splynx.sync_all(full_sync=full_sync)
+        # For ERPNext and Chatwoot, use asyncio fallback for now
+        run_sync_in_background(ERPNextSync, full_sync, "erpnext")
+        run_sync_in_background(ChatwootSync, full_sync, "chatwoot")
 
-            erpnext = ERPNextSync(db)
-            await erpnext.sync_all(full_sync=full_sync)
+        return {
+            "message": "Full sync started for all sources",
+            "splynx_task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery+asyncio",
+        }
+    else:
+        # Fallback to asyncio for all
+        async def run_all_syncs():
+            db = SessionLocal()
+            try:
+                logger.info("full_sync_started", full_sync=full_sync)
 
-            chatwoot = ChatwootSync(db)
-            await chatwoot.sync_all(full_sync=full_sync)
+                # Sync in order: Splynx first (master customer data), then ERPNext, then Chatwoot
+                splynx = SplynxSync(db)
+                await splynx.sync_all(full_sync=full_sync)
 
-            logger.info("full_sync_completed")
-        except Exception as e:
-            logger.error("full_sync_failed", error=str(e))
-        finally:
-            db.close()
+                erpnext = ERPNextSync(db)
+                await erpnext.sync_all(full_sync=full_sync)
 
-    asyncio.create_task(run_all_syncs(), name="full_sync_all_sources")
-    return {"message": "Full sync started for all sources", "full_sync": full_sync}
+                chatwoot = ChatwootSync(db)
+                await chatwoot.sync_all(full_sync=full_sync)
+
+                logger.info("full_sync_completed")
+            except Exception as e:
+                logger.error("full_sync_failed", error=str(e))
+            finally:
+                db.close()
+
+        asyncio.create_task(run_all_syncs(), name="full_sync_all_sources")
+        return {
+            "message": "Full sync started for all sources",
+            "full_sync": full_sync,
+            "backend": "asyncio",
+        }
+
+
+@router.get("/task/{task_id}")
+async def get_task_status(task_id: str) -> Dict[str, Any]:
+    """Get status of a Celery task by ID."""
+    if not _celery_available:
+        raise HTTPException(status_code=503, detail="Celery not available")
+
+    from app.worker import celery_app
+    result = celery_app.AsyncResult(task_id)
+
+    response = {
+        "task_id": task_id,
+        "status": result.status,
+    }
+
+    if result.ready():
+        if result.successful():
+            response["result"] = result.result
+        else:
+            response["error"] = str(result.result)
+
+    return response
 
 
 @router.get("/logs")
 async def get_sync_logs(
-    source: str = None,
+    source: Optional[str] = None,
     limit: int = 50,
     db: Session = Depends(get_db),
-) -> list:
+) -> List[Dict[str, Any]]:
     """Get recent sync logs."""
     query = db.query(SyncLog).order_by(SyncLog.started_at.desc())
 

@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "dotmac-insights"
+version = "0.1.0"
+description = "Business intelligence dashboard for Dotmac Technologies"
+authors = ["Dotmac Technologies"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+python-multipart = "^0.0.6"
+sqlalchemy = "^2.0.25"
+psycopg = {extras = ["binary"], version = "^3.1.0"}
+alembic = "^1.13.1"
+pydantic-settings = "^2.1.0"
+httpx = "^0.26.0"
+structlog = "^24.1.0"
+tenacity = "^8.2.3"
+python-dateutil = "^2.8.2"
+celery = {extras = ["redis"], version = "^5.3.0"}
+redis = "^5.0.0"
+gunicorn = "^23.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.23.0"
+black = "^24.1.0"
+ruff = "^0.1.14"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+strict_optional = true
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true

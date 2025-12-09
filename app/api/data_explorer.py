@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, inspect
+from sqlalchemy import func, inspect
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -14,6 +16,7 @@ from app.models.pop import Pop
 from app.models.employee import Employee
 from app.models.expense import Expense
 from app.models.sync_log import SyncLog
+from app.models.credit_note import CreditNote
 
 router = APIRouter()
 
@@ -29,6 +32,7 @@ TABLES = {
     "employees": Employee,
     "expenses": Expense,
     "sync_logs": SyncLog,
+    "credit_notes": CreditNote,
 }
 
 
@@ -162,6 +166,15 @@ async def get_table_stats(
         total_paid = db.query(func.sum(Invoice.amount_paid)).scalar()
         stats["total_invoiced"] = float(total_amount or 0)
         stats["total_paid"] = float(total_paid or 0)
+    elif table_name == "credit_notes":
+        stats["by_status"] = {
+            row.status.value: row.count
+            for row in db.query(CreditNote.status, func.count(CreditNote.id).label("count"))
+            .group_by(CreditNote.status)
+            .all()
+        }
+        total_amount = db.query(func.sum(CreditNote.amount)).scalar()
+        stats["total_credit_notes"] = float(total_amount or 0)
 
     elif table_name == "payments":
         stats["by_method"] = {
@@ -189,8 +202,8 @@ async def get_table_stats(
         }
 
     elif table_name == "pops":
-        stats["active"] = db.query(Pop).filter(Pop.is_active == True).count()
-        stats["inactive"] = db.query(Pop).filter(Pop.is_active == False).count()
+        stats["active"] = db.query(Pop).filter(Pop.is_active.is_(True)).count()
+        stats["inactive"] = db.query(Pop).filter(Pop.is_active.is_(False)).count()
 
     elif table_name == "employees":
         stats["by_department"] = {
@@ -327,7 +340,7 @@ async def search_all(
         {
             "id": inv.id,
             "invoice_number": inv.invoice_number,
-            "total_amount": float(inv.total_amount),
+            "total_amount": str(inv.total_amount),
             "status": inv.status.value,
         }
         for inv in invoices
@@ -375,7 +388,7 @@ async def search_all(
     return results
 
 
-def _apply_filters(query, model, filters: Dict[str, Any]):
+def _apply_filters(query: Any, model: Any, filters: Optional[Dict[str, Any]]) -> Any:
     """Apply filters to a query, handling both simple values and operator dicts."""
     if not filters:
         return query

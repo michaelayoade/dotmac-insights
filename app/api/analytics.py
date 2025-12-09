@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from datetime import datetime, timedelta
 
 from app.database import get_db
@@ -11,12 +13,11 @@ from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.pop import Pop
-from app.models.employee import Employee
 
 router = APIRouter()
 
 
-def _get_active_currencies(db: Session, filters: List = None) -> set:
+def _get_active_currencies(db: Session, filters: Optional[List[Any]] = None) -> set[str]:
     """Return distinct currencies for active subscriptions after filters."""
     query = (
         db.query(Subscription.currency)
@@ -49,7 +50,7 @@ def _resolve_currency(db: Session, filters: List, currency: Optional[str]) -> Op
     return currencies.pop() if currencies else None
 
 
-def calculate_mrr(db: Session, filters: List = None, currency: Optional[str] = None) -> float:
+def calculate_mrr(db: Session, filters: Optional[List[Any]] = None, currency: Optional[str] = None) -> float:
     """
     Calculate Monthly Recurring Revenue normalized by billing cycle and currency.
 
@@ -116,7 +117,7 @@ async def get_overview(
     overdue_invoices = db.query(Invoice).filter(Invoice.status == InvoiceStatus.OVERDUE).count()
 
     # POP count
-    pop_count = db.query(Pop).filter(Pop.is_active == True).count()
+    pop_count = db.query(Pop).filter(Pop.is_active.is_(True)).count()
 
     return {
         "customers": {
@@ -230,7 +231,7 @@ async def get_pop_performance(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get performance metrics by POP."""
-    pops = db.query(Pop).filter(Pop.is_active == True).all()
+    pops = db.query(Pop).filter(Pop.is_active.is_(True)).all()
 
     # Guard against mixed currencies globally unless caller specifies which to use
     _resolve_currency(db, [], currency)
@@ -293,7 +294,7 @@ async def get_pop_performance(
         })
 
     # Sort by MRR descending
-    results.sort(key=lambda x: x["mrr"], reverse=True)
+    results.sort(key=lambda x: cast(float, x.get("mrr", 0.0)), reverse=True)
 
     return results
 
@@ -366,19 +367,17 @@ async def get_support_metrics(
 @router.get("/invoices/aging")
 async def get_invoice_aging(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get invoice aging report."""
-    now = datetime.utcnow()
-
     # Get unpaid invoices
     unpaid = db.query(Invoice).filter(
         Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
     ).all()
 
-    aging = {
-        "current": {"count": 0, "amount": 0},
-        "1_30_days": {"count": 0, "amount": 0},
-        "31_60_days": {"count": 0, "amount": 0},
-        "61_90_days": {"count": 0, "amount": 0},
-        "over_90_days": {"count": 0, "amount": 0},
+    aging: Dict[str, Dict[str, float]] = {
+        "current": {"count": 0.0, "amount": 0.0},
+        "1_30_days": {"count": 0.0, "amount": 0.0},
+        "31_60_days": {"count": 0.0, "amount": 0.0},
+        "61_90_days": {"count": 0.0, "amount": 0.0},
+        "over_90_days": {"count": 0.0, "amount": 0.0},
     }
 
     for inv in unpaid:

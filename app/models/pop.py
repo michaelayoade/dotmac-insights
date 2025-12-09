@@ -1,7 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from sqlalchemy import String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from typing import Optional, List, TYPE_CHECKING
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.customer import Customer
+    from app.models.expense import Expense
 
 
 class Pop(Base):
@@ -9,31 +16,32 @@ class Pop(Base):
 
     __tablename__ = "pops"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # External IDs
-    splynx_id = Column(Integer, unique=True, index=True, nullable=True)
+    splynx_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
     # Basic info
-    name = Column(String(255), nullable=False)
-    code = Column(String(50), nullable=True)  # Short code like "LKI" for Lekki
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Location
-    address = Column(Text, nullable=True)
-    city = Column(String(100), nullable=True)
-    state = Column(String(100), nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(nullable=True)
 
     # Status
-    is_active = Column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customers = relationship("Customer", back_populates="pop")
+    customers: Mapped[List[Customer]] = relationship(back_populates="pop")
+    expenses: Mapped[List[Expense]] = relationship(back_populates="pop")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Pop {self.name}>"

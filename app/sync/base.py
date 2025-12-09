@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, List, Callable
 import structlog
 from sqlalchemy.orm import Session
 from app.models.sync_log import SyncLog, SyncStatus, SyncSource
@@ -11,7 +13,7 @@ logger = structlog.get_logger()
 class BaseSyncClient(ABC):
     """Base class for all sync integrations."""
 
-    source: SyncSource = None
+    source: SyncSource
 
     def __init__(self, db: Session):
         self.db = db
@@ -53,7 +55,7 @@ class BaseSyncClient(ABC):
                 duration_seconds=self.current_sync_log.duration_seconds,
             )
 
-    def fail_sync(self, error_message: str, error_details: str = None):
+    def fail_sync(self, error_message: str, error_details: Optional[str] = None) -> None:
         """Mark the current sync as failed."""
         if self.current_sync_log:
             self.current_sync_log.fail(error_message, error_details)
@@ -81,6 +83,39 @@ class BaseSyncClient(ABC):
     def increment_failed(self, count: int = 1):
         if self.current_sync_log:
             self.current_sync_log.records_failed += count
+
+    def flush_batch(self):
+        """Commit current batch to reduce transaction size."""
+        self.db.commit()
+
+    def process_in_batches(self, items: List[Any], processor: Callable[[Any], Optional[str]], batch_size: int = 500) -> None:
+        """Process items in batches with periodic commits.
+
+        Args:
+            items: List of items to process
+            processor: Function to call for each item, should return 'created', 'updated', or 'failed'
+            batch_size: Number of items to process before committing
+        """
+        for i, item in enumerate(items, 1):
+            try:
+                result = processor(item)
+                if result == "created":
+                    self.increment_created()
+                elif result == "updated":
+                    self.increment_updated()
+                elif result == "failed":
+                    self.increment_failed()
+            except Exception as e:
+                logger.warning("batch_item_failed", error=str(e), item_index=i)
+                self.increment_failed()
+
+            # Commit every batch_size items
+            if i % batch_size == 0:
+                self.db.commit()
+                logger.debug("batch_committed", processed=i, total=len(items))
+
+        # Final commit for remaining items
+        self.db.commit()
 
     @abstractmethod
     async def test_connection(self) -> bool:

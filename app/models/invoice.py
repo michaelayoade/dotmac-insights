@@ -1,8 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Enum, Text
-from sqlalchemy.orm import relationship
+from __future__ import annotations
+
+from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from decimal import Decimal
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.customer import Customer
+    from app.models.payment import Payment
+    from app.models.credit_note import CreditNote
 
 
 class InvoiceStatus(enum.Enum):
@@ -25,51 +34,52 @@ class Invoice(Base):
 
     __tablename__ = "invoices"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # External IDs
-    splynx_id = Column(Integer, index=True, nullable=True)
-    erpnext_id = Column(String(255), index=True, nullable=True)
+    splynx_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
 
     # Source system
-    source = Column(Enum(InvoiceSource), nullable=False, index=True)
+    source: Mapped[InvoiceSource] = mapped_column(Enum(InvoiceSource), nullable=False, index=True)
 
     # Customer link
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
 
     # Invoice details
-    invoice_number = Column(String(100), nullable=True, index=True)
-    description = Column(Text, nullable=True)
+    invoice_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Amounts
-    amount = Column(Numeric(12, 2), nullable=False)
-    tax_amount = Column(Numeric(12, 2), default=0)
-    total_amount = Column(Numeric(12, 2), nullable=False)
-    amount_paid = Column(Numeric(12, 2), default=0)
-    balance = Column(Numeric(12, 2), nullable=True)
-    currency = Column(String(10), default="NGN")
+    amount: Mapped[Decimal] = mapped_column(nullable=False)
+    tax_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    total_amount: Mapped[Decimal] = mapped_column(nullable=False)
+    amount_paid: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    balance: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")
 
     # Status
-    status = Column(Enum(InvoiceStatus), default=InvoiceStatus.PENDING, index=True)
+    status: Mapped[InvoiceStatus] = mapped_column(Enum(InvoiceStatus), default=InvoiceStatus.PENDING, index=True)
 
     # Dates
-    invoice_date = Column(DateTime, nullable=False, index=True)
-    due_date = Column(DateTime, nullable=True)
-    paid_date = Column(DateTime, nullable=True)
+    invoice_date: Mapped[datetime] = mapped_column(nullable=False, index=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    paid_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Categorization
-    category = Column(String(100), nullable=True)  # e.g., "Internet", "Installation", "Equipment"
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Sync metadata
-    last_synced_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer = relationship("Customer", back_populates="invoices")
-    payments = relationship("Payment", back_populates="invoice")
+    customer: Mapped[Optional[Customer]] = relationship(back_populates="invoices")
+    payments: Mapped[List[Payment]] = relationship(back_populates="invoice")
+    credit_notes: Mapped[List[CreditNote]] = relationship(back_populates="invoice")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Invoice {self.invoice_number} - {self.total_amount} {self.currency}>"
 
     @property

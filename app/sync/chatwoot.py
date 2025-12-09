@@ -1,15 +1,17 @@
+from __future__ import annotations
+
 import httpx
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List, Optional
 import structlog
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
 from app.sync.base import BaseSyncClient
-from app.models.sync_log import SyncSource, SyncStatus
+from app.models.sync_log import SyncSource
 from app.models.customer import Customer
-from app.models.conversation import Conversation, Message, ConversationStatus, ConversationPriority
+from app.models.conversation import Conversation, Message, ConversationStatus
 
 logger = structlog.get_logger()
 
@@ -38,8 +40,8 @@ class ChatwootSync(BaseSyncClient):
         client: httpx.AsyncClient,
         method: str,
         endpoint: str,
-        params: Dict = None,
-        json: Dict = None,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Make authenticated request to Chatwoot API."""
         response = await client.request(
@@ -57,8 +59,8 @@ class ChatwootSync(BaseSyncClient):
         client: httpx.AsyncClient,
         endpoint: str,
         data_key: str = "data",
-        params: Dict = None,
-    ) -> List[Dict]:
+        params: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
         """Fetch all records with pagination."""
         all_records = []
         page = 1
@@ -108,6 +110,16 @@ class ChatwootSync(BaseSyncClient):
             await self.sync_contacts(client, full_sync)
             await self.sync_conversations(client, full_sync)
 
+    async def sync_contacts_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Contacts with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_contacts(client, full_sync)
+
+    async def sync_conversations_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Conversations with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_conversations(client, full_sync)
+
     async def sync_contacts(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync contacts from Chatwoot and link to customers."""
         self.start_sync("contacts", "full" if full_sync else "incremental")
@@ -125,7 +137,7 @@ class ChatwootSync(BaseSyncClient):
                 # Try to find matching customer
                 email = contact_data.get("email")
                 phone = contact_data.get("phone_number")
-                name = contact_data.get("name", "")
+                _name = contact_data.get("name", "")  # Available for future use
 
                 customer = None
 
@@ -275,7 +287,8 @@ class ChatwootSync(BaseSyncClient):
                     self.increment_created()
 
                 # Sync messages for this conversation
-                await self._sync_conversation_messages(client, chatwoot_id)
+                if chatwoot_id is not None:
+                    await self._sync_conversation_messages(client, chatwoot_id)
 
             self.db.commit()
             self.complete_sync()

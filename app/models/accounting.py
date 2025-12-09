@@ -1,0 +1,254 @@
+from __future__ import annotations
+
+from sqlalchemy import String, Text, Enum
+from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+from decimal import Decimal
+from typing import Optional
+import enum
+from app.database import Base
+
+
+# ============= BANK ACCOUNT =============
+class BankAccount(Base):
+    """Bank accounts from ERPNext."""
+
+    __tablename__ = "bank_accounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    account_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    bank: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    bank_account_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")
+
+    is_company_account: Mapped[bool] = mapped_column(default=True)
+    is_default: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<BankAccount {self.account_name} - {self.bank}>"
+
+
+# ============= JOURNAL ENTRY =============
+class JournalEntryType(enum.Enum):
+    JOURNAL_ENTRY = "journal_entry"
+    BANK_ENTRY = "bank_entry"
+    CASH_ENTRY = "cash_entry"
+    CREDIT_CARD_ENTRY = "credit_card_entry"
+    DEBIT_NOTE = "debit_note"
+    CREDIT_NOTE = "credit_note"
+    CONTRA_ENTRY = "contra_entry"
+    EXCISE_ENTRY = "excise_entry"
+    WRITE_OFF_ENTRY = "write_off_entry"
+    OPENING_ENTRY = "opening_entry"
+    DEPRECIATION_ENTRY = "depreciation_entry"
+    EXCHANGE_RATE_REVALUATION = "exchange_rate_revaluation"
+
+
+class JournalEntry(Base):
+    """Journal entries from ERPNext for double-entry bookkeeping."""
+
+    __tablename__ = "journal_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+
+    voucher_type: Mapped[JournalEntryType] = mapped_column(Enum(JournalEntryType), default=JournalEntryType.JOURNAL_ENTRY)
+    posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    total_debit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    total_credit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+
+    cheque_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    cheque_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    user_remark: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    is_opening: Mapped[bool] = mapped_column(default=False)
+    docstatus: Mapped[int] = mapped_column(default=0)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<JournalEntry {self.erpnext_id} - {self.total_debit}>"
+
+
+# ============= PURCHASE INVOICE =============
+class PurchaseInvoiceStatus(enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    PAID = "paid"
+    UNPAID = "unpaid"
+    OVERDUE = "overdue"
+    CANCELLED = "cancelled"
+    RETURN = "return"
+
+
+class PurchaseInvoice(Base):
+    """Purchase invoices from ERPNext (vendor bills)."""
+
+    __tablename__ = "purchase_invoices"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+
+    supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    supplier_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    grand_total: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    outstanding_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    paid_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")
+
+    status: Mapped[PurchaseInvoiceStatus] = mapped_column(Enum(PurchaseInvoiceStatus), default=PurchaseInvoiceStatus.DRAFT)
+    docstatus: Mapped[int] = mapped_column(default=0)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<PurchaseInvoice {self.erpnext_id} - {self.supplier_name}>"
+
+
+# ============= GL ENTRY (General Ledger) =============
+class GLEntry(Base):
+    """General Ledger entries from ERPNext - the core of double-entry accounting."""
+
+    __tablename__ = "gl_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+
+    posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    party_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    party: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    debit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    credit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    debit_in_account_currency: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    credit_in_account_currency: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+
+    voucher_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    voucher_no: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+
+    cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    fiscal_year: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    is_cancelled: Mapped[bool] = mapped_column(default=False)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<GLEntry {self.erpnext_id} - {self.account}>"
+
+
+# ============= CHART OF ACCOUNTS =============
+class AccountType(enum.Enum):
+    ASSET = "asset"
+    LIABILITY = "liability"
+    EQUITY = "equity"
+    INCOME = "income"
+    EXPENSE = "expense"
+
+
+class Account(Base):
+    """Chart of accounts from ERPNext."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    account_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    account_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    parent_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    root_type: Mapped[Optional[AccountType]] = mapped_column(Enum(AccountType), nullable=True)
+    account_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_group: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False)
+
+    balance_must_be: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Account {self.account_name}>"
+
+
+# ============= BANK TRANSACTION =============
+class BankTransactionStatus(enum.Enum):
+    PENDING = "pending"
+    SETTLED = "settled"
+    UNRECONCILED = "unreconciled"
+    RECONCILED = "reconciled"
+    CANCELLED = "cancelled"
+
+
+class BankTransaction(Base):
+    """Bank transactions from ERPNext - imported bank statement lines."""
+
+    __tablename__ = "bank_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+
+    date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    status: Mapped[BankTransactionStatus] = mapped_column(Enum(BankTransactionStatus), default=BankTransactionStatus.PENDING)
+    bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    deposit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    withdrawal: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")
+
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reference_number: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    transaction_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    transaction_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Reconciliation
+    allocated_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    unallocated_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+
+    # Party info (from bank statement)
+    party_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    party: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    bank_party_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    bank_party_account_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    bank_party_iban: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    docstatus: Mapped[int] = mapped_column(default=0)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"

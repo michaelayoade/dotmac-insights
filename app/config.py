@@ -1,11 +1,10 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, List
-import secrets
 
 
 class Settings(BaseSettings):
-    # Database
-    database_url: str = "postgresql://user:password@localhost:5432/dotmac_insights"
+    # Database (uses psycopg3 driver)
+    database_url: str = "postgresql+psycopg://user:password@localhost:5432/dotmac_insights"
 
     # API Security
     api_key: str = ""  # Required for production - set via environment variable

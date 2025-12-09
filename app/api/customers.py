@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from sqlalchemy import or_
+from typing import Dict, Any, Optional
+from datetime import datetime
 
 from app.database import get_db
 from app.models.customer import Customer, CustomerStatus, CustomerType
-from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.invoice import Invoice, InvoiceStatus
+from app.models.subscription import Subscription
+from app.models.invoice import Invoice
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.pop import Pop
 

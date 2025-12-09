@@ -24,12 +24,12 @@ Unified data platform for Dotmac Technologies - aggregating data from Splynx, ER
 # Clone and enter directory
 cd dotmac-insights
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+# Add poetry to PATH if needed: export PATH="$HOME/.local/bin:$PATH"
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (no dev)
+poetry install --only main
 
 # Copy environment file and configure
 cp .env.example .env
@@ -41,18 +41,18 @@ cp .env.example .env
 Edit `.env` with your credentials:
 
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/dotmac_insights
+# Database (psycopg3 driver)
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/dotmac_insights
 
-# API Security
-# Required in production; used for all /api/* routes via X-API-Key or api_key query param
+# API Security (required in prod)
 API_KEY=replace_me_in_prod
 ENVIRONMENT=development  # development, staging, production
-# Comma-separated list; required in production to allow browser apps
 CORS_ORIGINS=http://localhost:3000
 
-# Splynx API
+# Splynx API (Basic auth recommended: base64 of "key:secret")
 SPLYNX_API_URL=https://your-splynx.com/api/2.0
+SPLYNX_AUTH_BASIC=base64_key_secret
+# or token auth:
 SPLYNX_API_KEY=your_key
 SPLYNX_API_SECRET=your_secret
 
@@ -65,37 +65,40 @@ ERPNEXT_API_SECRET=your_secret
 CHATWOOT_API_URL=https://your-chatwoot.com/api/v1
 CHATWOOT_API_TOKEN=your_token
 CHATWOOT_ACCOUNT_ID=1
+
+# Redis (required for Celery workers/beat; unset = asyncio fallback)
+REDIS_URL=redis://localhost:6379/0
 ```
 
 ### 4. Initialize Database
 
 ```bash
-# Create database tables
-python cli.py init-db
+# Create database tables (run migrations)
+poetry run alembic upgrade head
 ```
 
 ### 5. Test Connections
 
 ```bash
-python cli.py test-connections
+poetry run python cli.py test-connections
 ```
 
 ### 6. Run Initial Sync
 
 ```bash
 # Sync all sources (full sync)
-python cli.py sync all --full
+poetry run python cli.py sync all --full
 
 # Or sync individually
-python cli.py sync splynx --full
-python cli.py sync erpnext --full
-python cli.py sync chatwoot --full
+poetry run python cli.py sync splynx --full
+poetry run python cli.py sync erpnext --full
+poetry run python cli.py sync chatwoot --full
 ```
 
 ### 7. Start the API Server
 
 ```bash
-uvicorn app.main:app --reload
+poetry run uvicorn app.main:app --reload
 ```
 
 Access the API at: http://localhost:8000  
@@ -107,8 +110,8 @@ Auth: click **Authorize** in Swagger UI and enter your API key in `X-API-Key` (o
 ## Using Docker
 
 ```bash
-# Start all services (PostgreSQL, Redis, API)
-docker-compose up -d
+# Start all services (PostgreSQL, Redis, API, Celery worker, Celery beat)
+docker-compose up -d --build
 
 # View logs
 docker-compose logs -f api
@@ -118,11 +121,17 @@ docker-compose logs -f api
 
 ### Sync Management
 
-- `POST /api/sync/all` - Sync all sources
-- `POST /api/sync/splynx` - Sync Splynx
-- `POST /api/sync/erpnext` - Sync ERPNext
-- `POST /api/sync/chatwoot` - Sync Chatwoot
-- `GET /api/sync/status` - Get sync status
+- `POST /api/sync/all` - Sync all sources (Splynx via Celery if available; ERPNext/Chatwoot enqueued if Celery is on)
+- `POST /api/sync/splynx` - Full Splynx sync
+- `POST /api/sync/splynx/customers` - Customers only
+- `POST /api/sync/splynx/invoices` - Invoices only
+- `POST /api/sync/splynx/payments` - Payments only
+- `POST /api/sync/splynx/services` - Services only
+- `POST /api/sync/splynx/credit-notes` - Credit notes only
+- `POST /api/sync/erpnext` - ERPNext full sync (Celery if available)
+- `POST /api/sync/chatwoot` - Chatwoot full sync (Celery if available)
+- `GET /api/sync/task/{task_id}` - Check Celery task status
+- `GET /api/sync/status` - Get sync status (includes `celery_enabled` flag)
 - `GET /api/sync/logs` - View sync logs
 - `POST /api/sync/test-connections` - Test API connections
 
@@ -155,20 +164,20 @@ docker-compose logs -f api
 
 ```bash
 # Test connections
-python cli.py test-connections
+poetry run python cli.py test-connections
 
 # Sync data
-python cli.py sync all           # Incremental sync all
-python cli.py sync all --full    # Full sync all
-python cli.py sync splynx        # Sync Splynx only
-python cli.py sync erpnext       # Sync ERPNext only
-python cli.py sync chatwoot      # Sync Chatwoot only
+poetry run python cli.py sync all           # Incremental sync all
+poetry run python cli.py sync all --full    # Full sync all
+poetry run python cli.py sync splynx        # Sync Splynx only
+poetry run python cli.py sync erpnext       # Sync ERPNext only
+poetry run python cli.py sync chatwoot      # Sync Chatwoot only
 
 # View statistics
-python cli.py stats
+poetry run python cli.py stats
 
 # Initialize database
-python cli.py init-db
+poetry run alembic upgrade head
 ```
 
 ## Data Model

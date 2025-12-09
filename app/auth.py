@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader, APIKeyQuery
 from typing import Optional
 import secrets

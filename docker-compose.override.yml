@@ -1,0 +1,36 @@
+# Development overrides - automatically loaded by docker-compose
+# This file enables hot-reload and mounts source code for development
+#
+# Usage:
+#   docker-compose up              # Uses both files (dev mode)
+#   docker-compose -f docker-compose.yml up  # Production mode only
+
+services:
+  api:
+    # Override command to use uvicorn with --reload for development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Mount source code for hot-reload
+    volumes:
+      - ./app:/app/app:ro
+      - ./.env:/app/.env:ro
+    # Disable healthcheck in dev (faster startup)
+    healthcheck:
+      disable: true
+
+  celery_worker:
+    # Mount source code
+    volumes:
+      - ./app:/app/app:ro
+      - ./.env:/app/.env:ro
+    # Disable healthcheck in dev
+    healthcheck:
+      disable: true
+
+  celery_beat:
+    # Mount source code
+    volumes:
+      - ./app:/app/app:ro
+      - ./.env:/app/.env:ro
+    # Disable healthcheck in dev
+    healthcheck:
+      disable: true
