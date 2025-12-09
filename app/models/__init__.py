@@ -13,6 +13,10 @@ from app.models.project import Project
 from app.models.tariff import Tariff
 from app.models.router import Router
 from app.models.accounting import (
+    Supplier,
+    ModeOfPayment,
+    CostCenter,
+    FiscalYear,
     BankAccount,
     JournalEntry,
     PurchaseInvoice,
@@ -30,6 +34,26 @@ from app.models.transaction_category import TransactionCategory
 from app.models.ipv4_network import IPv4Network
 from app.models.ipv6_network import IPv6Network
 from app.models.payment_method import PaymentMethod
+from app.models.sales import (
+    SalesOrder,
+    SalesOrderStatus,
+    Quotation,
+    QuotationStatus,
+    ERPNextLead,
+    ERPNextLeadStatus,
+    Item,
+    CustomerGroup,
+    Territory,
+    SalesPerson,
+    ItemGroup,
+)
+from app.models.hr import (
+    Department,
+    HDTeam,
+    HDTeamMember,
+    Designation,
+    ERPNextUser,
+)
 
 __all__ = [
     "Customer",
@@ -47,6 +71,10 @@ __all__ = [
     "Project",
     "Tariff",
     "Router",
+    "Supplier",
+    "ModeOfPayment",
+    "CostCenter",
+    "FiscalYear",
     "BankAccount",
     "JournalEntry",
     "PurchaseInvoice",
@@ -63,4 +91,22 @@ __all__ = [
     "IPv4Network",
     "IPv6Network",
     "PaymentMethod",
+    # Sales models
+    "SalesOrder",
+    "SalesOrderStatus",
+    "Quotation",
+    "QuotationStatus",
+    "ERPNextLead",
+    "ERPNextLeadStatus",
+    "Item",
+    "CustomerGroup",
+    "Territory",
+    "SalesPerson",
+    "ItemGroup",
+    # HR models
+    "Department",
+    "HDTeam",
+    "HDTeamMember",
+    "Designation",
+    "ERPNextUser",
 ]

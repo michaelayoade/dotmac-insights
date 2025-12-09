@@ -37,6 +37,9 @@ const navigation: NavItem[] = [
   { name: 'Sync', href: '/sync', icon: RefreshCw },
 ];
 
+// Keys in sync status response that represent actual sync sources (have .status property)
+const SYNC_SOURCE_KEYS = ['splynx', 'erpnext', 'chatwoot'] as const;
+
 function SyncStatusIndicator() {
   const { data: status, error } = useSyncStatus();
 
@@ -58,7 +61,12 @@ function SyncStatusIndicator() {
     );
   }
 
-  const allSynced = Object.values(status).every(
+  // Filter to only sync source entries (exclude celery_enabled, celery_workers, etc.)
+  const syncSources = SYNC_SOURCE_KEYS
+    .filter((key) => status[key] && typeof status[key] === 'object' && 'status' in status[key])
+    .map((key) => status[key]);
+
+  const allSynced = syncSources.length === 0 || syncSources.every(
     (s) => s.status === 'completed' || s.status === 'never_synced'
   );
 
@@ -174,19 +182,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
+  // Load saved preference after hydration (avoids SSR mismatch)
   useEffect(() => {
-    setMounted(true);
     const saved = localStorage.getItem('sidebar_collapsed');
     if (saved) setCollapsed(JSON.parse(saved));
+    setHydrated(true);
   }, []);
 
+  // Persist collapsed state only after initial hydration
   useEffect(() => {
-    localStorage.setItem('sidebar_collapsed', JSON.stringify(collapsed));
-  }, [collapsed]);
-
-  if (!mounted) return null;
+    if (hydrated) {
+      localStorage.setItem('sidebar_collapsed', JSON.stringify(collapsed));
+    }
+  }, [collapsed, hydrated]);
 
   return (
     <div className="min-h-screen bg-slate-deep">

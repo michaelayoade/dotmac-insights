@@ -29,6 +29,31 @@ from app.models.accounting import (
     AccountType,
     BankTransaction,
     BankTransactionStatus,
+    Supplier,
+    ModeOfPayment,
+    PaymentModeType,
+    CostCenter,
+    FiscalYear,
+)
+from app.models.sales import (
+    SalesOrder,
+    SalesOrderStatus,
+    Quotation,
+    QuotationStatus,
+    ERPNextLead,
+    ERPNextLeadStatus,
+    Item,
+    CustomerGroup,
+    Territory,
+    SalesPerson,
+    ItemGroup,
+)
+from app.models.hr import (
+    Department,
+    HDTeam,
+    HDTeamMember,
+    Designation,
+    ERPNextUser,
 )
 
 logger = structlog.get_logger()
@@ -134,6 +159,21 @@ class ERPNextSync(BaseSyncClient):
             limit_start += limit_page_length
 
         return all_records
+
+    async def _fetch_document(
+        self,
+        client: httpx.AsyncClient,
+        doctype: str,
+        name: str,
+    ) -> Dict[str, Any]:
+        """Fetch a single document by name, including child tables."""
+        from urllib.parse import quote
+
+        # URL encode the document name to handle special characters
+        encoded_name = quote(name, safe="")
+        data = await self._request(client, "GET", f"/api/resource/{doctype}/{encoded_name}")
+        result: Dict[str, Any] = data.get("data", {})
+        return result
 
     async def test_connection(self) -> bool:
         """Test if ERPNext API connection is working."""
@@ -1743,3 +1783,1256 @@ class ERPNextSync(BaseSyncClient):
         """Wrapper for Celery task - syncs Bank Transactions with its own client."""
         async with httpx.AsyncClient(timeout=120) as client:
             await self.sync_bank_transactions(client, full_sync)
+
+    # ============= SUPPLIER SYNC =============
+
+    async def sync_suppliers(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync suppliers/vendors from ERPNext."""
+        self.start_sync("suppliers", "full" if full_sync else "incremental")
+
+        try:
+            suppliers = await self._fetch_all_doctype(
+                client,
+                "Supplier",
+                fields=["*"],
+            )
+
+            for sup_data in suppliers:
+                erpnext_id = sup_data.get("name")
+                existing = self.db.query(Supplier).filter(Supplier.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.supplier_name = sup_data.get("supplier_name", "")
+                    existing.supplier_group = sup_data.get("supplier_group")
+                    existing.supplier_type = sup_data.get("supplier_type")
+                    existing.country = sup_data.get("country")
+                    existing.default_currency = sup_data.get("default_currency", "NGN")
+                    existing.default_bank_account = sup_data.get("default_bank_account")
+                    existing.tax_id = sup_data.get("tax_id")
+                    existing.tax_withholding_category = sup_data.get("tax_withholding_category")
+                    existing.supplier_primary_contact = sup_data.get("supplier_primary_contact")
+                    existing.supplier_primary_address = sup_data.get("supplier_primary_address")
+                    existing.email_id = sup_data.get("email_id")
+                    existing.mobile_no = sup_data.get("mobile_no")
+                    existing.default_price_list = sup_data.get("default_price_list")
+                    existing.payment_terms = sup_data.get("payment_terms")
+                    existing.is_transporter = sup_data.get("is_transporter", 0) == 1
+                    existing.is_internal_supplier = sup_data.get("is_internal_supplier", 0) == 1
+                    existing.disabled = sup_data.get("disabled", 0) == 1
+                    existing.is_frozen = sup_data.get("is_frozen", 0) == 1
+                    existing.on_hold = sup_data.get("on_hold", 0) == 1
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    supplier = Supplier(
+                        erpnext_id=erpnext_id,
+                        supplier_name=sup_data.get("supplier_name", ""),
+                        supplier_group=sup_data.get("supplier_group"),
+                        supplier_type=sup_data.get("supplier_type"),
+                        country=sup_data.get("country"),
+                        default_currency=sup_data.get("default_currency", "NGN"),
+                        default_bank_account=sup_data.get("default_bank_account"),
+                        tax_id=sup_data.get("tax_id"),
+                        tax_withholding_category=sup_data.get("tax_withholding_category"),
+                        supplier_primary_contact=sup_data.get("supplier_primary_contact"),
+                        supplier_primary_address=sup_data.get("supplier_primary_address"),
+                        email_id=sup_data.get("email_id"),
+                        mobile_no=sup_data.get("mobile_no"),
+                        default_price_list=sup_data.get("default_price_list"),
+                        payment_terms=sup_data.get("payment_terms"),
+                        is_transporter=sup_data.get("is_transporter", 0) == 1,
+                        is_internal_supplier=sup_data.get("is_internal_supplier", 0) == 1,
+                        disabled=sup_data.get("disabled", 0) == 1,
+                        is_frozen=sup_data.get("is_frozen", 0) == 1,
+                        on_hold=sup_data.get("on_hold", 0) == 1,
+                    )
+                    self.db.add(supplier)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_suppliers_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Suppliers with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_suppliers(client, full_sync)
+
+    # ============= MODE OF PAYMENT SYNC =============
+
+    async def sync_modes_of_payment(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync payment modes from ERPNext (Cash, Bank Transfer, etc.)."""
+        self.start_sync("modes_of_payment", "full" if full_sync else "incremental")
+
+        try:
+            modes = await self._fetch_all_doctype(
+                client,
+                "Mode of Payment",
+                fields=["*"],
+            )
+
+            for mode_data in modes:
+                erpnext_id = mode_data.get("name")
+                existing = self.db.query(ModeOfPayment).filter(ModeOfPayment.erpnext_id == erpnext_id).first()
+
+                # Map type
+                type_str = (mode_data.get("type", "") or "").lower()
+                type_map = {
+                    "cash": PaymentModeType.CASH,
+                    "bank": PaymentModeType.BANK,
+                    "general": PaymentModeType.GENERAL,
+                }
+                payment_type = type_map.get(type_str, PaymentModeType.GENERAL)
+
+                if existing:
+                    existing.mode_of_payment = str(mode_data.get("mode_of_payment") or erpnext_id)
+                    existing.type = payment_type
+                    existing.enabled = mode_data.get("enabled", 1) == 1
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    mode = ModeOfPayment(
+                        erpnext_id=erpnext_id,
+                        mode_of_payment=mode_data.get("mode_of_payment", erpnext_id),
+                        type=payment_type,
+                        enabled=mode_data.get("enabled", 1) == 1,
+                    )
+                    self.db.add(mode)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_modes_of_payment_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Modes of Payment with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_modes_of_payment(client, full_sync)
+
+    # ============= COST CENTER SYNC =============
+
+    async def sync_cost_centers(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync cost centers from ERPNext for departmental accounting."""
+        self.start_sync("cost_centers", "full" if full_sync else "incremental")
+
+        try:
+            cost_centers = await self._fetch_all_doctype(
+                client,
+                "Cost Center",
+                fields=["*"],
+            )
+
+            for cc_data in cost_centers:
+                erpnext_id = cc_data.get("name")
+                existing = self.db.query(CostCenter).filter(CostCenter.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.cost_center_name = cc_data.get("cost_center_name", "")
+                    existing.cost_center_number = cc_data.get("cost_center_number")
+                    existing.parent_cost_center = cc_data.get("parent_cost_center")
+                    existing.company = cc_data.get("company")
+                    existing.is_group = cc_data.get("is_group", 0) == 1
+                    existing.disabled = cc_data.get("disabled", 0) == 1
+                    existing.lft = cc_data.get("lft")
+                    existing.rgt = cc_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    cost_center = CostCenter(
+                        erpnext_id=erpnext_id,
+                        cost_center_name=cc_data.get("cost_center_name", ""),
+                        cost_center_number=cc_data.get("cost_center_number"),
+                        parent_cost_center=cc_data.get("parent_cost_center"),
+                        company=cc_data.get("company"),
+                        is_group=cc_data.get("is_group", 0) == 1,
+                        disabled=cc_data.get("disabled", 0) == 1,
+                        lft=cc_data.get("lft"),
+                        rgt=cc_data.get("rgt"),
+                    )
+                    self.db.add(cost_center)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_cost_centers_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Cost Centers with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_cost_centers(client, full_sync)
+
+    # ============= FISCAL YEAR SYNC =============
+
+    async def sync_fiscal_years(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync fiscal years from ERPNext for accounting periods."""
+        self.start_sync("fiscal_years", "full" if full_sync else "incremental")
+
+        try:
+            fiscal_years = await self._fetch_all_doctype(
+                client,
+                "Fiscal Year",
+                fields=["*"],
+            )
+
+            for fy_data in fiscal_years:
+                erpnext_id = fy_data.get("name")
+                existing = self.db.query(FiscalYear).filter(FiscalYear.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.year = str(fy_data.get("year") or erpnext_id)
+                    existing.is_short_year = fy_data.get("is_short_year", 0) == 1
+                    existing.disabled = fy_data.get("disabled", 0) == 1
+                    existing.auto_created = fy_data.get("auto_created", 0) == 1
+                    existing.last_synced_at = datetime.utcnow()
+
+                    if fy_data.get("year_start_date"):
+                        try:
+                            existing.year_start_date = datetime.fromisoformat(fy_data["year_start_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if fy_data.get("year_end_date"):
+                        try:
+                            existing.year_end_date = datetime.fromisoformat(fy_data["year_end_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.increment_updated()
+                else:
+                    fiscal_year = FiscalYear(
+                        erpnext_id=erpnext_id,
+                        year=fy_data.get("year", erpnext_id),
+                        is_short_year=fy_data.get("is_short_year", 0) == 1,
+                        disabled=fy_data.get("disabled", 0) == 1,
+                        auto_created=fy_data.get("auto_created", 0) == 1,
+                    )
+
+                    if fy_data.get("year_start_date"):
+                        try:
+                            fiscal_year.year_start_date = datetime.fromisoformat(fy_data["year_start_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if fy_data.get("year_end_date"):
+                        try:
+                            fiscal_year.year_end_date = datetime.fromisoformat(fy_data["year_end_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.db.add(fiscal_year)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_fiscal_years_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Fiscal Years with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_fiscal_years(client, full_sync)
+
+    # ============= EXTENDED ACCOUNTING SYNC =============
+
+    async def sync_extended_accounting_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs all extended accounting data (Suppliers, Cost Centers, etc.)."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_suppliers(client, full_sync)
+            await self.sync_modes_of_payment(client, full_sync)
+            await self.sync_cost_centers(client, full_sync)
+            await self.sync_fiscal_years(client, full_sync)
+
+    # ============= SALES ORDER SYNC =============
+
+    async def sync_sales_orders(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync sales orders from ERPNext."""
+        self.start_sync("sales_orders", "full" if full_sync else "incremental")
+
+        try:
+            orders = await self._fetch_all_doctype(
+                client,
+                "Sales Order",
+                fields=["*"],
+            )
+
+            # Pre-fetch customers by erpnext_id for FK linking
+            customers_by_erpnext_id = {
+                c.erpnext_id: c.id
+                for c in self.db.query(Customer).filter(Customer.erpnext_id.isnot(None)).all()
+            }
+
+            batch_size = 500
+            for i, order_data in enumerate(orders, 1):
+                erpnext_id = order_data.get("name")
+                existing = self.db.query(SalesOrder).filter(SalesOrder.erpnext_id == erpnext_id).first()
+
+                # Map status
+                status_str = (order_data.get("status", "") or "").lower().replace(" ", "_")
+                status_map = {
+                    "draft": SalesOrderStatus.DRAFT,
+                    "to_deliver_and_bill": SalesOrderStatus.TO_DELIVER_AND_BILL,
+                    "to_bill": SalesOrderStatus.TO_BILL,
+                    "to_deliver": SalesOrderStatus.TO_DELIVER,
+                    "completed": SalesOrderStatus.COMPLETED,
+                    "cancelled": SalesOrderStatus.CANCELLED,
+                    "closed": SalesOrderStatus.CLOSED,
+                    "on_hold": SalesOrderStatus.ON_HOLD,
+                }
+                status = status_map.get(status_str, SalesOrderStatus.DRAFT)
+
+                # Link to customer
+                erpnext_customer = order_data.get("customer")
+                customer_id = customers_by_erpnext_id.get(erpnext_customer) if erpnext_customer else None
+
+                if existing:
+                    existing.customer = erpnext_customer
+                    existing.customer_name = order_data.get("customer_name")
+                    existing.customer_id = customer_id
+                    existing.order_type = order_data.get("order_type")
+                    existing.company = order_data.get("company")
+                    existing.currency = order_data.get("currency", "NGN")
+                    existing.total_qty = Decimal(str(order_data.get("total_qty", 0) or 0))
+                    existing.total = Decimal(str(order_data.get("total", 0) or 0))
+                    existing.net_total = Decimal(str(order_data.get("net_total", 0) or 0))
+                    existing.grand_total = Decimal(str(order_data.get("grand_total", 0) or 0))
+                    existing.rounded_total = Decimal(str(order_data.get("rounded_total", 0) or 0))
+                    existing.total_taxes_and_charges = Decimal(str(order_data.get("total_taxes_and_charges", 0) or 0))
+                    existing.per_delivered = Decimal(str(order_data.get("per_delivered", 0) or 0))
+                    existing.per_billed = Decimal(str(order_data.get("per_billed", 0) or 0))
+                    existing.billing_status = order_data.get("billing_status")
+                    existing.delivery_status = order_data.get("delivery_status")
+                    existing.status = status
+                    existing.docstatus = order_data.get("docstatus", 0)
+                    existing.sales_partner = order_data.get("sales_partner")
+                    existing.territory = order_data.get("territory")
+                    existing.source = order_data.get("source")
+                    existing.campaign = order_data.get("campaign")
+                    existing.last_synced_at = datetime.utcnow()
+
+                    if order_data.get("transaction_date"):
+                        try:
+                            existing.transaction_date = datetime.fromisoformat(order_data["transaction_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if order_data.get("delivery_date"):
+                        try:
+                            existing.delivery_date = datetime.fromisoformat(order_data["delivery_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.increment_updated()
+                else:
+                    sales_order = SalesOrder(
+                        erpnext_id=erpnext_id,
+                        customer=erpnext_customer,
+                        customer_name=order_data.get("customer_name"),
+                        customer_id=customer_id,
+                        order_type=order_data.get("order_type"),
+                        company=order_data.get("company"),
+                        currency=order_data.get("currency", "NGN"),
+                        total_qty=Decimal(str(order_data.get("total_qty", 0) or 0)),
+                        total=Decimal(str(order_data.get("total", 0) or 0)),
+                        net_total=Decimal(str(order_data.get("net_total", 0) or 0)),
+                        grand_total=Decimal(str(order_data.get("grand_total", 0) or 0)),
+                        rounded_total=Decimal(str(order_data.get("rounded_total", 0) or 0)),
+                        total_taxes_and_charges=Decimal(str(order_data.get("total_taxes_and_charges", 0) or 0)),
+                        per_delivered=Decimal(str(order_data.get("per_delivered", 0) or 0)),
+                        per_billed=Decimal(str(order_data.get("per_billed", 0) or 0)),
+                        billing_status=order_data.get("billing_status"),
+                        delivery_status=order_data.get("delivery_status"),
+                        status=status,
+                        docstatus=order_data.get("docstatus", 0),
+                        sales_partner=order_data.get("sales_partner"),
+                        territory=order_data.get("territory"),
+                        source=order_data.get("source"),
+                        campaign=order_data.get("campaign"),
+                    )
+
+                    if order_data.get("transaction_date"):
+                        try:
+                            sales_order.transaction_date = datetime.fromisoformat(order_data["transaction_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if order_data.get("delivery_date"):
+                        try:
+                            sales_order.delivery_date = datetime.fromisoformat(order_data["delivery_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.db.add(sales_order)
+                    self.increment_created()
+
+                # Batch commit
+                if i % batch_size == 0:
+                    self.db.commit()
+                    logger.debug("sales_orders_batch_committed", processed=i, total=len(orders))
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_sales_orders_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Sales Orders with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_sales_orders(client, full_sync)
+
+    # ============= QUOTATION SYNC =============
+
+    async def sync_quotations(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync quotations from ERPNext."""
+        self.start_sync("quotations", "full" if full_sync else "incremental")
+
+        try:
+            quotations = await self._fetch_all_doctype(
+                client,
+                "Quotation",
+                fields=["*"],
+            )
+
+            batch_size = 500
+            for i, quote_data in enumerate(quotations, 1):
+                erpnext_id = quote_data.get("name")
+                existing = self.db.query(Quotation).filter(Quotation.erpnext_id == erpnext_id).first()
+
+                # Map status
+                status_str = (quote_data.get("status", "") or "").lower()
+                status_map = {
+                    "draft": QuotationStatus.DRAFT,
+                    "open": QuotationStatus.OPEN,
+                    "replied": QuotationStatus.REPLIED,
+                    "ordered": QuotationStatus.ORDERED,
+                    "lost": QuotationStatus.LOST,
+                    "cancelled": QuotationStatus.CANCELLED,
+                    "expired": QuotationStatus.EXPIRED,
+                }
+                status = status_map.get(status_str, QuotationStatus.DRAFT)
+
+                if existing:
+                    existing.quotation_to = quote_data.get("quotation_to")
+                    existing.party_name = quote_data.get("party_name")
+                    existing.customer_name = quote_data.get("customer_name")
+                    existing.order_type = quote_data.get("order_type")
+                    existing.company = quote_data.get("company")
+                    existing.currency = quote_data.get("currency", "NGN")
+                    existing.total_qty = Decimal(str(quote_data.get("total_qty", 0) or 0))
+                    existing.total = Decimal(str(quote_data.get("total", 0) or 0))
+                    existing.net_total = Decimal(str(quote_data.get("net_total", 0) or 0))
+                    existing.grand_total = Decimal(str(quote_data.get("grand_total", 0) or 0))
+                    existing.rounded_total = Decimal(str(quote_data.get("rounded_total", 0) or 0))
+                    existing.total_taxes_and_charges = Decimal(str(quote_data.get("total_taxes_and_charges", 0) or 0))
+                    existing.status = status
+                    existing.docstatus = quote_data.get("docstatus", 0)
+                    existing.sales_partner = quote_data.get("sales_partner")
+                    existing.territory = quote_data.get("territory")
+                    existing.source = quote_data.get("source")
+                    existing.campaign = quote_data.get("campaign")
+                    existing.order_lost_reason = quote_data.get("order_lost_reason")
+                    existing.last_synced_at = datetime.utcnow()
+
+                    if quote_data.get("transaction_date"):
+                        try:
+                            existing.transaction_date = datetime.fromisoformat(quote_data["transaction_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if quote_data.get("valid_till"):
+                        try:
+                            existing.valid_till = datetime.fromisoformat(quote_data["valid_till"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.increment_updated()
+                else:
+                    quotation = Quotation(
+                        erpnext_id=erpnext_id,
+                        quotation_to=quote_data.get("quotation_to"),
+                        party_name=quote_data.get("party_name"),
+                        customer_name=quote_data.get("customer_name"),
+                        order_type=quote_data.get("order_type"),
+                        company=quote_data.get("company"),
+                        currency=quote_data.get("currency", "NGN"),
+                        total_qty=Decimal(str(quote_data.get("total_qty", 0) or 0)),
+                        total=Decimal(str(quote_data.get("total", 0) or 0)),
+                        net_total=Decimal(str(quote_data.get("net_total", 0) or 0)),
+                        grand_total=Decimal(str(quote_data.get("grand_total", 0) or 0)),
+                        rounded_total=Decimal(str(quote_data.get("rounded_total", 0) or 0)),
+                        total_taxes_and_charges=Decimal(str(quote_data.get("total_taxes_and_charges", 0) or 0)),
+                        status=status,
+                        docstatus=quote_data.get("docstatus", 0),
+                        sales_partner=quote_data.get("sales_partner"),
+                        territory=quote_data.get("territory"),
+                        source=quote_data.get("source"),
+                        campaign=quote_data.get("campaign"),
+                        order_lost_reason=quote_data.get("order_lost_reason"),
+                    )
+
+                    if quote_data.get("transaction_date"):
+                        try:
+                            quotation.transaction_date = datetime.fromisoformat(quote_data["transaction_date"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    if quote_data.get("valid_till"):
+                        try:
+                            quotation.valid_till = datetime.fromisoformat(quote_data["valid_till"]).date()
+                        except (ValueError, TypeError):
+                            pass
+
+                    self.db.add(quotation)
+                    self.increment_created()
+
+                # Batch commit
+                if i % batch_size == 0:
+                    self.db.commit()
+                    logger.debug("quotations_batch_committed", processed=i, total=len(quotations))
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_quotations_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Quotations with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_quotations(client, full_sync)
+
+    # ============= ERPNEXT LEAD SYNC =============
+
+    async def sync_erpnext_leads(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync leads from ERPNext CRM."""
+        self.start_sync("erpnext_leads", "full" if full_sync else "incremental")
+
+        try:
+            leads = await self._fetch_all_doctype(
+                client,
+                "Lead",
+                fields=["*"],
+            )
+
+            batch_size = 500
+            for i, lead_data in enumerate(leads, 1):
+                erpnext_id = lead_data.get("name")
+                existing = self.db.query(ERPNextLead).filter(ERPNextLead.erpnext_id == erpnext_id).first()
+
+                # Map status
+                status_str = (lead_data.get("status", "") or "").lower().replace(" ", "_")
+                status_map = {
+                    "lead": ERPNextLeadStatus.LEAD,
+                    "open": ERPNextLeadStatus.OPEN,
+                    "replied": ERPNextLeadStatus.REPLIED,
+                    "opportunity": ERPNextLeadStatus.OPPORTUNITY,
+                    "quotation": ERPNextLeadStatus.QUOTATION,
+                    "lost_quotation": ERPNextLeadStatus.LOST_QUOTATION,
+                    "interested": ERPNextLeadStatus.INTERESTED,
+                    "converted": ERPNextLeadStatus.CONVERTED,
+                    "do_not_contact": ERPNextLeadStatus.DO_NOT_CONTACT,
+                }
+                status = status_map.get(status_str, ERPNextLeadStatus.LEAD)
+
+                if existing:
+                    existing.lead_name = lead_data.get("lead_name", "")
+                    existing.company_name = lead_data.get("company_name")
+                    existing.email_id = lead_data.get("email_id")
+                    existing.phone = lead_data.get("phone")
+                    existing.mobile_no = lead_data.get("mobile_no")
+                    existing.website = lead_data.get("website")
+                    existing.source = lead_data.get("source")
+                    existing.lead_owner = lead_data.get("lead_owner")
+                    existing.territory = lead_data.get("territory")
+                    existing.industry = lead_data.get("industry")
+                    existing.market_segment = lead_data.get("market_segment")
+                    existing.status = status
+                    existing.qualification_status = lead_data.get("qualification_status")
+                    existing.city = lead_data.get("city")
+                    existing.state = lead_data.get("state")
+                    existing.country = lead_data.get("country")
+                    existing.notes = lead_data.get("notes")
+                    existing.converted = lead_data.get("converted", 0) == 1 or status == ERPNextLeadStatus.CONVERTED
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    lead = ERPNextLead(
+                        erpnext_id=erpnext_id,
+                        lead_name=lead_data.get("lead_name", ""),
+                        company_name=lead_data.get("company_name"),
+                        email_id=lead_data.get("email_id"),
+                        phone=lead_data.get("phone"),
+                        mobile_no=lead_data.get("mobile_no"),
+                        website=lead_data.get("website"),
+                        source=lead_data.get("source"),
+                        lead_owner=lead_data.get("lead_owner"),
+                        territory=lead_data.get("territory"),
+                        industry=lead_data.get("industry"),
+                        market_segment=lead_data.get("market_segment"),
+                        status=status,
+                        qualification_status=lead_data.get("qualification_status"),
+                        city=lead_data.get("city"),
+                        state=lead_data.get("state"),
+                        country=lead_data.get("country"),
+                        notes=lead_data.get("notes"),
+                        converted=lead_data.get("converted", 0) == 1 or status == ERPNextLeadStatus.CONVERTED,
+                    )
+                    self.db.add(lead)
+                    self.increment_created()
+
+                # Batch commit
+                if i % batch_size == 0:
+                    self.db.commit()
+                    logger.debug("erpnext_leads_batch_committed", processed=i, total=len(leads))
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_erpnext_leads_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs ERPNext Leads with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_erpnext_leads(client, full_sync)
+
+    # ============= ITEM SYNC =============
+
+    async def sync_items(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync items (products/services) from ERPNext."""
+        self.start_sync("items", "full" if full_sync else "incremental")
+
+        try:
+            items = await self._fetch_all_doctype(
+                client,
+                "Item",
+                fields=["*"],
+            )
+
+            batch_size = 500
+            for i, item_data in enumerate(items, 1):
+                erpnext_id = item_data.get("name")
+                existing = self.db.query(Item).filter(Item.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.item_code = item_data.get("item_code", erpnext_id)
+                    existing.item_name = item_data.get("item_name", "")
+                    existing.item_group = item_data.get("item_group")
+                    existing.description = item_data.get("description")
+                    existing.is_stock_item = item_data.get("is_stock_item", 1) == 1
+                    existing.is_fixed_asset = item_data.get("is_fixed_asset", 0) == 1
+                    existing.is_sales_item = item_data.get("is_sales_item", 1) == 1
+                    existing.is_purchase_item = item_data.get("is_purchase_item", 1) == 1
+                    existing.stock_uom = item_data.get("stock_uom")
+                    existing.default_warehouse = item_data.get("default_warehouse")
+                    existing.standard_rate = Decimal(str(item_data.get("standard_rate", 0) or 0))
+                    existing.valuation_rate = Decimal(str(item_data.get("valuation_rate", 0) or 0))
+                    existing.disabled = item_data.get("disabled", 0) == 1
+                    existing.has_variants = item_data.get("has_variants", 0) == 1
+                    existing.variant_of = item_data.get("variant_of")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    item = Item(
+                        erpnext_id=erpnext_id,
+                        item_code=item_data.get("item_code", erpnext_id),
+                        item_name=item_data.get("item_name", ""),
+                        item_group=item_data.get("item_group"),
+                        description=item_data.get("description"),
+                        is_stock_item=item_data.get("is_stock_item", 1) == 1,
+                        is_fixed_asset=item_data.get("is_fixed_asset", 0) == 1,
+                        is_sales_item=item_data.get("is_sales_item", 1) == 1,
+                        is_purchase_item=item_data.get("is_purchase_item", 1) == 1,
+                        stock_uom=item_data.get("stock_uom"),
+                        default_warehouse=item_data.get("default_warehouse"),
+                        standard_rate=Decimal(str(item_data.get("standard_rate", 0) or 0)),
+                        valuation_rate=Decimal(str(item_data.get("valuation_rate", 0) or 0)),
+                        disabled=item_data.get("disabled", 0) == 1,
+                        has_variants=item_data.get("has_variants", 0) == 1,
+                        variant_of=item_data.get("variant_of"),
+                    )
+                    self.db.add(item)
+                    self.increment_created()
+
+                # Batch commit
+                if i % batch_size == 0:
+                    self.db.commit()
+                    logger.debug("items_batch_committed", processed=i, total=len(items))
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_items_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Items with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_items(client, full_sync)
+
+    # ============= CUSTOMER GROUP SYNC =============
+
+    async def sync_customer_groups(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync customer groups from ERPNext."""
+        self.start_sync("customer_groups", "full" if full_sync else "incremental")
+
+        try:
+            groups = await self._fetch_all_doctype(
+                client,
+                "Customer Group",
+                fields=["*"],
+            )
+
+            for group_data in groups:
+                erpnext_id = group_data.get("name")
+                existing = self.db.query(CustomerGroup).filter(CustomerGroup.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.customer_group_name = group_data.get("customer_group_name", erpnext_id)
+                    existing.parent_customer_group = group_data.get("parent_customer_group")
+                    existing.is_group = group_data.get("is_group", 0) == 1
+                    existing.default_price_list = group_data.get("default_price_list")
+                    existing.default_payment_terms_template = group_data.get("default_payment_terms_template")
+                    existing.lft = group_data.get("lft")
+                    existing.rgt = group_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    customer_group = CustomerGroup(
+                        erpnext_id=erpnext_id,
+                        customer_group_name=group_data.get("customer_group_name", erpnext_id),
+                        parent_customer_group=group_data.get("parent_customer_group"),
+                        is_group=group_data.get("is_group", 0) == 1,
+                        default_price_list=group_data.get("default_price_list"),
+                        default_payment_terms_template=group_data.get("default_payment_terms_template"),
+                        lft=group_data.get("lft"),
+                        rgt=group_data.get("rgt"),
+                    )
+                    self.db.add(customer_group)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_customer_groups_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Customer Groups with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_customer_groups(client, full_sync)
+
+    # ============= TERRITORY SYNC =============
+
+    async def sync_territories(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync territories from ERPNext."""
+        self.start_sync("territories", "full" if full_sync else "incremental")
+
+        try:
+            territories = await self._fetch_all_doctype(
+                client,
+                "Territory",
+                fields=["*"],
+            )
+
+            for terr_data in territories:
+                erpnext_id = terr_data.get("name")
+                existing = self.db.query(Territory).filter(Territory.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.territory_name = terr_data.get("territory_name", erpnext_id)
+                    existing.parent_territory = terr_data.get("parent_territory")
+                    existing.is_group = terr_data.get("is_group", 0) == 1
+                    existing.territory_manager = terr_data.get("territory_manager")
+                    existing.lft = terr_data.get("lft")
+                    existing.rgt = terr_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    territory = Territory(
+                        erpnext_id=erpnext_id,
+                        territory_name=terr_data.get("territory_name", erpnext_id),
+                        parent_territory=terr_data.get("parent_territory"),
+                        is_group=terr_data.get("is_group", 0) == 1,
+                        territory_manager=terr_data.get("territory_manager"),
+                        lft=terr_data.get("lft"),
+                        rgt=terr_data.get("rgt"),
+                    )
+                    self.db.add(territory)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_territories_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Territories with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_territories(client, full_sync)
+
+    # ============= SALES PERSON SYNC =============
+
+    async def sync_sales_persons(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync sales persons from ERPNext."""
+        self.start_sync("sales_persons", "full" if full_sync else "incremental")
+
+        try:
+            persons = await self._fetch_all_doctype(
+                client,
+                "Sales Person",
+                fields=["*"],
+            )
+
+            for person_data in persons:
+                erpnext_id = person_data.get("name")
+                existing = self.db.query(SalesPerson).filter(SalesPerson.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.sales_person_name = person_data.get("sales_person_name", erpnext_id)
+                    existing.parent_sales_person = person_data.get("parent_sales_person")
+                    existing.is_group = person_data.get("is_group", 0) == 1
+                    existing.employee = person_data.get("employee")
+                    existing.department = person_data.get("department")
+                    existing.enabled = person_data.get("enabled", 1) == 1
+                    existing.commission_rate = Decimal(str(person_data.get("commission_rate", 0) or 0))
+                    existing.lft = person_data.get("lft")
+                    existing.rgt = person_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    sales_person = SalesPerson(
+                        erpnext_id=erpnext_id,
+                        sales_person_name=person_data.get("sales_person_name", erpnext_id),
+                        parent_sales_person=person_data.get("parent_sales_person"),
+                        is_group=person_data.get("is_group", 0) == 1,
+                        employee=person_data.get("employee"),
+                        department=person_data.get("department"),
+                        enabled=person_data.get("enabled", 1) == 1,
+                        commission_rate=Decimal(str(person_data.get("commission_rate", 0) or 0)),
+                        lft=person_data.get("lft"),
+                        rgt=person_data.get("rgt"),
+                    )
+                    self.db.add(sales_person)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_sales_persons_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Sales Persons with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_sales_persons(client, full_sync)
+
+    # ============= ITEM GROUP SYNC =============
+
+    async def sync_item_groups(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync item groups from ERPNext."""
+        self.start_sync("item_groups", "full" if full_sync else "incremental")
+
+        try:
+            groups = await self._fetch_all_doctype(
+                client,
+                "Item Group",
+                fields=["*"],
+            )
+
+            for group_data in groups:
+                erpnext_id = group_data.get("name")
+                existing = self.db.query(ItemGroup).filter(ItemGroup.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.item_group_name = group_data.get("item_group_name", erpnext_id)
+                    existing.parent_item_group = group_data.get("parent_item_group")
+                    existing.is_group = group_data.get("is_group", 0) == 1
+                    existing.lft = group_data.get("lft")
+                    existing.rgt = group_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    item_group = ItemGroup(
+                        erpnext_id=erpnext_id,
+                        item_group_name=group_data.get("item_group_name", erpnext_id),
+                        parent_item_group=group_data.get("parent_item_group"),
+                        is_group=group_data.get("is_group", 0) == 1,
+                        lft=group_data.get("lft"),
+                        rgt=group_data.get("rgt"),
+                    )
+                    self.db.add(item_group)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_item_groups_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Item Groups with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_item_groups(client, full_sync)
+
+    # ============= SALES SYNC (COMBINED) =============
+
+    async def sync_sales_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs all sales-related data."""
+        async with httpx.AsyncClient(timeout=180) as client:
+            # Sync reference data first
+            await self.sync_customer_groups(client, full_sync)
+            await self.sync_territories(client, full_sync)
+            await self.sync_sales_persons(client, full_sync)
+            await self.sync_item_groups(client, full_sync)
+            await self.sync_items(client, full_sync)
+            # Then sync transactional data
+            await self.sync_erpnext_leads(client, full_sync)
+            await self.sync_quotations(client, full_sync)
+            await self.sync_sales_orders(client, full_sync)
+
+    # ============= HR SYNC FUNCTIONS =============
+
+    async def sync_departments(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync departments from ERPNext HR module."""
+        self.start_sync("erpnext_departments", full_sync)
+
+        try:
+            departments = await self._fetch_all_doctype(
+                client,
+                "Department",
+                fields=["*"],
+            )
+
+            for dept_data in departments:
+                erpnext_id = dept_data.get("name")
+                existing = self.db.query(Department).filter(Department.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.department_name = dept_data.get("department_name", erpnext_id)
+                    existing.parent_department = dept_data.get("parent_department")
+                    existing.company = dept_data.get("company")
+                    existing.is_group = dept_data.get("is_group", 0) == 1
+                    existing.lft = dept_data.get("lft")
+                    existing.rgt = dept_data.get("rgt")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    department = Department(
+                        erpnext_id=erpnext_id,
+                        department_name=dept_data.get("department_name", erpnext_id),
+                        parent_department=dept_data.get("parent_department"),
+                        company=dept_data.get("company"),
+                        is_group=dept_data.get("is_group", 0) == 1,
+                        lft=dept_data.get("lft"),
+                        rgt=dept_data.get("rgt"),
+                    )
+                    self.db.add(department)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_departments_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Departments with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_departments(client, full_sync)
+
+    async def sync_designations(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync job designations from ERPNext."""
+        self.start_sync("erpnext_designations", full_sync)
+
+        try:
+            designations = await self._fetch_all_doctype(
+                client,
+                "Designation",
+                fields=["*"],
+            )
+
+            for desig_data in designations:
+                erpnext_id = desig_data.get("name")
+                existing = self.db.query(Designation).filter(Designation.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.designation_name = desig_data.get("designation_name", erpnext_id)
+                    existing.description = desig_data.get("description")
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    designation = Designation(
+                        erpnext_id=erpnext_id,
+                        designation_name=desig_data.get("designation_name", erpnext_id),
+                        description=desig_data.get("description"),
+                    )
+                    self.db.add(designation)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_designations_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Designations with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_designations(client, full_sync)
+
+    async def sync_erpnext_users(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync ERPNext system users."""
+        self.start_sync("erpnext_users", full_sync)
+
+        try:
+            users = await self._fetch_all_doctype(
+                client,
+                "User",
+                fields=["name", "email", "full_name", "first_name", "last_name", "enabled", "user_type"],
+            )
+
+            for user_data in users:
+                email = user_data.get("email") or user_data.get("name")
+                if not email:
+                    continue
+
+                existing = self.db.query(ERPNextUser).filter(ERPNextUser.email == email).first()
+
+                # Try to find linked employee by email
+                employee_id = None
+                employee = self.db.query(Employee).filter(Employee.email == email).first()
+                if employee:
+                    employee_id = employee.id
+
+                if existing:
+                    existing.erpnext_id = user_data.get("name")
+                    existing.full_name = user_data.get("full_name")
+                    existing.first_name = user_data.get("first_name")
+                    existing.last_name = user_data.get("last_name")
+                    existing.enabled = user_data.get("enabled", 1) == 1
+                    existing.user_type = user_data.get("user_type")
+                    existing.employee_id = employee_id
+                    existing.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                else:
+                    erpnext_user = ERPNextUser(
+                        erpnext_id=user_data.get("name"),
+                        email=email,
+                        full_name=user_data.get("full_name"),
+                        first_name=user_data.get("first_name"),
+                        last_name=user_data.get("last_name"),
+                        enabled=user_data.get("enabled", 1) == 1,
+                        user_type=user_data.get("user_type"),
+                        employee_id=employee_id,
+                    )
+                    self.db.add(erpnext_user)
+                    self.increment_created()
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_erpnext_users_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs ERPNext Users with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_erpnext_users(client, full_sync)
+
+    async def sync_hd_teams(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync helpdesk teams and their members from ERPNext."""
+        self.start_sync("erpnext_hd_teams", full_sync)
+
+        try:
+            # Fetch all HD Teams
+            teams = await self._fetch_all_doctype(
+                client,
+                "HD Team",
+                fields=["*"],
+            )
+
+            for team_data in teams:
+                erpnext_id = team_data.get("name")
+                existing = self.db.query(HDTeam).filter(HDTeam.erpnext_id == erpnext_id).first()
+
+                if existing:
+                    existing.team_name = team_data.get("team_name", erpnext_id)
+                    existing.description = team_data.get("description")
+                    existing.assignment_rule = team_data.get("assignment_rule")
+                    existing.ignore_restrictions = team_data.get("ignore_restrictions", 0) == 1
+                    existing.last_synced_at = datetime.utcnow()
+                    team = existing
+                    self.increment_updated()
+                else:
+                    team = HDTeam(
+                        erpnext_id=erpnext_id,
+                        team_name=team_data.get("team_name", erpnext_id),
+                        description=team_data.get("description"),
+                        assignment_rule=team_data.get("assignment_rule"),
+                        ignore_restrictions=team_data.get("ignore_restrictions", 0) == 1,
+                    )
+                    self.db.add(team)
+                    self.db.flush()  # Get the team ID
+                    self.increment_created()
+
+                # Sync team members - fetch from HD Team document
+                try:
+                    team_doc = await self._fetch_document(client, "HD Team", erpnext_id)
+                    members_data = team_doc.get("users", [])
+
+                    # Clear existing members for this team
+                    self.db.query(HDTeamMember).filter(HDTeamMember.team_id == team.id).delete()
+
+                    for member_data in members_data:
+                        user_email = member_data.get("user")
+                        if not user_email:
+                            continue
+
+                        # Try to find linked employee by email
+                        employee_id = None
+                        employee = self.db.query(Employee).filter(Employee.email == user_email).first()
+                        if employee:
+                            employee_id = employee.id
+
+                        member = HDTeamMember(
+                            team_id=team.id,
+                            user=user_email,
+                            user_name=member_data.get("user_name"),
+                            employee_id=employee_id,
+                        )
+                        self.db.add(member)
+                except Exception as e:
+                    logger.warning(f"Could not fetch members for HD Team {erpnext_id}: {e}")
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
+
+    async def sync_hd_teams_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs HD Teams with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_hd_teams(client, full_sync)
+
+    def resolve_employee_relationships(self):
+        """Resolve FK relationships for employees based on text field values."""
+        # Build lookup maps
+        # Department: Employee.department is ERPNext ID like "Sales (call center) - DT"
+        # which matches Department.erpnext_id
+        dept_map = {
+            d.erpnext_id: d.id
+            for d in self.db.query(Department).filter(Department.erpnext_id.isnot(None)).all()
+        }
+        desig_map = {
+            d.designation_name: d.id
+            for d in self.db.query(Designation).all()
+        }
+        emp_map = {
+            e.erpnext_id: e.id
+            for e in self.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+        }
+
+        updated = 0
+        for emp in self.db.query(Employee).all():
+            changed = False
+
+            # Resolve department (Employee.department is the ERPNext ID)
+            if emp.department and emp.department in dept_map:
+                if emp.department_id != dept_map[emp.department]:
+                    emp.department_id = dept_map[emp.department]
+                    changed = True
+
+            # Resolve designation
+            if emp.designation and emp.designation in desig_map:
+                if emp.designation_id != desig_map[emp.designation]:
+                    emp.designation_id = desig_map[emp.designation]
+                    changed = True
+
+            # Resolve reports_to (manager)
+            if emp.reports_to and emp.reports_to in emp_map:
+                if emp.reports_to_id != emp_map[emp.reports_to]:
+                    emp.reports_to_id = emp_map[emp.reports_to]
+                    changed = True
+
+            if changed:
+                updated += 1
+
+        self.db.commit()
+        logger.info(f"Resolved {updated} employee relationships")
+        return updated
+
+    def resolve_sales_person_employees(self):
+        """Resolve FK relationships for sales persons to employees."""
+        # Build employee lookup by erpnext_id
+        emp_map = {
+            e.erpnext_id: e.id
+            for e in self.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+        }
+
+        updated = 0
+        for sp in self.db.query(SalesPerson).all():
+            # The 'employee' field contains the ERPNext Employee ID
+            if sp.employee and sp.employee in emp_map:
+                if sp.employee_id != emp_map[sp.employee]:
+                    sp.employee_id = emp_map[sp.employee]
+                    updated += 1
+
+        self.db.commit()
+        logger.info(f"Linked {updated} sales persons to employees")
+        return updated
+
+    async def sync_hr_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs all HR-related data."""
+        async with httpx.AsyncClient(timeout=180) as client:
+            # Sync reference data first
+            await self.sync_departments(client, full_sync)
+            await self.sync_designations(client, full_sync)
+            # Then sync users and teams (which link to employees)
+            await self.sync_erpnext_users(client, full_sync)
+            await self.sync_hd_teams(client, full_sync)
+            # Resolve employee FK relationships
+            self.resolve_employee_relationships()
+            # Link sales persons to employees
+            self.resolve_sales_person_employees()

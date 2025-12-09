@@ -12,6 +12,7 @@ from app.sync.base import BaseSyncClient
 from app.models.sync_log import SyncSource
 from app.models.customer import Customer
 from app.models.conversation import Conversation, Message, ConversationStatus
+from app.models.employee import Employee
 
 logger = structlog.get_logger()
 
@@ -58,10 +59,16 @@ class ChatwootSync(BaseSyncClient):
         self,
         client: httpx.AsyncClient,
         endpoint: str,
-        data_key: str = "data",
+        data_key: str = "payload",
         params: Optional[Dict[str, Any]] = None,
+        max_pages: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Fetch all records with pagination."""
+        """Fetch all records with pagination.
+
+        Chatwoot API returns:
+        - Contacts: {"meta": {...}, "payload": [...]}
+        - Conversations: {"data": {"meta": {...}, "payload": [...]}}
+        """
         all_records = []
         page = 1
 
@@ -69,7 +76,13 @@ class ChatwootSync(BaseSyncClient):
             request_params = {"page": page, **(params or {})}
             response = await self._request(client, "GET", endpoint, params=request_params)
 
-            data = response.get(data_key) if data_key else response
+            # Handle nested data structure (conversations endpoint)
+            if "data" in response and isinstance(response["data"], dict):
+                container = response["data"]
+            else:
+                container = response
+
+            data = container.get(data_key) if data_key else container
             if not data:
                 break
 
@@ -77,9 +90,17 @@ class ChatwootSync(BaseSyncClient):
                 all_records.extend(data)
                 self.increment_fetched(len(data))
 
-                # Check if there are more pages
-                meta = response.get("meta", {})
-                if page >= meta.get("total_pages", page):
+                # Check pagination from meta
+                meta = container.get("meta", {})
+                total_count = meta.get("all_count") or meta.get("count", 0)
+
+                # Stop if we've fetched all or reached max pages
+                if len(all_records) >= total_count:
+                    break
+                if max_pages and page >= max_pages:
+                    logger.info("pagination_limit_reached", page=page, max_pages=max_pages, fetched=len(all_records))
+                    break
+                if len(data) == 0:
                     break
             else:
                 all_records.append(data)
@@ -107,6 +128,7 @@ class ChatwootSync(BaseSyncClient):
     async def sync_all(self, full_sync: bool = False):
         """Sync all entities from Chatwoot."""
         async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_agents(client, full_sync)  # Sync agents first to link employees
             await self.sync_contacts(client, full_sync)
             await self.sync_conversations(client, full_sync)
 
@@ -119,6 +141,65 @@ class ChatwootSync(BaseSyncClient):
         """Wrapper for Celery task - syncs Conversations with its own client."""
         async with httpx.AsyncClient(timeout=60) as client:
             await self.sync_conversations(client, full_sync)
+
+    async def sync_agents_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Agents with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_agents(client, full_sync)
+
+    async def sync_agents(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync agents from Chatwoot and link to employees by email."""
+        self.start_sync("agents", "full" if full_sync else "incremental")
+
+        try:
+            response = await self._request(
+                client,
+                "GET",
+                f"/accounts/{self.account_id}/agents",
+            )
+
+            agents = response if isinstance(response, list) else response.get("payload", [])
+            self.increment_fetched(len(agents))
+
+            for agent_data in agents:
+                chatwoot_agent_id = agent_data.get("id")
+                email = agent_data.get("email")
+                name = agent_data.get("name")
+
+                if not email:
+                    continue
+
+                # Find matching employee by email
+                employee = self.db.query(Employee).filter(
+                    Employee.email.ilike(email)
+                ).first()
+
+                if employee:
+                    employee.chatwoot_agent_id = chatwoot_agent_id
+                    employee.last_synced_at = datetime.utcnow()
+                    self.increment_updated()
+                    logger.debug(
+                        "chatwoot_agent_linked",
+                        employee_id=employee.id,
+                        employee_name=employee.name,
+                        chatwoot_agent_id=chatwoot_agent_id,
+                        email=email,
+                    )
+                else:
+                    logger.debug(
+                        "chatwoot_agent_no_employee_match",
+                        chatwoot_agent_id=chatwoot_agent_id,
+                        agent_name=name,
+                        email=email,
+                    )
+
+            self.db.commit()
+            self.complete_sync()
+
+        except Exception as e:
+            self.db.rollback()
+            self.fail_sync(str(e))
+            raise
 
     async def sync_contacts(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync contacts from Chatwoot and link to customers."""
@@ -174,12 +255,13 @@ class ChatwootSync(BaseSyncClient):
         self.start_sync("conversations", "full" if full_sync else "incremental")
 
         try:
-            # Fetch all conversations
+            # Fetch all conversations (limit pages in full sync to avoid timeout)
             conversations = await self._fetch_paginated(
                 client,
                 f"/accounts/{self.account_id}/conversations",
-                data_key="data",
+                data_key="payload",
                 params={"status": "all"},
+                max_pages=100 if full_sync else 10,  # ~2500 convos for full, ~250 for incremental
             )
 
             for conv_data in conversations:
@@ -215,6 +297,14 @@ class ChatwootSync(BaseSyncClient):
                 assignee = meta.get("assignee", {})
                 inbox = conv_data.get("inbox", {})
 
+                # Find employee by chatwoot_agent_id
+                employee = None
+                assignee_id = assignee.get("id")
+                if assignee_id:
+                    employee = self.db.query(Employee).filter(
+                        Employee.chatwoot_agent_id == assignee_id
+                    ).first()
+
                 # Parse timestamps
                 created_at = None
                 if conv_data.get("created_at"):
@@ -227,10 +317,28 @@ class ChatwootSync(BaseSyncClient):
                 first_response_time = None
                 resolution_time = None
 
+                # First try additional_attributes (some versions use this)
                 additional_attrs = conv_data.get("additional_attributes", {})
                 if additional_attrs:
                     first_response_time = additional_attrs.get("first_response_time")
                     resolution_time = additional_attrs.get("resolution_time")
+
+                # Calculate from first_reply_created_at if available (preferred)
+                first_reply_at = conv_data.get("first_reply_created_at")
+                if first_reply_at and created_at:
+                    try:
+                        first_reply_dt = datetime.fromtimestamp(first_reply_at)
+                        first_response_time = int((first_reply_dt - created_at).total_seconds())
+                    except (ValueError, TypeError):
+                        pass
+
+                # Parse first_response_at for the model field
+                first_response_at = None
+                if first_reply_at:
+                    try:
+                        first_response_at = datetime.fromtimestamp(first_reply_at)
+                    except (ValueError, TypeError):
+                        pass
 
                 # Get labels
                 labels = conv_data.get("labels", [])
@@ -244,6 +352,7 @@ class ChatwootSync(BaseSyncClient):
                     existing.channel = inbox.get("channel_type")
                     existing.assigned_agent_id = assignee.get("id")
                     existing.assigned_agent_name = assignee.get("name")
+                    existing.employee_id = employee.id if employee else None
                     existing.message_count = conv_data.get("messages_count", 0)
                     existing.labels = labels_str
                     existing.last_activity_at = datetime.utcnow()
@@ -251,6 +360,9 @@ class ChatwootSync(BaseSyncClient):
 
                     if first_response_time:
                         existing.first_response_time_seconds = int(first_response_time)
+
+                    if first_response_at:
+                        existing.first_response_at = first_response_at
 
                     if resolution_time:
                         existing.resolution_time_seconds = int(resolution_time)
@@ -269,6 +381,7 @@ class ChatwootSync(BaseSyncClient):
                         channel=inbox.get("channel_type"),
                         assigned_agent_id=assignee.get("id"),
                         assigned_agent_name=assignee.get("name"),
+                        employee_id=employee.id if employee else None,
                         message_count=conv_data.get("messages_count", 0),
                         labels=labels_str,
                         created_at=created_at or datetime.utcnow(),
@@ -276,6 +389,9 @@ class ChatwootSync(BaseSyncClient):
 
                     if first_response_time:
                         conversation.first_response_time_seconds = int(first_response_time)
+
+                    if first_response_at:
+                        conversation.first_response_at = first_response_at
 
                     if resolution_time:
                         conversation.resolution_time_seconds = int(resolution_time)

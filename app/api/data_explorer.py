@@ -7,6 +7,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from app.database import get_db
+# Core models
 from app.models.customer import Customer
 from app.models.subscription import Subscription
 from app.models.invoice import Invoice
@@ -17,22 +18,115 @@ from app.models.employee import Employee
 from app.models.expense import Expense
 from app.models.sync_log import SyncLog
 from app.models.credit_note import CreditNote
+from app.models.ticket import Ticket
+from app.models.project import Project
+# Splynx models
+from app.models.tariff import Tariff
+from app.models.router import Router
+from app.models.customer_note import CustomerNote
+from app.models.administrator import Administrator
+from app.models.network_monitor import NetworkMonitor
+from app.models.lead import Lead
+from app.models.ipv4_address import IPv4Address
+from app.models.ipv4_network import IPv4Network
+from app.models.ipv6_network import IPv6Network
+from app.models.ticket_message import TicketMessage
+from app.models.transaction_category import TransactionCategory
+from app.models.payment_method import PaymentMethod
+# ERPNext accounting models
+from app.models.accounting import (
+    BankAccount,
+    JournalEntry,
+    PurchaseInvoice,
+    GLEntry,
+    Account,
+    BankTransaction,
+    Supplier,
+    ModeOfPayment,
+    CostCenter,
+    FiscalYear,
+)
+# HR models
+from app.models.hr import (
+    Department,
+    HDTeam,
+    HDTeamMember,
+    Designation,
+    ERPNextUser,
+)
+# Sales models
+from app.models.sales import (
+    SalesOrder,
+    Quotation,
+    ERPNextLead,
+    Item,
+    CustomerGroup,
+    Territory,
+    SalesPerson,
+    ItemGroup,
+)
 
 router = APIRouter()
 
-# Available tables for exploration
+# Available tables for exploration (organized by category)
 TABLES = {
+    # Core business data
     "customers": Customer,
     "subscriptions": Subscription,
     "invoices": Invoice,
     "payments": Payment,
+    "credit_notes": CreditNote,
+    "expenses": Expense,
+    "projects": Project,
+    "tickets": Ticket,
+    # People
+    "employees": Employee,
+    "administrators": Administrator,
+    "leads": Lead,
+    # Network infrastructure (Splynx)
+    "pops": Pop,
+    "routers": Router,
+    "tariffs": Tariff,
+    "ipv4_networks": IPv4Network,
+    "ipv6_networks": IPv6Network,
+    "ipv4_addresses": IPv4Address,
+    "network_monitors": NetworkMonitor,
+    # Support
     "conversations": Conversation,
     "messages": Message,
-    "pops": Pop,
-    "employees": Employee,
-    "expenses": Expense,
+    "ticket_messages": TicketMessage,
+    "customer_notes": CustomerNote,
+    # Accounting (ERPNext)
+    "accounts": Account,
+    "bank_accounts": BankAccount,
+    "bank_transactions": BankTransaction,
+    "journal_entries": JournalEntry,
+    "gl_entries": GLEntry,
+    "purchase_invoices": PurchaseInvoice,
+    "suppliers": Supplier,
+    "cost_centers": CostCenter,
+    "fiscal_years": FiscalYear,
+    "modes_of_payment": ModeOfPayment,
+    # Reference data
+    "transaction_categories": TransactionCategory,
+    "payment_methods": PaymentMethod,
+    # HR (ERPNext)
+    "departments": Department,
+    "designations": Designation,
+    "hd_teams": HDTeam,
+    "hd_team_members": HDTeamMember,
+    "erpnext_users": ERPNextUser,
+    # Sales (ERPNext)
+    "sales_orders": SalesOrder,
+    "quotations": Quotation,
+    "erpnext_leads": ERPNextLead,
+    "items": Item,
+    "customer_groups": CustomerGroup,
+    "territories": Territory,
+    "sales_persons": SalesPerson,
+    "item_groups": ItemGroup,
+    # System
     "sync_logs": SyncLog,
-    "credit_notes": CreditNote,
 }
 
 
@@ -218,6 +312,144 @@ async def get_table_stats(
             for row in db.query(Employee.status, func.count(Employee.id).label("count"))
             .group_by(Employee.status)
             .all()
+        }
+
+    elif table_name == "tickets":
+        stats["by_status"] = {
+            row.status.value: row.count
+            for row in db.query(Ticket.status, func.count(Ticket.id).label("count"))
+            .group_by(Ticket.status)
+            .all()
+        }
+        stats["by_priority"] = {
+            row.priority.value: row.count
+            for row in db.query(Ticket.priority, func.count(Ticket.id).label("count"))
+            .group_by(Ticket.priority)
+            .all()
+        }
+        stats["by_source"] = {
+            row.source.value: row.count
+            for row in db.query(Ticket.source, func.count(Ticket.id).label("count"))
+            .group_by(Ticket.source)
+            .all()
+        }
+
+    elif table_name == "projects":
+        stats["by_status"] = {
+            row.status.value if hasattr(row.status, 'value') else row.status: row.count
+            for row in db.query(Project.status, func.count(Project.id).label("count"))
+            .group_by(Project.status)
+            .all()
+            if row.status
+        }
+        stats["with_customer"] = db.query(Project).filter(Project.customer_id.isnot(None)).count()
+        stats["with_manager"] = db.query(Project).filter(Project.project_manager_id.isnot(None)).count()
+
+    elif table_name == "tariffs":
+        stats["by_type"] = {
+            row.tariff_type.value: row.count
+            for row in db.query(Tariff.tariff_type, func.count(Tariff.id).label("count"))
+            .group_by(Tariff.tariff_type)
+            .all()
+        }
+        stats["enabled"] = db.query(Tariff).filter(Tariff.enabled.is_(True)).count()
+
+    elif table_name == "routers":
+        stats["by_nas_type"] = {
+            str(row.nas_type): row.count
+            for row in db.query(Router.nas_type, func.count(Router.id).label("count"))
+            .group_by(Router.nas_type)
+            .all()
+            if row.nas_type is not None
+        }
+        stats["with_pop"] = db.query(Router).filter(Router.pop_id.isnot(None)).count()
+
+    elif table_name == "leads":
+        stats["by_status"] = {
+            row.status: row.count
+            for row in db.query(Lead.status, func.count(Lead.id).label("count"))
+            .group_by(Lead.status)
+            .all()
+            if row.status
+        }
+        stats["converted"] = db.query(Lead).filter(Lead.customer_id.isnot(None)).count()
+
+    elif table_name == "network_monitors":
+        stats["by_ping_state"] = {
+            row.ping_state.value: row.count
+            for row in db.query(NetworkMonitor.ping_state, func.count(NetworkMonitor.id).label("count"))
+            .group_by(NetworkMonitor.ping_state)
+            .all()
+        }
+        stats["active"] = db.query(NetworkMonitor).filter(NetworkMonitor.active.is_(True)).count()
+
+    elif table_name == "ipv4_networks":
+        stats["by_type"] = {
+            row.network_type: row.count
+            for row in db.query(IPv4Network.network_type, func.count(IPv4Network.id).label("count"))
+            .group_by(IPv4Network.network_type)
+            .all()
+            if row.network_type
+        }
+        stats["by_usage"] = {
+            row.type_of_usage: row.count
+            for row in db.query(IPv4Network.type_of_usage, func.count(IPv4Network.id).label("count"))
+            .group_by(IPv4Network.type_of_usage)
+            .all()
+            if row.type_of_usage
+        }
+
+    elif table_name == "ipv4_addresses":
+        stats["used"] = db.query(IPv4Address).filter(IPv4Address.is_used.is_(True)).count()
+        stats["available"] = db.query(IPv4Address).filter(IPv4Address.is_used.is_(False)).count()
+        stats["assigned_to_customer"] = db.query(IPv4Address).filter(IPv4Address.customer_id.isnot(None)).count()
+
+    elif table_name == "accounts":
+        stats["by_account_type"] = {
+            row.account_type: row.count
+            for row in db.query(Account.account_type, func.count(Account.id).label("count"))
+            .group_by(Account.account_type)
+            .all()
+            if row.account_type
+        }
+        stats["by_root_type"] = {
+            row.root_type: row.count
+            for row in db.query(Account.root_type, func.count(Account.id).label("count"))
+            .group_by(Account.root_type)
+            .all()
+            if row.root_type
+        }
+
+    elif table_name == "journal_entries":
+        total_debit = db.query(func.sum(JournalEntry.total_debit)).scalar()
+        total_credit = db.query(func.sum(JournalEntry.total_credit)).scalar()
+        stats["total_debit"] = float(total_debit or 0)
+        stats["total_credit"] = float(total_credit or 0)
+
+    elif table_name == "gl_entries":
+        total_debit = db.query(func.sum(GLEntry.debit)).scalar()
+        total_credit = db.query(func.sum(GLEntry.credit)).scalar()
+        stats["total_debit"] = float(total_debit or 0)
+        stats["total_credit"] = float(total_credit or 0)
+
+    elif table_name == "purchase_invoices":
+        stats["by_status"] = {
+            row.status: row.count
+            for row in db.query(PurchaseInvoice.status, func.count(PurchaseInvoice.id).label("count"))
+            .group_by(PurchaseInvoice.status)
+            .all()
+            if row.status
+        }
+        total = db.query(func.sum(PurchaseInvoice.grand_total)).scalar()
+        stats["total_amount"] = float(total or 0)
+
+    elif table_name == "administrators":
+        stats["by_role"] = {
+            row.role_name: row.count
+            for row in db.query(Administrator.role_name, func.count(Administrator.id).label("count"))
+            .group_by(Administrator.role_name)
+            .all()
+            if row.role_name
         }
 
     return stats

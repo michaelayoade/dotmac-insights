@@ -1,12 +1,142 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum
+from sqlalchemy import String, Text, Enum, Date
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 import enum
 from app.database import Base
+
+
+# ============= SUPPLIER =============
+class Supplier(Base):
+    """Suppliers/Vendors from ERPNext."""
+
+    __tablename__ = "suppliers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    supplier_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    supplier_group: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    supplier_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    default_currency: Mapped[str] = mapped_column(String(10), default="NGN")
+    default_bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    tax_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    tax_withholding_category: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Contact info
+    supplier_primary_contact: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    supplier_primary_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    mobile_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Accounting defaults
+    default_price_list: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    payment_terms: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Flags
+    is_transporter: Mapped[bool] = mapped_column(default=False)
+    is_internal_supplier: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False)
+    is_frozen: Mapped[bool] = mapped_column(default=False)
+    on_hold: Mapped[bool] = mapped_column(default=False)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Supplier {self.supplier_name}>"
+
+
+# ============= MODE OF PAYMENT =============
+class PaymentModeType(enum.Enum):
+    CASH = "cash"
+    BANK = "bank"
+    GENERAL = "general"
+
+
+class ModeOfPayment(Base):
+    """Payment modes from ERPNext (Cash, Bank Transfer, etc.)."""
+
+    __tablename__ = "modes_of_payment"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    mode_of_payment: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    type: Mapped[PaymentModeType] = mapped_column(Enum(PaymentModeType), default=PaymentModeType.GENERAL)
+    enabled: Mapped[bool] = mapped_column(default=True)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<ModeOfPayment {self.mode_of_payment}>"
+
+
+# ============= COST CENTER =============
+class CostCenter(Base):
+    """Cost centers from ERPNext for departmental accounting."""
+
+    __tablename__ = "cost_centers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    cost_center_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    cost_center_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    parent_cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    is_group: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False)
+
+    # Tree structure (nested set)
+    lft: Mapped[Optional[int]] = mapped_column(nullable=True)
+    rgt: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<CostCenter {self.cost_center_name}>"
+
+
+# ============= FISCAL YEAR =============
+class FiscalYear(Base):
+    """Fiscal years from ERPNext for accounting periods."""
+
+    __tablename__ = "fiscal_years"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    year: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    year_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    year_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    is_short_year: Mapped[bool] = mapped_column(default=False)
+    disabled: Mapped[bool] = mapped_column(default=False)
+    auto_created: Mapped[bool] = mapped_column(default=False)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<FiscalYear {self.year}>"
 
 
 # ============= BANK ACCOUNT =============

@@ -3,6 +3,8 @@ import structlog
 
 from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketSource
 from app.models.customer import Customer
+from app.models.administrator import Administrator
+from app.models.employee import Employee
 
 logger = structlog.get_logger()
 
@@ -22,6 +24,29 @@ async def sync_tickets(sync_client, client, full_sync: bool):
             for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
         }
 
+        # Pre-fetch administrators and build admin_splynx_id -> employee_id map
+        # First get all admins with their emails
+        admin_email_map = {}  # splynx_id -> email
+        admin_name_map = {}   # splynx_id -> name
+        for admin in sync_client.db.query(Administrator).all():
+            if admin.splynx_id:
+                admin_email_map[admin.splynx_id] = admin.email
+                admin_name_map[admin.splynx_id] = admin.name
+
+        # Build employee lookup by email
+        employee_by_email = {}
+        for emp in sync_client.db.query(Employee).filter(Employee.email.isnot(None)).all():
+            if emp.email:
+                employee_by_email[emp.email.lower()] = emp.id
+
+        # Build admin_splynx_id -> employee_id map
+        admin_to_employee = {}
+        for splynx_id, email in admin_email_map.items():
+            if email:
+                emp_id = employee_by_email.get(email.lower())
+                if emp_id:
+                    admin_to_employee[splynx_id] = emp_id
+
         for i, ticket_data in enumerate(tickets, 1):
             splynx_id = str(ticket_data.get("id"))
             existing = sync_client.db.query(Ticket).filter(
@@ -31,6 +56,14 @@ async def sync_tickets(sync_client, client, full_sync: bool):
             # Find customer
             customer_splynx_id = ticket_data.get("customer_id")
             customer_id = customers_by_splynx_id.get(customer_splynx_id) if customer_splynx_id else None
+
+            # Find assigned employee from admin
+            assign_to_id = ticket_data.get("assign_to")
+            assigned_employee_id = None
+            assigned_to_name = None
+            if assign_to_id and assign_to_id != 0:
+                assigned_employee_id = admin_to_employee.get(assign_to_id)
+                assigned_to_name = admin_name_map.get(assign_to_id)
 
             # Map status
             status_id = ticket_data.get("status_id")
@@ -76,7 +109,8 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                 existing.subject = ticket_data.get("subject")
                 existing.status = status
                 existing.priority = priority
-                existing.assigned_to = str(ticket_data.get("assign_to")) if ticket_data.get("assign_to") else None
+                existing.assigned_to = assigned_to_name or (str(assign_to_id) if assign_to_id else None)
+                existing.assigned_employee_id = assigned_employee_id
                 existing.opening_date = created_at
                 existing.resolution_date = updated_at if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] else None
                 existing.last_synced_at = datetime.utcnow()
@@ -91,7 +125,8 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                     description=ticket_data.get("note"),
                     status=status,
                     priority=priority,
-                    assigned_to=str(ticket_data.get("assign_to")) if ticket_data.get("assign_to") else None,
+                    assigned_to=assigned_to_name or (str(assign_to_id) if assign_to_id else None),
+                    assigned_employee_id=assigned_employee_id,
                     opening_date=created_at or datetime.utcnow(),
                     resolution_date=updated_at if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] else None,
                 )

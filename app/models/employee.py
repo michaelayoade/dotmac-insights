@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Enum
+from sqlalchemy import String, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.ticket import Ticket
     from app.models.project import Project
     from app.models.expense import Expense
+    from app.models.hr import Department, Designation
 
 
 class EmploymentStatus(enum.Enum):
@@ -38,10 +39,15 @@ class Employee(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    # Position
+    # Position (text fields for ERPNext values)
     designation: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     reports_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Position (FK relationships)
+    department_id: Mapped[Optional[int]] = mapped_column(ForeignKey("departments.id"), nullable=True, index=True)
+    designation_id: Mapped[Optional[int]] = mapped_column(ForeignKey("designations.id"), nullable=True, index=True)
+    reports_to_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
 
     # Employment
     status: Mapped[EmploymentStatus] = mapped_column(Enum(EmploymentStatus), default=EmploymentStatus.ACTIVE, index=True)
@@ -65,6 +71,15 @@ class Employee(Base):
     )
     managed_projects: Mapped[List[Project]] = relationship(back_populates="project_manager")
     expenses: Mapped[List[Expense]] = relationship(back_populates="employee")
+
+    # HR Relationships
+    department_rel: Mapped[Optional["Department"]] = relationship(foreign_keys=[department_id])
+    designation_rel: Mapped[Optional["Designation"]] = relationship(foreign_keys=[designation_id])
+    manager: Mapped[Optional["Employee"]] = relationship(
+        foreign_keys=[reports_to_id],
+        remote_side="Employee.id",
+        backref="direct_reports"
+    )
 
     def __repr__(self) -> str:
         return f"<Employee {self.name} - {self.department}>"

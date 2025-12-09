@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
+    from app.models.employee import Employee
 
 
 class ConversationStatus(enum.Enum):
@@ -48,11 +49,14 @@ class Conversation(Base):
     status: Mapped[ConversationStatus] = mapped_column(Enum(ConversationStatus), default=ConversationStatus.OPEN, index=True)
     priority: Mapped[ConversationPriority] = mapped_column(Enum(ConversationPriority), default=ConversationPriority.MEDIUM)
 
-    # Assignment
-    assigned_agent_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Assignment (Chatwoot agent info)
+    assigned_agent_id: Mapped[Optional[int]] = mapped_column(nullable=True)  # Chatwoot agent ID
     assigned_agent_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     assigned_team_id: Mapped[Optional[int]] = mapped_column(nullable=True)
     assigned_team_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Link to Employee (via chatwoot_agent_id match)
+    employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
 
     # Categorization
     labels: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -78,6 +82,7 @@ class Conversation(Base):
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="conversations")
     messages: Mapped[List[Message]] = relationship(back_populates="conversation")
+    employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])
 
     def __repr__(self) -> str:
         return f"<Conversation {self.chatwoot_id} - {self.status.value}>"
