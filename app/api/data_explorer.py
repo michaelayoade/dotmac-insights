@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, inspect
+from sqlalchemy import func, inspect, and_, or_
+from sqlalchemy.types import DateTime, Date
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from decimal import Decimal
+import csv
+import io
+import json
 
 from app.database import get_db
 # Core models
@@ -65,8 +71,32 @@ from app.models.sales import (
     SalesPerson,
     ItemGroup,
 )
+# Auth/RBAC models
+from app.models.auth import (
+    User,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    ServiceToken,
+    TokenDenylist,
+)
+from app.auth import Require
 
 router = APIRouter()
+
+# Table categories for organization
+TABLE_CATEGORIES = {
+    "core_business": "Core Business Data",
+    "people": "People & Contacts",
+    "network": "Network Infrastructure",
+    "support": "Support & Communication",
+    "accounting": "Accounting & Finance",
+    "hr": "HR & Teams",
+    "sales": "Sales & CRM",
+    "auth": "Authentication & RBAC",
+    "system": "System & Logs",
+}
 
 # Available tables for exploration (organized by category)
 TABLES = {
@@ -125,41 +155,174 @@ TABLES = {
     "territories": Territory,
     "sales_persons": SalesPerson,
     "item_groups": ItemGroup,
+    # Auth/RBAC
+    "auth_users": User,
+    "auth_roles": Role,
+    "auth_permissions": Permission,
+    "auth_user_roles": UserRole,
+    "auth_role_permissions": RolePermission,
+    "auth_service_tokens": ServiceToken,
+    "auth_token_denylist": TokenDenylist,
     # System
     "sync_logs": SyncLog,
 }
 
+# Map tables to categories
+TABLE_TO_CATEGORY = {
+    "customers": "core_business",
+    "subscriptions": "core_business",
+    "invoices": "core_business",
+    "payments": "core_business",
+    "credit_notes": "core_business",
+    "expenses": "core_business",
+    "projects": "core_business",
+    "tickets": "core_business",
+    "employees": "people",
+    "administrators": "people",
+    "leads": "people",
+    "pops": "network",
+    "routers": "network",
+    "tariffs": "network",
+    "ipv4_networks": "network",
+    "ipv6_networks": "network",
+    "ipv4_addresses": "network",
+    "network_monitors": "network",
+    "conversations": "support",
+    "messages": "support",
+    "ticket_messages": "support",
+    "customer_notes": "support",
+    "accounts": "accounting",
+    "bank_accounts": "accounting",
+    "bank_transactions": "accounting",
+    "journal_entries": "accounting",
+    "gl_entries": "accounting",
+    "purchase_invoices": "accounting",
+    "suppliers": "accounting",
+    "cost_centers": "accounting",
+    "fiscal_years": "accounting",
+    "modes_of_payment": "accounting",
+    "transaction_categories": "accounting",
+    "payment_methods": "accounting",
+    "departments": "hr",
+    "designations": "hr",
+    "hd_teams": "hr",
+    "hd_team_members": "hr",
+    "erpnext_users": "hr",
+    "sales_orders": "sales",
+    "quotations": "sales",
+    "erpnext_leads": "sales",
+    "items": "sales",
+    "customer_groups": "sales",
+    "territories": "sales",
+    "sales_persons": "sales",
+    "item_groups": "sales",
+    "auth_users": "auth",
+    "auth_roles": "auth",
+    "auth_permissions": "auth",
+    "auth_user_roles": "auth",
+    "auth_role_permissions": "auth",
+    "auth_service_tokens": "auth",
+    "auth_token_denylist": "auth",
+    "sync_logs": "system",
+}
 
-@router.get("/tables")
+
+def _get_date_columns(model: Any) -> List[str]:
+    """Get list of date/datetime columns for a model."""
+    date_columns = []
+    for column in inspect(model).mapper.column_attrs:
+        col = getattr(model, column.key)
+        if hasattr(col, 'type'):
+            if isinstance(col.type, (DateTime, Date)):
+                date_columns.append(column.key)
+    return date_columns
+
+
+def _serialize_value(value: Any) -> Any:
+    """Serialize a value for JSON output."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, Decimal):
+        return float(value)
+    elif hasattr(value, "value"):  # Enum
+        return value.value
+    return value
+
+
+@router.get("/tables", dependencies=[Depends(Require("explorer:read"))])
 async def list_tables(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """List all available tables with record counts."""
+    """List all available tables with record counts, organized by category."""
     tables = {}
+    by_category: Dict[str, List[Dict[str, Any]]] = {}
 
     for name, model in TABLES.items():
         count = db.query(model).count()
-        tables[name] = {
+        columns = [c.key for c in inspect(model).mapper.column_attrs]
+        date_columns = _get_date_columns(model)
+        category = TABLE_TO_CATEGORY.get(name, "other")
+
+        table_info = {
+            "name": name,
             "count": count,
-            "columns": [c.key for c in inspect(model).mapper.column_attrs],
+            "columns": columns,
+            "date_columns": date_columns,
+            "category": category,
+            "category_label": TABLE_CATEGORIES.get(category, "Other"),
         }
+        tables[name] = table_info
 
-    return tables
+        if category not in by_category:
+            by_category[category] = []
+        by_category[category].append(table_info)
+
+    return {
+        "tables": tables,
+        "categories": TABLE_CATEGORIES,
+        "by_category": by_category,
+        "total_tables": len(tables),
+        "total_records": sum(t["count"] for t in tables.values()),
+    }
 
 
-@router.get("/tables/{table_name}")
+@router.get("/tables/{table_name}", dependencies=[Depends(Require("explorer:read"))])
 async def explore_table(
     table_name: str,
     limit: int = Query(default=100, le=1000),
     offset: int = 0,
     order_by: Optional[str] = None,
-    order_dir: str = Query(default="desc", regex="^(asc|desc)$"),
+    order_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
+    date_column: Optional[str] = Query(default=None, description="Column to filter by date"),
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
+    search: Optional[str] = Query(default=None, description="Search text in string columns"),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Explore data in a specific table."""
+    """Explore data in a specific table with date filtering and search."""
     if table_name not in TABLES:
         raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
 
     model = TABLES[table_name]
     query = db.query(model)
+
+    # Apply date filtering
+    if date_column and start_date and end_date:
+        col = getattr(model, date_column, None)
+        if col is None:
+            raise HTTPException(status_code=400, detail=f"Invalid date column: {date_column}")
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        query = query.filter(col >= start_dt, col <= end_dt)
+
+    # Apply search (search in string columns)
+    if search:
+        search_conditions = []
+        for column in inspect(model).mapper.column_attrs:
+            col = getattr(model, column.key)
+            if hasattr(col, 'type') and hasattr(col.type, 'python_type'):
+                if col.type.python_type == str:
+                    search_conditions.append(col.ilike(f"%{search}%"))
+        if search_conditions:
+            query = query.filter(or_(*search_conditions))
 
     # Apply ordering
     if order_by:
@@ -184,13 +347,7 @@ async def explore_table(
         row = {}
         for column in inspect(model).mapper.column_attrs:
             value = getattr(record, column.key)
-            # Handle datetime serialization
-            if isinstance(value, datetime):
-                value = value.isoformat()
-            # Handle enums
-            elif hasattr(value, "value"):
-                value = value.value
-            row[column.key] = value
+            row[column.key] = _serialize_value(value)
         data.append(row)
 
     return {
@@ -198,11 +355,19 @@ async def explore_table(
         "total": total,
         "limit": limit,
         "offset": offset,
+        "date_columns": _get_date_columns(model),
+        "columns": [c.key for c in inspect(model).mapper.column_attrs],
+        "filters_applied": {
+            "date_column": date_column,
+            "start_date": start_date,
+            "end_date": end_date,
+            "search": search,
+        },
         "data": data,
     }
 
 
-@router.get("/tables/{table_name}/stats")
+@router.get("/tables/{table_name}/stats", dependencies=[Depends(Require("explorer:read"))])
 async def get_table_stats(
     table_name: str,
     db: Session = Depends(get_db),
@@ -455,7 +620,92 @@ async def get_table_stats(
     return stats
 
 
-@router.get("/data-quality")
+@router.get("/tables/{table_name}/export", dependencies=[Depends(Require("explorer:read"))])
+async def export_table(
+    table_name: str,
+    format: str = Query(default="csv", pattern="^(csv|json)$"),
+    date_column: Optional[str] = Query(default=None, description="Column to filter by date"),
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
+    search: Optional[str] = Query(default=None, description="Search text in string columns"),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Export table data as CSV or JSON with optional filtering."""
+    if table_name not in TABLES:
+        raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
+
+    model = TABLES[table_name]
+    query = db.query(model)
+
+    # Apply date filtering
+    if date_column and start_date and end_date:
+        col = getattr(model, date_column, None)
+        if col is None:
+            raise HTTPException(status_code=400, detail=f"Invalid date column: {date_column}")
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        query = query.filter(col >= start_dt, col <= end_dt)
+
+    # Apply search (search in string columns)
+    if search:
+        search_conditions = []
+        for column in inspect(model).mapper.column_attrs:
+            col = getattr(model, column.key)
+            if hasattr(col, 'type') and hasattr(col.type, 'python_type'):
+                if col.type.python_type == str:
+                    search_conditions.append(col.ilike(f"%{search}%"))
+        if search_conditions:
+            query = query.filter(or_(*search_conditions))
+
+    # Default order by id desc
+    if hasattr(model, "id"):
+        query = query.order_by(model.id.desc())
+
+    # Limit to 10000 records for export to prevent memory issues
+    records = query.limit(10000).all()
+
+    # Get column names
+    columns = [c.key for c in inspect(model).mapper.column_attrs]
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(columns)
+        for record in records:
+            row = []
+            for col in columns:
+                value = getattr(record, col)
+                row.append(_serialize_value(value))
+            writer.writerow(row)
+
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={table_name}_export.csv"
+            },
+        )
+    else:  # json
+        data = []
+        for record in records:
+            row = {}
+            for col in columns:
+                value = getattr(record, col)
+                row[col] = _serialize_value(value)
+            data.append(row)
+
+        output = json.dumps(data, indent=2, default=str)
+        return StreamingResponse(
+            iter([output]),
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f"attachment; filename={table_name}_export.json"
+            },
+        )
+
+
+@router.get("/data-quality", dependencies=[Depends(Require("explorer:read"))])
 async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Check data quality and completeness across all tables."""
     report = {}
@@ -528,7 +778,7 @@ async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
     return report
 
 
-@router.get("/search")
+@router.get("/search", dependencies=[Depends(Require("explorer:read"))])
 async def search_all(
     q: str = Query(..., min_length=2),
     limit: int = Query(default=50, le=200),
@@ -656,7 +906,7 @@ def _apply_filters(query: Any, model: Any, filters: Optional[Dict[str, Any]]) ->
     return query
 
 
-@router.post("/query")
+@router.post("/query", dependencies=[Depends(Require("explorer:read"))])
 async def run_custom_query(
     table: str,
     filters: Optional[Dict[str, Any]] = None,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,35 +10,71 @@ import {
   TrendingUp,
   Database,
   RefreshCw,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Activity,
   Menu,
   X,
-  KeyRound,
+  Lightbulb,
+  Lock,
+  Sun,
+  Moon,
+  User,
+  LogOut,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
+import { useAuth, Scope } from '@/lib/auth-context';
+import { useTheme } from '@dotmac/design-tokens';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string | number;
+  requiredScopes?: Scope[];
 }
 
 const navigation: NavItem[] = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
-  { name: 'Customers', href: '/customers', icon: Users },
-  { name: 'POPs', href: '/pops', icon: Radio },
-  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-  { name: 'Data Explorer', href: '/explorer', icon: Database },
-  { name: 'Sync', href: '/sync', icon: RefreshCw },
+  { name: 'Customers', href: '/customers', icon: Users, requiredScopes: ['customers:read'] },
+  { name: 'POPs', href: '/pops', icon: Radio, requiredScopes: ['analytics:read'] },
+  { name: 'Analytics', href: '/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+  { name: 'Insights', href: '/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+  { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explore:read'] },
+  { name: 'Sync', href: '/sync', icon: RefreshCw, requiredScopes: ['sync:read'] },
 ];
 
 // Keys in sync status response that represent actual sync sources (have .status property)
 const SYNC_SOURCE_KEYS = ['splynx', 'erpnext', 'chatwoot'] as const;
+
+function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
+  const { isDarkMode, setColorScheme } = useTheme();
+
+  return (
+    <button
+      onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
+      className={cn(
+        'flex items-center justify-center rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors',
+        collapsed ? 'w-10 h-10' : 'w-full px-3 py-2 gap-2'
+      )}
+      title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {isDarkMode ? (
+        <>
+          <Sun className="w-5 h-5" />
+          {!collapsed && <span className="text-sm">Light Mode</span>}
+        </>
+      ) : (
+        <>
+          <Moon className="w-5 h-5" />
+          {!collapsed && <span className="text-sm">Dark Mode</span>}
+        </>
+      )}
+    </button>
+  );
+}
 
 function SyncStatusIndicator() {
   const { data: status, error } = useSyncStatus();
@@ -67,7 +103,7 @@ function SyncStatusIndicator() {
     .map((key) => status[key]);
 
   const allSynced = syncSources.length === 0 || syncSources.every(
-    (s) => s.status === 'completed' || s.status === 'never_synced'
+    (s) => s && (s.status === 'completed' || s.status === 'never_synced')
   );
 
   return (
@@ -84,96 +120,114 @@ function SyncStatusIndicator() {
   );
 }
 
-function ApiKeyControl({ collapsed }: { collapsed: boolean }) {
-  const [value, setValue] = useState('');
-  const [saved, setSaved] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'saved' | 'cleared'>('idle');
-  const [mounted, setMounted] = useState(false);
+function AuthStatusIndicator({ collapsed }: { collapsed?: boolean }) {
+  const { isAuthenticated, isLoading, scopes, logout } = useAuth();
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [tokenValue, setTokenValue] = useState('');
 
-  useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem('dotmac_api_key');
-    if (stored) {
-      setSaved(stored);
-      setValue(stored);
+  const handleSetToken = () => {
+    if (tokenValue.trim()) {
+      localStorage.setItem('dotmac_access_token', tokenValue.trim());
+      setTokenValue('');
+      setShowTokenInput(false);
+      // Trigger auth check by dispatching storage event (for cross-tab sync)
+      window.dispatchEvent(new StorageEvent('storage', { key: 'dotmac_access_token' }));
+      window.location.reload();
     }
-  }, []);
-
-  const handleSave = () => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    localStorage.setItem('dotmac_api_key', trimmed);
-    setSaved(trimmed);
-    setStatus('saved');
-    setTimeout(() => setStatus('idle'), 1800);
   };
 
-  const handleClear = () => {
-    localStorage.removeItem('dotmac_api_key');
-    setSaved(null);
-    setValue('');
-    setStatus('cleared');
-    setTimeout(() => setStatus('idle'), 1800);
-  };
-
-  if (!mounted) return null;
-
-  if (collapsed) {
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center gap-2 text-slate-muted text-[10px]">
-        <div className="p-2 rounded-lg bg-slate-elevated border border-slate-border">
-          <KeyRound className="w-4 h-4" />
-        </div>
-        <span>API Key</span>
+      <div className={cn(
+        'flex items-center text-slate-muted text-xs',
+        collapsed ? 'justify-center' : 'gap-2 px-3'
+      )}>
+        <span className="w-2 h-2 rounded-full bg-slate-muted animate-pulse" />
+        {!collapsed && <span>Checking auth...</span>}
       </div>
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className={cn('text-xs', collapsed && 'flex justify-center')}>
+        {showTokenInput ? (
+          <div className="px-3 space-y-2">
+            <input
+              type="password"
+              value={tokenValue}
+              onChange={(e) => setTokenValue(e.target.value)}
+              placeholder="Paste JWT token..."
+              className="w-full px-2 py-1.5 bg-slate-elevated border border-slate-border rounded text-white text-xs placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
+              onKeyDown={(e) => e.key === 'Enter' && handleSetToken()}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSetToken}
+                className="flex-1 px-2 py-1 bg-teal-electric text-slate-deep rounded text-xs font-medium hover:bg-teal-glow transition-colors"
+              >
+                Set Token
+              </button>
+              <button
+                onClick={() => { setShowTokenInput(false); setTokenValue(''); }}
+                className="px-2 py-1 text-slate-muted hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowTokenInput(true)}
+            className={cn(
+              'flex items-center rounded-lg text-amber-warn hover:text-amber-warn/80 hover:bg-slate-elevated transition-colors',
+              collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2 w-full'
+            )}
+            title="Set authentication token"
+          >
+            <Key className="w-4 h-4" />
+            {!collapsed && <span>Set Token</span>}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Authenticated state
+  const scopeCount = scopes.length;
+  const isDevMode = process.env.NODE_ENV === 'development';
+
   return (
-    <div className="space-y-2 rounded-lg border border-slate-border bg-slate-elevated p-3">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-md bg-teal-electric/10 flex items-center justify-center">
-          <KeyRound className="w-4 h-4 text-teal-electric" />
-        </div>
-        <div className="leading-tight">
-          <p className="text-xs font-semibold text-white">API Key</p>
-          <p className="text-[11px] text-slate-muted">Used for all backend requests (X-API-Key)</p>
-        </div>
+    <div className={cn('text-xs', collapsed && 'flex flex-col items-center gap-2')}>
+      {/* User status */}
+      <div className={cn(
+        'flex items-center text-teal-electric',
+        collapsed ? 'justify-center' : 'gap-2 px-3'
+      )}>
+        <User className="w-4 h-4" />
+        {!collapsed && (
+          <span>
+            {isDevMode ? 'Dev Token' : 'Authenticated'}
+            {scopeCount > 0 && <span className="text-slate-muted ml-1">({scopeCount} scopes)</span>}
+          </span>
+        )}
       </div>
-      <input
-        type="password"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Enter API key"
-        className="w-full rounded-md border border-slate-border bg-slate-card px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
-      />
-      <div className="flex items-center justify-between gap-2">
+
+      {/* Logout button */}
+      {!isDevMode && (
         <button
-          onClick={handleSave}
-          className="flex-1 rounded-md bg-teal-electric text-slate-deep text-sm font-semibold py-2 hover:bg-teal-glow transition-colors"
-          disabled={!value.trim()}
+          onClick={logout}
+          className={cn(
+            'flex items-center rounded-lg text-slate-muted hover:text-coral-alert hover:bg-slate-elevated transition-colors mt-1',
+            collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5 w-full'
+          )}
+          title="Sign out"
         >
-          Save
+          <LogOut className="w-4 h-4" />
+          {!collapsed && <span>Sign Out</span>}
         </button>
-        <button
-          onClick={handleClear}
-          className="px-3 py-2 rounded-md border border-slate-border text-slate-muted text-sm hover:text-white hover:border-slate-muted transition-colors"
-          disabled={!saved}
-        >
-          Clear
-        </button>
-      </div>
-      <div className="text-[11px] text-slate-muted flex items-center gap-2">
-        <span className={cn(
-          'w-2 h-2 rounded-full',
-          status === 'saved' ? 'bg-teal-electric' : status === 'cleared' ? 'bg-slate-muted' : saved ? 'bg-teal-electric' : 'bg-slate-muted'
-        )} />
-        <span>
-          {status === 'saved' && 'Saved locally'}
-          {status === 'cleared' && 'Cleared'}
-          {status === 'idle' && (saved ? `Using ${saved.slice(0, 4)}…` : 'Not set')}
-        </span>
-      </div>
+      )}
     </div>
   );
 }
@@ -183,6 +237,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const { hasAnyScope, isAuthenticated } = useAuth();
+
+  // Filter navigation items based on user scopes
+  const filteredNavigation = useMemo(() => {
+    return navigation.map((item) => {
+      // If no scopes required, item is accessible
+      if (!item.requiredScopes || item.requiredScopes.length === 0) {
+        return { ...item, accessible: true };
+      }
+      // Check if user has any of the required scopes
+      const accessible = isAuthenticated && hasAnyScope(item.requiredScopes);
+      return { ...item, accessible };
+    });
+  }, [isAuthenticated, hasAnyScope]);
 
   // Load saved preference after hydration (avoids SSR mismatch)
   useEffect(() => {
@@ -232,8 +300,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <nav className="p-4 space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = pathname === item.href;
+
+            // For inaccessible items, show disabled state with lock icon
+            if (!item.accessible) {
+              return (
+                <div
+                  key={item.name}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-muted/50 cursor-not-allowed"
+                  title="You don't have permission to access this section"
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium flex-1">{item.name}</span>
+                  <Lock className="w-4 h-4" />
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
@@ -252,6 +336,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+        {/* Mobile bottom controls */}
+        <div className="absolute bottom-4 left-4 right-4 space-y-3">
+          <AuthStatusIndicator collapsed={false} />
+          <ThemeToggle collapsed={false} />
+        </div>
       </div>
 
       {/* Desktop sidebar */}
@@ -279,8 +368,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = pathname === item.href;
+
+            // For inaccessible items, show disabled state with lock icon
+            if (!item.accessible) {
+              return (
+                <div
+                  key={item.name}
+                  className={cn(
+                    'group flex items-center rounded-lg relative cursor-not-allowed',
+                    collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5',
+                    'text-slate-muted/50'
+                  )}
+                  title="You don't have permission to access this section"
+                >
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {!collapsed && (
+                    <>
+                      <span className="font-medium flex-1">{item.name}</span>
+                      <Lock className="w-4 h-4" />
+                    </>
+                  )}
+
+                  {/* Tooltip for collapsed state */}
+                  {collapsed && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-slate-elevated border border-slate-border rounded text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 flex items-center gap-2">
+                      <Lock className="w-3 h-3" />
+                      {item.name}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
@@ -315,6 +436,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           'border-t border-slate-border p-3',
           collapsed && 'flex flex-col items-center'
         )}>
+          {/* Auth status */}
+          <div className="mb-3">
+            <AuthStatusIndicator collapsed={collapsed} />
+          </div>
+
           {/* Sync status */}
           {!collapsed && (
             <div className="mb-3 px-3">
@@ -322,8 +448,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <div className="mb-3 px-3">
-            <ApiKeyControl collapsed={collapsed} />
+          {/* Theme toggle */}
+          <div className="mb-2">
+            <ThemeToggle collapsed={collapsed} />
           </div>
 
           {/* Collapse button */}

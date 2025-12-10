@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Dict, Any, List, Optional
 import structlog
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
@@ -15,7 +16,7 @@ from app.models.customer import Customer
 from app.models.employee import Employee, EmploymentStatus
 from app.models.expense import Expense, ExpenseStatus
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
-from app.models.payment import Payment, PaymentMethod, PaymentSource
+from app.models.payment import Payment, PaymentMethod, PaymentSource, PaymentStatus
 from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketSource
 from app.models.project import Project, ProjectStatus, ProjectPriority
 from app.models.accounting import (
@@ -69,6 +70,24 @@ class ERPNextSync(BaseSyncClient):
         self.base_url = settings.erpnext_api_url.rstrip("/")
         self.api_key = settings.erpnext_api_key
         self.api_secret = settings.erpnext_api_secret
+
+    @staticmethod
+    def _safe_int(value: Any) -> Optional[int]:
+        """Parse an integer from ERPNext custom fields if present."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_iso_date(value: Any) -> Optional[datetime]:
+        """Best-effort ISO date parser used for ERPNext date fields."""
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return None
 
     def _get_headers(self) -> Dict[str, str]:
         """Get authentication headers for ERPNext API."""
@@ -404,17 +423,36 @@ class ERPNextSync(BaseSyncClient):
                 client,
                 "Sales Invoice",
                 fields=[
-                    "name", "customer", "posting_date", "due_date",
-                    "grand_total", "outstanding_amount", "status",
-                    "paid_amount", "currency",
-                ],
+                "name", "customer", "posting_date", "due_date",
+                "grand_total", "outstanding_amount", "status",
+                "paid_amount", "currency",
+                "custom_splynx_invoice_id",
+            ],
             )
+
+            # Track invoice IDs already assigned an erpnext_id in this transaction
+            assigned_invoice_ids: set[int] = set()
+            # Track erpnext_ids already processed in this transaction
+            processed_erpnext_ids: set[str] = set()
 
             for inv_data in invoices:
                 erpnext_id = inv_data.get("name")
-                existing = self.db.query(Invoice).filter(
-                    Invoice.erpnext_id == erpnext_id,
-                    Invoice.source == InvoiceSource.ERPNEXT,
+
+                # Skip if this erpnext_id was already processed in this batch
+                if erpnext_id in processed_erpnext_ids:
+                    continue
+                processed_erpnext_ids.add(erpnext_id)
+                custom_splynx_invoice_id = self._safe_int(inv_data.get("custom_splynx_invoice_id"))
+                splynx_invoice = (
+                    self.db.query(Invoice)
+                    .filter(Invoice.splynx_id == custom_splynx_invoice_id)
+                    .first()
+                    if custom_splynx_invoice_id
+                    else None
+                )
+
+                existing_erpnext = self.db.query(Invoice).filter(
+                    Invoice.erpnext_id == erpnext_id
                 ).first()
 
                 # Find customer
@@ -440,28 +478,89 @@ class ERPNextSync(BaseSyncClient):
                 outstanding = float(inv_data.get("outstanding_amount", 0) or 0)
                 paid_amount = float(inv_data.get("paid_amount", 0) or 0)
 
-                if existing:
-                    existing.customer_id = customer_id
-                    existing.total_amount = Decimal(str(total_amount))
-                    existing.amount = Decimal(str(total_amount))
-                    existing.amount_paid = Decimal(str(paid_amount))
-                    existing.balance = Decimal(str(outstanding))
-                    existing.status = status
-                    existing.currency = inv_data.get("currency", "NGN")
-                    existing.last_synced_at = datetime.utcnow()
+                # Determine target invoice, handling conflicts between splynx linkage and existing erpnext record
+                target_invoice: Optional[Invoice] = None
+                duplicate_invoice: Optional[Invoice] = None
 
-                    if inv_data.get("posting_date"):
-                        try:
-                            existing.invoice_date = datetime.fromisoformat(inv_data["posting_date"])
-                        except (ValueError, TypeError):
-                            pass
+                if splynx_invoice and existing_erpnext:
+                    if splynx_invoice.id == existing_erpnext.id:
+                        # Same invoice - use it
+                        target_invoice = splynx_invoice
+                    elif existing_erpnext.source == InvoiceSource.ERPNEXT:
+                        # Existing ERPNext-only record can be merged into Splynx record
+                        target_invoice = splynx_invoice
+                        duplicate_invoice = existing_erpnext
+                    else:
+                        # Conflict: existing_erpnext is a Splynx invoice with this erpnext_id
+                        # This is a data integrity issue - use existing_erpnext to avoid unique constraint violation
+                        # Log warning and skip updating the linkage
+                        import structlog
+                        logger = structlog.get_logger()
+                        logger.warning(
+                            "erpnext_splynx_linkage_conflict",
+                            erpnext_id=erpnext_id,
+                            custom_splynx_id=custom_splynx_invoice_id,
+                            existing_invoice_id=existing_erpnext.id,
+                            linked_splynx_invoice_id=splynx_invoice.id,
+                        )
+                        target_invoice = existing_erpnext
+                elif splynx_invoice:
+                    target_invoice = splynx_invoice
+                elif existing_erpnext:
+                    target_invoice = existing_erpnext
 
-                    if inv_data.get("due_date"):
-                        try:
-                            existing.due_date = datetime.fromisoformat(inv_data["due_date"])
-                        except (ValueError, TypeError):
-                            pass
+                # Fallback soft match if the custom field is missing
+                if not target_invoice:
+                    posting_dt = self._parse_iso_date(inv_data.get("posting_date"))
+                    if posting_dt and customer_id:
+                        # Exclude invoices already assigned in this transaction or already having an erpnext_id
+                        target_invoice = (
+                            self.db.query(Invoice)
+                            .filter(
+                                Invoice.source == InvoiceSource.SPLYNX,
+                                Invoice.customer_id == customer_id,
+                                Invoice.total_amount == Decimal(str(total_amount)),
+                                func.date(Invoice.invoice_date) == posting_dt.date(),
+                                Invoice.erpnext_id.is_(None),
+                                ~Invoice.id.in_(assigned_invoice_ids) if assigned_invoice_ids else True,
+                            )
+                            .first()
+                        )
 
+                if target_invoice:
+                    # Track this invoice as assigned to avoid duplicate erpnext_id assignments
+                    assigned_invoice_ids.add(target_invoice.id)
+
+                    # If we're merging with a duplicate, clear its erpnext_id first to avoid constraint violation
+                    if duplicate_invoice:
+                        duplicate_invoice.erpnext_id = None
+                        self.db.flush()  # Flush the NULL assignment before setting the new value
+
+                    target_invoice.erpnext_id = erpnext_id
+                    target_invoice.customer_id = customer_id
+                    target_invoice.total_amount = Decimal(str(total_amount))
+                    target_invoice.amount = Decimal(str(total_amount))
+                    target_invoice.amount_paid = Decimal(str(paid_amount))
+                    target_invoice.balance = Decimal(str(outstanding))
+                    target_invoice.status = status
+                    target_invoice.currency = inv_data.get("currency", "NGN")
+                    target_invoice.last_synced_at = datetime.utcnow()
+
+                    posting_dt = self._parse_iso_date(inv_data.get("posting_date"))
+                    if posting_dt:
+                        target_invoice.invoice_date = posting_dt
+
+                    due_dt = self._parse_iso_date(inv_data.get("due_date"))
+                    if due_dt:
+                        target_invoice.due_date = due_dt
+
+                    # If we found a duplicate ERPNext-only record, re-home children and delete it
+                    if duplicate_invoice:
+                        for payment in list(duplicate_invoice.payments):
+                            payment.invoice_id = target_invoice.id
+                        for credit_note in list(duplicate_invoice.credit_notes):
+                            credit_note.invoice_id = target_invoice.id
+                        self.db.delete(duplicate_invoice)
                     self.increment_updated()
                 else:
                     invoice = Invoice(
@@ -478,17 +577,13 @@ class ERPNextSync(BaseSyncClient):
                         invoice_date=datetime.utcnow(),
                     )
 
-                    if inv_data.get("posting_date"):
-                        try:
-                            invoice.invoice_date = datetime.fromisoformat(inv_data["posting_date"])
-                        except (ValueError, TypeError):
-                            pass
+                    posting_dt = self._parse_iso_date(inv_data.get("posting_date"))
+                    if posting_dt:
+                        invoice.invoice_date = posting_dt
 
-                    if inv_data.get("due_date"):
-                        try:
-                            invoice.due_date = datetime.fromisoformat(inv_data["due_date"])
-                        except (ValueError, TypeError):
-                            pass
+                    due_dt = self._parse_iso_date(inv_data.get("due_date"))
+                    if due_dt:
+                        invoice.due_date = due_dt
 
                     self.db.add(invoice)
                     self.increment_created()
@@ -513,8 +608,15 @@ class ERPNextSync(BaseSyncClient):
                     "name", "party", "party_type", "posting_date",
                     "paid_amount", "mode_of_payment", "reference_no",
                     "payment_type", "status",
+                    "custom_splynx_payment_id",
+                    "custom_splynx_credit_note_id",
                 ],
             )
+
+            # Track payment IDs already assigned an erpnext_id in this transaction
+            assigned_payment_ids: set[int] = set()
+            # Track erpnext_ids already processed in this transaction
+            processed_payment_erpnext_ids: set[str] = set()
 
             for pay_data in payments:
                 # Only process customer payments
@@ -522,9 +624,22 @@ class ERPNextSync(BaseSyncClient):
                     continue
 
                 erpnext_id = pay_data.get("name")
-                existing = self.db.query(Payment).filter(
-                    Payment.erpnext_id == erpnext_id,
-                    Payment.source == PaymentSource.ERPNEXT,
+
+                # Skip if this erpnext_id was already processed in this batch
+                if erpnext_id in processed_payment_erpnext_ids:
+                    continue
+                processed_payment_erpnext_ids.add(erpnext_id)
+                custom_splynx_payment_id = self._safe_int(pay_data.get("custom_splynx_payment_id"))
+                splynx_payment = (
+                    self.db.query(Payment)
+                    .filter(Payment.splynx_id == custom_splynx_payment_id)
+                    .first()
+                    if custom_splynx_payment_id
+                    else None
+                )
+
+                existing_erpnext = self.db.query(Payment).filter(
+                    Payment.erpnext_id == erpnext_id
                 ).first()
 
                 # Find customer
@@ -550,18 +665,89 @@ class ERPNextSync(BaseSyncClient):
                         payment_method = value
                         break
 
-                if existing:
-                    existing.customer_id = customer_id
-                    existing.amount = Decimal(str(amount))
-                    existing.payment_method = payment_method
-                    existing.transaction_reference = pay_data.get("reference_no")
-                    existing.last_synced_at = datetime.utcnow()
+                # Determine target payment, handling conflicts between splynx linkage and existing erpnext record
+                target_payment: Optional[Payment] = None
+                duplicate_payment: Optional[Payment] = None
 
-                    if pay_data.get("posting_date"):
-                        try:
-                            existing.payment_date = datetime.fromisoformat(pay_data["posting_date"])
-                        except (ValueError, TypeError):
-                            pass
+                if splynx_payment and existing_erpnext:
+                    if splynx_payment.id == existing_erpnext.id:
+                        # Same payment - use it
+                        target_payment = splynx_payment
+                    elif existing_erpnext.source == PaymentSource.ERPNEXT:
+                        # Existing ERPNext-only record can be merged into Splynx record
+                        target_payment = splynx_payment
+                        duplicate_payment = existing_erpnext
+                    else:
+                        # Conflict: existing_erpnext is a Splynx payment with this erpnext_id
+                        # Use existing_erpnext to avoid unique constraint violation
+                        import structlog
+                        logger = structlog.get_logger()
+                        logger.warning(
+                            "erpnext_splynx_payment_linkage_conflict",
+                            erpnext_id=erpnext_id,
+                            custom_splynx_id=custom_splynx_payment_id,
+                            existing_payment_id=existing_erpnext.id,
+                            linked_splynx_payment_id=splynx_payment.id,
+                        )
+                        target_payment = existing_erpnext
+                elif splynx_payment:
+                    target_payment = splynx_payment
+                elif existing_erpnext:
+                    target_payment = existing_erpnext
+
+                # Soft-match if custom link missing: same amount, customer, and date
+                if not target_payment:
+                    posting_dt = self._parse_iso_date(pay_data.get("posting_date"))
+                    if posting_dt and customer_id:
+                        # Exclude payments already assigned in this transaction or already having an erpnext_id
+                        target_payment = (
+                            self.db.query(Payment)
+                            .filter(
+                                Payment.source == PaymentSource.SPLYNX,
+                                Payment.customer_id == customer_id,
+                                Payment.amount == Decimal(str(amount)),
+                                func.date(Payment.payment_date) == posting_dt.date(),
+                                Payment.erpnext_id.is_(None),
+                                ~Payment.id.in_(assigned_payment_ids) if assigned_payment_ids else True,
+                            )
+                            .first()
+                        )
+
+                if target_payment:
+                    # Track this payment as assigned to avoid duplicate erpnext_id assignments
+                    assigned_payment_ids.add(target_payment.id)
+
+                    # If we're merging with a duplicate, clear its erpnext_id first to avoid constraint violation
+                    if duplicate_payment:
+                        duplicate_payment.erpnext_id = None
+                        self.db.flush()  # Flush the NULL assignment before setting the new value
+
+                    target_payment.erpnext_id = erpnext_id
+                    target_payment.customer_id = customer_id
+                    target_payment.amount = Decimal(str(amount))
+                    target_payment.payment_method = payment_method
+                    target_payment.transaction_reference = pay_data.get("reference_no")
+                    target_payment.last_synced_at = datetime.utcnow()
+
+                    posting_dt = self._parse_iso_date(pay_data.get("posting_date"))
+                    if posting_dt:
+                        target_payment.payment_date = posting_dt
+
+                    # Map ERPNext status to our enum if present
+                    status_str = (pay_data.get("status", "") or "").lower()
+                    status_map = {
+                        "submitted": PaymentStatus.COMPLETED,
+                        "completed": PaymentStatus.COMPLETED,
+                        "draft": PaymentStatus.PENDING,
+                        "cancelled": PaymentStatus.FAILED,
+                        "failed": PaymentStatus.FAILED,
+                    }
+                    if status_str in status_map:
+                        target_payment.status = status_map[status_str]
+
+                    # Delete the duplicate ERPNext-only payment after merging
+                    if duplicate_payment:
+                        self.db.delete(duplicate_payment)
 
                     self.increment_updated()
                 else:
@@ -576,11 +762,9 @@ class ERPNextSync(BaseSyncClient):
                         payment_date=datetime.utcnow(),
                     )
 
-                    if pay_data.get("posting_date"):
-                        try:
-                            payment.payment_date = datetime.fromisoformat(pay_data["posting_date"])
-                        except (ValueError, TypeError):
-                            pass
+                    posting_dt = self._parse_iso_date(pay_data.get("posting_date"))
+                    if posting_dt:
+                        payment.payment_date = posting_dt
 
                     self.db.add(payment)
                     self.increment_created()
@@ -618,6 +802,27 @@ class ERPNextSync(BaseSyncClient):
                 for p in self.db.query(Project).filter(Project.erpnext_id.isnot(None)).all()
             }
 
+            # OPTIMIZATION: Batch fetch Expense Claim Detail child records to avoid N+1
+            # This fetches all expense details in one API call instead of N individual calls
+            expense_details: Dict[str, List[Dict[str, Any]]] = {}
+            try:
+                all_details = await self._fetch_all_doctype(
+                    client,
+                    "Expense Claim Detail",
+                    fields=["parent", "expense_type", "description"],
+                )
+                # Group by parent expense claim
+                for detail in all_details:
+                    parent = detail.get("parent")
+                    if parent:
+                        if parent not in expense_details:
+                            expense_details[parent] = []
+                        expense_details[parent].append(detail)
+                logger.info("expense_details_prefetched", total=len(all_details), unique_claims=len(expense_details))
+            except Exception as e:
+                logger.warning("failed_to_prefetch_expense_details", error=str(e))
+                # Continue without details - N+1 fallback disabled for performance
+
             # Helper for Decimal conversion
             def to_decimal(val: Any) -> Decimal:
                 return Decimal(str(val or 0))
@@ -648,23 +853,17 @@ class ERPNextSync(BaseSyncClient):
                 erpnext_project = exp_data.get("project")
                 project_id = projects_by_erpnext_id.get(erpnext_project) if erpnext_project else None
 
-                # Fetch full document to get expense_type from child table
+                # Get expense_type and description from pre-fetched child records (N+1 fix)
                 expense_type = None
                 description = None
-                try:
-                    full_doc = await self._request(
-                        client, "GET", f"/api/resource/Expense Claim/{erpnext_id}"
-                    )
-                    expenses_child = full_doc.get("data", {}).get("expenses", [])
-                    if expenses_child:
-                        # Get expense types, join if multiple
-                        expense_types = [e.get("expense_type") for e in expenses_child if e.get("expense_type")]
-                        expense_type = ", ".join(set(expense_types)) if expense_types else None
-                        # Get descriptions
-                        descriptions = [e.get("description") for e in expenses_child if e.get("description")]
-                        description = "; ".join(descriptions) if descriptions else None
-                except Exception as e:
-                    logger.warning("failed_to_fetch_expense_details", erpnext_id=erpnext_id, error=str(e))
+                claim_details = expense_details.get(erpnext_id, [])
+                if claim_details:
+                    # Get expense types, join if multiple
+                    expense_types = [d.get("expense_type") for d in claim_details if d.get("expense_type")]
+                    expense_type = ", ".join(set(expense_types)) if expense_types else None
+                    # Get descriptions
+                    descriptions = [d.get("description") for d in claim_details if d.get("description")]
+                    description = "; ".join(descriptions) if descriptions else None
 
                 if existing:
                     # Employee

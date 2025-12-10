@@ -1,20 +1,37 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Optional
 import structlog
 import httpx
 
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.customer import Customer
 from app.sync.splynx_parts.utils import parse_date
+from app.config import settings
+from app.models.sync_cursor import parse_datetime
 
 logger = structlog.get_logger()
 
 
 async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool):
-    """Sync invoices from Splynx. Falls back to proforma invoices when needed."""
+    """Sync invoices from Splynx with incremental cursor support.
+
+    Falls back to proforma invoices when needed. Uses date_updated for client-side filtering.
+    """
     sync_client.start_sync("invoices", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size_invoices
 
     try:
+        # Get cursor for incremental sync
+        cursor = sync_client.get_cursor("invoices")
+        last_sync_time: Optional[datetime] = None
+
+        if not full_sync and cursor and cursor.last_modified_at:
+            last_sync_time = cursor.last_modified_at  # Now a datetime
+            logger.info("splynx_incremental_sync", entity="invoices", since=last_sync_time.isoformat() if last_sync_time else None)
+
+        if full_sync:
+            sync_client.reset_cursor("invoices")
+
         # Try regular invoices first, fall back to proforma-invoices
         invoices = []
         try:
@@ -31,18 +48,37 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
 
         logger.info("splynx_invoices_fetched", count=len(invoices))
 
+        # Track latest update time for cursor (as datetime)
+        latest_update: Optional[datetime] = None
+
         # Pre-fetch customers for faster lookup
         customers_by_splynx_id = {
             c.splynx_id: c.id
             for c in sync_client.db.query(Customer).all()
         }
 
+        processed_count = 0
+        skipped_count = 0
         for i, inv_data in enumerate(invoices, 1):
+            # Track latest update time for cursor (parse to datetime for proper comparison)
+            record_update_str = inv_data.get("date_updated") or inv_data.get("real_create_datetime")
+            record_update_dt = parse_datetime(record_update_str) if record_update_str else None
+
+            if record_update_dt:
+                if latest_update is None or record_update_dt > latest_update:
+                    latest_update = record_update_dt
+
+            # Skip records not modified since last sync (incremental optimization)
+            if last_sync_time and record_update_dt and record_update_dt <= last_sync_time:
+                skipped_count += 1
+                continue
+
             splynx_id = inv_data.get("id")
             existing = sync_client.db.query(Invoice).filter(
                 Invoice.splynx_id == splynx_id,
                 Invoice.source == InvoiceSource.SPLYNX,
             ).first()
+            processed_count += 1
 
             # Find customer using pre-fetched map
             customer_splynx_id = inv_data.get("customer_id")
@@ -116,8 +152,24 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 logger.debug("invoices_batch_committed", processed=i, total=len(invoices))
 
         sync_client.db.commit()
+
+        # Update cursor with latest modification time for next incremental sync
+        if latest_update:
+            sync_client.update_cursor(
+                entity_type="invoices",
+                modified_at=latest_update,
+                records_count=processed_count,
+            )
+
         sync_client.complete_sync()
-        logger.info("splynx_invoices_synced", created=sync_client.current_sync_log.records_created, updated=sync_client.current_sync_log.records_updated)
+        logger.info(
+            "splynx_invoices_synced",
+            created=sync_client.current_sync_log.records_created,
+            updated=sync_client.current_sync_log.records_updated,
+            processed=processed_count,
+            skipped=skipped_count,
+            cursor_updated_to=latest_update.isoformat() if latest_update else None,
+        )
 
     except Exception as e:
         sync_client.db.rollback()

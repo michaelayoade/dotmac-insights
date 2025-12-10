@@ -12,6 +12,7 @@ from app.sync.erpnext import ERPNextSync
 from app.sync.chatwoot import ChatwootSync
 from app.models.sync_log import SyncLog, SyncSource
 from app.config import settings
+from app.auth import Require
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -58,7 +59,7 @@ def run_sync_in_background(sync_class, full_sync: bool, source_name: str):
     asyncio.create_task(_run(), name=f"{source_name}_sync")
 
 
-@router.get("/status")
+@router.get("/status", dependencies=[Depends(Require("sync:splynx:read", "sync:erpnext:read", "sync:chatwoot:read"))])
 async def get_sync_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get the status of all sync operations."""
     sources = [SyncSource.SPLYNX, SyncSource.ERPNEXT, SyncSource.CHATWOOT]
@@ -104,7 +105,7 @@ async def get_sync_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
     return {**status, **celery_status}
 
 
-@router.post("/test-connections")
+@router.post("/test-connections", dependencies=[Depends(Require("sync:splynx:read", "sync:erpnext:read", "sync:chatwoot:read"))])
 async def test_all_connections(db: Session = Depends(get_db)) -> Dict[str, bool]:
     """Test connections to all external systems."""
     results = {}
@@ -121,7 +122,7 @@ async def test_all_connections(db: Session = Depends(get_db)) -> Dict[str, bool]
     return results
 
 
-@router.post("/splynx")
+@router.post("/splynx", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx sync.
 
@@ -144,7 +145,7 @@ async def trigger_splynx_sync(full_sync: bool = False) -> Dict[str, Any]:
         }
 
 
-@router.post("/splynx/customers")
+@router.post("/splynx/customers", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_customers_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx customers sync only."""
     if _celery_available:
@@ -172,7 +173,7 @@ async def trigger_splynx_customers_sync(full_sync: bool = False) -> Dict[str, An
         }
 
 
-@router.post("/splynx/invoices")
+@router.post("/splynx/invoices", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_invoices_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx invoices sync only."""
     if _celery_available:
@@ -199,7 +200,7 @@ async def trigger_splynx_invoices_sync(full_sync: bool = False) -> Dict[str, Any
         }
 
 
-@router.post("/splynx/payments")
+@router.post("/splynx/payments", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_payments_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx payments sync only."""
     if _celery_available:
@@ -226,7 +227,7 @@ async def trigger_splynx_payments_sync(full_sync: bool = False) -> Dict[str, Any
         }
 
 
-@router.post("/splynx/services")
+@router.post("/splynx/services", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_services_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx services sync only."""
     if _celery_available:
@@ -253,7 +254,7 @@ async def trigger_splynx_services_sync(full_sync: bool = False) -> Dict[str, Any
         }
 
 
-@router.post("/splynx/credit-notes")
+@router.post("/splynx/credit-notes", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_credit_notes_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx credit notes sync only."""
     if _celery_available:
@@ -280,7 +281,7 @@ async def trigger_splynx_credit_notes_sync(full_sync: bool = False) -> Dict[str,
         }
 
 
-@router.post("/splynx/tickets")
+@router.post("/splynx/tickets", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_tickets_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx tickets sync only."""
     if _celery_available:
@@ -307,7 +308,7 @@ async def trigger_splynx_tickets_sync(full_sync: bool = False) -> Dict[str, Any]
         }
 
 
-@router.post("/splynx/tariffs")
+@router.post("/splynx/tariffs", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_tariffs_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx tariffs sync only."""
     if _celery_available:
@@ -334,7 +335,7 @@ async def trigger_splynx_tariffs_sync(full_sync: bool = False) -> Dict[str, Any]
         }
 
 
-@router.post("/splynx/routers")
+@router.post("/splynx/routers", dependencies=[Depends(Require("sync:splynx:write"))])
 async def trigger_splynx_routers_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Splynx routers sync only."""
     if _celery_available:
@@ -361,7 +362,7 @@ async def trigger_splynx_routers_sync(full_sync: bool = False) -> Dict[str, Any]
         }
 
 
-@router.post("/erpnext")
+@router.post("/erpnext", dependencies=[Depends(Require("sync:erpnext:write"))])
 async def trigger_erpnext_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger ERPNext sync."""
     if _celery_available:
@@ -377,7 +378,7 @@ async def trigger_erpnext_sync(full_sync: bool = False) -> Dict[str, Any]:
         return {"message": "ERPNext sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
-@router.post("/chatwoot")
+@router.post("/chatwoot", dependencies=[Depends(Require("sync:chatwoot:write"))])
 async def trigger_chatwoot_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger Chatwoot sync."""
     if _celery_available:
@@ -393,7 +394,7 @@ async def trigger_chatwoot_sync(full_sync: bool = False) -> Dict[str, Any]:
         return {"message": "Chatwoot sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
-@router.post("/all")
+@router.post("/all", dependencies=[Depends(Require("sync:splynx:write", "sync:erpnext:write", "sync:chatwoot:write"))])
 async def trigger_all_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger sync for all sources."""
     if _celery_available:
@@ -441,7 +442,7 @@ async def trigger_all_sync(full_sync: bool = False) -> Dict[str, Any]:
         }
 
 
-@router.get("/task/{task_id}")
+@router.get("/task/{task_id}", dependencies=[Depends(Require("sync:splynx:read", "sync:erpnext:read", "sync:chatwoot:read"))])
 async def get_task_status(task_id: str) -> Dict[str, Any]:
     """Get status of a Celery task by ID."""
     if not _celery_available:
@@ -464,7 +465,7 @@ async def get_task_status(task_id: str) -> Dict[str, Any]:
     return response
 
 
-@router.get("/logs")
+@router.get("/logs", dependencies=[Depends(Require("sync:splynx:read", "sync:erpnext:read", "sync:chatwoot:read"))])
 async def get_sync_logs(
     source: Optional[str] = None,
     limit: int = 50,

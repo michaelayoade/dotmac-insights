@@ -114,4 +114,10 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=settings.full_sync_hour, minute=20),
         "kwargs": {"full_sync": True},
     },
+    # DLQ processor - runs every 10 minutes to retry failed records
+    "process-dlq-records": {
+        "task": "app.tasks.sync_tasks.process_dlq_records",
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes
+        "kwargs": {"limit": 50},
+    },
 }

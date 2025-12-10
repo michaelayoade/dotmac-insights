@@ -5,6 +5,7 @@ from app.models.credit_note import CreditNote, CreditNoteStatus
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceSource
 from app.sync.splynx_parts.utils import parse_date
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -12,7 +13,7 @@ logger = structlog.get_logger()
 async def sync_credit_notes(sync_client, client, full_sync: bool):
     """Sync credit notes from Splynx."""
     sync_client.start_sync("credit_notes", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size
 
     try:
         credit_notes = await sync_client._fetch_paginated(client, "/admin/finance/credit-notes")

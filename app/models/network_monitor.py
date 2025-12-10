@@ -53,7 +53,7 @@ class NetworkMonitor(Base):
 
     # Ping monitoring
     is_ping: Mapped[bool] = mapped_column(default=True)
-    ping_state: Mapped[MonitorState] = mapped_column(Enum(MonitorState), default=MonitorState.UNKNOWN)
+    ping_state: Mapped[MonitorState] = mapped_column(Enum(MonitorState), default=MonitorState.UNKNOWN, index=True)
     ping_time: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
 
     # SNMP monitoring

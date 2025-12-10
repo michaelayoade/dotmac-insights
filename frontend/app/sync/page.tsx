@@ -19,6 +19,7 @@ import { Badge } from '@/components/Badge';
 import { DataTable } from '@/components/DataTable';
 import { useSyncStatus, useSyncLogs, triggerSync } from '@/hooks/useApi';
 import { formatDate, cn } from '@/lib/utils';
+import { useToast, Modal } from '@dotmac/core';
 
 type SyncSource = 'splynx' | 'erpnext' | 'chatwoot';
 
@@ -45,23 +46,54 @@ const SOURCE_CONFIG: Record<SyncSource, { name: string; icon: typeof Database; c
 
 export default function SyncPage() {
   const [syncingSource, setSyncingSource] = useState<SyncSource | 'all' | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean; source: SyncSource | null }>({ open: false, source: null });
   const { data: syncStatus, mutate: refreshStatus } = useSyncStatus();
   const { data: syncLogs, mutate: refreshLogs, isLoading: logsLoading } = useSyncLogs(50);
+  const { toast } = useToast();
 
   const handleSync = async (source: SyncSource | 'all', fullSync: boolean = false) => {
     setSyncingSource(source);
+    const sourceName = source === 'all' ? 'All Sources' : SOURCE_CONFIG[source].name;
+
+    toast({
+      title: `${fullSync ? 'Full' : 'Quick'} sync started`,
+      description: `Syncing ${sourceName}...`,
+      variant: 'info',
+    });
+
     try {
       await triggerSync(source, fullSync);
       // Refresh status after a short delay
       setTimeout(() => {
         refreshStatus();
         refreshLogs();
+        toast({
+          title: 'Sync completed',
+          description: `${sourceName} synced successfully`,
+          variant: 'success',
+        });
       }, 2000);
     } catch (error) {
-      console.error('Sync failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        title: 'Sync failed',
+        description: message,
+        variant: 'error',
+      });
     } finally {
       setSyncingSource(null);
     }
+  };
+
+  const handleFullSyncClick = (source: SyncSource) => {
+    setConfirmModal({ open: true, source });
+  };
+
+  const confirmFullSync = () => {
+    if (confirmModal.source) {
+      handleSync(confirmModal.source, true);
+    }
+    setConfirmModal({ open: false, source: null });
   };
 
   const getStatusBadge = (status: string) => {
@@ -73,7 +105,7 @@ export default function SyncPage() {
       case 'running':
         return <Badge variant="info" size="sm"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Running</Badge>;
       default:
-        return <Badge variant="muted" size="sm"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+        return <Badge variant="default" size="sm"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
     }
   };
 
@@ -244,7 +276,7 @@ export default function SyncPage() {
                     Quick Sync
                   </button>
                   <button
-                    onClick={() => handleSync(source, true)}
+                    onClick={() => handleFullSyncClick(source)}
                     disabled={isSyncing}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all',
@@ -299,7 +331,7 @@ export default function SyncPage() {
               key: 'sync_type',
               header: 'Type',
               render: (item) => (
-                <Badge variant={item.sync_type === 'full' ? 'info' : 'muted'} size="sm">
+                <Badge variant={item.sync_type === 'full' ? 'info' : 'default'} size="sm">
                   {item.sync_type as string}
                 </Badge>
               ),
@@ -316,11 +348,11 @@ export default function SyncPage() {
               render: (item) => (
                 <span className="font-mono text-white">
                   {(item.records_fetched as number || 0).toLocaleString()}
-                  {(item.records_created || item.records_updated) && (
+                  {(item.records_created || item.records_updated) ? (
                     <span className="text-slate-muted text-xs ml-1">
-                      (+{item.records_created || 0}/~{item.records_updated || 0})
+                      (+{String(item.records_created || 0)}/~{String(item.records_updated || 0)})
                     </span>
-                  )}
+                  ) : null}
                 </span>
               ),
             },
@@ -356,12 +388,37 @@ export default function SyncPage() {
                 ),
             },
           ]}
-          data={(syncLogs || []) as Record<string, unknown>[]}
+          data={(syncLogs || []) as unknown as Record<string, unknown>[]}
           keyField="id"
           loading={logsLoading}
           emptyMessage="No sync history available"
         />
       </Card>
+
+      {/* Full Sync Confirmation Modal */}
+      <Modal
+        open={confirmModal.open}
+        onOpenChange={(open) => setConfirmModal({ open, source: confirmModal.source })}
+        title="Confirm Full Sync"
+        description={`Full sync will re-fetch all data from ${confirmModal.source ? SOURCE_CONFIG[confirmModal.source].name : 'the source'}. This may take several minutes and will reset incremental sync cursors.`}
+        size="sm"
+      >
+        <div className="flex gap-3 justify-end mt-6">
+          <button
+            onClick={() => setConfirmModal({ open: false, source: null })}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmFullSync}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-warn text-slate-deep hover:bg-amber-400 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4 inline mr-2" />
+            Start Full Sync
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

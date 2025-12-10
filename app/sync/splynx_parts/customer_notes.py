@@ -3,6 +3,7 @@ import structlog
 
 from app.models.customer_note import CustomerNote
 from app.models.customer import Customer
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -10,7 +11,7 @@ logger = structlog.get_logger()
 async def sync_customer_notes(sync_client, client, full_sync: bool):
     """Sync customer notes from Splynx."""
     sync_client.start_sync("customer_notes", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size
 
     try:
         notes = await sync_client._fetch_paginated(client, "/admin/customers/customer-notes")

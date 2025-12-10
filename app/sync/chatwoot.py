@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import structlog
 from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.sync.base import BaseSyncClient
+from app.sync.base import BaseSyncClient, CircuitBreakerOpenError
 from app.models.sync_log import SyncSource
 from app.models.customer import Customer
 from app.models.conversation import Conversation, Message, ConversationStatus
 from app.models.employee import Employee
 
 logger = structlog.get_logger()
+
+
+def utcnow() -> datetime:
+    """Get current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class ChatwootSync(BaseSyncClient):
@@ -44,16 +49,27 @@ class ChatwootSync(BaseSyncClient):
         params: Optional[Dict[str, Any]] = None,
         json: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Make authenticated request to Chatwoot API."""
-        response = await client.request(
-            method,
-            f"{self.base_url}{endpoint}",
-            headers=self._get_headers(),
-            params=params,
-            json=json,
-        )
-        response.raise_for_status()
-        return response.json()
+        """Make authenticated request to Chatwoot API with circuit breaker protection."""
+        # Check circuit breaker before making request
+        if not self.circuit_breaker.can_execute():
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker for {self.source.value} is open"
+            )
+
+        try:
+            response = await client.request(
+                method,
+                f"{self.base_url}{endpoint}",
+                headers=self._get_headers(),
+                params=params,
+                json=json,
+            )
+            response.raise_for_status()
+            self.circuit_breaker.record_success()
+            return response.json()
+        except Exception as e:
+            self.circuit_breaker.record_failure(e)
+            raise
 
     async def _fetch_paginated(
         self,
@@ -251,18 +267,43 @@ class ChatwootSync(BaseSyncClient):
             raise
 
     async def sync_conversations(self, client: httpx.AsyncClient, full_sync: bool = False):
-        """Sync conversations/tickets from Chatwoot."""
+        """Sync conversations/tickets from Chatwoot.
+
+        Uses last_activity_at from conversations for cursor tracking (not utcnow())
+        to ensure we don't miss updates if sync takes time.
+        """
         self.start_sync("conversations", "full" if full_sync else "incremental")
 
         try:
-            # Fetch all conversations (limit pages in full sync to avoid timeout)
+            # Get cursor for incremental sync
+            cursor = self.get_cursor("conversations")
+            last_updated_after = None
+
+            if not full_sync and cursor and cursor.last_sync_timestamp:
+                # Chatwoot API supports updated_after for incremental fetches (Unix timestamp)
+                last_updated_after = int(cursor.last_sync_timestamp.timestamp())
+                logger.info("chatwoot_incremental_sync", entity="conversations", since=cursor.last_sync_timestamp)
+
+            # Reset cursor if full sync requested
+            if full_sync:
+                self.reset_cursor("conversations")
+
+            # Build params with updated_after filter for incremental
+            params = {"status": "all"}
+            if last_updated_after:
+                params["updated_after"] = last_updated_after
+
+            # Fetch conversations (limit pages appropriately)
             conversations = await self._fetch_paginated(
                 client,
                 f"/accounts/{self.account_id}/conversations",
                 data_key="payload",
-                params={"status": "all"},
-                max_pages=100 if full_sync else 10,  # ~2500 convos for full, ~250 for incremental
+                params=params,
+                max_pages=100 if full_sync else 20,  # More pages for incremental since filtered
             )
+
+            # Track the latest activity timestamp from API responses for cursor
+            latest_activity_ts: Optional[int] = None
 
             for conv_data in conversations:
                 chatwoot_id = conv_data.get("id")
@@ -312,6 +353,12 @@ class ChatwootSync(BaseSyncClient):
                         created_at = datetime.fromtimestamp(conv_data["created_at"])
                     except (ValueError, TypeError):
                         created_at = datetime.utcnow()
+
+                # Track the latest activity timestamp for cursor (use last_activity_at from API)
+                conv_last_activity = conv_data.get("last_activity_at")
+                if conv_last_activity:
+                    if latest_activity_ts is None or conv_last_activity > latest_activity_ts:
+                        latest_activity_ts = conv_last_activity
 
                 # Calculate response and resolution times
                 first_response_time = None
@@ -407,7 +454,28 @@ class ChatwootSync(BaseSyncClient):
                     await self._sync_conversation_messages(client, chatwoot_id)
 
             self.db.commit()
+
+            # Update cursor with latest activity timestamp from API (not utcnow())
+            # This ensures we don't miss updates if sync takes time
+            if latest_activity_ts:
+                cursor_timestamp = datetime.fromtimestamp(latest_activity_ts, tz=timezone.utc)
+            else:
+                # Fallback to utcnow() if no conversations were synced
+                cursor_timestamp = utcnow()
+
+            self.update_cursor(
+                entity_type="conversations",
+                timestamp=cursor_timestamp,
+                records_count=len(conversations),
+            )
+
             self.complete_sync()
+            logger.info(
+                "chatwoot_conversations_synced",
+                total=len(conversations),
+                created=self.current_sync_log.records_created,
+                updated=self.current_sync_log.records_updated,
+            )
 
         except Exception as e:
             self.db.rollback()
@@ -415,16 +483,19 @@ class ChatwootSync(BaseSyncClient):
             raise
 
     async def _sync_conversation_messages(self, client: httpx.AsyncClient, conversation_chatwoot_id: int):
-        """Sync messages for a specific conversation."""
+        """Sync messages for a specific conversation with delta tracking.
+
+        Uses `after` parameter with last_message_id to only fetch new messages.
+
+        Chatwoot's MessageFinder supports:
+        - `after`: Returns up to 100 messages after the specified ID (ascending order)
+        - `before`: Returns up to 20 messages before the specified ID
+        - Both: Returns up to 1000 messages between two IDs
+
+        We use `after` for efficient delta syncs, fetching only new messages since
+        the last sync. Verified against Chatwoot source: app/finders/message_finder.rb
+        """
         try:
-            response = await self._request(
-                client,
-                "GET",
-                f"/accounts/{self.account_id}/conversations/{conversation_chatwoot_id}/messages",
-            )
-
-            messages = response if isinstance(response, list) else response.get("payload", [])
-
             conversation = self.db.query(Conversation).filter(
                 Conversation.chatwoot_id == conversation_chatwoot_id
             ).first()
@@ -432,12 +503,38 @@ class ChatwootSync(BaseSyncClient):
             if not conversation:
                 return
 
+            # Get last synced message ID for this conversation to enable delta sync
+            last_synced_msg = self.db.query(Message).filter(
+                Message.conversation_id == conversation.id
+            ).order_by(Message.chatwoot_id.desc()).first()
+
+            last_message_id = last_synced_msg.chatwoot_id if last_synced_msg else None
+
+            # Chatwoot API supports before/after params for message pagination
+            params = {}
+            if last_message_id:
+                params["after"] = last_message_id  # Only fetch messages after this ID
+
+            response = await self._request(
+                client,
+                "GET",
+                f"/accounts/{self.account_id}/conversations/{conversation_chatwoot_id}/messages",
+                params=params if params else None,
+            )
+
+            messages = response if isinstance(response, list) else response.get("payload", [])
+
+            if not messages:
+                return
+
+            new_messages_count = 0
             for msg_data in messages:
                 chatwoot_id = msg_data.get("id")
-                existing = self.db.query(Message).filter(Message.chatwoot_id == chatwoot_id).first()
 
+                # Skip if already exists (double-check for safety)
+                existing = self.db.query(Message).filter(Message.chatwoot_id == chatwoot_id).first()
                 if existing:
-                    continue  # Messages don't change, skip if exists
+                    continue
 
                 # Parse timestamp
                 created_at = None
@@ -461,6 +558,15 @@ class ChatwootSync(BaseSyncClient):
                     created_at=created_at or datetime.utcnow(),
                 )
                 self.db.add(message)
+                new_messages_count += 1
+
+            if new_messages_count > 0:
+                logger.debug(
+                    "chatwoot_messages_synced",
+                    conversation_id=conversation_chatwoot_id,
+                    new_messages=new_messages_count,
+                    delta_from=last_message_id,
+                )
 
         except Exception as e:
             logger.warning(

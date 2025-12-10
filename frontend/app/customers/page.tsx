@@ -7,11 +7,13 @@ import { Badge, StatusBadge } from '@/components/Badge';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useCustomers, useCustomer } from '@/hooks/useApi';
 import { formatCurrency, formatDate, formatNumber, cn, debounce } from '@/lib/utils';
+import { Select } from '@dotmac/core';
 
 export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [billingTypeFilter, setBillingTypeFilter] = useState<string>('');
   const [offset, setOffset] = useState(0);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const limit = 20;
@@ -20,6 +22,7 @@ export default function CustomersPage() {
     search: search || undefined,
     status: statusFilter || undefined,
     customer_type: typeFilter || undefined,
+    billing_type: billingTypeFilter || undefined,
     limit,
     offset,
   });
@@ -59,35 +62,59 @@ export default function CustomersPage() {
               </div>
 
               {/* Status Filter */}
-              <select
+              <Select
+                placeholder="All Status"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                onValueChange={(value) => {
+                  setStatusFilter(value);
                   setOffset(0);
                 }}
-                className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                options={[
+                  { value: '', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'suspended', label: 'Suspended' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                ]}
+                size="sm"
+                className="w-[140px]"
+              />
 
               {/* Type Filter */}
-              <select
+              <Select
+                placeholder="All Types"
                 value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
+                onValueChange={(value) => {
+                  setTypeFilter(value);
                   setOffset(0);
                 }}
-                className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
-              >
-                <option value="">All Types</option>
-                <option value="residential">Residential</option>
-                <option value="business">Business</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
+                options={[
+                  { value: '', label: 'All Types' },
+                  { value: 'residential', label: 'Residential' },
+                  { value: 'business', label: 'Business' },
+                  { value: 'enterprise', label: 'Enterprise' },
+                ]}
+                size="sm"
+                className="w-[140px]"
+              />
+
+              {/* Billing Type Filter */}
+              <Select
+                placeholder="All Billing"
+                value={billingTypeFilter}
+                onValueChange={(value) => {
+                  setBillingTypeFilter(value);
+                  setOffset(0);
+                }}
+                options={[
+                  { value: '', label: 'All Billing' },
+                  { value: 'prepaid', label: 'Prepaid' },
+                  { value: 'prepaid_monthly', label: 'Prepaid Monthly' },
+                  { value: 'recurring', label: 'Recurring' },
+                ]}
+                size="sm"
+                className="w-[160px]"
+              />
             </div>
           </Card>
 
@@ -114,7 +141,7 @@ export default function CustomersPage() {
                       </div>
                       <div>
                         <p className="text-white font-medium font-body">{item.name as string}</p>
-                        <p className="text-slate-muted text-xs">{item.account_number || '—'}</p>
+                        <p className="text-slate-muted text-xs">{String(item.account_number || '—')}</p>
                       </div>
                     </div>
                   ),
@@ -124,12 +151,12 @@ export default function CustomersPage() {
                   header: 'Contact',
                   render: (item) => (
                     <div className="space-y-0.5">
-                      {item.email && (
+                      {item.email ? (
                         <p className="text-slate-muted text-sm">{item.email as string}</p>
-                      )}
-                      {item.phone && (
+                      ) : null}
+                      {item.phone ? (
                         <p className="text-slate-muted text-sm">{item.phone as string}</p>
-                      )}
+                      ) : null}
                     </div>
                   ),
                 },
@@ -146,6 +173,15 @@ export default function CustomersPage() {
                   ),
                 },
                 {
+                  key: 'billing_type',
+                  header: 'Billing',
+                  render: (item) => (
+                    <span className="text-slate-muted capitalize">
+                      {item.billing_type ? (item.billing_type as string).replace('_', ' ') : '—'}
+                    </span>
+                  ),
+                },
+                {
                   key: 'tenure_days',
                   header: 'Tenure',
                   align: 'right',
@@ -157,7 +193,7 @@ export default function CustomersPage() {
                   },
                 },
               ]}
-              data={(data?.data || []) as Record<string, unknown>[]}
+              data={(data?.data || []) as unknown as Record<string, unknown>[]}
               keyField="id"
               loading={isLoading}
               emptyMessage="No customers found"

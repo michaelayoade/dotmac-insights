@@ -5,19 +5,21 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.database import get_db
-from app.models.customer import Customer, CustomerStatus, CustomerType
+from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
 from app.models.subscription import Subscription
 from app.models.invoice import Invoice
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.pop import Pop
+from app.auth import Require
 
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/", dependencies=[Depends(Require("explorer:read"))])
 async def list_customers(
     status: Optional[str] = None,
     customer_type: Optional[str] = None,
+    billing_type: Optional[str] = None,
     pop_id: Optional[int] = None,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
@@ -40,6 +42,13 @@ async def list_customers(
             query = query.filter(Customer.customer_type == type_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid customer_type: {customer_type}")
+
+    if billing_type:
+        try:
+            billing_enum = BillingType(billing_type)
+            query = query.filter(Customer.billing_type == billing_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid billing_type: {billing_type}")
 
     if pop_id:
         query = query.filter(Customer.pop_id == pop_id)
@@ -70,6 +79,7 @@ async def list_customers(
                 "phone": c.phone,
                 "status": c.status.value,
                 "customer_type": c.customer_type.value,
+                "billing_type": c.billing_type.value if c.billing_type else None,
                 "pop_id": c.pop_id,
                 "account_number": c.account_number,
                 "signup_date": c.signup_date.isoformat() if c.signup_date else None,
@@ -83,7 +93,7 @@ async def list_customers(
     }
 
 
-@router.get("/{customer_id}")
+@router.get("/{customer_id}", dependencies=[Depends(Require("explorer:read"))])
 async def get_customer(customer_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get detailed customer information including related data."""
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
@@ -193,7 +203,7 @@ async def get_customer(customer_id: int, db: Session = Depends(get_db)) -> Dict[
     }
 
 
-@router.get("/churned")
+@router.get("/churned", dependencies=[Depends(Require("explorer:read"))])
 async def get_churned_customers(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,

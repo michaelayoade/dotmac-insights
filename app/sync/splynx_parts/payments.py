@@ -4,6 +4,7 @@ import structlog
 from app.models.payment import Payment, PaymentMethod, PaymentSource
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceSource
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -11,7 +12,7 @@ logger = structlog.get_logger()
 async def sync_payments(sync_client, client, full_sync: bool):
     """Sync payments from Splynx."""
     sync_client.start_sync("payments", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size_payments
 
     try:
         payments = await sync_client._fetch_paginated(client, "/admin/finance/payments")

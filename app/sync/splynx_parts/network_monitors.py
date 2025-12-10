@@ -2,6 +2,7 @@ from datetime import datetime
 import structlog
 
 from app.models.network_monitor import NetworkMonitor, MonitorState
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -9,7 +10,7 @@ logger = structlog.get_logger()
 async def sync_network_monitors(sync_client, client, full_sync: bool):
     """Sync network monitoring devices from Splynx."""
     sync_client.start_sync("network_monitors", "full" if full_sync else "incremental")
-    batch_size = 100
+    batch_size = settings.sync_batch_size
 
     try:
         monitors = await sync_client._fetch_paginated(

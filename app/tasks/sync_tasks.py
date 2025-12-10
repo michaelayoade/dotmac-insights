@@ -517,3 +517,132 @@ def sync_chatwoot_conversations(self, full_sync: bool = False):
     except Exception as e:
         logger.error("task_failed", task=task_name, error=str(e))
         raise self.retry(exc=e)
+
+
+# DLQ Processor Tasks
+@celery_app.task(bind=True, max_retries=1)
+def process_dlq_records(self, source: Optional[str] = None, limit: int = 100):
+    """Process failed sync records from the Dead Letter Queue.
+
+    Retries failed records with exponential backoff. Records that exceed
+    max_retries are marked as permanently failed.
+
+    Args:
+        source: Optional source filter ('SPLYNX', 'ERPNEXT', 'CHATWOOT')
+        limit: Maximum number of records to process per run
+    """
+    from app.models.sync_cursor import FailedSyncRecord
+    from app.models.sync_log import SyncSource
+    from app.sync.base import utcnow
+    import json
+
+    task_name = "process_dlq_records"
+    logger.info("task_started", task=task_name, source=source, limit=limit)
+
+    try:
+        with TaskLock(task_name, timeout=300):
+            db = SessionLocal()
+            try:
+                # Build query for pending DLQ records
+                query = db.query(FailedSyncRecord).filter(
+                    FailedSyncRecord.is_resolved == False,
+                    FailedSyncRecord.retry_count < FailedSyncRecord.max_retries,
+                    FailedSyncRecord.next_retry_at <= utcnow(),
+                )
+
+                if source:
+                    try:
+                        source_enum = SyncSource(source)
+                        query = query.filter(FailedSyncRecord.source == source_enum)
+                    except ValueError:
+                        logger.warning("dlq_invalid_source", source=source)
+
+                records = query.order_by(FailedSyncRecord.created_at).limit(limit).all()
+                logger.info("dlq_records_found", count=len(records))
+
+                processed = 0
+                succeeded = 0
+                failed = 0
+
+                for record in records:
+                    processed += 1
+                    try:
+                        # Get the appropriate sync client
+                        sync_client = None
+                        if record.source == SyncSource.SPLYNX:
+                            sync_client = SplynxSync(db)
+                        elif record.source == SyncSource.ERPNEXT:
+                            sync_client = ERPNextSync(db)
+                        elif record.source == SyncSource.CHATWOOT:
+                            sync_client = ChatwootSync(db)
+
+                        if not sync_client:
+                            logger.warning("dlq_unknown_source", record_id=record.id, source=record.source)
+                            continue
+
+                        # Parse payload and attempt reprocessing
+                        payload = json.loads(record.payload) if isinstance(record.payload, str) else record.payload
+
+                        # For now, just mark as retry and let the next regular sync handle it
+                        # In the future, could implement entity-specific reprocessing
+                        record.mark_retry()
+                        # Exponential backoff: 5, 10, 20, 40 minutes (capped at 60)
+                        backoff_minutes = 5 * (2 ** (record.retry_count - 1))
+                        from datetime import timedelta
+                        record.next_retry_at = utcnow() + timedelta(minutes=min(backoff_minutes, 60))
+
+                        logger.info(
+                            "dlq_record_scheduled_retry",
+                            record_id=record.id,
+                            entity_type=record.entity_type,
+                            external_id=record.external_id,
+                            retry_count=record.retry_count,
+                            next_retry_at=record.next_retry_at.isoformat(),
+                        )
+
+                        # Check if max retries exceeded
+                        if record.retry_count >= record.max_retries:
+                            record.is_resolved = True
+                            logger.warning(
+                                "dlq_record_max_retries_exceeded",
+                                record_id=record.id,
+                                entity_type=record.entity_type,
+                                external_id=record.external_id,
+                            )
+                            failed += 1
+                        else:
+                            succeeded += 1
+
+                    except Exception as e:
+                        logger.error(
+                            "dlq_record_processing_error",
+                            record_id=record.id,
+                            error=str(e),
+                        )
+                        record.error_message = f"DLQ processing error: {str(e)[:500]}"
+                        record.mark_retry()
+                        failed += 1
+
+                db.commit()
+                logger.info(
+                    "task_completed",
+                    task=task_name,
+                    processed=processed,
+                    succeeded=succeeded,
+                    failed=failed,
+                )
+                return {
+                    "status": "success",
+                    "task": task_name,
+                    "processed": processed,
+                    "succeeded": succeeded,
+                    "failed": failed,
+                }
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        return {"status": "failed", "task": task_name, "error": str(e)}

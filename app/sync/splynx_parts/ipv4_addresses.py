@@ -3,6 +3,7 @@ import structlog
 
 from app.models.ipv4_address import IPv4Address
 from app.models.customer import Customer
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -23,7 +24,7 @@ def parse_datetime(value):
 async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
     """Sync IPv4 addresses from Splynx."""
     sync_client.start_sync("ipv4_addresses", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size
 
     try:
         ips = await sync_client._fetch_paginated(

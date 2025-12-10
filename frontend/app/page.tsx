@@ -244,7 +244,7 @@ export default function OverviewPage() {
                 header: 'POP Name',
                 sortable: true,
                 render: (item) => (
-                  <span className="text-white font-medium font-body">{item.name}</span>
+                  <span className="text-white font-medium font-body">{String(item.name)}</span>
                 ),
               },
               {
@@ -298,7 +298,7 @@ export default function OverviewPage() {
                 render: (item) => formatCurrency(item.outstanding as number, currency),
               },
             ]}
-            data={popPerformance as Record<string, unknown>[]}
+            data={popPerformance as unknown as Record<string, unknown>[]}
             keyField="id"
           />
         </Card>

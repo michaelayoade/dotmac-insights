@@ -54,6 +54,16 @@ from app.models.hr import (
     Designation,
     ERPNextUser,
 )
+from app.models.auth import (
+    User,
+    Role,
+    Permission,
+    UserRole,
+    RolePermission,
+    ServiceToken,
+    TokenDenylist,
+)
+from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 
 __all__ = [
     "Customer",
@@ -109,4 +119,15 @@ __all__ = [
     "HDTeamMember",
     "Designation",
     "ERPNextUser",
+    # Auth/RBAC models
+    "User",
+    "Role",
+    "Permission",
+    "UserRole",
+    "RolePermission",
+    "ServiceToken",
+    "TokenDenylist",
+    # Sync infrastructure
+    "SyncCursor",
+    "FailedSyncRecord",
 ]

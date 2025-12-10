@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import String, Text, ForeignKey, Enum, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
@@ -62,10 +62,15 @@ class Customer(Base):
     # Address
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     address_2: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    city: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     zip_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    gps: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="Nigeria")
+
+    # Geolocation
+    gps: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Raw GPS string from source
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True, index=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True, index=True)
 
     # Classification
     customer_type: Mapped[CustomerType] = mapped_column(Enum(CustomerType), default=CustomerType.RESIDENTIAL)

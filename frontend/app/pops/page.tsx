@@ -182,7 +182,7 @@ export default function POPsPage() {
                   </div>
                   <div>
                     <p className="text-white font-medium font-body">{item.name as string}</p>
-                    <p className="text-slate-muted text-xs">{item.city || item.code || '—'}</p>
+                    <p className="text-slate-muted text-xs">{String(item.city || item.code || '—')}</p>
                   </div>
                 </div>
               ),
@@ -194,8 +194,8 @@ export default function POPsPage() {
               align: 'right',
               render: (item) => (
                 <div className="text-right">
-                  <p className="text-white font-mono">{item.active_customers}</p>
-                  <p className="text-slate-muted text-xs">{item.total_customers} total</p>
+                  <p className="text-white font-mono">{String(item.active_customers)}</p>
+                  <p className="text-slate-muted text-xs">{String(item.total_customers)} total</p>
                 </div>
               ),
             },
@@ -242,7 +242,7 @@ export default function POPsPage() {
                   'font-mono',
                   (item.churned_customers as number) > 10 ? 'text-coral-alert' : 'text-slate-muted'
                 )}>
-                  {item.churned_customers}
+                  {String(item.churned_customers)}
                 </span>
               ),
             },
@@ -259,7 +259,7 @@ export default function POPsPage() {
                       'font-mono',
                       tickets > 5 ? 'text-amber-warn' : 'text-slate-muted'
                     )}>
-                      {tickets}
+                      {String(tickets)}
                     </span>
                     {tickets > 5 && (
                       <Badge variant="warning" size="sm">High</Badge>
@@ -283,7 +283,7 @@ export default function POPsPage() {
               ),
             },
           ]}
-          data={(pops || []) as Record<string, unknown>[]}
+          data={(pops || []) as unknown as Record<string, unknown>[]}
           keyField="id"
           loading={isLoading}
           emptyMessage="No POPs found"

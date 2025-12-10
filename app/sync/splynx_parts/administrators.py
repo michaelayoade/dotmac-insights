@@ -2,6 +2,7 @@ from datetime import datetime
 import structlog
 
 from app.models.administrator import Administrator
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -9,7 +10,7 @@ logger = structlog.get_logger()
 async def sync_administrators(sync_client, client, full_sync: bool):
     """Sync administrators from Splynx."""
     sync_client.start_sync("administrators", "full" if full_sync else "incremental")
-    batch_size = 100
+    batch_size = settings.sync_batch_size
 
     try:
         admins = await sync_client._fetch_paginated(

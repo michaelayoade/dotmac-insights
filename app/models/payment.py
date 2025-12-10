@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import String, Text, ForeignKey, Enum, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
@@ -80,6 +80,21 @@ class Payment(Base):
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
+
+    __table_args__ = (
+        Index(
+            "uq_payments_splynx_id_not_null",
+            "splynx_id",
+            unique=True,
+            postgresql_where=text("splynx_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_payments_erpnext_id_not_null",
+            "erpnext_id",
+            unique=True,
+            postgresql_where=text("erpnext_id IS NOT NULL"),
+        ),
+    )
 
     def __repr__(self) -> str:
         return f"<Payment {self.receipt_number} - {self.amount} {self.currency}>"

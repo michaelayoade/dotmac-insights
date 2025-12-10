@@ -6,9 +6,17 @@ class Settings(BaseSettings):
     # Database (uses psycopg3 driver)
     database_url: str = "postgresql+psycopg://user:password@localhost:5432/dotmac_insights"
 
-    # API Security
-    api_key: str = ""  # Required for production - set via environment variable
+    # CORS Configuration
     cors_origins: str = ""  # Comma-separated list of allowed origins, empty = no CORS
+
+    # JWT/OIDC Authentication (better-auth integration)
+    jwt_issuer: str = ""  # e.g., "https://auth.example.com"
+    jwks_url: str = ""  # e.g., "https://auth.example.com/.well-known/jwks.json"
+    jwt_audience: Optional[str] = None  # Optional audience claim validation
+    jwks_cache_ttl: int = 3600  # Seconds to cache JWKS keys (1 hour default)
+
+    # Service token settings
+    service_token_hash_rounds: int = 12  # bcrypt rounds for hashing service tokens
 
     # Splynx
     splynx_api_url: str = ""
@@ -29,6 +37,23 @@ class Settings(BaseSettings):
     # Sync settings
     sync_interval_minutes: int = 15
     full_sync_hour: int = 2
+
+    # Batch sizes for sync operations
+    sync_batch_size: int = 500  # Default batch size
+    sync_batch_size_customers: int = 500
+    sync_batch_size_invoices: int = 500
+    sync_batch_size_payments: int = 500
+    sync_batch_size_tickets: int = 500
+    sync_batch_size_messages: int = 1000  # Higher for messages
+
+    # Circuit breaker settings
+    circuit_breaker_fail_max: int = 5  # Failures before opening circuit
+    circuit_breaker_reset_timeout: int = 60  # Seconds before attempting reset
+
+    # Retry settings
+    retry_max_attempts: int = 3
+    retry_min_wait: int = 2  # seconds
+    retry_max_wait: int = 30  # seconds
 
     # Redis
     redis_url: Optional[str] = None
@@ -54,6 +79,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Validate API key in production
-if settings.is_production and not settings.api_key:
-    raise ValueError("API_KEY must be set in production environment")
+# Validate JWT auth in production
+if settings.is_production and not settings.jwks_url:
+    raise ValueError("JWKS_URL must be set in production environment for JWT authentication")

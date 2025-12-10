@@ -3,6 +3,7 @@ import structlog
 
 from app.models.lead import Lead
 from app.models.customer import Customer
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -23,7 +24,7 @@ def parse_datetime(value):
 async def sync_leads(sync_client, client, full_sync: bool):
     """Sync CRM leads from Splynx."""
     sync_client.start_sync("leads", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size
 
     try:
         leads = await sync_client._fetch_paginated(

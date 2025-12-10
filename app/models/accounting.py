@@ -246,7 +246,7 @@ class PurchaseInvoice(Base):
     paid_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     currency: Mapped[str] = mapped_column(String(10), default="NGN")
 
-    status: Mapped[PurchaseInvoiceStatus] = mapped_column(Enum(PurchaseInvoiceStatus), default=PurchaseInvoiceStatus.DRAFT)
+    status: Mapped[PurchaseInvoiceStatus] = mapped_column(Enum(PurchaseInvoiceStatus), default=PurchaseInvoiceStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
     # Sync metadata

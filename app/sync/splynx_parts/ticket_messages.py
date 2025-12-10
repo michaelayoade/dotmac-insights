@@ -5,6 +5,7 @@ from app.models.ticket_message import TicketMessage
 from app.models.ticket import Ticket
 from app.models.customer import Customer
 from app.models.administrator import Administrator
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -25,7 +26,7 @@ def parse_datetime(value):
 async def sync_ticket_messages(sync_client, client, full_sync: bool):
     """Sync ticket messages from Splynx."""
     sync_client.start_sync("ticket_messages", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size_messages
 
     try:
         messages = await sync_client._fetch_paginated(

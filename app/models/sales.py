@@ -63,7 +63,7 @@ class SalesOrder(Base):
     delivery_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Status
-    status: Mapped[SalesOrderStatus] = mapped_column(Enum(SalesOrderStatus), default=SalesOrderStatus.DRAFT)
+    status: Mapped[SalesOrderStatus] = mapped_column(Enum(SalesOrderStatus), default=SalesOrderStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
     # Sales team
@@ -127,12 +127,12 @@ class Quotation(Base):
     total_taxes_and_charges: Mapped[Decimal] = mapped_column(default=Decimal("0"))
 
     # Status
-    status: Mapped[QuotationStatus] = mapped_column(Enum(QuotationStatus), default=QuotationStatus.DRAFT)
+    status: Mapped[QuotationStatus] = mapped_column(Enum(QuotationStatus), default=QuotationStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
     # Sales team
     sales_partner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    territory: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    territory: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
 
     # Source
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

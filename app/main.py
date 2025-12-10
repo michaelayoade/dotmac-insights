@@ -6,7 +6,7 @@ import structlog
 from app.database import engine, Base
 from app.api import api_router
 from app.config import settings
-from app.auth import verify_api_key
+from app.auth import get_current_principal
 
 # Configure structured logging
 structlog.configure(
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
         "starting_application",
         app="dotmac-insights",
         environment=settings.environment,
-        auth_enabled=bool(settings.api_key),
+        jwt_configured=bool(settings.jwks_url),
     )
 
     # Create database tables
@@ -77,22 +77,15 @@ else:
     logger.info("cors_disabled", message="No CORS origins configured - same-origin requests only")
 
 
-# Determine if auth is required
-if settings.api_key:
-    # Auth enabled: Protect all API routes
-    app.include_router(
-        api_router,
-        prefix="/api",
-        dependencies=[Depends(verify_api_key)],
-    )
-    logger.info("api_auth_enabled")
-else:
-    # No auth (development mode)
-    app.include_router(api_router, prefix="/api")
-    if settings.is_production:
-        logger.error("api_auth_disabled_in_production", message="API_KEY not set - API is unprotected!")
-    else:
-        logger.warning("api_auth_disabled", message="No API_KEY set - API is unprotected")
+# Include API routes with JWT/RBAC authentication
+# Each route handles its own scope requirements via Require() dependency
+app.include_router(
+    api_router,
+    prefix="/api",
+    dependencies=[Depends(get_current_principal)],
+)
+logger.info("api_jwt_auth_enabled")
+
 
 
 @app.get("/")

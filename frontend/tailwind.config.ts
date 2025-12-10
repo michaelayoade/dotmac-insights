@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -9,18 +10,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Base colors
-        'slate-deep': '#0f1419',
-        'slate-card': '#1a2332',
-        'slate-elevated': '#243042',
-        'slate-border': '#2d3a4f',
-        'slate-muted': '#64748b',
+        // Base colors - using CSS variables for theme switching
+        'slate-deep': 'var(--color-slate-deep)',
+        'slate-card': 'var(--color-slate-card)',
+        'slate-elevated': 'var(--color-slate-elevated)',
+        'slate-border': 'var(--color-slate-border)',
+        'slate-muted': 'var(--color-slate-muted)',
 
-        // Accent colors
-        'teal-electric': '#00d4aa',
-        'teal-glow': '#00ffcc',
-        'coral-alert': '#ff6b6b',
-        'amber-warn': '#fbbf24',
+        // Accent colors - using CSS variables for theme switching
+        'teal-electric': 'var(--color-teal-electric)',
+        'teal-glow': 'var(--color-teal-glow)',
+        'coral-alert': 'var(--color-coral-alert)',
+        'amber-warn': 'var(--color-amber-warn)',
         'blue-info': '#3b82f6',
         'purple-accent': '#a855f7',
       },

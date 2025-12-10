@@ -4,12 +4,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light theme (default) */
 :root {
+  --color-slate-deep: #f8fafc;
+  --color-slate-card: #ffffff;
+  --color-slate-elevated: #f1f5f9;
+  --color-slate-border: #e2e8f0;
+  --color-slate-muted: #64748b;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-teal-electric: #0d9488;
+  --color-teal-glow: #14b8a6;
+  --color-coral-alert: #ef4444;
+  --color-amber-warn: #f59e0b;
+}
+
+/* Dark theme */
+.dark {
   --color-slate-deep: #0f1419;
   --color-slate-card: #1a2332;
   --color-slate-elevated: #243042;
   --color-slate-border: #2d3a4f;
   --color-slate-muted: #64748b;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
   --color-teal-electric: #00d4aa;
   --color-teal-glow: #00ffcc;
   --color-coral-alert: #ff6b6b;
@@ -26,10 +44,20 @@ html {
 
 body {
   background-color: var(--color-slate-deep);
-  color: #e2e8f0;
+  color: var(--color-text-primary);
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Theme-aware text color utility */
+.text-foreground {
+  color: var(--color-text-primary);
+}
+
+.text-foreground-secondary {
+  color: var(--color-text-secondary);
 }
 
 /* Custom scrollbar */

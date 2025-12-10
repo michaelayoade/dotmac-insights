@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
-from app.sync.base import BaseSyncClient
+from app.sync.base import BaseSyncClient, CircuitBreakerOpenError
 from app.models.sync_log import SyncSource
 from app.sync.splynx_parts.locations import sync_locations
 from app.sync.splynx_parts.customers import sync_customers
@@ -100,7 +100,13 @@ class SplynxSync(BaseSyncClient):
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Make authenticated request to Splynx API."""
+        """Make authenticated request to Splynx API with circuit breaker protection."""
+        # Check circuit breaker before making request
+        if not self.circuit_breaker.can_execute():
+            raise CircuitBreakerOpenError(
+                f"Circuit breaker for {self.source.value} is open"
+            )
+
         if self.use_basic_auth:
             headers = self._get_auth_headers()
         else:
@@ -110,24 +116,29 @@ class SplynxSync(BaseSyncClient):
         url = f"{self.base_url}{endpoint}"
         logger.debug("splynx_request", method=method, url=url, params=params)
 
-        response = await client.request(
-            method,
-            url,
-            headers=headers,
-            params=params,
-            json=json_data,
-        )
-
-        if response.status_code != 200:
-            logger.error(
-                "splynx_request_failed",
-                status=response.status_code,
-                url=url,
-                response_text=response.text[:500] if response.text else None,
+        try:
+            response = await client.request(
+                method,
+                url,
+                headers=headers,
+                params=params,
+                json=json_data,
             )
 
-        response.raise_for_status()
-        return response.json()
+            if response.status_code != 200:
+                logger.error(
+                    "splynx_request_failed",
+                    status=response.status_code,
+                    url=url,
+                    response_text=response.text[:500] if response.text else None,
+                )
+
+            response.raise_for_status()
+            self.circuit_breaker.record_success()
+            return response.json()
+        except Exception as e:
+            self.circuit_breaker.record_failure(e)
+            raise
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _fetch_paginated(

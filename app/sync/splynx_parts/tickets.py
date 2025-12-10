@@ -5,6 +5,7 @@ from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketSource
 from app.models.customer import Customer
 from app.models.administrator import Administrator
 from app.models.employee import Employee
+from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -12,7 +13,7 @@ logger = structlog.get_logger()
 async def sync_tickets(sync_client, client, full_sync: bool):
     """Sync support tickets from Splynx."""
     sync_client.start_sync("tickets", "full" if full_sync else "incremental")
-    batch_size = 500
+    batch_size = settings.sync_batch_size_tickets
 
     try:
         tickets = await sync_client._fetch_paginated(client, "/admin/support/tickets")

@@ -1,46 +1,556 @@
-from fastapi import HTTPException, Security
-from fastapi.security import APIKeyHeader, APIKeyQuery
-from typing import Optional
+"""Authentication and Authorization module.
+
+This module provides:
+- JWT verification with JWKS caching (for better-auth/auth.js integration)
+- Service token authentication (for machine-to-machine)
+- RBAC scope enforcement via require() decorator
+- User/principal management
+"""
+
+from __future__ import annotations
+
 import secrets
+import time
+from datetime import datetime
+from functools import wraps
+from typing import Optional, Union, Callable, List, Any
+
+import bcrypt
+import httpx
 import structlog
+from fastapi import HTTPException, Depends, Request, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError, jwk
+from jose.exceptions import JWKError
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
+from app.models.auth import User, ServiceToken, TokenDenylist
 
 logger = structlog.get_logger()
 
-# API Key can be passed via header or query parameter
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-api_key_query = APIKeyQuery(name="api_key", auto_error=False)
+# Security schemes
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def verify_api_key(
-    api_key_header_value: Optional[str] = Security(api_key_header),
-    api_key_query_value: Optional[str] = Security(api_key_query),
-) -> str:
+# ============================================================================
+# Pydantic Models for Auth
+# ============================================================================
+
+
+class JWTClaims(BaseModel):
+    """Parsed JWT claims from better-auth."""
+    sub: str  # User ID from better-auth
+    email: Optional[str] = None
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    iss: Optional[str] = None
+    aud: Optional[str] = None
+    exp: Optional[int] = None
+    iat: Optional[int] = None
+    jti: Optional[str] = None
+
+
+class Principal(BaseModel):
+    """Authenticated principal (user or service token)."""
+    type: str  # "user" or "service_token"
+    id: int  # User ID or ServiceToken ID
+    external_id: Optional[str] = None  # better-auth user ID (for users)
+    email: Optional[str] = None
+    name: Optional[str] = None
+    is_superuser: bool = False
+    scopes: set[str] = set()  # Available permission scopes
+    raw_claims: Optional[dict] = None  # Original JWT claims (for users)
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def has_scope(self, scope: str) -> bool:
+        """Check if principal has a specific permission scope."""
+        if self.is_superuser:
+            return True
+        if "*" in self.scopes:
+            return True
+        if scope in self.scopes:
+            return True
+        # Check wildcard permissions
+        for s in self.scopes:
+            if s.endswith(":*"):
+                prefix = s[:-1]
+                if scope.startswith(prefix):
+                    return True
+        return False
+
+
+# ============================================================================
+# JWKS Cache
+# ============================================================================
+
+
+class JWKSCache:
+    """Caches JWKS keys with TTL to avoid repeated fetches."""
+
+    def __init__(self):
+        self._keys: dict = {}
+        self._fetched_at: float = 0
+        self._ttl: int = settings.jwks_cache_ttl
+
+    async def get_keys(self) -> dict:
+        """Get JWKS keys, fetching if cache is expired."""
+        now = time.time()
+
+        if self._keys and (now - self._fetched_at) < self._ttl:
+            return self._keys
+
+        if not settings.jwks_url:
+            logger.warning("jwks_url_not_configured")
+            return {}
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(settings.jwks_url)
+                response.raise_for_status()
+                jwks_data = response.json()
+
+            # Convert JWKS to key dict indexed by kid
+            self._keys = {}
+            for key_data in jwks_data.get("keys", []):
+                kid = key_data.get("kid")
+                if kid:
+                    self._keys[kid] = key_data
+
+            self._fetched_at = now
+            logger.info("jwks_refreshed", key_count=len(self._keys))
+            return self._keys
+
+        except Exception as e:
+            logger.error("jwks_fetch_failed", error=str(e))
+            # Return stale cache if available
+            if self._keys:
+                logger.warning("using_stale_jwks_cache")
+                return self._keys
+            return {}
+
+    def invalidate(self):
+        """Force cache invalidation."""
+        self._fetched_at = 0
+
+
+# Singleton JWKS cache
+_jwks_cache = JWKSCache()
+
+
+# ============================================================================
+# JWT Verification
+# ============================================================================
+
+
+async def verify_jwt(token: str) -> JWTClaims:
+    """Verify a JWT token using JWKS.
+
+    Args:
+        token: The JWT token string
+
+    Returns:
+        JWTClaims with verified claims
+
+    Raises:
+        HTTPException: If token is invalid, expired, or verification fails
     """
-    Verify the API key from either header or query parameter.
-    Returns the API key if valid, raises HTTPException if not.
-    """
-    api_key = api_key_header_value or api_key_query_value
-
-    if not api_key:
-        logger.warning("api_key_missing")
+    if not settings.jwks_url:
         raise HTTPException(
-            status_code=401,
-            detail="API key required. Provide via X-API-Key header or api_key query parameter.",
+            status_code=500,
+            detail="JWT authentication not configured (JWKS_URL not set)"
         )
 
-    # Compare using constant-time comparison to prevent timing attacks
-    if not secrets.compare_digest(api_key, settings.api_key):
-        logger.warning("api_key_invalid", provided_key_prefix=api_key[:8] + "..." if len(api_key) > 8 else "***")
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid API key",
+    try:
+        # Decode header to get kid
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get("kid")
+
+        if not kid:
+            raise HTTPException(status_code=401, detail="JWT missing kid in header")
+
+        # Get JWKS keys
+        keys = await _jwks_cache.get_keys()
+        if kid not in keys:
+            # Try refreshing cache in case of key rotation
+            _jwks_cache.invalidate()
+            keys = await _jwks_cache.get_keys()
+
+        if kid not in keys:
+            logger.warning("jwt_kid_not_found", kid=kid)
+            raise HTTPException(status_code=401, detail="JWT signing key not found")
+
+        # Build public key
+        key_data = keys[kid]
+        public_key = jwk.construct(key_data)
+
+        # Verify and decode
+        options = {
+            "verify_exp": True,
+            "verify_iss": bool(settings.jwt_issuer),
+            "verify_aud": bool(settings.jwt_audience),
+        }
+
+        payload = jwt.decode(
+            token,
+            public_key,
+            algorithms=["RS256", "ES256"],
+            issuer=settings.jwt_issuer or None,
+            audience=settings.jwt_audience or None,
+            options=options,
         )
 
-    return api_key
+        return JWTClaims(**payload)
+
+    except JWTError as e:
+        logger.warning("jwt_verification_failed", error=str(e))
+        raise HTTPException(status_code=401, detail=f"Invalid JWT: {str(e)}")
+    except JWKError as e:
+        logger.error("jwk_error", error=str(e))
+        raise HTTPException(status_code=401, detail="JWT key error")
 
 
-def generate_api_key() -> str:
-    """Generate a secure random API key."""
-    return secrets.token_urlsafe(32)
+# ============================================================================
+# Service Token Verification
+# ============================================================================
+
+
+def hash_service_token(token: str) -> str:
+    """Hash a service token using bcrypt."""
+    return bcrypt.hashpw(
+        token.encode("utf-8"),
+        bcrypt.gensalt(rounds=settings.service_token_hash_rounds)
+    ).decode("utf-8")
+
+
+def verify_service_token_hash(token: str, token_hash: str) -> bool:
+    """Verify a service token against its hash."""
+    return bcrypt.checkpw(token.encode("utf-8"), token_hash.encode("utf-8"))
+
+
+async def verify_service_token(token: str, db: Session) -> ServiceToken:
+    """Verify a service token and return the token record.
+
+    Args:
+        token: The service token string (format: prefix_secret)
+        db: Database session
+
+    Returns:
+        ServiceToken record if valid
+
+    Raises:
+        HTTPException: If token is invalid, expired, or revoked
+    """
+    # Extract prefix (first 8 chars used for lookup)
+    if len(token) < 12:
+        raise HTTPException(status_code=401, detail="Invalid service token format")
+
+    prefix = token[:8]
+
+    # Find token by prefix
+    service_token = db.query(ServiceToken).filter(
+        ServiceToken.token_prefix == prefix,
+        ServiceToken.is_active == True,
+    ).first()
+
+    if not service_token:
+        logger.warning("service_token_not_found", prefix=prefix)
+        raise HTTPException(status_code=401, detail="Invalid service token")
+
+    # Check expiration
+    if service_token.expires_at and datetime.utcnow() > service_token.expires_at:
+        logger.warning("service_token_expired", token_id=service_token.id)
+        raise HTTPException(status_code=401, detail="Service token expired")
+
+    # Check revocation
+    if service_token.revoked_at:
+        logger.warning("service_token_revoked", token_id=service_token.id)
+        raise HTTPException(status_code=401, detail="Service token revoked")
+
+    # Verify hash
+    if not verify_service_token_hash(token, service_token.token_hash):
+        logger.warning("service_token_hash_mismatch", token_id=service_token.id)
+        raise HTTPException(status_code=401, detail="Invalid service token")
+
+    # Update usage stats
+    service_token.last_used_at = datetime.utcnow()
+    service_token.use_count += 1
+    db.commit()
+
+    return service_token
+
+
+def generate_service_token() -> tuple[str, str, str]:
+    """Generate a new service token.
+
+    Returns:
+        Tuple of (full_token, prefix, hash)
+    """
+    # Generate 32 bytes of random data
+    secret = secrets.token_urlsafe(32)
+    prefix = secret[:8]
+    token_hash = hash_service_token(secret)
+    return secret, prefix, token_hash
+
+
+# ============================================================================
+# Token Denylist
+# ============================================================================
+
+
+async def is_token_denylisted(jti: str, db: Session) -> bool:
+    """Check if a JWT is in the denylist."""
+    if not jti:
+        return False
+    return db.query(TokenDenylist).filter(TokenDenylist.jti == jti).first() is not None
+
+
+async def denylist_token(jti: str, expires_at: datetime, reason: str, db: Session) -> None:
+    """Add a JWT to the denylist."""
+    entry = TokenDenylist(jti=jti, expires_at=expires_at, reason=reason)
+    db.add(entry)
+    db.commit()
+
+
+# ============================================================================
+# User Resolution
+# ============================================================================
+
+
+async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
+    """Get or create a user from JWT claims.
+
+    On first login, creates a user record linked to better-auth via external_id.
+    On subsequent logins, updates user info from JWT claims.
+
+    Note: The very first user to authenticate becomes a superuser automatically.
+    """
+    user = db.query(User).filter(User.external_id == claims.sub).first()
+
+    if not user:
+        # Check if this is the first user in the system
+        is_first_user = db.query(User).count() == 0
+
+        # Create new user (first user becomes superuser)
+        user = User(
+            external_id=claims.sub,
+            email=claims.email or f"{claims.sub}@unknown",
+            name=claims.name,
+            picture=claims.picture,
+            is_active=True,
+            is_superuser=is_first_user,
+            last_login_at=datetime.utcnow(),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        if is_first_user:
+            logger.info("first_superuser_created", user_id=user.id, external_id=claims.sub, email=claims.email)
+        else:
+            logger.info("user_created", user_id=user.id, external_id=claims.sub)
+    else:
+        # Update user info from claims
+        if claims.email and claims.email != user.email:
+            user.email = claims.email
+        if claims.name:
+            user.name = claims.name
+        if claims.picture:
+            user.picture = claims.picture
+        user.last_login_at = datetime.utcnow()
+        db.commit()
+
+    return user
+
+
+# ============================================================================
+# FastAPI Dependencies
+# ============================================================================
+
+
+async def get_current_principal(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Get the current authenticated principal from the request.
+
+    Supports multiple authentication methods:
+    1. Bearer token (JWT from better-auth)
+    2. Service token (Bearer token without dots - for machine-to-machine auth)
+
+    Returns:
+        Principal object with user/token info and scopes
+
+    Raises:
+        HTTPException: If no valid authentication provided
+    """
+    # Try Bearer token
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+
+        # Check if it's a service token (shorter, no dots)
+        if "." not in token:
+            # Service token authentication
+            service_token = await verify_service_token(token, db)
+            return Principal(
+                type="service_token",
+                id=service_token.id,
+                external_id=None,
+                email=None,
+                name=service_token.name,
+                is_superuser=False,
+                scopes=set(service_token.scope_list),
+            )
+        else:
+            # JWT authentication
+            claims = await verify_jwt(token)
+
+            # Check denylist
+            if claims.jti and await is_token_denylisted(claims.jti, db):
+                raise HTTPException(status_code=401, detail="Token has been revoked")
+
+            # Get or create user
+            user = await get_or_create_user(claims, db)
+
+            if not user.is_active:
+                raise HTTPException(status_code=403, detail="User account is disabled")
+
+            return Principal(
+                type="user",
+                id=user.id,
+                external_id=user.external_id,
+                email=user.email,
+                name=user.name,
+                is_superuser=user.is_superuser,
+                scopes=user.all_permissions,
+                raw_claims=claims.model_dump(),
+            )
+
+    # No valid authentication
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication required. Provide Bearer token (JWT or service token).",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def get_optional_principal(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[Principal]:
+    """Get the current principal if authenticated, None otherwise.
+
+    Use this for endpoints that work differently for authenticated vs anonymous users.
+    """
+    try:
+        return await get_current_principal(request, credentials, db)
+    except HTTPException:
+        return None
+
+
+# ============================================================================
+# Scope Enforcement - require() decorator
+# ============================================================================
+
+
+def require(*scopes: str) -> Callable:
+    """Decorator to require specific permission scopes.
+
+    Usage:
+        @router.get("/data")
+        @require("explorer:read")
+        async def get_data(principal: Principal = Depends(get_current_principal)):
+            ...
+
+        @router.post("/sync")
+        @require("sync:splynx:write")
+        async def trigger_sync(principal: Principal = Depends(get_current_principal)):
+            ...
+
+        # Multiple scopes (any one grants access)
+        @router.get("/admin")
+        @require("admin:users:read", "admin:roles:read")
+        async def admin_dashboard(principal: Principal = Depends(get_current_principal)):
+            ...
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> Any:
+            # Find principal in kwargs
+            principal: Optional[Principal] = kwargs.get("principal")
+
+            if not principal:
+                # Try to find in args by looking for Principal type
+                for arg in args:
+                    if isinstance(arg, Principal):
+                        principal = arg
+                        break
+
+            if not principal:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Authentication required",
+                )
+
+            # Check if principal has any of the required scopes
+            has_permission = any(principal.has_scope(scope) for scope in scopes)
+
+            if not has_permission:
+                logger.warning(
+                    "permission_denied",
+                    principal_type=principal.type,
+                    principal_id=principal.id,
+                    required_scopes=list(scopes),
+                    available_scopes=list(principal.scopes),
+                )
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Permission denied. Required: {', '.join(scopes)}",
+                )
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+    return decorator
+
+
+class Require:
+    """Dependency class for scope enforcement.
+
+    Alternative to @require decorator, useful when you need more control.
+
+    Usage:
+        @router.get("/data")
+        async def get_data(
+            principal: Principal = Depends(get_current_principal),
+            _: None = Depends(Require("explorer:read")),
+        ):
+            ...
+    """
+
+    def __init__(self, *scopes: str):
+        self.scopes = scopes
+
+    async def __call__(
+        self,
+        principal: Principal = Depends(get_current_principal),
+    ) -> None:
+        has_permission = any(principal.has_scope(scope) for scope in self.scopes)
+
+        if not has_permission:
+            logger.warning(
+                "permission_denied",
+                principal_type=principal.type,
+                principal_id=principal.id,
+                required_scopes=list(self.scopes),
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied. Required: {', '.join(self.scopes)}",
+            )
