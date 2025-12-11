@@ -14,12 +14,17 @@ import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 
 export default function AnomaliesPage() {
-  const { hasAccess } = useRequireScope('analytics:read');
+  const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error, mutate } = useAnomalies({ isPaused: () => !canFetch });
+
+  if (authLoading) {
+    return <LoadingState />;
+  }
+
   if (!hasAccess) {
     return <AccessDenied />;
   }
-
-  const { data, isLoading, error, mutate } = useAnomalies();
 
   if (isLoading) {
     return <LoadingState />;

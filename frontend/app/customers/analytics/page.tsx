@@ -44,6 +44,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { DataTable } from '@/components/DataTable';
 import {
   LineChart,
   Line,
@@ -79,29 +80,23 @@ export default function CustomerAnalyticsPage() {
   }, [months]);
 
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
-
-  if (authLoading) {
-    return <LoadingState />;
-  }
-
-  if (!hasAccess) {
-    return <AccessDenied />;
-  }
+  const canFetch = hasAccess && !authLoading;
 
   // Fetch all data
-  const { data: signupTrend, isLoading: signupLoading, error: signupError } = useCustomerSignupTrend({ start_date: startDate, interval: 'month' });
-  const { data: cohortData, isLoading: cohortLoading, error: cohortError } = useCustomerCohort(cohortMonths);
-  const { data: byPlan, isLoading: planLoading, error: planError } = useCustomersByPlan();
-  const { data: byType, isLoading: typeLoading, error: typeError } = useCustomersByType();
-  const { data: byLocation, isLoading: locationLoading, error: locationError } = useCustomersByLocation(50);
-  const { data: byPop, isLoading: popLoading, error: popError } = useCustomersByPop();
-  const { data: byRouter, isLoading: routerLoading, error: routerError } = useCustomersByRouter();
-  const { data: ticketVolume, isLoading: ticketLoading, error: ticketError } = useCustomersByTicketVolume(ticketDays);
-  const { data: outreach, isLoading: outreachLoading, error: outreachError } = useCustomerDataQualityOutreach();
-  const { data: revenueOverdue, isLoading: overdueLoading, error: overdueError } = useCustomerRevenueOverdue();
-  const { data: paymentTimeliness, isLoading: paymentLoading, error: paymentError } = useCustomerPaymentTimeliness(paymentDays);
-  const { data: blockedAnalytics, isLoading: blockedLoading, error: blockedError } = useBlockedAnalytics();
-  const { data: activeAnalytics, isLoading: activeLoading, error: activeError } = useActiveAnalytics();
+  const swrGuard = { isPaused: () => !canFetch };
+  const { data: signupTrend, isLoading: signupLoading, error: signupError } = useCustomerSignupTrend({ start_date: startDate, interval: 'month' }, swrGuard);
+  const { data: cohortData, isLoading: cohortLoading, error: cohortError } = useCustomerCohort(cohortMonths, swrGuard);
+  const { data: byPlan, isLoading: planLoading, error: planError } = useCustomersByPlan(swrGuard);
+  const { data: byType, isLoading: typeLoading, error: typeError } = useCustomersByType(swrGuard);
+  const { data: byLocation, isLoading: locationLoading, error: locationError } = useCustomersByLocation(50, swrGuard);
+  const { data: byPop, isLoading: popLoading, error: popError } = useCustomersByPop(swrGuard);
+  const { data: byRouter, isLoading: routerLoading, error: routerError } = useCustomersByRouter(undefined, swrGuard);
+  const { data: ticketVolume, isLoading: ticketLoading, error: ticketError } = useCustomersByTicketVolume(ticketDays, swrGuard);
+  const { data: outreach, isLoading: outreachLoading, error: outreachError } = useCustomerDataQualityOutreach(swrGuard);
+  const { data: revenueOverdue, isLoading: overdueLoading, error: overdueError } = useCustomerRevenueOverdue(undefined, undefined, swrGuard);
+  const { data: paymentTimeliness, isLoading: paymentLoading, error: paymentError } = useCustomerPaymentTimeliness(paymentDays, swrGuard);
+  const { data: blockedAnalytics, isLoading: blockedLoading, error: blockedError } = useBlockedAnalytics(swrGuard);
+  const { data: activeAnalytics, isLoading: activeLoading, error: activeError } = useActiveAnalytics(swrGuard);
 
   const isLoading = signupLoading || cohortLoading || planLoading || typeLoading || locationLoading || popLoading || routerLoading || ticketLoading || outreachLoading || overdueLoading || paymentLoading || blockedLoading || activeLoading;
   const error = signupError || cohortError || planError || typeError || locationError || popError || routerError || ticketError || outreachError || overdueError || paymentError || blockedError || activeError;
@@ -257,6 +252,26 @@ export default function CustomerAnalyticsPage() {
   const paymentRisk = (activeAnalytics as ActiveAnalyticsResponse | undefined)?.payment_risk;
   const topActiveCustomers = (activeAnalytics as ActiveAnalyticsResponse | undefined)?.top_customers || [];
   const supportConcerns = (activeAnalytics as ActiveAnalyticsResponse | undefined)?.support_concerns || [];
+  const topPlanRows = useMemo(
+    () => activePlans.map((plan, idx) => ({ ...plan, _id: plan.plan_name || `plan-${idx}` })),
+    [activePlans]
+  );
+  const locationRows = useMemo(
+    () => normalizedByLocation.map((loc, idx) => ({ ...loc, _id: `${loc.city || 'unknown'}-${loc.state || ''}-${idx}` })),
+    [normalizedByLocation]
+  );
+  const cohortRows = useMemo(
+    () => (normalizedCohort.cohorts || []).map((cohort, idx) => ({ ...cohort, _id: cohort.cohort || `cohort-${idx}` })),
+    [normalizedCohort.cohorts]
+  );
+
+  if (authLoading) {
+    return <LoadingState />;
+  }
+
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -456,26 +471,32 @@ export default function CustomerAnalyticsPage() {
               {!activePlans || activePlans.length === 0 ? (
                 <EmptyState message="No active plan data" />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-border">
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-muted uppercase">Plan</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Customers</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">MRR</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-border">
-                      {activePlans.map((plan, idx) => (
-                        <tr key={`${plan.plan_name}-${idx}`} className="hover:bg-slate-elevated/50">
-                          <td className="px-4 py-3 text-white">{plan.plan_name || 'Unknown plan'}</td>
-                          <td className="px-4 py-3 text-right text-slate-muted">{(plan.customer_count ?? 0).toLocaleString()}</td>
-                          <td className="px-4 py-3 text-right text-teal-electric">{formatCurrency(plan.mrr ?? 0, 'NGN')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                  keyField="_id"
+                  data={topPlanRows as any[]}
+                  columns={[
+                    {
+                      key: 'plan_name',
+                      header: 'Plan',
+                      sortable: true,
+                      render: (row) => <span className="text-white">{(row.plan_name as string) || 'Unknown plan'}</span>,
+                    },
+                    {
+                      key: 'customer_count',
+                      header: 'Customers',
+                      sortable: true,
+                      align: 'right',
+                      render: (row) => <span className="text-slate-muted">{(row.customer_count as number)?.toLocaleString() ?? 0}</span>,
+                    },
+                    {
+                      key: 'mrr',
+                      header: 'MRR',
+                      sortable: true,
+                      align: 'right',
+                      render: (row) => <span className="text-teal-electric">{formatCurrency((row.mrr as number) ?? 0, 'NGN')}</span>,
+                    },
+                  ]}
+                />
               )}
             </InsightCard>
 
@@ -635,7 +656,7 @@ export default function CustomerAnalyticsPage() {
                 <EmptyState message="No plan distribution data" />
               ) : (
                 <div className="space-y-4">
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={320}>
                     <PieChart>
                       <Pie
                         data={byPlan}
@@ -643,7 +664,9 @@ export default function CustomerAnalyticsPage() {
                         nameKey="plan_name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={80}
+                        innerRadius={50}
+                        outerRadius={110}
+                        paddingAngle={2}
                         label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
@@ -660,7 +683,7 @@ export default function CustomerAnalyticsPage() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
                     {byPlan.map((plan: CustomerByPlanItem, index: number) => (
                       <div key={plan.plan_name} className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
@@ -725,30 +748,42 @@ export default function CustomerAnalyticsPage() {
               {normalizedByLocation.length === 0 ? (
                 <EmptyState message="No location data available" />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-border">
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-muted uppercase">City</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-slate-muted uppercase">State</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Customers</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">MRR</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-border">
-                      {normalizedByLocation.map((loc) => (
-                        <tr key={`${loc.city || ''}-${loc.state || ''}`} className="hover:bg-slate-elevated/50">
-                          <td className="px-4 py-3 text-white capitalize">{loc.city || 'Unknown'}</td>
-                          <td className="px-4 py-3 text-slate-muted capitalize">{loc.state || '-'}</td>
-                          <td className="px-4 py-3 text-right text-white">{loc.customer_count}</td>
-                          <td className="px-4 py-3 text-right text-teal-electric">
-                            {loc.mrr !== undefined ? formatCurrency(loc.mrr, 'NGN') : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable
+                  keyField="_id"
+                  data={locationRows as any[]}
+                  columns={[
+                    {
+                      key: 'city',
+                      header: 'City',
+                      sortable: true,
+                      render: (row) => <span className="text-white capitalize">{(row.city as string) || 'Unknown'}</span>,
+                    },
+                    {
+                      key: 'state',
+                      header: 'State',
+                      sortable: true,
+                      render: (row) => <span className="text-slate-muted capitalize">{(row.state as string) || '-'}</span>,
+                    },
+                    {
+                      key: 'customer_count',
+                      header: 'Customers',
+                      sortable: true,
+                      align: 'right',
+                      render: (row) => <span className="text-white">{(row.customer_count as number)?.toLocaleString() ?? 0}</span>,
+                    },
+                    {
+                      key: 'mrr',
+                      header: 'MRR',
+                      sortable: true,
+                      align: 'right',
+                      render: (row) => (
+                        <span className="text-teal-electric">
+                          {row.mrr !== undefined ? formatCurrency((row.mrr as number) ?? 0, 'NGN') : '—'}
+                        </span>
+                      ),
+                    },
+                  ]}
+                />
               )}
             </InsightCard>
           </div>
@@ -799,65 +834,62 @@ export default function CustomerAnalyticsPage() {
             {!normalizedCohort.cohorts || normalizedCohort.cohorts.length === 0 ? (
               <EmptyState message="No cohort data available" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-border">
-                      <th className="px-4 py-2 text-left text-xs font-medium text-slate-muted uppercase">Cohort</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Total</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Active</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">New</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Blocked</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Inactive</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Churned</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">MRR</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">Retention</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-muted uppercase">View</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-border">
-                    {normalizedCohort.cohorts.map((cohort: CustomerCohortItem) => (
-                      <tr key={cohort.cohort} className="hover:bg-slate-elevated/50">
-                        <td className="px-4 py-3 text-white font-medium">{cohort.cohort}</td>
-                        <td className="px-4 py-3 text-right text-white">{cohort.total_customers}</td>
-                        <td className="px-4 py-3 text-right text-teal-electric">{cohort.active ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-muted">{(cohort as any).new ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-muted">{(cohort as any).blocked ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-muted">{(cohort as any).inactive ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-muted">{cohort.churned ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-teal-electric">{(cohort as any).total_mrr ? formatCurrency((cohort as any).total_mrr, 'NGN') : '—'}</td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            (cohort.retention_rate ?? 0) >= 80 ? 'bg-green-500/20 text-green-400' :
-                            (cohort.retention_rate ?? 0) >= 60 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-red-500/20 text-red-400'
-                          }`}>
-                            {(cohort.retention_rate ?? 0).toFixed(1)}%
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2 text-xs">
-                            <Link
-                              href={`/customers?cohort=${encodeURIComponent(cohort.cohort)}`}
-                              className="text-teal-electric hover:text-teal-glow underline"
-                            >
-                              View all
-                            </Link>
-                            {(cohort as any).blocked > 0 && (
-                              <Link
-                                href={`/customers?cohort=${encodeURIComponent(cohort.cohort)}&status=blocked`}
-                                className="text-amber-warn hover:text-amber-400 underline"
-                              >
-                                View blocked
-                              </Link>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                keyField="_id"
+                data={cohortRows as any[]}
+                columns={[
+                  { key: 'cohort', header: 'Cohort', sortable: true, render: (row) => <span className="text-white font-medium">{row.cohort as string}</span> },
+                  { key: 'total_customers', header: 'Total', sortable: true, align: 'right', render: (row) => <span className="text-white">{row.total_customers as number}</span> },
+                  { key: 'active', header: 'Active', sortable: true, align: 'right', render: (row) => <span className="text-teal-electric">{row.active ?? '—'}</span> },
+                  { key: 'new', header: 'New', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{(row as any).new ?? '—'}</span> },
+                  { key: 'blocked', header: 'Blocked', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{(row as any).blocked ?? '—'}</span> },
+                  { key: 'inactive', header: 'Inactive', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{(row as any).inactive ?? '—'}</span> },
+                  { key: 'churned', header: 'Churned', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{row.churned ?? '—'}</span> },
+                  { key: 'total_mrr', header: 'MRR', sortable: true, align: 'right', render: (row) => <span className="text-teal-electric">{(row as any).total_mrr ? formatCurrency((row as any).total_mrr, 'NGN') : '—'}</span> },
+                  {
+                    key: 'retention_rate',
+                    header: 'Retention',
+                    sortable: true,
+                    align: 'right',
+                    render: (row) => (
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          (row.retention_rate ?? 0) >= 80
+                            ? 'bg-green-500/20 text-green-400'
+                            : (row.retention_rate ?? 0) >= 60
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {(row.retention_rate ?? 0).toFixed(1)}%
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    header: 'View',
+                    align: 'right',
+                    render: (row) => (
+                      <div className="flex justify-end gap-2 text-xs">
+                        <Link
+                          href={`/customers?cohort=${encodeURIComponent(row.cohort as string)}`}
+                          className="text-teal-electric hover:text-teal-glow underline"
+                        >
+                          View all
+                        </Link>
+                        {(row as any).blocked > 0 && (
+                          <Link
+                            href={`/customers?cohort=${encodeURIComponent(row.cohort as string)}&status=blocked`}
+                            className="text-amber-warn hover:text-amber-400 underline"
+                          >
+                            View blocked
+                          </Link>
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             )}
           </InsightCard>
         </div>

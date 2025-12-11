@@ -42,7 +42,7 @@ function AnimatedNumber({ value, duration = 1500 }: { value: number; duration?: 
     };
 
     requestAnimationFrame(animate);
-  }, [value, duration]);
+  }, [value, duration, displayValue]);
 
   return <>{displayValue.toLocaleString()}</>;
 }

@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dotmac/core": "file:../../dotmac-component-library/packages/core/dotmac-core-1.0.0.tgz",

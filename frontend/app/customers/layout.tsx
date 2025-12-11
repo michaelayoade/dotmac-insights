@@ -19,7 +19,7 @@ const customerTabs = [
 ];
 
 export default function CustomersLayout({ children }: { children: React.ReactNode }) {
-  const { hasAccess, isLoading: authLoading } = useRequireScope('customers:read');
+  const { hasAccess, isLoading: authLoading } = useRequireScope(['customers:read', 'analytics:read']);
   const pathname = usePathname();
 
   if (authLoading) {

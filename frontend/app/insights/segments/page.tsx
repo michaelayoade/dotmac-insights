@@ -18,31 +18,9 @@ type ViewKey = keyof CustomerSegmentsInsightsResponse;
 
 export default function SegmentsPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
-
-  if (authLoading) {
-    return <LoadingState />;
-  }
-
-  if (!hasAccess) {
-    return <AccessDenied />;
-  }
-
-  const { data, isLoading, error, mutate } = useCustomerSegmentsInsights();
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error, mutate } = useCustomerSegmentsInsights({ isPaused: () => !canFetch });
   const [activeView, setActiveView] = useState<ViewKey>('by_status');
-
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load customer segments"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
 
   const totalCustomers = useMemo(() => {
     if (!data?.by_status) return 0;
@@ -65,6 +43,28 @@ export default function SegmentsPage() {
 
   const currentView = viewConfigs.find((view) => view.key === activeView) || viewConfigs[0];
   const currentItems = currentView.items as Array<Record<string, unknown>>;
+
+  if (authLoading) {
+    return <LoadingState />;
+  }
+
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load customer segments"
+        error={error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

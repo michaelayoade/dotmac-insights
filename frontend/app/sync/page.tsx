@@ -20,6 +20,8 @@ import { DataTable } from '@/components/DataTable';
 import { useSyncStatus, useSyncLogs, triggerSync } from '@/hooks/useApi';
 import { formatDate, cn } from '@/lib/utils';
 import { useToast, Modal } from '@dotmac/core';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type SyncSource = 'splynx' | 'erpnext' | 'chatwoot';
 
@@ -45,34 +47,38 @@ const SOURCE_CONFIG: Record<SyncSource, { name: string; icon: typeof Database; c
 };
 
 export default function SyncPage() {
+  const { hasAccess: canRead, isLoading: authLoading } = useRequireScope('sync:read');
+  const { hasAccess: canWrite } = useRequireScope('sync:write');
   const [syncingSource, setSyncingSource] = useState<SyncSource | 'all' | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; source: SyncSource | null }>({ open: false, source: null });
-  const { data: syncStatus, mutate: refreshStatus } = useSyncStatus();
-  const { data: syncLogs, mutate: refreshLogs, isLoading: logsLoading } = useSyncLogs(50);
+  const swrGuard = { isPaused: () => authLoading || !canRead };
+  const { data: syncStatus, mutate: refreshStatus } = useSyncStatus(swrGuard);
+  const { data: syncLogs, mutate: refreshLogs, isLoading: logsLoading } = useSyncLogs(50, swrGuard);
   const { toast } = useToast();
 
   const handleSync = async (source: SyncSource | 'all', fullSync: boolean = false) => {
+    if (!canWrite) {
+      toast({ title: 'Access denied', description: 'You need sync:write to trigger syncs.', variant: 'error' });
+      return;
+    }
     setSyncingSource(source);
     const sourceName = source === 'all' ? 'All Sources' : SOURCE_CONFIG[source].name;
 
     toast({
-      title: `${fullSync ? 'Full' : 'Quick'} sync started`,
+      title: `${fullSync ? 'Full' : 'Quick'} sync requested`,
       description: `Syncing ${sourceName}...`,
       variant: 'info',
     });
 
     try {
-      await triggerSync(source, fullSync);
-      // Refresh status after a short delay
-      setTimeout(() => {
-        refreshStatus();
-        refreshLogs();
-        toast({
-          title: 'Sync completed',
-          description: `${sourceName} synced successfully`,
-          variant: 'success',
-        });
-      }, 2000);
+      const response = await triggerSync(source, fullSync);
+      refreshStatus();
+      refreshLogs();
+      toast({
+        title: 'Sync started',
+        description: response?.message || `${sourceName} sync initiated`,
+        variant: 'success',
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
@@ -109,6 +115,18 @@ export default function SyncPage() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
+      </div>
+    );
+  }
+
+  if (!canRead) {
+    return <AccessDenied />;
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -121,10 +139,10 @@ export default function SyncPage() {
         </div>
         <button
           onClick={() => handleSync('all', false)}
-          disabled={syncingSource !== null}
+          disabled={syncingSource !== null || !canWrite}
           className={cn(
             'flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all',
-            syncingSource !== null
+            syncingSource !== null || !canWrite
               ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
               : 'bg-teal-electric text-slate-deep hover:bg-teal-glow'
           )}
@@ -260,10 +278,10 @@ export default function SyncPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleSync(source, false)}
-                    disabled={isSyncing}
+                    disabled={isSyncing || !canWrite}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all',
-                      isSyncing
+                      isSyncing || !canWrite
                         ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
                         : 'bg-slate-elevated text-white hover:bg-slate-border'
                     )}
@@ -277,10 +295,10 @@ export default function SyncPage() {
                   </button>
                   <button
                     onClick={() => handleFullSyncClick(source)}
-                    disabled={isSyncing}
+                    disabled={isSyncing || !canWrite}
                     className={cn(
                       'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all',
-                      isSyncing
+                      isSyncing || !canWrite
                         ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
                         : 'border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated'
                     )}

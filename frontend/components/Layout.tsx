@@ -8,7 +8,6 @@ import {
   Users,
   Radio,
   TrendingUp,
-  Database,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -42,7 +41,7 @@ const navigation: NavItem[] = [
     name: 'Customers',
     href: '/customers',
     icon: Users,
-    requiredScopes: ['customers:read', 'explorer:read'],
+    requiredScopes: ['customers:read', 'explore:read'],
     children: [
       { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
@@ -51,7 +50,6 @@ const navigation: NavItem[] = [
   // Future/optional sections can be added below
   // { name: 'Overview', href: '/', icon: LayoutDashboard },
   // { name: 'POPs', href: '/pops', icon: Radio, requiredScopes: ['analytics:read'] },
-  { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explore:read'] },
   // { name: 'Sync', href: '/sync', icon: RefreshCw, requiredScopes: ['sync:read'] },
 ];
 
@@ -86,7 +84,10 @@ function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
 }
 
 function SyncStatusIndicator() {
-  const { data: status, error } = useSyncStatus();
+  const { isAuthenticated } = useAuth();
+  const { data: status, error } = useSyncStatus({
+    isPaused: () => !isAuthenticated,
+  });
 
   if (error) {
     return (

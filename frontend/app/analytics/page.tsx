@@ -1,11 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Users,
   AlertTriangle,
   Clock,
   ArrowUpRight,
@@ -78,7 +75,7 @@ export default function AnalyticsPage() {
   const endDateStr = formatDateParam(dateRange.endDate);
 
   // Core data
-  const { data: overview, isLoading: overviewLoading } = useOverview();
+  const { data: overview } = useOverview();
   const { data: revenueTrend } = useRevenueTrend(timeRange, startDateStr, endDateStr);
   const { data: churnTrend } = useChurnTrend(timeRange, startDateStr, endDateStr);
   const { data: invoiceAging } = useInvoiceAging();
@@ -129,9 +126,6 @@ export default function AnalyticsPage() {
   const avgChurn = churnTrend && churnTrend.length > 0
     ? churnTrend.reduce((sum, m) => sum + m.churned, 0) / churnTrend.length
     : 0;
-
-  // Calculate total churned in period
-  const totalChurned = churnTrend?.reduce((sum, m) => sum + m.churned, 0) || 0;
 
   // Prepare funnel data
   const funnelData = pipelineData ? [

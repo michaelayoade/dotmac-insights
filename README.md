@@ -6,9 +6,11 @@ Unified data platform for Dotmac Technologies - aggregating data from Splynx, ER
 
 - **Data Sync**: Automated sync from Splynx (ISP billing), ERPNext (ERP), and Chatwoot (support)
 - **Unified Customer View**: Link customers across all systems
-- **Data Explorer**: Query and explore all synced data via API
+- **Web Dashboard**: Next.js frontend with customer analytics, insights, and data explorer
+- **Data Explorer**: Query and explore all synced data via API or UI
 - **Analytics**: Revenue trends, churn analysis, POP performance, support metrics
-- **Real-time Updates**: Configurable sync intervals
+- **Customer 360**: Complete customer profile with finance, services, support history
+- **Real-time Updates**: Configurable sync intervals via Celery
 
 ## Quick Start
 
@@ -16,7 +18,9 @@ Unified data platform for Dotmac Technologies - aggregating data from Splynx, ER
 
 - Python 3.11+
 - PostgreSQL 15+
-- Redis (optional, for caching)
+- Redis (optional, for Celery background tasks)
+- Node.js 18+ (for frontend)
+- pnpm (for building component library)
 
 ### 2. Setup
 
@@ -101,11 +105,88 @@ poetry run python cli.py sync chatwoot --full
 poetry run uvicorn app.main:app --reload
 ```
 
-Access the API at: http://localhost:8000  
-API Documentation: http://localhost:8000/docs  
+Access the API at: http://localhost:8000
+API Documentation: http://localhost:8000/docs
 Auth: click **Authorize** in Swagger UI and enter your API key in `X-API-Key` (or pass `api_key` as a query param).
 
 > In production, `API_KEY` must be set or the app will refuse to start. CORS is locked down unless `CORS_ORIGINS` is provided. Development without an API key is allowed but logged as a warning.
+
+### 8. Setup Frontend
+
+The frontend requires the `@dotmac/core` and `@dotmac/design-tokens` packages from the component library.
+
+```bash
+# Clone the component library (one level up from dotmac-insights)
+cd ..
+git clone https://github.com/michaelayoade/dotmac-component-library.git
+cd dotmac-component-library
+
+# Install and build
+pnpm install
+pnpm build
+
+# Create tarballs for local installation
+cd packages/core && pnpm pack && cd ../..
+cd packages/design-tokens && pnpm pack && cd ../..
+
+# Return to frontend directory
+cd ../dotmac-insights/frontend
+```
+
+### 9. Configure Frontend Environment
+
+Create `frontend/.env.local`:
+
+```env
+# Backend API URL
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Service token for development (grants all scopes)
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+NEXT_PUBLIC_SERVICE_TOKEN=your_service_token_here
+```
+
+> **Note**: The service token must match the `SERVICE_TOKEN` in your backend `.env` file.
+
+### 10. Install and Run Frontend
+
+```bash
+cd frontend
+
+# Install dependencies (will use local tarballs from component library)
+npm install
+
+# Start development server
+npm run dev
+```
+
+Access the dashboard at: http://localhost:3000
+
+### Quick Reference: Running the Full Stack
+
+```bash
+# Terminal 1: Backend API
+cd dotmac-insights
+poetry run uvicorn app.main:app --reload --host 0.0.0.0
+
+# Terminal 2: Celery Worker (optional, for background sync)
+cd dotmac-insights
+poetry run celery -A app.celery_app worker --loglevel=info
+
+# Terminal 3: Celery Beat (optional, for scheduled sync)
+cd dotmac-insights
+poetry run celery -A app.celery_app beat --loglevel=info
+
+# Terminal 4: Frontend
+cd dotmac-insights/frontend
+npm run dev
+```
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | Next.js Dashboard |
+| Backend API | http://localhost:8000 | FastAPI Server |
+| API Docs | http://localhost:8000/docs | Swagger UI |
 
 ## Using Docker
 
@@ -214,7 +295,7 @@ Customers are linked across systems using:
                    │ REST APIs
            ┌───────▼───────┐
            │  Sync Engine  │
-           │   (Python)    │
+           │ (Python/Celery)│
            └───────┬───────┘
                    │
            ┌───────▼───────┐
@@ -223,23 +304,25 @@ Customers are linked across systems using:
            └───────┬───────┘
                    │
            ┌───────▼───────┐
-           │  FastAPI      │
-           │   Server      │
+           │   FastAPI     │
+           │    Server     │
+           │  :8000/api    │
            └───────┬───────┘
                    │
            ┌───────▼───────┐
+           │   Next.js     │
            │  Dashboard    │
-           │  (Phase 2)    │
+           │    :3000      │
            └───────────────┘
 ```
 
-## Next Steps (Phase 2)
+## Next Steps
 
-1. **Web Dashboard** - Visual interface for exploring data
-2. **Churn Prediction** - ML-based customer risk scoring
-3. **Automated Reports** - Scheduled email reports
-4. **Alerts** - Notifications for critical events
-5. **Manager Views** - Role-based dashboards
+1. **Churn Prediction** - ML-based customer risk scoring
+2. **Automated Reports** - Scheduled email reports
+3. **Alerts** - Notifications for critical events
+4. **Manager Views** - Role-based dashboards
+5. **Mobile App** - React Native companion app
 
 ## Support
 

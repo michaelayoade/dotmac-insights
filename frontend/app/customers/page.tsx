@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Search,
   Mail,
@@ -26,7 +26,7 @@ import {
   useCustomerDashboard,
   useCustomerUsage,
 } from '@/hooks/useApi';
-import { formatCurrency, formatDate, cn, debounce } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 
@@ -161,8 +161,8 @@ function MetricCard({
 }
 
 export default function CustomersPage() {
-  // Allow either explorer:read (spec) or customers:read (legacy/nav) to view the page
-  const { hasAccess: canViewCustomers, isLoading: authLoading } = useRequireScope(['explorer:read', 'customers:read']);
+  // Allow either explore:read (spec) or customers:read (legacy/nav) to view the page
+  const { hasAccess: canViewCustomers, isLoading: authLoading } = useRequireScope(['explore:read', 'customers:read']);
   const { hasAccess: hasAnalytics } = useRequireScope('analytics:read');
 
   const [search, setSearch] = useState('');
@@ -173,6 +173,7 @@ export default function CustomersPage() {
   const [baseStationFilter, setBaseStationFilter] = useState<string>('');
   const [signupStart, setSignupStart] = useState<string>('');
   const [signupEnd, setSignupEnd] = useState<string>('');
+  const [searchInput, setSearchInput] = useState('');
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(20);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -200,10 +201,29 @@ export default function CustomersPage() {
   const { data: customer360, isLoading: c360Loading } = useCustomer360(selectedCustomerId);
   const { data: usageData, isLoading: usageLoading } = useCustomerUsage(selectedCustomerId);
 
-  const handleSearchChange = debounce((value: string) => {
-    setSearch(value);
+  // Debounce search input updates to avoid excessive fetches
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput);
+      setOffset(0);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setCohortFilter('');
+    setCityFilter('');
+    setBaseStationFilter('');
+    setSignupStart('');
+    setSignupEnd('');
+    setSearch('');
+    setSearchInput('');
     setOffset(0);
-  }, 300);
+    setLimit(20);
+  };
 
   if (authLoading) {
     return (
@@ -403,7 +423,8 @@ export default function CustomersPage() {
                 <input
                   type="text"
                   placeholder="Search by name, email, phone..."
-                  onChange={(e) => handleSearchChange(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
                 />
               </div>
@@ -475,6 +496,18 @@ export default function CustomersPage() {
                 className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
             </div>
+
+            <div className="flex justify-between items-center pt-4">
+              <button
+                onClick={resetFilters}
+                className="text-sm text-slate-muted hover:text-white transition-colors"
+              >
+                Clear all filters
+              </button>
+              <div className="text-xs text-slate-muted">
+                Cohorts, city, base station, and date range will reset too.
+              </div>
+            </div>
           </Card>
 
           {/* Results count */}
@@ -510,6 +543,7 @@ export default function CustomersPage() {
                 {
                   key: 'name',
                   header: 'Customer',
+                  sortable: true,
                   render: (item) => (
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-slate-elevated flex items-center justify-center text-teal-electric font-medium font-mono text-sm">
@@ -530,6 +564,7 @@ export default function CustomersPage() {
                 {
                   key: 'email',
                   header: 'Contact',
+                  sortable: true,
                   render: (item) => (
                     <div className="space-y-0.5">
                       {item.email ? (
@@ -544,11 +579,13 @@ export default function CustomersPage() {
                 {
                   key: 'status',
                   header: 'Status',
+                  sortable: true,
                   render: (item) => <StatusBadge status={item.status as string} />,
                 },
                 {
                   key: 'customer_type',
                   header: 'Type',
+                  sortable: true,
                   render: (item) => (
                     <span className="text-slate-muted capitalize">{item.customer_type as string}</span>
                   ),
@@ -557,6 +594,7 @@ export default function CustomersPage() {
                   key: 'mrr',
                   header: 'MRR',
                   align: 'right',
+                  sortable: true,
                   render: (item) => (
                     <span className="text-slate-muted font-mono">{formatCurrency((item.mrr as number) || 0)}</span>
                   ),
@@ -564,6 +602,7 @@ export default function CustomersPage() {
                 {
                   key: 'signup_date',
                   header: 'Signup',
+                  sortable: true,
                   render: (item) => (
                     <span className="text-slate-muted text-sm">{formatDate(item.signup_date as string)}</span>
                   ),

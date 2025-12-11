@@ -33,9 +33,33 @@ try:
         sync_erpnext_all,
         sync_chatwoot_all,
     )
-    _celery_available = bool(settings.redis_url)
+    # Mirror worker default: fall back to local Redis when not explicitly set
+    _celery_available = bool(settings.redis_url or "redis://localhost:6379/0")
 except ImportError:
     pass
+
+
+def get_celery_status() -> Dict[str, Any]:
+    """Report Celery broker/worker availability."""
+    celery_status: Dict[str, Any] = {
+        "celery_enabled": _celery_available,
+        "celery_workers": 0,
+    }
+
+    if not _celery_available:
+        celery_status["celery_error"] = "Celery not configured"
+        return celery_status
+
+    try:
+        from app.worker import celery_app
+
+        ping = celery_app.control.ping(timeout=1.0)
+        celery_status["celery_workers"] = len(ping)
+    except Exception as exc:
+        celery_status["celery_enabled"] = False
+        celery_status["celery_error"] = str(exc)
+
+    return celery_status
 
 
 def run_sync_in_background(sync_class, full_sync: bool, source_name: str):
@@ -90,19 +114,7 @@ async def get_sync_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
             }
 
     # Add Celery status as separate dict entries
-    celery_status: Dict[str, Any] = {
-        "celery_enabled": _celery_available,
-        "celery_workers": 0,
-    }
-    if _celery_available:
-        try:
-            from app.worker import celery_app
-            ping = celery_app.control.ping(timeout=1.0)
-            celery_status["celery_workers"] = len(ping)
-        except Exception:
-            pass
-
-    return {**status, **celery_status}
+    return {**status, **get_celery_status()}
 
 
 @router.post("/test-connections", dependencies=[Depends(Require("sync:splynx:read", "sync:erpnext:read", "sync:chatwoot:read"))])
@@ -398,18 +410,18 @@ async def trigger_chatwoot_sync(full_sync: bool = False) -> Dict[str, Any]:
 async def trigger_all_sync(full_sync: bool = False) -> Dict[str, Any]:
     """Trigger sync for all sources."""
     if _celery_available:
-        # Enqueue Splynx sync via Celery
-        task = sync_splynx_all.delay(full_sync=full_sync)
-
-        # For ERPNext and Chatwoot, use asyncio fallback for now
-        run_sync_in_background(ERPNextSync, full_sync, "erpnext")
-        run_sync_in_background(ChatwootSync, full_sync, "chatwoot")
+        # Enqueue all syncs via Celery for consistency/observability
+        splynx_task = sync_splynx_all.delay(full_sync=full_sync)
+        erpnext_task = sync_erpnext_all.delay(full_sync=full_sync)
+        chatwoot_task = sync_chatwoot_all.delay(full_sync=full_sync)
 
         return {
             "message": "Full sync started for all sources",
-            "splynx_task_id": task.id,
+            "splynx_task_id": splynx_task.id,
+            "erpnext_task_id": erpnext_task.id,
+            "chatwoot_task_id": chatwoot_task.id,
             "full_sync": full_sync,
-            "backend": "celery+asyncio",
+            "backend": "celery",
         }
     else:
         # Fallback to asyncio for all

@@ -249,6 +249,8 @@ export function useCustomerPlanChanges(months = 6, config?: SWRConfiguration) {
 export function useSyncStatus(config?: SWRConfiguration) {
   return useSWR('sync-status', () => api.getSyncStatus(), {
     refreshInterval: 10000, // Refresh every 10 seconds
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
     ...config,
   });
 }
@@ -284,6 +286,8 @@ export function useSyncLogs(limit = 50, config?: SWRConfiguration) {
     () => api.getSyncLogs(limit),
     {
       refreshInterval: 10000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
       ...config,
     }
   );
