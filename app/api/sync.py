@@ -31,6 +31,8 @@ try:
         sync_splynx_tariffs,
         sync_splynx_routers,
         sync_erpnext_all,
+        sync_erpnext_accounting,
+        sync_erpnext_extended_accounting,
         sync_chatwoot_all,
     )
     # Mirror worker default: fall back to local Redis when not explicitly set
@@ -388,6 +390,52 @@ async def trigger_erpnext_sync(full_sync: bool = False) -> Dict[str, Any]:
     else:
         run_sync_in_background(ERPNextSync, full_sync, "erpnext")
         return {"message": "ERPNext sync started", "full_sync": full_sync, "backend": "asyncio"}
+
+
+@router.post("/erpnext/accounting", dependencies=[Depends(Require("sync:erpnext:write"))])
+async def trigger_erpnext_accounting_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger ERPNext accounting sync (Chart of Accounts, GL Entries, Journal Entries, Purchase Invoices)."""
+    if _celery_available:
+        task = sync_erpnext_accounting.delay(full_sync=full_sync)
+        return {
+            "message": "ERPNext accounting sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                await sync_client.sync_accounting_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="erpnext_accounting_sync")
+        return {"message": "ERPNext accounting sync started", "full_sync": full_sync, "backend": "asyncio"}
+
+
+@router.post("/erpnext/extended-accounting", dependencies=[Depends(Require("sync:erpnext:write"))])
+async def trigger_erpnext_extended_accounting_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger ERPNext extended accounting sync (Suppliers, Cost Centers, Fiscal Years, Bank Transactions)."""
+    if _celery_available:
+        task = sync_erpnext_extended_accounting.delay(full_sync=full_sync)
+        return {
+            "message": "ERPNext extended accounting sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                await sync_client.sync_extended_accounting_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="erpnext_extended_accounting_sync")
+        return {"message": "ERPNext extended accounting sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
 @router.post("/chatwoot", dependencies=[Depends(Require("sync:chatwoot:write"))])

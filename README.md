@@ -162,6 +162,31 @@ npm run dev
 
 Access the dashboard at: http://localhost:3000
 
+## Accounting & Finance API Quick Reference
+
+All finance/accounting endpoints require an API key and the appropriate scopes. Many endpoints enforce a single currency; if multiple currencies exist and no `currency` is provided, the API returns 400 to avoid mixed-currency aggregates.
+
+**Finance** (`/api/finance`)
+- `/dashboard?currency=`: KPIs (MRR/ARR, collections, DSO, outstanding, invoice status).
+- `/invoices` filters: `status, customer_id, start_date, end_date, min_amount, max_amount, currency, overdue_only, search, sort_by (invoice_date|due_date|total_amount|amount_paid|customer_id|status), sort_dir, limit, offset`.
+- `/payments` filters: `status, payment_method, customer_id, invoice_id, start_date, end_date, min_amount, max_amount, currency, search, sort_by (payment_date|amount|customer_id|invoice_id|status), sort_dir, limit, offset`.
+- `/credit-notes` filters: `customer_id, invoice_id, start_date, end_date, currency, search, sort_by (issue_date|amount|customer_id|invoice_id|status), sort_dir, limit, offset`.
+- Analytics: `revenue-trend (months, currency)`, `collections (currency)`, `aging (currency)`, `by-currency`, `insights/payment-behavior (currency)`, `insights/forecasts (currency)`.
+
+**Accounting** (`/api/accounting`)
+- `/chart-of-accounts?currency=&root_type=&include_disabled=`
+- `/trial-balance?as_of_date=&fiscal_year=&cost_center=&currency=`
+- `/balance-sheet?as_of_date=&comparative_date=&currency=`
+- `/income-statement?start_date=&end_date=&fiscal_year=&cost_center=&currency=`
+- `/cash-flow?start_date=&end_date=&fiscal_year=&currency=`
+- `/accounts-payable?as_of_date=&supplier=&currency=`
+- `/accounts-receivable?as_of_date=&customer_id=&currency=`
+- `/general-ledger?account=&cost_center=&start_date=&end_date=&voucher_type=&fiscal_year=&currency=&limit=&offset=`
+- `/journal-entries?type=&start_date=&end_date=&cost_center=&currency=&limit=&offset=`
+- `/balance-sheet`, `/income-statement` include period metadata and respect currency filters; AR/AP aging use due dates and currency.
+
+Date params accept ISO-8601 (UTC, `Z` accepted). Sorting defaults to date desc with id tiebreakers; see `sort_by/sort_dir` above.
+
 ### Quick Reference: Running the Full Stack
 
 ```bash

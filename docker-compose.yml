@@ -84,7 +84,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: celery -A app.worker:celery_app worker --loglevel=info --concurrency=2
+    command: sh -c "celery -A app.worker:celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-4}"
     restart: unless-stopped
 
   celery_beat:

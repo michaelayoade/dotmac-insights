@@ -2009,7 +2009,7 @@ class ERPNextSync(BaseSyncClient):
                     existing.supplier_group = sup_data.get("supplier_group")
                     existing.supplier_type = sup_data.get("supplier_type")
                     existing.country = sup_data.get("country")
-                    existing.default_currency = sup_data.get("default_currency", "NGN")
+                    existing.default_currency = sup_data.get("default_currency") or "NGN"
                     existing.default_bank_account = sup_data.get("default_bank_account")
                     existing.tax_id = sup_data.get("tax_id")
                     existing.tax_withholding_category = sup_data.get("tax_withholding_category")
@@ -2033,7 +2033,7 @@ class ERPNextSync(BaseSyncClient):
                         supplier_group=sup_data.get("supplier_group"),
                         supplier_type=sup_data.get("supplier_type"),
                         country=sup_data.get("country"),
-                        default_currency=sup_data.get("default_currency", "NGN"),
+                        default_currency=sup_data.get("default_currency") or "NGN",
                         default_bank_account=sup_data.get("default_bank_account"),
                         tax_id=sup_data.get("tax_id"),
                         tax_withholding_category=sup_data.get("tax_withholding_category"),
@@ -2253,12 +2253,13 @@ class ERPNextSync(BaseSyncClient):
     # ============= EXTENDED ACCOUNTING SYNC =============
 
     async def sync_extended_accounting_task(self, full_sync: bool = False):
-        """Wrapper for Celery task - syncs all extended accounting data (Suppliers, Cost Centers, etc.)."""
+        """Wrapper for Celery task - syncs all extended accounting data (Suppliers, Cost Centers, Bank Transactions, etc.)."""
         async with httpx.AsyncClient(timeout=120) as client:
             await self.sync_suppliers(client, full_sync)
             await self.sync_modes_of_payment(client, full_sync)
             await self.sync_cost_centers(client, full_sync)
             await self.sync_fiscal_years(client, full_sync)
+            await self.sync_bank_transactions(client, full_sync)
 
     # ============= SALES ORDER SYNC =============
 
