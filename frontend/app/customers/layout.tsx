@@ -4,27 +4,22 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
-  Database,
   Users,
-  HeartPulse,
-  Network,
-  AlertTriangle,
+  UserMinus,
+  TrendingUp,
+  Lightbulb,
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 
-const insightsTabs = [
-  { key: 'overview', label: 'Overview', href: '/insights/overview', icon: LayoutDashboard },
-  { key: 'completeness', label: 'Data Completeness', href: '/insights/completeness', icon: Database },
-  { key: 'segments', label: 'Customer Segments', href: '/insights/segments', icon: Users },
-  { key: 'health', label: 'Customer Health', href: '/insights/health', icon: HeartPulse },
-  { key: 'relationships', label: 'Data Relationships', href: '/insights/relationships', icon: Network },
-  { key: 'anomalies', label: 'Anomalies', href: '/insights/anomalies', icon: AlertTriangle },
+const customerTabs = [
+  { key: 'list', label: 'All Customers', href: '/customers', icon: Users },
+  { key: 'analytics', label: 'Analytics', href: '/customers/analytics', icon: TrendingUp },
+  { key: 'insights', label: 'Insights', href: '/customers/insights', icon: Lightbulb },
 ];
 
-export default function InsightsLayout({ children }: { children: React.ReactNode }) {
-  const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+export default function CustomersLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('customers:read');
   const pathname = usePathname();
 
   if (authLoading) {
@@ -41,19 +36,13 @@ export default function InsightsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-bold text-white">Deep Insights</h1>
-        <p className="text-slate-muted mt-1">
-          Analyze data completeness, relationships, and identify actionable insights
-        </p>
-      </div>
-
       {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-border pb-4">
-        {insightsTabs.map((tab) => {
+        {customerTabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = pathname === tab.href || (pathname === '/insights' && tab.key === 'overview');
+          const isActive = pathname === tab.href ||
+            (tab.key === 'list' && pathname === '/customers') ||
+            (tab.key !== 'list' && pathname.startsWith(tab.href));
           return (
             <Link
               key={tab.key}

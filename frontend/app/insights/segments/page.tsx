@@ -1,20 +1,34 @@
 'use client';
 
-import { useState } from 'react';
-import { useCustomerSegments } from '@/hooks/useApi';
-import { CustomerSegment } from '@/lib/api';
+import { useMemo, useState } from 'react';
+import { useCustomerSegmentsInsights } from '@/hooks/useApi';
+import { CustomerSegmentsInsightsResponse } from '@/lib/api';
 import {
   InsightCard,
   SummaryCard,
-  ProgressBar,
   LoadingState,
   ErrorDisplay,
   EmptyState,
 } from '@/components/insights/shared';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { formatCurrency } from '@/lib/utils';
+
+type ViewKey = keyof CustomerSegmentsInsightsResponse;
 
 export default function SegmentsPage() {
-  const { data, isLoading, error, mutate } = useCustomerSegments();
-  const [selectedView, setSelectedView] = useState<string>('by_status');
+  const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+
+  if (authLoading) {
+    return <LoadingState />;
+  }
+
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
+  const { data, isLoading, error, mutate } = useCustomerSegmentsInsights();
+  const [activeView, setActiveView] = useState<ViewKey>('by_status');
 
   if (isLoading) {
     return <LoadingState />;
@@ -30,36 +44,44 @@ export default function SegmentsPage() {
     );
   }
 
-  const segmentViews = [
-    { key: 'by_status', label: 'By Status' },
-    { key: 'by_type', label: 'By Type' },
-    { key: 'by_billing_type', label: 'By Billing' },
-    { key: 'by_tenure', label: 'By Tenure' },
-    { key: 'by_mrr_tier', label: 'By MRR Tier' },
-    { key: 'by_geography', label: 'By Geography' },
-    { key: 'by_pop', label: 'By POP' },
+  const totalCustomers = useMemo(() => {
+    if (!data?.by_status) return 0;
+    return data.by_status.reduce((sum, item) => sum + item.count, 0);
+  }, [data?.by_status]);
+
+  const viewConfigs: Array<{
+    key: ViewKey;
+    label: string;
+    items: unknown[];
+    labelField: string;
+    mrrField?: string;
+  }> = [
+    { key: 'by_status', label: 'By Status', items: data?.by_status || [], labelField: 'status', mrrField: 'total_mrr' },
+    { key: 'by_type', label: 'By Type', items: data?.by_type || [], labelField: 'type', mrrField: 'total_mrr' },
+    { key: 'by_billing', label: 'By Billing', items: data?.by_billing || [], labelField: 'billing_type', mrrField: 'total_mrr' },
+    { key: 'by_tenure', label: 'By Tenure', items: data?.by_tenure || [], labelField: 'segment' },
+    { key: 'by_mrr', label: 'By MRR Tier', items: data?.by_mrr || [], labelField: 'segment' },
   ];
 
-  const currentData = (data as unknown as Record<string, CustomerSegment[]>)?.[selectedView] || [];
-  const colors = ['teal', 'green', 'purple', 'yellow', 'red', 'blue'];
+  const currentView = viewConfigs.find((view) => view.key === activeView) || viewConfigs[0];
+  const currentItems = currentView.items as Array<Record<string, unknown>>;
 
   return (
     <div className="space-y-6">
-      {/* Total Customers */}
       <SummaryCard
         title="Total Customers"
-        value={data?.total_customers.toLocaleString() || 0}
+        value={totalCustomers.toLocaleString()}
         gradient="from-purple-500 to-purple-600"
       />
 
       {/* View Selector */}
       <div className="flex flex-wrap gap-2">
-        {segmentViews.map((view) => (
+        {viewConfigs.map((view) => (
           <button
             key={view.key}
-            onClick={() => setSelectedView(view.key)}
+            onClick={() => setActiveView(view.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedView === view.key
+              activeView === view.key
                 ? 'bg-teal-electric text-slate-deep'
                 : 'bg-slate-elevated text-slate-muted hover:text-white'
             }`}
@@ -69,39 +91,36 @@ export default function SegmentsPage() {
         ))}
       </div>
 
-      {/* Segment Data */}
-      <InsightCard title={segmentViews.find(v => v.key === selectedView)?.label || 'Segments'}>
+      <InsightCard title={currentView.label}>
         <div className="space-y-3">
-          {currentData.map((segment: CustomerSegment, index: number) => (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
-              <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-white">
-                    {segment.segment || 'Unknown'}
-                  </span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-slate-muted">
-                      {segment.count} ({segment.percentage.toFixed(1)}%)
+          {currentItems.map((item, index) => {
+            const label = String(item[currentView.labelField] || 'Unknown');
+            const count = Number(item.count || 0);
+            const mrr = currentView.mrrField ? Number(item[currentView.mrrField] || 0) : null;
+            const percent = totalCustomers > 0 ? (count / totalCustomers) * 100 : 0;
+
+            return (
+              <div key={`${label}-${index}`} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-sm font-medium text-white truncate">
+                      {label}
                     </span>
-                    {segment.total_mrr !== undefined && (
-                      <span className="text-sm text-teal-electric font-medium">
-                        {segment.total_mrr.toLocaleString(undefined, { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 })}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3 text-sm text-slate-muted">
+                      <span>{count.toLocaleString()} ({percent.toFixed(1)}%)</span>
+                      {mrr !== null && (
+                        <span className="text-teal-electric font-medium">
+                          {formatCurrency(mrr, 'NGN', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <ProgressBar
-                  value={segment.percentage}
-                  max={100}
-                  color={colors[index % colors.length]}
-                />
               </div>
-            </div>
-          ))}
-          {currentData.length === 0 && (
-            <EmptyState
-              message="No segment data available for this view. Try syncing your customer data."
-            />
+            );
+          })}
+          {currentItems.length === 0 && (
+            <EmptyState message="No segment data available. Try syncing your customer data." />
           )}
         </div>
       </InsightCard>

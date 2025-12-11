@@ -10,8 +10,15 @@ import {
   EmptyState,
 } from '@/components/insights/shared';
 import { CheckCircle } from 'lucide-react';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function AnomaliesPage() {
+  const { hasAccess } = useRequireScope('analytics:read');
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
   const { data, isLoading, error, mutate } = useAnomalies();
 
   if (isLoading) {

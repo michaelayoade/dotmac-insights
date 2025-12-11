@@ -84,6 +84,8 @@ export function getStatusColor(status: string): string {
   const statusMap: Record<string, string> = {
     active: 'success',
     inactive: 'warning',
+    blocked: 'danger',
+    new: 'info',
     suspended: 'warning',
     cancelled: 'danger',
     open: 'warning',

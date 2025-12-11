@@ -57,6 +57,18 @@ export function usePlanDistribution(currency?: string, config?: SWRConfiguration
   );
 }
 
+// Customer Domain Hooks
+export function useCustomerDashboard(enabled = true, config?: SWRConfiguration) {
+  return useSWR(
+    enabled ? 'customer-dashboard' : null,
+    () => api.getCustomerDashboard(),
+    {
+      refreshInterval: 60000, // Refresh every minute
+      ...config,
+    }
+  );
+}
+
 export function useCustomers(
   params?: {
     status?: string;
@@ -66,6 +78,11 @@ export function useCustomers(
     search?: string;
     limit?: number;
     offset?: number;
+    cohort?: string;
+    signup_start?: string;
+    signup_end?: string;
+    city?: string;
+    base_station?: string;
   },
   config?: SWRConfiguration
 ) {
@@ -80,6 +97,151 @@ export function useCustomer(id: number | null, config?: SWRConfiguration) {
   return useSWR(
     id ? ['customer', id] : null,
     () => (id ? api.getCustomer(id) : null),
+    config
+  );
+}
+
+export function useCustomerUsage(
+  id: number | null,
+  params?: { start_date?: string; end_date?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    id ? ['customer-usage', id, params] : null,
+    () => (id ? api.getCustomerUsage(id, params) : null),
+    config
+  );
+}
+
+export function useCustomer360(id: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['customer-360', id] : null,
+    () => (id ? api.getCustomer360(id) : null),
+    config
+  );
+}
+
+export function useBlockedCustomers(
+  params?: {
+    min_days_blocked?: number;
+    max_days_blocked?: number;
+    pop_id?: number;
+    plan?: string;
+    min_mrr?: number;
+    sort_by?: 'mrr' | 'days_blocked' | 'tenure';
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['blocked-customers', params],
+    () => api.getBlockedCustomers(params),
+    config
+  );
+}
+
+// Customer Analytics Hooks
+export function useBlockedAnalytics(config?: SWRConfiguration) {
+  return useSWR('customer-blocked-analytics', () => api.getBlockedAnalytics(), config);
+}
+
+export function useActiveAnalytics(config?: SWRConfiguration) {
+  return useSWR('customer-active-analytics', () => api.getActiveAnalytics(), config);
+}
+
+export function useCustomerSignupTrend(
+  params?: { start_date?: string; end_date?: string; interval?: 'month' | 'week' },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['customer-signup-trend', params],
+    () => api.getCustomerSignupTrend(params),
+    config
+  );
+}
+
+export function useCustomerCohort(months = 12, config?: SWRConfiguration) {
+  return useSWR(['customer-cohort', months], () => api.getCustomerCohort(months), config);
+}
+
+export function useCustomersByPlan(config?: SWRConfiguration) {
+  return useSWR('customers-by-plan', () => api.getCustomersByPlan(), config);
+}
+
+export function useCustomersByType(config?: SWRConfiguration) {
+  return useSWR('customers-by-type', () => api.getCustomersByType(), config);
+}
+
+export function useCustomersByLocation(limit?: number, config?: SWRConfiguration) {
+  return useSWR(['customers-by-location', limit], () => api.getCustomersByLocation(limit), config);
+}
+
+export function useCustomersByPop(config?: SWRConfiguration) {
+  return useSWR('customers-by-pop', () => api.getCustomersByPop(), config);
+}
+
+export function useCustomersByRouter(popId?: number, config?: SWRConfiguration) {
+  return useSWR(
+    ['customers-by-router', popId],
+    () => api.getCustomersByRouter(popId),
+    config
+  );
+}
+
+export function useCustomersByTicketVolume(days = 30, config?: SWRConfiguration) {
+  return useSWR(
+    ['customers-by-ticket-volume', days],
+    () => api.getCustomersByTicketVolume(days),
+    config
+  );
+}
+
+export function useCustomerDataQualityOutreach(config?: SWRConfiguration) {
+  return useSWR(
+    'customer-data-quality-outreach',
+    () => api.getCustomerDataQualityOutreach(),
+    config
+  );
+}
+
+export function useCustomerRevenueOverdue(popId?: number, planName?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['customer-revenue-overdue', popId, planName],
+    () => api.getCustomerRevenueOverdue(popId, planName),
+    config
+  );
+}
+
+export function useCustomerPaymentTimeliness(days = 30, config?: SWRConfiguration) {
+  return useSWR(
+    ['customer-payment-timeliness', days],
+    () => api.getCustomerPaymentTimeliness(days),
+    config
+  );
+}
+
+// Customer Insights Hooks
+export function useCustomerSegmentsInsights(config?: SWRConfiguration) {
+  return useSWR('customer-segments-insights', () => api.getCustomerSegmentsInsights(), config);
+}
+
+export function useCustomerHealthInsights(config?: SWRConfiguration) {
+  return useSWR(
+    'customer-health-insights',
+    () => api.getCustomerHealthInsights(),
+    config
+  );
+}
+
+export function useCustomerCompletenessInsights(config?: SWRConfiguration) {
+  return useSWR('customer-completeness-insights', () => api.getCustomerCompletenessInsights(), config);
+}
+
+export function useCustomerPlanChanges(months = 6, config?: SWRConfiguration) {
+  return useSWR(
+    ['customer-plan-changes', months],
+    () => api.getCustomerPlanChanges(months),
     config
   );
 }

@@ -34,16 +34,25 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string | number;
   requiredScopes?: Scope[];
+  children?: NavItem[];
 }
 
 const navigation: NavItem[] = [
-  { name: 'Overview', href: '/', icon: LayoutDashboard },
-  { name: 'Customers', href: '/customers', icon: Users, requiredScopes: ['customers:read'] },
-  { name: 'POPs', href: '/pops', icon: Radio, requiredScopes: ['analytics:read'] },
-  { name: 'Analytics', href: '/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
-  { name: 'Insights', href: '/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+  {
+    name: 'Customers',
+    href: '/customers',
+    icon: Users,
+    requiredScopes: ['customers:read', 'explorer:read'],
+    children: [
+      { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+      { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  // Future/optional sections can be added below
+  // { name: 'Overview', href: '/', icon: LayoutDashboard },
+  // { name: 'POPs', href: '/pops', icon: Radio, requiredScopes: ['analytics:read'] },
   { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explore:read'] },
-  { name: 'Sync', href: '/sync', icon: RefreshCw, requiredScopes: ['sync:read'] },
+  // { name: 'Sync', href: '/sync', icon: RefreshCw, requiredScopes: ['sync:read'] },
 ];
 
 // Keys in sync status response that represent actual sync sources (have .status property)
@@ -121,18 +130,15 @@ function SyncStatusIndicator() {
 }
 
 function AuthStatusIndicator({ collapsed }: { collapsed?: boolean }) {
-  const { isAuthenticated, isLoading, scopes, logout } = useAuth();
+  const { isAuthenticated, isLoading, scopes, login, logout } = useAuth();
   const [showTokenInput, setShowTokenInput] = useState(false);
   const [tokenValue, setTokenValue] = useState('');
 
   const handleSetToken = () => {
     if (tokenValue.trim()) {
-      localStorage.setItem('dotmac_access_token', tokenValue.trim());
+      login(tokenValue.trim());
       setTokenValue('');
       setShowTokenInput(false);
-      // Trigger auth check by dispatching storage event (for cross-tab sync)
-      window.dispatchEvent(new StorageEvent('storage', { key: 'dotmac_access_token' }));
-      window.location.reload();
     }
   };
 
@@ -185,6 +191,7 @@ function AuthStatusIndicator({ collapsed }: { collapsed?: boolean }) {
               collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2 w-full'
             )}
             title="Set authentication token"
+            data-auth-token-cta
           >
             <Key className="w-4 h-4" />
             {!collapsed && <span>Set Token</span>}
@@ -240,16 +247,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { hasAnyScope, isAuthenticated } = useAuth();
 
   // Filter navigation items based on user scopes
-  const filteredNavigation = useMemo(() => {
-    return navigation.map((item) => {
-      // If no scopes required, item is accessible
-      if (!item.requiredScopes || item.requiredScopes.length === 0) {
-        return { ...item, accessible: true };
-      }
-      // Check if user has any of the required scopes
-      const accessible = isAuthenticated && hasAnyScope(item.requiredScopes);
-      return { ...item, accessible };
-    });
+  type NavNode = NavItem & { accessibleSelf: boolean; visible: boolean; depth: number; children?: NavNode[] };
+
+  const filteredNavigation: NavNode[] = useMemo(() => {
+    const mapItem = (item: NavItem, depth = 0): NavNode => {
+      const accessibleSelf = !item.requiredScopes || item.requiredScopes.length === 0
+        ? true
+        : (isAuthenticated && hasAnyScope(item.requiredScopes));
+      const children = (item.children || []).map((child) => mapItem(child, depth + 1));
+      const visible = accessibleSelf || children.some((child) => child.visible);
+      return { ...item, accessibleSelf, visible, depth, children };
+    };
+
+    return navigation.map((item) => mapItem(item));
   }, [isAuthenticated, hasAnyScope]);
 
   // Load saved preference after hydration (avoids SSR mismatch)
@@ -265,6 +275,73 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       localStorage.setItem('sidebar_collapsed', JSON.stringify(collapsed));
     }
   }, [collapsed, hydrated]);
+
+  const isNodeActive = (node: NavNode): boolean => {
+    if (pathname === node.href) return true;
+    return (node.children || []).some((child) => isNodeActive(child));
+  };
+
+  const renderDesktopNode = (node: NavNode): React.ReactNode => {
+    if (!node.visible) return null;
+
+    const active = isNodeActive(node);
+    const isDisabled = !node.accessibleSelf;
+    const hasChildren = node.children?.some((child) => child.visible);
+
+    const content = (
+      <div
+        className={cn(
+          'group flex items-center rounded-lg transition-all duration-200 relative',
+          collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5',
+          active
+            ? 'bg-teal-electric/10 text-teal-electric'
+            : 'text-slate-muted hover:text-white hover:bg-slate-elevated',
+          isDisabled && 'cursor-not-allowed text-slate-muted/50 hover:bg-transparent hover:text-slate-muted/50'
+        )}
+      >
+        <node.icon className={cn('w-5 h-5 shrink-0', active && 'drop-shadow-[0_0_8px_rgba(0,212,170,0.5)]')} />
+        {!collapsed && <span className="font-medium flex-1">{node.name}</span>}
+        {isDisabled && !collapsed && <Lock className="w-4 h-4" />}
+        {active && !isDisabled && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-teal-electric rounded-r-full" />
+        )}
+
+        {/* Tooltip for collapsed state */}
+        {collapsed && (
+          <div className="absolute left-full ml-2 px-2 py-1 bg-slate-elevated border border-slate-border rounded text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 flex items-center gap-2">
+            {isDisabled && <Lock className="w-3 h-3" />}
+            {node.name}
+          </div>
+        )}
+      </div>
+    );
+
+    const wrapper = isDisabled ? (
+      <div title="You don't have permission to access this section">
+        {content}
+      </div>
+    ) : (
+      <Link href={node.href}>
+        {content}
+      </Link>
+    );
+
+    return (
+      <div key={node.href} className="space-y-1">
+        {wrapper}
+        {hasChildren && (
+          <div
+            className={cn(
+              'space-y-1',
+              collapsed ? 'pl-0' : 'pl-6 border-l border-slate-border/60 ml-3'
+            )}
+          >
+            {node.children?.map((child) => renderDesktopNode(child))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-deep">
@@ -301,38 +378,49 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}>
         <nav className="p-4 space-y-1">
           {filteredNavigation.map((item) => {
-            const isActive = pathname === item.href;
+            if (!item.visible) return null;
 
-            // For inaccessible items, show disabled state with lock icon
-            if (!item.accessible) {
-              return (
+            const renderNode = (node: typeof item) => {
+              const active = pathname === node.href;
+              const isDisabled = !node.accessibleSelf;
+              const paddingClass = node.depth > 0 ? 'pl-6' : '';
+              const content = (
                 <div
-                  key={item.name}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-muted/50 cursor-not-allowed"
-                  title="You don't have permission to access this section"
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                    active
+                      ? 'bg-teal-electric/10 text-teal-electric'
+                      : 'text-slate-muted hover:text-white hover:bg-slate-elevated',
+                    paddingClass,
+                    isDisabled && 'cursor-not-allowed text-slate-muted/50 hover:bg-transparent hover:text-slate-muted/50'
+                  )}
                 >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium flex-1">{item.name}</span>
-                  <Lock className="w-4 h-4" />
+                  <node.icon className="w-5 h-5" />
+                  <span className="font-medium flex-1">{node.name}</span>
+                  {isDisabled && <Lock className="w-4 h-4" />}
                 </div>
               );
-            }
+
+              return isDisabled ? (
+                <div key={node.name} title="You don't have permission to access this section">
+                  {content}
+                </div>
+              ) : (
+                <Link
+                  key={node.name}
+                  href={node.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {content}
+                </Link>
+              );
+            };
 
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                  isActive
-                    ? 'bg-teal-electric/10 text-teal-electric'
-                    : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
-                )}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.name}</span>
-              </Link>
+              <div key={item.name} className="space-y-1">
+                {renderNode(item)}
+                {item.children?.map((child) => child.visible ? renderNode(child) : null)}
+              </div>
             );
           })}
         </nav>
@@ -368,67 +456,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {filteredNavigation.map((item) => {
-            const isActive = pathname === item.href;
-
-            // For inaccessible items, show disabled state with lock icon
-            if (!item.accessible) {
-              return (
-                <div
-                  key={item.name}
-                  className={cn(
-                    'group flex items-center rounded-lg relative cursor-not-allowed',
-                    collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5',
-                    'text-slate-muted/50'
-                  )}
-                  title="You don't have permission to access this section"
-                >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  {!collapsed && (
-                    <>
-                      <span className="font-medium flex-1">{item.name}</span>
-                      <Lock className="w-4 h-4" />
-                    </>
-                  )}
-
-                  {/* Tooltip for collapsed state */}
-                  {collapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-slate-elevated border border-slate-border rounded text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 flex items-center gap-2">
-                      <Lock className="w-3 h-3" />
-                      {item.name}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  'group flex items-center rounded-lg transition-all duration-200 relative',
-                  collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5',
-                  isActive
-                    ? 'bg-teal-electric/10 text-teal-electric'
-                    : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
-                )}
-              >
-                <item.icon className={cn('w-5 h-5 shrink-0', isActive && 'drop-shadow-[0_0_8px_rgba(0,212,170,0.5)]')} />
-                {!collapsed && <span className="font-medium">{item.name}</span>}
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-teal-electric rounded-r-full" />
-                )}
-
-                {/* Tooltip for collapsed state */}
-                {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-slate-elevated border border-slate-border rounded text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    {item.name}
-                  </div>
-                )}
-              </Link>
-            );
-          })}
+          {filteredNavigation.map((item) => renderDesktopNode(item))}
         </nav>
 
         {/* Bottom section */}

@@ -11,8 +11,15 @@ import {
   ErrorDisplay,
   EmptyState,
 } from '@/components/insights/shared';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function RelationshipsPage() {
+  const { hasAccess } = useRequireScope('analytics:read');
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
   const { data, isLoading, error, mutate } = useRelationshipMap();
 
   if (isLoading) {

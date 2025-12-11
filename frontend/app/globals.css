@@ -51,6 +51,15 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Map commonly used utility classes to theme variables for light/dark support */
+.bg-slate-deep { background-color: var(--color-slate-deep); }
+.bg-slate-card { background-color: var(--color-slate-card); }
+.bg-slate-elevated { background-color: var(--color-slate-elevated); }
+.border-slate-border { border-color: var(--color-slate-border); }
+.text-slate-muted { color: var(--color-slate-muted); }
+.text-slate-deep { color: var(--color-text-secondary); }
+.text-white { color: var(--color-text-primary); }
+
 /* Theme-aware text color utility */
 .text-foreground {
   color: var(--color-text-primary);

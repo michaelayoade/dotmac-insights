@@ -14,6 +14,17 @@ export type Scope =
   | 'admin:read'
   | 'admin:write';
 
+const ALL_SCOPES: Scope[] = [
+  'customers:read',
+  'customers:write',
+  'analytics:read',
+  'sync:read',
+  'sync:write',
+  'explore:read',
+  'admin:read',
+  'admin:write',
+];
+
 interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -67,26 +78,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('dotmac_access_token');
 
     if (!token) {
-      // Check for dev token fallback
-      const devToken = process.env.NODE_ENV === 'development'
-        ? process.env.NEXT_PUBLIC_SERVICE_TOKEN
-        : null;
+      // Check for service token fallback (primarily local/dev)
+      const serviceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN || null;
 
-      if (devToken) {
-        // Dev mode with service token - grant all scopes
+      if (serviceToken) {
+        // Persist service token so fetchApi picks it up immediately
+        setAuthToken(serviceToken);
+        // Grant all scopes for service token
         setState({
           isAuthenticated: true,
           isLoading: false,
-          scopes: [
-            'customers:read',
-            'customers:write',
-            'analytics:read',
-            'sync:read',
-            'sync:write',
-            'explore:read',
-            'admin:read',
-            'admin:write',
-          ],
+          scopes: ALL_SCOPES,
           error: null,
         });
         return;
@@ -115,7 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Decode token to get scopes
     const payload = decodeJwtPayload(token);
-    const scopes = (payload?.scopes || []) as Scope[];
+    const envServiceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN;
+    let scopes = (payload?.scopes || []) as Scope[];
+    if (scopes.length === 0 && envServiceToken && token === envServiceToken) {
+      scopes = ALL_SCOPES;
+    }
 
     setState({
       isAuthenticated: true,
@@ -129,7 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(token);
 
     // If scopes not provided, try to decode from token
-    const tokenScopes = scopes || (decodeJwtPayload(token)?.scopes as Scope[]) || [];
+    const envServiceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN;
+    let tokenScopes = scopes || (decodeJwtPayload(token)?.scopes as Scope[]) || [];
+    if (tokenScopes.length === 0 && envServiceToken && token === envServiceToken) {
+      tokenScopes = ALL_SCOPES;
+    }
 
     setState({
       isAuthenticated: true,

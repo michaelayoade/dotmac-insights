@@ -54,6 +54,8 @@ import {
   useExpenseTrend,
 } from '@/hooks/useApi';
 import { formatCurrency, formatNumber, formatPercent, cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type TimeRange = 6 | 12 | 24;
 type ActiveTab = 'revenue' | 'sales' | 'support' | 'collections' | 'operations';
@@ -64,6 +66,9 @@ function formatDateParam(date: Date | null): string | undefined {
 }
 
 export default function AnalyticsPage() {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+
+  // All hooks must be called before any conditional returns
   const [timeRange, setTimeRange] = useState<TimeRange>(12);
   const [activeTab, setActiveTab] = useState<ActiveTab>('revenue');
   const [dateRange, setDateRange] = useState<DateRange>({ startDate: null, endDate: null });
@@ -93,6 +98,20 @@ export default function AnalyticsPage() {
   const { data: expensesByCategory } = useExpensesByCategory(timeRange, startDateStr, endDateStr);
   const { data: vendorSpend } = useVendorSpend(timeRange, 10, startDateStr, endDateStr);
   const { data: expenseTrend } = useExpenseTrend(timeRange, startDateStr, endDateStr);
+
+  // Auth loading state - after all hooks
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
+      </div>
+    );
+  }
+
+  // Access denied state
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
 
   const currency = overview?.revenue?.currency || 'NGN';
   const latestExpense = expenseTrend?.[expenseTrend.length - 1]?.total || 0;
@@ -341,8 +360,8 @@ export default function AnalyticsPage() {
                     <CardDescription>Customers at risk of churning</CardDescription>
                   </div>
                   {churnRisk && (
-                    <Badge variant={churnRisk.length > 10 ? 'danger' : 'warning'}>
-                      {churnRisk.length} at risk
+                    <Badge variant={(churnRisk.summary.overdue_customers + churnRisk.summary.suspended_customers) > 10 ? 'danger' : 'warning'}>
+                      {churnRisk.summary.overdue_customers + churnRisk.summary.suspended_customers} at risk
                     </Badge>
                   )}
                 </div>
@@ -387,7 +406,7 @@ export default function AnalyticsPage() {
                     },
                   },
                 ]}
-                data={(churnRisk || []) as unknown as Record<string, unknown>[]}
+                data={(churnRisk?.customers || []) as unknown as Record<string, unknown>[]}
                 keyField="id"
                 loading={!churnRisk}
                 emptyMessage="No customers at risk"

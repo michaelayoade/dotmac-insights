@@ -315,6 +315,10 @@ class ERPNextSync(BaseSyncClient):
                         notes=cust_data.get("custom_notes"),
                     )
                     self.db.add(customer)
+                    # Track new customer immediately so later records with the same splynx_id
+                    # resolve to this instance instead of inserting a duplicate within the batch.
+                    if splynx_id:
+                        customers_by_splynx_id[splynx_id] = customer
                     self.increment_created()
 
                 # Batch commit

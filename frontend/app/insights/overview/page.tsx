@@ -13,8 +13,15 @@ import {
   LoadingState,
   ErrorDisplay,
 } from '@/components/insights/shared';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function OverviewPage() {
+  const { hasAccess } = useRequireScope('analytics:read');
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
   const { data: completeness, isLoading: loadingCompleteness, error: errorCompleteness, mutate: mutateCompleteness } = useDataCompleteness();
   const { data: availability, isLoading: loadingAvailability, error: errorAvailability, mutate: mutateAvailability } = useDataAvailability();
   const { data: anomalies, isLoading: loadingAnomalies, error: errorAnomalies, mutate: mutateAnomalies } = useAnomalies();

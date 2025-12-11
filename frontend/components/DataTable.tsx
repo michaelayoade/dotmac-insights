@@ -175,13 +175,20 @@ interface PaginationProps {
   limit: number;
   offset: number;
   onPageChange: (offset: number) => void;
+  onLimitChange?: (limit: number) => void;
+  limitOptions?: number[];
 }
 
-export function Pagination({ total, limit, offset, onPageChange }: PaginationProps) {
+export function Pagination({
+  total,
+  limit,
+  offset,
+  onPageChange,
+  onLimitChange,
+  limitOptions = [20, 50, 100]
+}: PaginationProps) {
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = Math.ceil(total / limit);
-
-  if (totalPages <= 1) return null;
 
   const pages: (number | 'ellipsis')[] = [];
 
@@ -206,47 +213,70 @@ export function Pagination({ total, limit, offset, onPageChange }: PaginationPro
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t border-slate-border">
-      <span className="text-slate-muted text-sm">
-        Showing {offset + 1} to {Math.min(offset + limit, total)} of {total}
-      </span>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onPageChange(Math.max(0, offset - limit))}
-          disabled={offset === 0}
-          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Previous
-        </button>
-
-        {pages.map((page, index) =>
-          page === 'ellipsis' ? (
-            <span key={`ellipsis-${index}`} className="px-2 text-slate-muted">
-              ...
-            </span>
-          ) : (
-            <button
-              key={page}
-              onClick={() => onPageChange((page - 1) * limit)}
-              className={cn(
-                'w-8 h-8 text-sm rounded-lg transition-colors',
-                currentPage === page
-                  ? 'bg-teal-electric/20 text-teal-electric border border-teal-electric/30'
-                  : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
-              )}
+      <div className="flex items-center gap-4">
+        <span className="text-slate-muted text-sm">
+          Showing {offset + 1} to {Math.min(offset + limit, total)} of {total}
+        </span>
+        {onLimitChange && (
+          <div className="flex items-center gap-2">
+            <span className="text-slate-muted text-sm">Per page:</span>
+            <select
+              value={limit}
+              onChange={(e) => {
+                onLimitChange(Number(e.target.value));
+                onPageChange(0); // Reset to first page when changing limit
+              }}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
-              {page}
-            </button>
-          )
+              {limitOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
-
-        <button
-          onClick={() => onPageChange(offset + limit)}
-          disabled={offset + limit >= total}
-          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Next
-        </button>
       </div>
+      {totalPages > 1 && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onPageChange(Math.max(0, offset - limit))}
+            disabled={offset === 0}
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+
+          {pages.map((page, index) =>
+            page === 'ellipsis' ? (
+              <span key={`ellipsis-${index}`} className="px-2 text-slate-muted">
+                ...
+              </span>
+            ) : (
+              <button
+                key={page}
+                onClick={() => onPageChange((page - 1) * limit)}
+                className={cn(
+                  'w-8 h-8 text-sm rounded-lg transition-colors',
+                  currentPage === page
+                    ? 'bg-teal-electric/20 text-teal-electric border border-teal-electric/30'
+                    : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                )}
+              >
+                {page}
+              </button>
+            )
+          )}
+
+          <button
+            onClick={() => onPageChange(offset + limit)}
+            disabled={offset + limit >= total}
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 }

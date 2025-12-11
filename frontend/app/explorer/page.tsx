@@ -22,8 +22,13 @@ import { DateRangePicker, DateRange } from '@/components/DateRangePicker';
 import { useTablesEnhanced, useTableDataEnhanced } from '@/hooks/useApi';
 import { api, EnhancedTableInfo } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function ExplorerPage() {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('explore:read');
+
+  // All hooks must be called before any conditional returns
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['core_business']));
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,58 +101,6 @@ export default function ExplorerPage() {
     return filtered;
   }, [tablesData?.by_category, searchQuery]);
 
-  const toggleCategory = (category: string) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
-    } else {
-      newExpanded.add(category);
-    }
-    setExpandedCategories(newExpanded);
-  };
-
-  const selectTable = (tableName: string) => {
-    setSelectedTable(tableName);
-    setOffset(0);
-    setOrderBy('');
-    setTableSearchQuery('');
-    setSelectedDateColumn('');
-    setDateRange({ startDate: null, endDate: null });
-  };
-
-  const handleSort = (column: string) => {
-    if (orderBy === column) {
-      setOrderDir(orderDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setOrderBy(column);
-      setOrderDir('desc');
-    }
-    setOffset(0);
-  };
-
-  const handleExport = async (format: 'csv' | 'json') => {
-    if (!selectedTable) return;
-    setExporting(true);
-    try {
-      const blob = await api.exportTableData(selectedTable, format, {
-        date_column: selectedDateColumn || undefined,
-        start_date: dateRange.startDate?.toISOString().split('T')[0],
-        end_date: dateRange.endDate?.toISOString().split('T')[0],
-        search: tableSearchQuery || undefined,
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${selectedTable}_export_${new Date().toISOString().split('T')[0]}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Export failed:', err);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const columns = useMemo(() => {
     if (!tableData?.data?.[0]) return [];
     return Object.keys(tableData.data[0]).map((key) => ({
@@ -201,6 +154,72 @@ export default function ExplorerPage() {
       },
     }));
   }, [tableData?.data]);
+
+  // Auth loading state - after all hooks
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
+      </div>
+    );
+  }
+
+  // Access denied state
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const selectTable = (tableName: string) => {
+    setSelectedTable(tableName);
+    setOffset(0);
+    setOrderBy('');
+    setTableSearchQuery('');
+    setSelectedDateColumn('');
+    setDateRange({ startDate: null, endDate: null });
+  };
+
+  const handleSort = (column: string) => {
+    if (orderBy === column) {
+      setOrderDir(orderDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOrderBy(column);
+      setOrderDir('desc');
+    }
+    setOffset(0);
+  };
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    if (!selectedTable) return;
+    setExporting(true);
+    try {
+      const blob = await api.exportTableData(selectedTable, format, {
+        date_column: selectedDateColumn || undefined,
+        start_date: dateRange.startDate?.toISOString().split('T')[0],
+        end_date: dateRange.endDate?.toISOString().split('T')[0],
+        search: tableSearchQuery || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedTable}_export_${new Date().toISOString().split('T')[0]}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
