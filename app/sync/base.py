@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.sync_log import SyncLog, SyncStatus, SyncSource
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 from app.config import settings
+import asyncio
 
 logger = structlog.get_logger()
 
@@ -36,6 +37,8 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time: Optional[datetime] = None
         self.state = "closed"  # closed, open, half-open
+        # Ensure only one probe runs in half-open at a time
+        self._half_open_lock = asyncio.Lock()
 
     def can_execute(self) -> bool:
         """Check if the circuit allows execution."""
@@ -49,7 +52,7 @@ class CircuitBreaker:
                 return True
             return False
         # half-open - allow one request
-        return True
+        return not self._half_open_lock.locked()
 
     def record_success(self):
         """Record a successful execution."""
@@ -73,7 +76,7 @@ class CircuitBreaker:
 
     def is_open(self) -> bool:
         """Check if circuit is open (blocking requests)."""
-        return self.state == "open" and not self.can_execute()
+        return self.state == "open"
 
     async def execute(self, coro: Coroutine[Any, Any, T]) -> T:
         """Execute a coroutine with circuit breaker protection.
@@ -93,6 +96,21 @@ class CircuitBreaker:
                 f"Circuit breaker '{self.name}' is open. "
                 f"Will retry after {self.reset_timeout}s."
             )
+
+        if self.state == "half-open":
+            if self._half_open_lock.locked():
+                raise CircuitBreakerOpenError(
+                    f"Circuit breaker '{self.name}' is half-open. "
+                    "Probe in progress."
+                )
+            async with self._half_open_lock:
+                try:
+                    result = await coro
+                    self.record_success()
+                    return result
+                except Exception as e:
+                    self.record_failure(e)
+                    raise
 
         try:
             result = await coro

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import String, Text, ForeignKey, Enum, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -71,8 +71,11 @@ class Invoice(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="invoices")
@@ -102,8 +105,9 @@ class Invoice(Base):
         """Number of days past due date."""
         if not self.due_date or self.status == InvoiceStatus.PAID:
             return 0
-        if datetime.utcnow() > self.due_date:
-            return (datetime.utcnow() - self.due_date).days
+        now = datetime.now(timezone.utc)
+        if now > self.due_date:
+            return (now - self.due_date).days
         return 0
 
     @property

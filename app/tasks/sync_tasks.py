@@ -8,6 +8,8 @@ import redis
 from app.worker import celery_app
 from app.config import settings
 from app.database import SessionLocal
+from app.cache import invalidate_analytics_cache
+from app.sync.base import BaseSyncClient
 from app.sync.splynx import SplynxSync
 from app.sync.erpnext import ERPNextSync
 from app.sync.chatwoot import ChatwootSync
@@ -67,6 +69,15 @@ def run_async(coro):
         loop.close()
 
 
+def _invalidate_analytics_cache(task_name: str) -> None:
+    """Invalidate analytics cache after sync completes."""
+    try:
+        run_async(invalidate_analytics_cache())
+        logger.info("analytics_cache_invalidated", task=task_name)
+    except Exception as exc:
+        logger.warning("analytics_cache_invalidation_failed", task=task_name, error=str(exc))
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def sync_splynx_customers(self, full_sync: bool = False):
     """Sync customers from Splynx.
@@ -83,6 +94,7 @@ def sync_splynx_customers(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_customers_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -107,6 +119,7 @@ def sync_splynx_invoices(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_invoices_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -131,6 +144,7 @@ def sync_splynx_payments(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_payments_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -155,6 +169,7 @@ def sync_splynx_services(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_services_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -179,6 +194,7 @@ def sync_splynx_credit_notes(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_credit_notes_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -203,6 +219,7 @@ def sync_splynx_tickets(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_tickets_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -227,6 +244,7 @@ def sync_splynx_tariffs(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_tariffs_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -251,6 +269,7 @@ def sync_splynx_routers(self, full_sync: bool = False):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_routers_task(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -283,6 +302,7 @@ def sync_splynx_all(self, full_sync: bool = True):
             try:
                 sync_client = SplynxSync(db)
                 run_async(sync_client.sync_all(full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -314,6 +334,7 @@ def sync_erpnext_all(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_all(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -338,6 +359,7 @@ def sync_erpnext_customers(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_customers_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -362,6 +384,7 @@ def sync_erpnext_invoices(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_invoices_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -386,6 +409,7 @@ def sync_erpnext_payments(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_payments_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -410,6 +434,7 @@ def sync_erpnext_expenses(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_expenses_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -434,6 +459,7 @@ def sync_erpnext_hd_tickets(self, full_sync: bool = False):
             try:
                 sync_client = ERPNextSync(db)
                 run_async(sync_client.sync_hd_tickets_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -459,6 +485,7 @@ def sync_chatwoot_all(self, full_sync: bool = False):
             try:
                 sync_client = ChatwootSync(db)
                 run_async(sync_client.sync_all(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -483,6 +510,7 @@ def sync_chatwoot_contacts(self, full_sync: bool = False):
             try:
                 sync_client = ChatwootSync(db)
                 run_async(sync_client.sync_contacts_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -507,6 +535,7 @@ def sync_chatwoot_conversations(self, full_sync: bool = False):
             try:
                 sync_client = ChatwootSync(db)
                 run_async(sync_client.sync_conversations_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}
             finally:
@@ -568,7 +597,7 @@ def process_dlq_records(self, source: Optional[str] = None, limit: int = 100):
                     processed += 1
                     try:
                         # Get the appropriate sync client
-                        sync_client = None
+                        sync_client: Optional[BaseSyncClient] = None
                         if record.source == SyncSource.SPLYNX:
                             sync_client = SplynxSync(db)
                         elif record.source == SyncSource.ERPNEXT:

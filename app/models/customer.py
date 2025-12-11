@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import String, Text, ForeignKey, Enum, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -17,14 +17,14 @@ if TYPE_CHECKING:
     from app.models.credit_note import CreditNote
     from app.models.ticket import Ticket
     from app.models.project import Project
+    from app.models.customer_usage import CustomerUsage
 
 
 class CustomerStatus(enum.Enum):
     ACTIVE = "active"
-    INACTIVE = "inactive"
-    SUSPENDED = "suspended"
-    CANCELLED = "cancelled"
-    PROSPECT = "prospect"
+    INACTIVE = "inactive"      # Splynx "disabled"
+    SUSPENDED = "suspended"    # Splynx "blocked"
+    PROSPECT = "prospect"      # Splynx "new"
 
 
 class CustomerType(enum.Enum):
@@ -115,6 +115,15 @@ class Customer(Base):
     # Notes
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Authentication (hashed password from Splynx for customer portal login)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Billing info from Splynx (blocking/credit status)
+    blocking_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    days_until_blocking: Mapped[Optional[int]] = mapped_column(nullable=True)
+    deposit_balance: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
+    payment_per_month: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -129,18 +138,33 @@ class Customer(Base):
     credit_notes: Mapped[List[CreditNote]] = relationship(back_populates="customer")
     tickets: Mapped[List[Ticket]] = relationship(back_populates="customer")
     projects: Mapped[List[Project]] = relationship(back_populates="customer")
+    usage_records: Mapped[List[CustomerUsage]] = relationship(back_populates="customer")
 
     def __repr__(self) -> str:
         return f"<Customer {self.name} ({self.status.value})>"
 
     @property
     def is_churned(self) -> bool:
-        return self.status == CustomerStatus.CANCELLED and self.cancellation_date is not None
+        """Customer is churned if status is INACTIVE (Splynx 'disabled')."""
+        return self.status == CustomerStatus.INACTIVE
 
     @property
     def tenure_days(self) -> int:
         """Days since signup."""
         if not self.signup_date:
             return 0
-        end_date = self.cancellation_date or datetime.utcnow()
+        end_date = self.cancellation_date or datetime.now(timezone.utc)
         return (end_date - self.signup_date).days
+
+    def verify_password(self, password: str) -> bool:
+        """Verify a password against the stored hash."""
+        if not self.password_hash:
+            return False
+        import bcrypt
+        return bcrypt.checkpw(password.encode("utf-8"), self.password_hash.encode("utf-8"))
+
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash a password using bcrypt."""
+        import bcrypt
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")

@@ -30,6 +30,7 @@ from app.sync.splynx_parts.transaction_categories import sync_transaction_catego
 from app.sync.splynx_parts.ipv4_networks import sync_ipv4_networks
 from app.sync.splynx_parts.ipv6_networks import sync_ipv6_networks
 from app.sync.splynx_parts.payment_methods import sync_payment_methods
+from app.sync.splynx_parts.usage import sync_customer_usage
 
 logger = structlog.get_logger()
 
@@ -234,12 +235,17 @@ class SplynxSync(BaseSyncClient):
             await sync_ipv4_networks(self, client, full_sync)
             await sync_ipv6_networks(self, client, full_sync)
             await sync_payment_methods(self, client, full_sync)
+            await sync_customer_usage(self, client, full_sync)
 
     # Individual task methods for Celery (create their own HTTP clients)
     async def sync_customers_task(self, full_sync: bool = False):
         """Sync customers - standalone task version."""
         async with httpx.AsyncClient(timeout=300) as client:
-            await sync_locations(self, client, full_sync)  # Sync locations first for FK
+            # Try to sync locations first for POP mapping, but don't fail if it errors
+            try:
+                await sync_locations(self, client, full_sync)
+            except Exception as e:
+                logger.warning("locations_sync_failed_continuing", error=str(e))
             await sync_customers(self, client, full_sync)
 
     async def sync_invoices_task(self, full_sync: bool = False):
@@ -326,3 +332,8 @@ class SplynxSync(BaseSyncClient):
         """Sync payment methods - standalone task version."""
         async with httpx.AsyncClient(timeout=300) as client:
             await sync_payment_methods(self, client, full_sync)
+
+    async def sync_customer_usage_task(self, full_sync: bool = False):
+        """Sync customer usage/traffic counters - standalone task version."""
+        async with httpx.AsyncClient(timeout=300) as client:
+            await sync_customer_usage(self, client, full_sync)

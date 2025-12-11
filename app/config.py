@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: Optional[str] = None
 
+    # Analytics
+    analytics_statement_timeout_ms: Optional[int] = 15000  # per-request DB timeout
+
     # Environment
     environment: str = "development"  # development, staging, production
 

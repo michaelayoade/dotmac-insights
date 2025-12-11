@@ -1,4 +1,5 @@
 from app.models.customer import Customer
+from app.models.customer_usage import CustomerUsage
 from app.models.pop import Pop
 from app.models.subscription import Subscription
 from app.models.invoice import Invoice
@@ -67,6 +68,7 @@ from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 
 __all__ = [
     "Customer",
+    "CustomerUsage",
     "Pop",
     "Subscription",
     "Invoice",

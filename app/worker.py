@@ -23,8 +23,8 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=600,  # 10 minutes max per task
-    task_soft_time_limit=540,  # Soft limit at 9 minutes
+    task_time_limit=1800,  # 30 minutes max per task (password sync needs time)
+    task_soft_time_limit=1740,  # Soft limit at 29 minutes
     worker_prefetch_multiplier=1,  # Process one task at a time per worker
     task_acks_late=True,  # Ack after task completes (for reliability)
     task_reject_on_worker_lost=True,

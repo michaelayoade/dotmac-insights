@@ -191,7 +191,7 @@ class ERPNextSync(BaseSyncClient):
         # URL encode the document name to handle special characters
         encoded_name = quote(name, safe="")
         data = await self._request(client, "GET", f"/api/resource/{doctype}/{encoded_name}")
-        result: Dict[str, Any] = data.get("data", {})
+        result: Dict[str, Any] = data.get("data", {}) if isinstance(data, dict) else {}
         return result
 
     async def test_connection(self) -> bool:
@@ -442,10 +442,10 @@ class ERPNextSync(BaseSyncClient):
             for inv_data in invoices:
                 erpnext_id = inv_data.get("name")
 
-                # Skip if this erpnext_id was already processed in this batch
-                if erpnext_id in processed_erpnext_ids:
+                # Skip if no erpnext_id or already processed in this batch
+                if not erpnext_id or erpnext_id in processed_erpnext_ids:
                     continue
-                processed_erpnext_ids.add(erpnext_id)
+                processed_erpnext_ids.add(str(erpnext_id))
                 custom_splynx_invoice_id = self._safe_int(inv_data.get("custom_splynx_invoice_id"))
                 splynx_invoice = (
                     self.db.query(Invoice)
@@ -526,7 +526,7 @@ class ERPNextSync(BaseSyncClient):
                                 Invoice.total_amount == Decimal(str(total_amount)),
                                 func.date(Invoice.invoice_date) == posting_dt.date(),
                                 Invoice.erpnext_id.is_(None),
-                                ~Invoice.id.in_(assigned_invoice_ids) if assigned_invoice_ids else True,
+                                ~Invoice.id.in_(assigned_invoice_ids) if assigned_invoice_ids else Invoice.id.isnot(None),
                             )
                             .first()
                         )
@@ -559,12 +559,12 @@ class ERPNextSync(BaseSyncClient):
                         target_invoice.due_date = due_dt
 
                     # If we found a duplicate ERPNext-only record, re-home children and delete it
-                    if duplicate_invoice:
-                        for payment in list(duplicate_invoice.payments):
-                            payment.invoice_id = target_invoice.id
-                        for credit_note in list(duplicate_invoice.credit_notes):
-                            credit_note.invoice_id = target_invoice.id
-                        self.db.delete(duplicate_invoice)
+                        if duplicate_invoice:
+                            for payment in list(duplicate_invoice.payments):
+                                payment.invoice_id = target_invoice.id
+                            for credit_note in list(duplicate_invoice.credit_notes):
+                                credit_note.invoice_id = target_invoice.id
+                            self.db.delete(duplicate_invoice)
                     self.increment_updated()
                 else:
                     invoice = Invoice(
@@ -629,10 +629,10 @@ class ERPNextSync(BaseSyncClient):
 
                 erpnext_id = pay_data.get("name")
 
-                # Skip if this erpnext_id was already processed in this batch
-                if erpnext_id in processed_payment_erpnext_ids:
+                # Skip if no erpnext_id or already processed in this batch
+                if not erpnext_id or erpnext_id in processed_payment_erpnext_ids:
                     continue
-                processed_payment_erpnext_ids.add(erpnext_id)
+                processed_payment_erpnext_ids.add(str(erpnext_id))
                 custom_splynx_payment_id = self._safe_int(pay_data.get("custom_splynx_payment_id"))
                 splynx_payment = (
                     self.db.query(Payment)
@@ -712,7 +712,7 @@ class ERPNextSync(BaseSyncClient):
                                 Payment.amount == Decimal(str(amount)),
                                 func.date(Payment.payment_date) == posting_dt.date(),
                                 Payment.erpnext_id.is_(None),
-                                ~Payment.id.in_(assigned_payment_ids) if assigned_payment_ids else True,
+                                ~Payment.id.in_(assigned_payment_ids) if assigned_payment_ids else Payment.id.isnot(None),
                             )
                             .first()
                         )
@@ -860,14 +860,14 @@ class ERPNextSync(BaseSyncClient):
                 # Get expense_type and description from pre-fetched child records (N+1 fix)
                 expense_type = None
                 description = None
-                claim_details = expense_details.get(erpnext_id, [])
+                claim_details = expense_details.get(str(erpnext_id), []) if erpnext_id else []
                 if claim_details:
                     # Get expense types, join if multiple
                     expense_types = [d.get("expense_type") for d in claim_details if d.get("expense_type")]
-                    expense_type = ", ".join(set(expense_types)) if expense_types else None
+                    expense_type = ", ".join(sorted(set(str(t) for t in expense_types if t))) if expense_types else None
                     # Get descriptions
                     descriptions = [d.get("description") for d in claim_details if d.get("description")]
-                    description = "; ".join(descriptions) if descriptions else None
+                    description = "; ".join([str(desc) for desc in descriptions]) if descriptions else None
 
                 if existing:
                     # Employee
@@ -2100,7 +2100,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     mode = ModeOfPayment(
                         erpnext_id=erpnext_id,
-                        mode_of_payment=mode_data.get("mode_of_payment", erpnext_id),
+                        mode_of_payment=mode_data.get("mode_of_payment") or str(erpnext_id or ""),
                         type=payment_type,
                         enabled=mode_data.get("enabled", 1) == 1,
                     )
@@ -2216,7 +2216,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     fiscal_year = FiscalYear(
                         erpnext_id=erpnext_id,
-                        year=fy_data.get("year", erpnext_id),
+                        year=fy_data.get("year") or str(erpnext_id or ""),
                         is_short_year=fy_data.get("is_short_year", 0) == 1,
                         disabled=fy_data.get("disabled", 0) == 1,
                         auto_created=fy_data.get("auto_created", 0) == 1,
@@ -2639,8 +2639,8 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(Item).filter(Item.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.item_code = item_data.get("item_code", erpnext_id)
-                    existing.item_name = item_data.get("item_name", "")
+                    existing.item_code = item_data.get("item_code") or str(erpnext_id or "")
+                    existing.item_name = item_data.get("item_name") or ""
                     existing.item_group = item_data.get("item_group")
                     existing.description = item_data.get("description")
                     existing.is_stock_item = item_data.get("is_stock_item", 1) == 1
@@ -2659,8 +2659,8 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     item = Item(
                         erpnext_id=erpnext_id,
-                        item_code=item_data.get("item_code", erpnext_id),
-                        item_name=item_data.get("item_name", ""),
+                        item_code=item_data.get("item_code") or str(erpnext_id or ""),
+                        item_name=item_data.get("item_name") or "",
                         item_group=item_data.get("item_group"),
                         description=item_data.get("description"),
                         is_stock_item=item_data.get("is_stock_item", 1) == 1,
@@ -2714,7 +2714,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(CustomerGroup).filter(CustomerGroup.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.customer_group_name = group_data.get("customer_group_name", erpnext_id)
+                    existing.customer_group_name = group_data.get("customer_group_name") or str(erpnext_id or "")
                     existing.parent_customer_group = group_data.get("parent_customer_group")
                     existing.is_group = group_data.get("is_group", 0) == 1
                     existing.default_price_list = group_data.get("default_price_list")
@@ -2726,7 +2726,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     customer_group = CustomerGroup(
                         erpnext_id=erpnext_id,
-                        customer_group_name=group_data.get("customer_group_name", erpnext_id),
+                        customer_group_name=group_data.get("customer_group_name") or str(erpnext_id or ""),
                         parent_customer_group=group_data.get("parent_customer_group"),
                         is_group=group_data.get("is_group", 0) == 1,
                         default_price_list=group_data.get("default_price_list"),
@@ -2768,7 +2768,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(Territory).filter(Territory.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.territory_name = terr_data.get("territory_name", erpnext_id)
+                    existing.territory_name = terr_data.get("territory_name") or str(erpnext_id or "")
                     existing.parent_territory = terr_data.get("parent_territory")
                     existing.is_group = terr_data.get("is_group", 0) == 1
                     existing.territory_manager = terr_data.get("territory_manager")
@@ -2779,7 +2779,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     territory = Territory(
                         erpnext_id=erpnext_id,
-                        territory_name=terr_data.get("territory_name", erpnext_id),
+                        territory_name=terr_data.get("territory_name") or str(erpnext_id or ""),
                         parent_territory=terr_data.get("parent_territory"),
                         is_group=terr_data.get("is_group", 0) == 1,
                         territory_manager=terr_data.get("territory_manager"),
@@ -2820,7 +2820,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(SalesPerson).filter(SalesPerson.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.sales_person_name = person_data.get("sales_person_name", erpnext_id)
+                    existing.sales_person_name = person_data.get("sales_person_name") or str(erpnext_id or "")
                     existing.parent_sales_person = person_data.get("parent_sales_person")
                     existing.is_group = person_data.get("is_group", 0) == 1
                     existing.employee = person_data.get("employee")
@@ -2834,7 +2834,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     sales_person = SalesPerson(
                         erpnext_id=erpnext_id,
-                        sales_person_name=person_data.get("sales_person_name", erpnext_id),
+                        sales_person_name=person_data.get("sales_person_name") or str(erpnext_id or ""),
                         parent_sales_person=person_data.get("parent_sales_person"),
                         is_group=person_data.get("is_group", 0) == 1,
                         employee=person_data.get("employee"),
@@ -2878,7 +2878,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(ItemGroup).filter(ItemGroup.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.item_group_name = group_data.get("item_group_name", erpnext_id)
+                    existing.item_group_name = group_data.get("item_group_name") or str(erpnext_id or "")
                     existing.parent_item_group = group_data.get("parent_item_group")
                     existing.is_group = group_data.get("is_group", 0) == 1
                     existing.lft = group_data.get("lft")
@@ -2888,7 +2888,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     item_group = ItemGroup(
                         erpnext_id=erpnext_id,
-                        item_group_name=group_data.get("item_group_name", erpnext_id),
+                        item_group_name=group_data.get("item_group_name") or str(erpnext_id or ""),
                         parent_item_group=group_data.get("parent_item_group"),
                         is_group=group_data.get("is_group", 0) == 1,
                         lft=group_data.get("lft"),
@@ -2930,7 +2930,7 @@ class ERPNextSync(BaseSyncClient):
 
     async def sync_departments(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync departments from ERPNext HR module."""
-        self.start_sync("erpnext_departments", full_sync)
+        self.start_sync("erpnext_departments", "full" if full_sync else "incremental")
 
         try:
             departments = await self._fetch_all_doctype(
@@ -2944,7 +2944,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(Department).filter(Department.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.department_name = dept_data.get("department_name", erpnext_id)
+                    existing.department_name = dept_data.get("department_name") or str(erpnext_id or "")
                     existing.parent_department = dept_data.get("parent_department")
                     existing.company = dept_data.get("company")
                     existing.is_group = dept_data.get("is_group", 0) == 1
@@ -2955,7 +2955,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     department = Department(
                         erpnext_id=erpnext_id,
-                        department_name=dept_data.get("department_name", erpnext_id),
+                        department_name=dept_data.get("department_name") or str(erpnext_id or ""),
                         parent_department=dept_data.get("parent_department"),
                         company=dept_data.get("company"),
                         is_group=dept_data.get("is_group", 0) == 1,
@@ -2980,7 +2980,7 @@ class ERPNextSync(BaseSyncClient):
 
     async def sync_designations(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync job designations from ERPNext."""
-        self.start_sync("erpnext_designations", full_sync)
+        self.start_sync("erpnext_designations", "full" if full_sync else "incremental")
 
         try:
             designations = await self._fetch_all_doctype(
@@ -2994,14 +2994,14 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(Designation).filter(Designation.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.designation_name = desig_data.get("designation_name", erpnext_id)
+                    existing.designation_name = desig_data.get("designation_name") or str(erpnext_id or "")
                     existing.description = desig_data.get("description")
                     existing.last_synced_at = datetime.utcnow()
                     self.increment_updated()
                 else:
                     designation = Designation(
                         erpnext_id=erpnext_id,
-                        designation_name=desig_data.get("designation_name", erpnext_id),
+                        designation_name=desig_data.get("designation_name") or str(erpnext_id or ""),
                         description=desig_data.get("description"),
                     )
                     self.db.add(designation)
@@ -3022,7 +3022,7 @@ class ERPNextSync(BaseSyncClient):
 
     async def sync_erpnext_users(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync ERPNext system users."""
-        self.start_sync("erpnext_users", full_sync)
+        self.start_sync("erpnext_users", "full" if full_sync else "incremental")
 
         try:
             users = await self._fetch_all_doctype(
@@ -3083,7 +3083,7 @@ class ERPNextSync(BaseSyncClient):
 
     async def sync_hd_teams(self, client: httpx.AsyncClient, full_sync: bool = False):
         """Sync helpdesk teams and their members from ERPNext."""
-        self.start_sync("erpnext_hd_teams", full_sync)
+        self.start_sync("erpnext_hd_teams", "full" if full_sync else "incremental")
 
         try:
             # Fetch all HD Teams
@@ -3098,7 +3098,7 @@ class ERPNextSync(BaseSyncClient):
                 existing = self.db.query(HDTeam).filter(HDTeam.erpnext_id == erpnext_id).first()
 
                 if existing:
-                    existing.team_name = team_data.get("team_name", erpnext_id)
+                    existing.team_name = team_data.get("team_name") or str(erpnext_id or "")
                     existing.description = team_data.get("description")
                     existing.assignment_rule = team_data.get("assignment_rule")
                     existing.ignore_restrictions = team_data.get("ignore_restrictions", 0) == 1
@@ -3108,7 +3108,7 @@ class ERPNextSync(BaseSyncClient):
                 else:
                     team = HDTeam(
                         erpnext_id=erpnext_id,
-                        team_name=team_data.get("team_name", erpnext_id),
+                        team_name=team_data.get("team_name") or str(erpnext_id or ""),
                         description=team_data.get("description"),
                         assignment_rule=team_data.get("assignment_rule"),
                         ignore_restrictions=team_data.get("ignore_restrictions", 0) == 1,
@@ -3119,7 +3119,9 @@ class ERPNextSync(BaseSyncClient):
 
                 # Sync team members - fetch from HD Team document
                 try:
-                    team_doc = await self._fetch_document(client, "HD Team", erpnext_id)
+                    if not erpnext_id:
+                        continue
+                    team_doc = await self._fetch_document(client, "HD Team", str(erpnext_id))
                     members_data = team_doc.get("users", [])
 
                     # Clear existing members for this team

@@ -4,15 +4,20 @@ completeness, and actionable intelligence.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Query  # Depends still needed for get_db
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, distinct, and_, or_, extract, text
+from sqlalchemy import func, case, distinct, and_, or_, extract, text, cast
+from sqlalchemy.sql.sqltypes import Date
 from sqlalchemy.sql import label
 from typing import Dict, Any, List, Optional
+from itertools import groupby
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.database import get_db
+from app.config import settings
 from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.invoice import Invoice, InvoiceStatus
@@ -27,9 +32,24 @@ from app.models.lead import Lead
 from app.models.project import Project
 from app.models.router import Router
 from app.models.customer_note import CustomerNote
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
+from app.cache import cached, CACHE_TTL
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _apply_statement_timeout(db: Session) -> None:
+    """Apply per-request statement timeout for Postgres connections."""
+    timeout_ms = getattr(settings, "analytics_statement_timeout_ms", None)
+    if not timeout_ms or not db.bind or db.bind.dialect.name != "postgresql":
+        return
+    try:
+        db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": timeout_ms})
+    except Exception:
+        # Rollback the failed transaction to allow subsequent queries to work
+        db.rollback()
+        return
 
 
 # ============================================================================
@@ -37,11 +57,16 @@ router = APIRouter()
 # ============================================================================
 
 @router.get("/data-completeness", dependencies=[Depends(Require("analytics:read"))])
-async def get_data_completeness(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("data-completeness", ttl=CACHE_TTL["medium"], include_principal=True)
+async def get_data_completeness(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Comprehensive data completeness analysis across all entities.
     Shows what data is available, missing, and the quality score.
     """
+    _apply_statement_timeout(db)
     total_customers = db.query(Customer).count()
 
     if total_customers == 0:
@@ -216,10 +241,16 @@ def _generate_completeness_recommendations(fields: Dict, total: int, linkage: Di
 # ============================================================================
 
 @router.get("/customer-segments", dependencies=[Depends(Require("analytics:read"))])
-async def get_customer_segments(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("customer-segments", ttl=CACHE_TTL["medium"], include_principal=True)
+async def get_customer_segments(
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Advanced customer segmentation based on multiple dimensions.
     """
+    _apply_statement_timeout(db)
     # Status distribution
     status_dist = db.query(
         Customer.status,
@@ -241,50 +272,58 @@ async def get_customer_segments(db: Session = Depends(get_db)) -> Dict[str, Any]
         func.sum(Customer.mrr).label("total_mrr")
     ).group_by(Customer.billing_type).all()
 
-    # Tenure segments
-    today = datetime.utcnow().date()
-    tenure_segments = []
-    for label_name, min_days, max_days in [
-        ("New (0-30 days)", 0, 30),
-        ("Growing (31-90 days)", 31, 90),
-        ("Established (91-365 days)", 91, 365),
-        ("Loyal (1-2 years)", 366, 730),
-        ("Long-term (2+ years)", 731, 9999),
-    ]:
-        if max_days == 9999:
-            count = db.query(Customer).filter(
-                Customer.signup_date.isnot(None),
-                func.julianday(today) - func.julianday(Customer.signup_date) >= min_days
-            ).count()
-        else:
-            count = db.query(Customer).filter(
-                Customer.signup_date.isnot(None),
-                func.julianday(today) - func.julianday(Customer.signup_date) >= min_days,
-                func.julianday(today) - func.julianday(Customer.signup_date) <= max_days
-            ).count()
-        tenure_segments.append({"segment": label_name, "count": count})
+    # Tenure segments - single aggregated query
+    days_since_signup = func.date_part("day", func.current_date() - Customer.signup_date)
+    tenure_bucket = case(
+        (days_since_signup <= 30, 'New (0-30 days)'),
+        (days_since_signup <= 90, 'Growing (31-90 days)'),
+        (days_since_signup <= 365, 'Established (91-365 days)'),
+        (days_since_signup <= 730, 'Loyal (1-2 years)'),
+        else_='Long-term (2+ years)'
+    )
 
-    # MRR segments
-    mrr_segments = []
-    for label_name, min_mrr, max_mrr in [
-        ("No MRR", 0, 0),
-        ("Low (<10K)", 1, 10000),
-        ("Medium (10K-50K)", 10000, 50000),
-        ("High (50K-200K)", 50000, 200000),
-        ("Enterprise (200K+)", 200000, 999999999),
-    ]:
-        if min_mrr == 0 and max_mrr == 0:
-            count = db.query(Customer).filter(
-                or_(Customer.mrr.is_(None), Customer.mrr == 0)
-            ).count()
-        elif max_mrr == 999999999:
-            count = db.query(Customer).filter(Customer.mrr >= min_mrr).count()
-        else:
-            count = db.query(Customer).filter(
-                Customer.mrr >= min_mrr,
-                Customer.mrr < max_mrr
-            ).count()
-        mrr_segments.append({"segment": label_name, "count": count})
+    tenure_data = (
+        db.query(
+            tenure_bucket.label("segment"),
+            func.count(Customer.id).label("count"),
+        )
+        .filter(Customer.signup_date.isnot(None))
+        .group_by(tenure_bucket)
+        .all()
+    )
+
+    # Ensure all segments are represented in order
+    segment_order = [
+        "New (0-30 days)",
+        "Growing (31-90 days)",
+        "Established (91-365 days)",
+        "Loyal (1-2 years)",
+        "Long-term (2+ years)",
+    ]
+    tenure_map = {row.segment: row.count for row in tenure_data}
+    tenure_segments = [{"segment": seg, "count": tenure_map.get(seg, 0)} for seg in segment_order]
+
+    # MRR segments - single aggregated query
+    mrr_bucket = case(
+        (or_(Customer.mrr.is_(None), Customer.mrr == 0), 'No MRR'),
+        (Customer.mrr < 10000, 'Low (<10K)'),
+        (Customer.mrr < 50000, 'Medium (10K-50K)'),
+        (Customer.mrr < 200000, 'High (50K-200K)'),
+        else_='Enterprise (200K+)'
+    )
+
+    mrr_data = (
+        db.query(
+            mrr_bucket.label("segment"),
+            func.count(Customer.id).label("count"),
+        )
+        .group_by(mrr_bucket)
+        .all()
+    )
+
+    mrr_order = ["No MRR", "Low (<10K)", "Medium (10K-50K)", "High (50K-200K)", "Enterprise (200K+)"]
+    mrr_map = {row.segment: row.count for row in mrr_data}
+    mrr_segments = [{"segment": seg, "count": mrr_map.get(seg, 0)} for seg in mrr_order]
 
     # Geographic distribution (top cities)
     city_dist = db.query(
@@ -293,7 +332,7 @@ async def get_customer_segments(db: Session = Depends(get_db)) -> Dict[str, Any]
         func.sum(Customer.mrr).label("total_mrr")
     ).filter(Customer.city.isnot(None)).group_by(Customer.city).order_by(
         func.count(Customer.id).desc()
-    ).limit(15).all()
+    ).limit(limit).all()
 
     # POP distribution
     pop_dist = db.query(
@@ -303,7 +342,7 @@ async def get_customer_segments(db: Session = Depends(get_db)) -> Dict[str, Any]
         func.sum(Customer.mrr).label("total_mrr")
     ).join(Customer, Customer.pop_id == Pop.id).group_by(
         Pop.id, Pop.name, Pop.city
-    ).order_by(func.count(Customer.id).desc()).all()
+    ).order_by(func.count(Customer.id).desc()).limit(limit).all()
 
     return {
         "by_status": [
@@ -353,10 +392,15 @@ async def get_customer_segments(db: Session = Depends(get_db)) -> Dict[str, Any]
 
 
 @router.get("/customer-health", dependencies=[Depends(Require("analytics:read"))])
-async def get_customer_health(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("customer-health", ttl=CACHE_TTL["short"], include_principal=True)
+async def get_customer_health(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Customer health analysis including payment behavior, support needs, and risk indicators.
     """
+    _apply_statement_timeout(db)
     total_active = db.query(Customer).filter(Customer.status == CustomerStatus.ACTIVE).count()
 
     # Payment behavior analysis
@@ -365,50 +409,66 @@ async def get_customer_health(db: Session = Depends(get_db)) -> Dict[str, Any]:
         Invoice.status == InvoiceStatus.OVERDUE
     ).count()
 
-    # Average payment timing
-    paid_invoices = db.query(Invoice).filter(
+    # Average payment timing - keep processing in SQL to avoid loading all invoices
+    days_early = func.date_part("day", Invoice.due_date - Invoice.paid_date)
+    payment_timing = db.query(
+        func.sum(case(
+            (and_(Invoice.paid_date <= Invoice.due_date, days_early > 3), 1),
+            else_=0
+        )).label("early"),
+        func.sum(case(
+            (and_(Invoice.paid_date <= Invoice.due_date, days_early <= 3), 1),
+            else_=0
+        )).label("on_time"),
+        func.sum(case(
+            (Invoice.paid_date > Invoice.due_date, 1),
+            else_=0
+        )).label("late"),
+        func.count(Invoice.id).label("total_paid"),
+    ).filter(
         Invoice.status == InvoiceStatus.PAID,
         Invoice.paid_date.isnot(None),
         Invoice.due_date.isnot(None)
-    ).all()
+    ).one()
 
-    early_payments = 0
-    on_time_payments = 0
-    late_payments = 0
-    for inv in paid_invoices:
-        if inv.paid_date <= inv.due_date:
-            if (inv.due_date - inv.paid_date).days > 3:
-                early_payments += 1
-            else:
-                on_time_payments += 1
-        else:
-            late_payments += 1
-
-    total_paid = early_payments + on_time_payments + late_payments
+    early_payments = int(payment_timing.early or 0)
+    on_time_payments = int(payment_timing.on_time or 0)
+    late_payments = int(payment_timing.late or 0)
+    total_paid = int(payment_timing.total_paid or 0)
 
     # Support intensity (tickets per customer)
-    tickets_30d = db.query(
+    tickets_per_customer = db.query(
         Ticket.customer_id,
         func.count(Ticket.id).label("ticket_count")
     ).filter(
         Ticket.customer_id.isnot(None),
         Ticket.created_at >= datetime.utcnow() - timedelta(days=30)
-    ).group_by(Ticket.customer_id).all()
+    ).group_by(Ticket.customer_id).subquery()
 
-    high_support_customers = sum(1 for t in tickets_30d if t.ticket_count >= 3)
+    ticket_intensity = db.query(
+        func.count(tickets_per_customer.c.customer_id).label("customers_with_tickets_30d"),
+        func.sum(case((tickets_per_customer.c.ticket_count >= 3, 1), else_=0)).label("high_support_customers")
+    ).one()
+    customers_with_tickets_30d = int(ticket_intensity.customers_with_tickets_30d or 0)
+    high_support_customers = int(ticket_intensity.high_support_customers or 0)
 
     # Conversation activity
-    convos_30d = db.query(
+    convos_per_customer = db.query(
         Conversation.customer_id,
         func.count(Conversation.id).label("convo_count")
     ).filter(
         Conversation.customer_id.isnot(None),
         Conversation.created_at >= datetime.utcnow() - timedelta(days=30)
-    ).group_by(Conversation.customer_id).all()
+    ).group_by(Conversation.customer_id).subquery()
+
+    convo_intensity = db.query(
+        func.count(convos_per_customer.c.customer_id).label("customers_with_conversations_30d")
+    ).one()
+    customers_with_conversations_30d = int(convo_intensity.customers_with_conversations_30d or 0)
 
     # Churn indicators
     recently_cancelled = db.query(Customer).filter(
-        Customer.status == CustomerStatus.CANCELLED,
+        Customer.status == CustomerStatus.INACTIVE,
         Customer.cancellation_date >= datetime.utcnow() - timedelta(days=30)
     ).count()
 
@@ -442,9 +502,9 @@ async def get_customer_health(db: Session = Depends(get_db)) -> Dict[str, Any]:
             },
         },
         "support_intensity": {
-            "customers_with_tickets_30d": len(tickets_30d),
+            "customers_with_tickets_30d": customers_with_tickets_30d,
             "high_support_customers": high_support_customers,
-            "customers_with_conversations_30d": len(convos_30d),
+            "customers_with_conversations_30d": customers_with_conversations_30d,
         },
         "churn_indicators": {
             "recently_cancelled_30d": recently_cancelled,
@@ -459,15 +519,158 @@ async def get_customer_health(db: Session = Depends(get_db)) -> Dict[str, Any]:
     }
 
 
+@router.get("/churn-risk", dependencies=[Depends(Require("analytics:read"))])
+async def get_churn_risk(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """Alias endpoint summarizing churn risks."""
+    _apply_statement_timeout(db)
+    overdue_customers = db.query(distinct(Invoice.customer_id)).filter(
+        Invoice.status == InvoiceStatus.OVERDUE
+    ).count()
+    recently_cancelled = db.query(Customer).filter(
+        Customer.status == CustomerStatus.INACTIVE,
+        Customer.cancellation_date >= datetime.utcnow() - timedelta(days=30)
+    ).count()
+    suspended = db.query(Customer).filter(Customer.status == CustomerStatus.SUSPENDED).count()
+    high_ticket_customers = db.query(func.count(Customer.id)).join(
+        Ticket, Ticket.customer_id == Customer.id
+    ).filter(
+        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
+    ).group_by(Customer.id).having(func.count(Ticket.id) >= 3).count()
+
+    return {
+        "summary": {
+            "overdue_customers": overdue_customers,
+            "recent_cancellations_30d": recently_cancelled,
+            "suspended_customers": suspended,
+            "high_ticket_customers": high_ticket_customers,
+        }
+    }
+
+
+@router.get("/plan-changes", dependencies=[Depends(Require("analytics:read"))])
+async def get_plan_changes(
+    months: int = Query(default=6, ge=1, le=24),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Plan change insights (upgrade/downgrade/lateral) over the past N months."""
+    end_dt = datetime.utcnow()
+    start_dt = end_dt - timedelta(days=months * 30)
+
+    subs = (
+        db.query(Subscription)
+        .filter(
+            Subscription.start_date.isnot(None),
+            Subscription.start_date >= start_dt,
+        )
+        .order_by(Subscription.customer_id, Subscription.start_date)
+        .all()
+    )
+
+    transitions: List[Dict[str, Any]] = []
+    customers_with_changes = set()
+
+    for _, cust_subs in groupby(subs, key=lambda s: s.customer_id):
+        history = list(cust_subs)
+        if len(history) < 2:
+            continue
+        customers_with_changes.add(history[0].customer_id)
+        history = sorted(history, key=lambda s: s.start_date or datetime.min)
+        for prev, curr in zip(history, history[1:]):
+            prev_price = float(prev.price or 0)
+            curr_price = float(curr.price or 0)
+            if curr_price > prev_price:
+                change_type = "upgrade"
+            elif curr_price < prev_price:
+                change_type = "downgrade"
+            else:
+                change_type = "lateral"
+            transitions.append(
+                {
+                    "customer_id": curr.customer_id,
+                    "from_plan": prev.plan_name,
+                    "to_plan": curr.plan_name,
+                    "price_change": round(curr_price - prev_price, 2),
+                    "change_type": change_type,
+                    "date": (curr.start_date or end_dt).date().isoformat(),
+                }
+            )
+
+    upgrades = sum(1 for t in transitions if t["change_type"] == "upgrade")
+    downgrades = sum(1 for t in transitions if t["change_type"] == "downgrade")
+    lateral = sum(1 for t in transitions if t["change_type"] == "lateral")
+
+    upgrade_mrr = sum(t["price_change"] for t in transitions if t["change_type"] == "upgrade")
+    downgrade_mrr = sum(abs(t["price_change"]) for t in transitions if t["change_type"] == "downgrade")
+    net_mrr = upgrade_mrr - downgrade_mrr
+
+    active_customers = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.ACTIVE).scalar() or 0
+
+    transition_counts: Dict[str, Dict[str, Any]] = {}
+    for t in transitions:
+        key = f"{t['from_plan']} -> {t['to_plan']}"
+        if key not in transition_counts:
+            transition_counts[key] = {"count": 0, "type": t["change_type"]}
+        transition_counts[key]["count"] += 1
+
+    common_transitions = sorted(
+        [
+            {"transition": k, "count": v["count"], "type": v["type"]}
+            for k, v in transition_counts.items()
+        ],
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:20]
+
+    recent_changes = sorted(transitions, key=lambda t: t["date"], reverse=True)[:20]
+
+    customers_changed = len(customers_with_changes)
+    total_changes = len(transitions)
+
+    upgrade_rate = round(upgrades / active_customers * 100, 2) if active_customers else 0
+    downgrade_rate = round(downgrades / active_customers * 100, 2) if active_customers else 0
+    upgrade_to_downgrade_ratio = round(upgrades / downgrades, 2) if downgrades else (upgrades if upgrades else 0)
+
+    return {
+        "period_months": months,
+        "summary": {
+            "customers_with_plan_changes": customers_changed,
+            "total_changes": total_changes,
+            "upgrades": upgrades,
+            "downgrades": downgrades,
+            "lateral_moves": lateral,
+        },
+        "revenue_impact": {
+            "upgrade_mrr_gained": round(upgrade_mrr, 2),
+            "downgrade_mrr_lost": round(downgrade_mrr, 2),
+            "net_mrr_change": round(net_mrr, 2),
+        },
+        "rates": {
+            "upgrade_rate": upgrade_rate,
+            "downgrade_rate": downgrade_rate,
+            "upgrade_to_downgrade_ratio": upgrade_to_downgrade_ratio,
+        },
+        "common_transitions": common_transitions,
+        "recent_changes": recent_changes,
+    }
+
+
 # ============================================================================
 # RELATIONSHIP ANALYSIS
 # ============================================================================
 
 @router.get("/relationship-map", dependencies=[Depends(Require("analytics:read"))])
-async def get_relationship_map(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("relationship-map", ttl=CACHE_TTL["medium"], include_principal=True)
+async def get_relationship_map(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Analyze relationships between entities and identify orphaned/unlinked records.
     """
+    _apply_statement_timeout(db)
     # Entity counts
     entities = {
         "customers": db.query(Customer).count(),
@@ -571,124 +774,133 @@ async def get_relationship_map(db: Session = Depends(get_db)) -> Dict[str, Any]:
 # ============================================================================
 
 @router.get("/financial-insights", dependencies=[Depends(Require("analytics:read"))])
+@cached("financial-insights", ttl=CACHE_TTL["medium"], include_principal=True)
 async def get_financial_insights(
     months: int = Query(default=12, le=36),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """
     Deep financial analysis including revenue patterns, payment behavior, and forecasting indicators.
     """
-    # Total MRR
-    total_mrr = db.query(func.sum(Customer.mrr)).filter(
-        Customer.status == CustomerStatus.ACTIVE
-    ).scalar() or 0
+    _apply_statement_timeout(db)
+    try:
+        # Total MRR
+        total_mrr = db.query(func.sum(Customer.mrr)).filter(
+            Customer.status == CustomerStatus.ACTIVE
+        ).scalar() or 0
 
-    # Revenue by customer type
-    mrr_by_type = db.query(
-        Customer.customer_type,
-        func.sum(Customer.mrr).label("mrr"),
-        func.count(Customer.id).label("count")
-    ).filter(
-        Customer.status == CustomerStatus.ACTIVE
-    ).group_by(Customer.customer_type).all()
+        # Revenue by customer type
+        mrr_by_type = db.query(
+            Customer.customer_type,
+            func.sum(Customer.mrr).label("mrr"),
+            func.count(Customer.id).label("count")
+        ).filter(
+            Customer.status == CustomerStatus.ACTIVE
+        ).group_by(Customer.customer_type).all()
 
-    # Invoice aging
-    today = datetime.utcnow().date()
-    aging_buckets = {
-        "current": {"count": 0, "amount": 0},
-        "1_30_days": {"count": 0, "amount": 0},
-        "31_60_days": {"count": 0, "amount": 0},
-        "61_90_days": {"count": 0, "amount": 0},
-        "over_90_days": {"count": 0, "amount": 0},
-    }
+        # Invoice aging
+        aging_buckets: Dict[str, Dict[str, Any]] = {
+            "current": {"count": 0, "amount": 0.0},
+            "1_30_days": {"count": 0, "amount": 0.0},
+            "31_60_days": {"count": 0, "amount": 0.0},
+            "61_90_days": {"count": 0, "amount": 0.0},
+            "over_90_days": {"count": 0, "amount": 0.0},
+        }
 
-    overdue_invoices = db.query(Invoice).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
-        Invoice.due_date.isnot(None)
-    ).all()
+        days_overdue = func.date_part("day", func.current_date() - cast(Invoice.due_date, Date))
+        invoice_balance = func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.amount_paid, 0)
+        aging_bucket = case(
+            (days_overdue <= 0, "current"),
+            (days_overdue <= 30, "1_30_days"),
+            (days_overdue <= 60, "31_60_days"),
+            (days_overdue <= 90, "61_90_days"),
+            else_="over_90_days",
+        )
 
-    for inv in overdue_invoices:
-        days_overdue = (today - inv.due_date.date() if hasattr(inv.due_date, 'date') else today - inv.due_date).days if inv.due_date else 0
-        balance = float(inv.total_amount or 0) - float(inv.amount_paid or 0)
+        overdue_by_bucket = db.query(
+            aging_bucket.label("bucket"),
+            func.count(Invoice.id).label("count"),
+            func.sum(invoice_balance).label("amount")
+        ).filter(
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+            Invoice.due_date.isnot(None)
+        ).group_by(
+            aging_bucket
+        ).all()
 
-        if days_overdue <= 0:
-            bucket = "current"
-        elif days_overdue <= 30:
-            bucket = "1_30_days"
-        elif days_overdue <= 60:
-            bucket = "31_60_days"
-        elif days_overdue <= 90:
-            bucket = "61_90_days"
-        else:
-            bucket = "over_90_days"
+        for row in overdue_by_bucket:
+            aging_buckets[row.bucket]["count"] = row.count
+            aging_buckets[row.bucket]["amount"] = float(row.amount or 0)
 
-        aging_buckets[bucket]["count"] += 1
-        aging_buckets[bucket]["amount"] += balance
+        # Payment method distribution
+        payment_methods = db.query(
+            Payment.payment_method,
+            func.count(Payment.id).label("count"),
+            func.sum(Payment.amount).label("total")
+        ).filter(
+            Payment.status == PaymentStatus.COMPLETED
+        ).group_by(Payment.payment_method).all()
 
-    # Payment method distribution
-    payment_methods = db.query(
-        Payment.payment_method,
-        func.count(Payment.id).label("count"),
-        func.sum(Payment.amount).label("total")
-    ).filter(
-        Payment.status == PaymentStatus.COMPLETED
-    ).group_by(Payment.payment_method).all()
+        # Credit notes impact
+        total_credits = db.query(func.sum(CreditNote.amount)).filter(
+            CreditNote.status.in_(["issued", "applied"])
+        ).scalar() or 0
 
-    # Credit notes impact
-    total_credits = db.query(func.sum(CreditNote.amount)).filter(
-        CreditNote.status.in_(["issued", "applied"])
-    ).scalar() or 0
+        # Monthly revenue trend
+        revenue_trend = db.query(
+            extract('year', Payment.payment_date).label('year'),
+            extract('month', Payment.payment_date).label('month'),
+            func.sum(Payment.amount).label('total')
+        ).filter(
+            Payment.status == PaymentStatus.COMPLETED,
+            Payment.payment_date.isnot(None),
+            Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30)
+        ).group_by(
+            extract('year', Payment.payment_date),
+            extract('month', Payment.payment_date)
+        ).order_by(
+            extract('year', Payment.payment_date),
+            extract('month', Payment.payment_date)
+        ).all()
 
-    # Monthly revenue trend
-    revenue_trend = db.query(
-        extract('year', Payment.payment_date).label('year'),
-        extract('month', Payment.payment_date).label('month'),
-        func.sum(Payment.amount).label('total')
-    ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
-        Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30)
-    ).group_by(
-        extract('year', Payment.payment_date),
-        extract('month', Payment.payment_date)
-    ).order_by(
-        extract('year', Payment.payment_date),
-        extract('month', Payment.payment_date)
-    ).all()
-
-    return {
-        "mrr": {
-            "total": float(total_mrr),
-            "by_customer_type": [
+        return {
+            "mrr": {
+                "total": float(total_mrr),
+                "by_customer_type": [
+                    {
+                        "type": row.customer_type.value if row.customer_type else "unknown",
+                        "mrr": float(row.mrr or 0),
+                        "customer_count": row.count,
+                        "avg_mrr": round(float(row.mrr or 0) / max(int(getattr(row, "count", 1) or 1), 1), 2),
+                    }
+                    for row in mrr_by_type
+                ],
+            },
+            "invoice_aging": aging_buckets,
+            "total_outstanding": sum(b["amount"] for b in aging_buckets.values()),
+            "payment_methods": [
                 {
-                    "type": row.customer_type.value if row.customer_type else "unknown",
-                    "mrr": float(row.mrr or 0),
-                    "customer_count": row.count,
-                    "avg_mrr": round(float(row.mrr or 0) / max(row.count, 1), 2),
+                    "method": row.payment_method.value if row.payment_method else "unknown",
+                    "count": row.count,
+                    "total": float(row.total or 0),
                 }
-                for row in mrr_by_type
+                for row in payment_methods
             ],
-        },
-        "invoice_aging": aging_buckets,
-        "total_outstanding": sum(b["amount"] for b in aging_buckets.values()),
-        "payment_methods": [
-            {
-                "method": row.payment_method.value if row.payment_method else "unknown",
-                "count": row.count,
-                "total": float(row.total or 0),
-            }
-            for row in payment_methods
-        ],
-        "credit_notes_issued": float(total_credits),
-        "revenue_trend": [
-            {
-                "year": int(row.year),
-                "month": int(row.month),
-                "period": f"{int(row.year)}-{int(row.month):02d}",
-                "revenue": float(row.total or 0),
-            }
-            for row in revenue_trend
-        ],
-    }
+            "credit_notes_issued": float(total_credits),
+            "revenue_trend": [
+                {
+                    "year": int(row.year),
+                    "month": int(row.month),
+                    "period": f"{int(row.year)}-{int(row.month):02d}",
+                    "revenue": float(row.total or 0),
+                }
+                for row in revenue_trend
+            ],
+        }
+    except Exception as exc:
+        logger.exception("financial_insights_failed", extra={"error": str(exc)})
+        return {"error": "financial insights unavailable"}
 
 
 # ============================================================================
@@ -696,60 +908,72 @@ async def get_financial_insights(
 # ============================================================================
 
 @router.get("/operational-insights", dependencies=[Depends(Require("analytics:read"))])
+@cached("operational-insights", ttl=CACHE_TTL["short"], include_principal=True)
 async def get_operational_insights(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """
     Operational metrics including support performance, network utilization, and employee productivity.
     """
+    _apply_statement_timeout(db)
     since = datetime.utcnow() - timedelta(days=days)
 
     # Ticket analysis
-    tickets = db.query(Ticket).filter(Ticket.created_at >= since).all()
-    total_tickets = len(tickets)
+    ticket_stats = db.query(
+        func.count(Ticket.id).label("total"),
+        func.sum(case((Ticket.status == TicketStatus.RESOLVED, 1), else_=0)).label("resolved"),
+        func.avg(case(
+            (
+                and_(Ticket.status == TicketStatus.RESOLVED, Ticket.resolution_date.isnot(None)),
+                func.extract('epoch', Ticket.resolution_date - Ticket.created_at) / 3600
+            ),
+            else_=None
+        )).label("avg_resolution_hours"),
+    ).filter(
+        Ticket.created_at >= since
+    ).one()
+    total_tickets = int(ticket_stats.total or 0)
+    resolved_tickets = int(ticket_stats.resolved or 0)
+    avg_resolution_hours = float(ticket_stats.avg_resolution_hours or 0)
 
-    resolved_tickets = [t for t in tickets if t.status == TicketStatus.RESOLVED]
-    avg_resolution_hours = 0
-    if resolved_tickets:
-        resolution_times = [
-            (t.resolution_date - t.created_at).total_seconds() / 3600
-            for t in resolved_tickets
-            if t.resolution_date and t.created_at
-        ]
-        if resolution_times:
-            avg_resolution_hours = sum(resolution_times) / len(resolution_times)
-
-    # Tickets by priority
-    tickets_by_priority = {}
-    for t in tickets:
-        priority = t.priority.value if t.priority else "unknown"
-        if priority not in tickets_by_priority:
-            tickets_by_priority[priority] = 0
-        tickets_by_priority[priority] += 1
+    tickets_by_priority_rows = db.query(
+        Ticket.priority,
+        func.count(Ticket.id).label("count")
+    ).filter(
+        Ticket.created_at >= since
+    ).group_by(Ticket.priority).all()
+    tickets_by_priority = {
+        (row.priority.value if row.priority else "unknown"): row.count
+        for row in tickets_by_priority_rows
+    }
 
     # Conversation analysis
-    conversations = db.query(Conversation).filter(Conversation.created_at >= since).all()
-    total_conversations = len(conversations)
+    convo_stats = db.query(
+        func.count(Conversation.id).label("total"),
+        func.sum(case((Conversation.status == ConversationStatus.RESOLVED, 1), else_=0)).label("resolved"),
+        func.avg(case(
+            (
+                and_(Conversation.status == ConversationStatus.RESOLVED, Conversation.first_response_time_seconds.isnot(None)),
+                Conversation.first_response_time_seconds / 3600.0
+            ),
+            else_=None
+        )).label("avg_first_response_hours"),
+    ).filter(
+        Conversation.created_at >= since
+    ).one()
+    total_conversations = int(convo_stats.total or 0)
+    resolved_convos = int(convo_stats.resolved or 0)
+    avg_response_hours = float(convo_stats.avg_first_response_hours or 0)
 
-    resolved_convos = [c for c in conversations if c.status == ConversationStatus.RESOLVED]
-    avg_response_hours = 0
-    if resolved_convos:
-        response_times = [
-            c.first_response_time_seconds / 3600
-            for c in resolved_convos
-            if c.first_response_time_seconds
-        ]
-        if response_times:
-            avg_response_hours = sum(response_times) / len(response_times)
-
-    # By channel
-    by_channel = {}
-    for c in conversations:
-        channel = c.channel or "unknown"
-        if channel not in by_channel:
-            by_channel[channel] = 0
-        by_channel[channel] += 1
+    by_channel_rows = db.query(
+        Conversation.channel,
+        func.count(Conversation.id).label("count")
+    ).filter(
+        Conversation.created_at >= since
+    ).group_by(Conversation.channel).all()
+    by_channel = {row.channel or "unknown": row.count for row in by_channel_rows}
 
     # Employee productivity (tickets handled)
     employee_tickets = db.query(
@@ -777,15 +1001,15 @@ async def get_operational_insights(
         "period_days": days,
         "tickets": {
             "total": total_tickets,
-            "resolved": len(resolved_tickets),
-            "resolution_rate": round(len(resolved_tickets) / max(total_tickets, 1) * 100, 1),
+            "resolved": resolved_tickets,
+            "resolution_rate": round(resolved_tickets / max(total_tickets, 1) * 100, 1),
             "avg_resolution_hours": round(avg_resolution_hours, 1),
             "by_priority": tickets_by_priority,
         },
         "conversations": {
             "total": total_conversations,
-            "resolved": len(resolved_convos),
-            "resolution_rate": round(len(resolved_convos) / max(total_conversations, 1) * 100, 1),
+            "resolved": resolved_convos,
+            "resolution_rate": round(resolved_convos / max(total_conversations, 1) * 100, 1),
             "avg_first_response_hours": round(avg_response_hours, 1),
             "by_channel": by_channel,
         },
@@ -805,17 +1029,65 @@ async def get_operational_insights(
     }
 
 
+@router.get("/network-health", dependencies=[Depends(Require("analytics:read"))])
+async def get_network_health(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """Alias endpoint summarizing network health (avoids 404)."""
+    _apply_statement_timeout(db)
+    pop_stats = db.query(
+        Pop.id,
+        Pop.name,
+        Pop.city,
+        func.count(Customer.id).label("customers"),
+        func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active_customers"),
+    ).outerjoin(
+        Customer, Customer.pop_id == Pop.id
+    ).group_by(
+        Pop.id, Pop.name, Pop.city
+    ).order_by(func.count(Customer.id).desc()).limit(50).all()
+
+    routers = db.query(func.count(Router.id)).scalar() or 0
+    pops = db.query(func.count(Pop.id)).scalar() or 0
+
+    return {
+        "summary": {
+            "pops": pops,
+            "routers": routers,
+            "avg_customers_per_pop": round(
+                (sum(r.customers or 0 for r in pop_stats) / max(len(pop_stats), 1)), 2
+            ),
+        },
+        "by_pop": [
+            {
+                "id": row.id,
+                "name": row.name,
+                "city": row.city,
+                "customers": row.customers,
+                "active_customers": row.active_customers or 0,
+            }
+            for row in pop_stats
+        ],
+    }
+
+
 # ============================================================================
 # ANOMALY & PATTERN DETECTION
 # ============================================================================
 
 @router.get("/anomalies", dependencies=[Depends(Require("analytics:read"))])
-async def detect_anomalies(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("anomalies", ttl=CACHE_TTL["medium"], include_principal=True)
+async def detect_anomalies(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Detect data anomalies and patterns that may indicate issues.
     """
-    anomalies = []
-    patterns = []
+    _apply_statement_timeout(db)
+    anomalies: List[Dict[str, Any]] = []
+    patterns: List[Dict[str, Any]] = []
 
     # Check for customers with subscriptions but no invoices in 90 days
     active_with_sub_no_invoice = db.query(Customer).join(
@@ -852,9 +1124,9 @@ async def detect_anomalies(db: Session = Depends(get_db)) -> Dict[str, Any]:
         })
 
     # Customers with many open tickets
-    high_ticket_customers = db.query(
-        Customer.id,
-        Customer.name,
+    high_ticket_base = db.query(
+        Customer.id.label("id"),
+        Customer.name.label("name"),
         func.count(Ticket.id).label("open_tickets")
     ).join(
         Ticket, Ticket.customer_id == Customer.id
@@ -862,46 +1134,55 @@ async def detect_anomalies(db: Session = Depends(get_db)) -> Dict[str, Any]:
         Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
     ).group_by(Customer.id, Customer.name).having(
         func.count(Ticket.id) >= 5
-    ).all()
+    )
+    high_ticket_sub = high_ticket_base.subquery()
+    high_ticket_total = db.query(func.count()).select_from(high_ticket_sub).scalar() or 0
+    high_ticket_customers = db.query(
+        high_ticket_sub.c.id,
+        high_ticket_sub.c.name,
+        high_ticket_sub.c.open_tickets
+    ).order_by(
+        high_ticket_sub.c.open_tickets.desc()
+    ).limit(25).all()
 
-    if high_ticket_customers:
+    if high_ticket_total:
         anomalies.append({
             "type": "support",
             "severity": "medium",
-            "description": f"{len(high_ticket_customers)} customers have 5+ open tickets",
+            "description": f"{high_ticket_total} customers have 5+ open tickets",
             "customers": [{"id": c.id, "name": c.name, "tickets": c.open_tickets} for c in high_ticket_customers[:5]],
         })
 
     # Duplicate customer detection (same email or phone)
-    duplicate_emails = db.query(
-        Customer.email,
-        func.count(Customer.id).label("count")
+    duplicate_email_sub = db.query(
+        Customer.email
     ).filter(
         Customer.email.isnot(None),
         Customer.email != ""
-    ).group_by(Customer.email).having(func.count(Customer.id) > 1).all()
+    ).group_by(Customer.email).having(func.count(Customer.id) > 1).subquery()
+    duplicate_emails = db.query(func.count()).select_from(duplicate_email_sub).scalar() or 0
 
     if duplicate_emails:
         anomalies.append({
             "type": "data_quality",
             "severity": "medium",
-            "description": f"{len(duplicate_emails)} email addresses used by multiple customers",
+            "description": f"{duplicate_emails} email addresses used by multiple customers",
             "action": "Review and merge duplicate customer records",
         })
 
-    duplicate_phones = db.query(
-        Customer.phone,
-        func.count(Customer.id).label("count")
+    duplicate_phone_sub = db.query(
+        Customer.phone
     ).filter(
         Customer.phone.isnot(None),
         Customer.phone != ""
-    ).group_by(Customer.phone).having(func.count(Customer.id) > 1).all()
+    ).group_by(Customer.phone).having(func.count(Customer.id) > 1).subquery()
+    duplicate_phones = db.query(func.count()).select_from(duplicate_phone_sub).scalar() or 0
 
     if duplicate_phones:
         anomalies.append({
             "type": "data_quality",
             "severity": "low",
-            "description": f"{len(duplicate_phones)} phone numbers used by multiple customers",
+            "description": f"{duplicate_phones} phone numbers used by multiple customers",
             "action": "Review potential duplicate records",
         })
 
@@ -954,10 +1235,15 @@ async def detect_anomalies(db: Session = Depends(get_db)) -> Dict[str, Any]:
 # ============================================================================
 
 @router.get("/data-availability", dependencies=[Depends(Require("analytics:read"))])
-async def get_data_availability(db: Session = Depends(get_db)) -> Dict[str, Any]:
+@cached("data-availability", ttl=CACHE_TTL["short"], include_principal=True)
+async def get_data_availability(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """
     Report on what data is available vs what's needed for comprehensive analytics.
     """
+    _apply_statement_timeout(db)
 
     # Check data freshness
     latest_sync = db.query(func.max(Customer.last_synced_at)).scalar()

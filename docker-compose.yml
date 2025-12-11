@@ -103,7 +103,7 @@ services:
       redis:
         condition: service_healthy
       celery_worker:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.worker:celery_app inspect ping"]
       interval: 60s

@@ -289,7 +289,7 @@ class ChatwootSync(BaseSyncClient):
                 self.reset_cursor("conversations")
 
             # Build params with updated_after filter for incremental
-            params = {"status": "all"}
+            params: Dict[str, Any] = {"status": "all"}
             if last_updated_after:
                 params["updated_after"] = last_updated_after
 
@@ -473,8 +473,8 @@ class ChatwootSync(BaseSyncClient):
             logger.info(
                 "chatwoot_conversations_synced",
                 total=len(conversations),
-                created=self.current_sync_log.records_created,
-                updated=self.current_sync_log.records_updated,
+                created=self.current_sync_log.records_created if self.current_sync_log else 0,
+                updated=self.current_sync_log.records_updated if self.current_sync_log else 0,
             )
 
         except Exception as e:

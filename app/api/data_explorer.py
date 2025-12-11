@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, inspect, and_, or_
 from sqlalchemy.types import DateTime, Date
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from datetime import datetime
 from decimal import Decimal
 import csv
@@ -326,7 +326,7 @@ async def explore_table(
 
     # Apply ordering
     if order_by:
-        column = getattr(model, order_by, None)
+        column = cast(Any, getattr(model, order_by, None))
         if column is None:
             raise HTTPException(status_code=400, detail=f"Invalid column: {order_by}")
         if order_dir == "desc":
@@ -386,13 +386,13 @@ async def get_table_stats(
     # Add specific stats based on table
     if table_name == "customers":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Customer.status, func.count(Customer.id).label("count"))
             .group_by(Customer.status)
             .all()
         }
         stats["by_type"] = {
-            row.customer_type.value: row.count
+            row.customer_type.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Customer.customer_type, func.count(Customer.id).label("count"))
             .group_by(Customer.customer_type)
             .all()
@@ -400,13 +400,13 @@ async def get_table_stats(
 
     elif table_name == "subscriptions":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Subscription.status, func.count(Subscription.id).label("count"))
             .group_by(Subscription.status)
             .all()
         }
         stats["by_plan"] = {
-            row.plan_name: row.count
+            row.plan_name: int(getattr(row, "count", 0) or 0)
             for row in db.query(Subscription.plan_name, func.count(Subscription.id).label("count"))
             .group_by(Subscription.plan_name)
             .order_by(func.count(Subscription.id).desc())
@@ -416,7 +416,7 @@ async def get_table_stats(
 
     elif table_name == "invoices":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Invoice.status, func.count(Invoice.id).label("count"))
             .group_by(Invoice.status)
             .all()
@@ -427,7 +427,7 @@ async def get_table_stats(
         stats["total_paid"] = float(total_paid or 0)
     elif table_name == "credit_notes":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(CreditNote.status, func.count(CreditNote.id).label("count"))
             .group_by(CreditNote.status)
             .all()
@@ -437,7 +437,7 @@ async def get_table_stats(
 
     elif table_name == "payments":
         stats["by_method"] = {
-            row.payment_method.value: row.count
+            row.payment_method.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Payment.payment_method, func.count(Payment.id).label("count"))
             .group_by(Payment.payment_method)
             .all()
@@ -447,13 +447,13 @@ async def get_table_stats(
 
     elif table_name == "conversations":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Conversation.status, func.count(Conversation.id).label("count"))
             .group_by(Conversation.status)
             .all()
         }
         stats["by_channel"] = {
-            row.channel: row.count
+            row.channel: int(getattr(row, "count", 0) or 0)
             for row in db.query(Conversation.channel, func.count(Conversation.id).label("count"))
             .group_by(Conversation.channel)
             .all()
@@ -466,14 +466,14 @@ async def get_table_stats(
 
     elif table_name == "employees":
         stats["by_department"] = {
-            row.department: row.count
+            row.department: int(getattr(row, "count", 0) or 0)
             for row in db.query(Employee.department, func.count(Employee.id).label("count"))
             .group_by(Employee.department)
             .all()
             if row.department
         }
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Employee.status, func.count(Employee.id).label("count"))
             .group_by(Employee.status)
             .all()
@@ -481,19 +481,19 @@ async def get_table_stats(
 
     elif table_name == "tickets":
         stats["by_status"] = {
-            row.status.value: row.count
+            row.status.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Ticket.status, func.count(Ticket.id).label("count"))
             .group_by(Ticket.status)
             .all()
         }
         stats["by_priority"] = {
-            row.priority.value: row.count
+            row.priority.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Ticket.priority, func.count(Ticket.id).label("count"))
             .group_by(Ticket.priority)
             .all()
         }
         stats["by_source"] = {
-            row.source.value: row.count
+            row.source.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Ticket.source, func.count(Ticket.id).label("count"))
             .group_by(Ticket.source)
             .all()
@@ -501,7 +501,7 @@ async def get_table_stats(
 
     elif table_name == "projects":
         stats["by_status"] = {
-            row.status.value if hasattr(row.status, 'value') else row.status: row.count
+            row.status.value if hasattr(row.status, 'value') else row.status: int(getattr(row, "count", 0) or 0)
             for row in db.query(Project.status, func.count(Project.id).label("count"))
             .group_by(Project.status)
             .all()
@@ -512,7 +512,7 @@ async def get_table_stats(
 
     elif table_name == "tariffs":
         stats["by_type"] = {
-            row.tariff_type.value: row.count
+            row.tariff_type.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(Tariff.tariff_type, func.count(Tariff.id).label("count"))
             .group_by(Tariff.tariff_type)
             .all()
@@ -521,7 +521,7 @@ async def get_table_stats(
 
     elif table_name == "routers":
         stats["by_nas_type"] = {
-            str(row.nas_type): row.count
+            str(row.nas_type): int(getattr(row, "count", 0) or 0)
             for row in db.query(Router.nas_type, func.count(Router.id).label("count"))
             .group_by(Router.nas_type)
             .all()
@@ -531,7 +531,7 @@ async def get_table_stats(
 
     elif table_name == "leads":
         stats["by_status"] = {
-            row.status: row.count
+            row.status: int(getattr(row, "count", 0) or 0)
             for row in db.query(Lead.status, func.count(Lead.id).label("count"))
             .group_by(Lead.status)
             .all()
@@ -541,7 +541,7 @@ async def get_table_stats(
 
     elif table_name == "network_monitors":
         stats["by_ping_state"] = {
-            row.ping_state.value: row.count
+            row.ping_state.value: int(getattr(row, "count", 0) or 0)
             for row in db.query(NetworkMonitor.ping_state, func.count(NetworkMonitor.id).label("count"))
             .group_by(NetworkMonitor.ping_state)
             .all()
@@ -550,14 +550,14 @@ async def get_table_stats(
 
     elif table_name == "ipv4_networks":
         stats["by_type"] = {
-            row.network_type: row.count
+            row.network_type: int(getattr(row, "count", 0) or 0)
             for row in db.query(IPv4Network.network_type, func.count(IPv4Network.id).label("count"))
             .group_by(IPv4Network.network_type)
             .all()
             if row.network_type
         }
         stats["by_usage"] = {
-            row.type_of_usage: row.count
+            row.type_of_usage: int(getattr(row, "count", 0) or 0)
             for row in db.query(IPv4Network.type_of_usage, func.count(IPv4Network.id).label("count"))
             .group_by(IPv4Network.type_of_usage)
             .all()
@@ -571,14 +571,14 @@ async def get_table_stats(
 
     elif table_name == "accounts":
         stats["by_account_type"] = {
-            row.account_type: row.count
+            row.account_type: int(getattr(row, "count", 0) or 0)
             for row in db.query(Account.account_type, func.count(Account.id).label("count"))
             .group_by(Account.account_type)
             .all()
             if row.account_type
         }
         stats["by_root_type"] = {
-            row.root_type: row.count
+            row.root_type: int(getattr(row, "count", 0) or 0)
             for row in db.query(Account.root_type, func.count(Account.id).label("count"))
             .group_by(Account.root_type)
             .all()
@@ -599,7 +599,7 @@ async def get_table_stats(
 
     elif table_name == "purchase_invoices":
         stats["by_status"] = {
-            row.status: row.count
+            row.status: int(getattr(row, "count", 0) or 0)
             for row in db.query(PurchaseInvoice.status, func.count(PurchaseInvoice.id).label("count"))
             .group_by(PurchaseInvoice.status)
             .all()
@@ -610,7 +610,7 @@ async def get_table_stats(
 
     elif table_name == "administrators":
         stats["by_role"] = {
-            row.role_name: row.count
+            row.role_name: int(getattr(row, "count", 0) or 0)
             for row in db.query(Administrator.role_name, func.count(Administrator.id).label("count"))
             .group_by(Administrator.role_name)
             .all()
@@ -687,17 +687,17 @@ async def export_table(
             },
         )
     else:  # json
-        data = []
+        json_data: List[Dict[str, Any]] = []
         for record in records:
-            row = {}
+            json_row: Dict[str, Any] = {}
             for col in columns:
                 value = getattr(record, col)
-                row[col] = _serialize_value(value)
-            data.append(row)
+                json_row[col] = _serialize_value(value)
+            json_data.append(json_row)
 
-        output = json.dumps(data, indent=2, default=str)
+        json_output: str = json.dumps(json_data, indent=2, default=str)
         return StreamingResponse(
-            iter([output]),
+            iter([json_output]),
             media_type="application/json",
             headers={
                 "Content-Disposition": f"attachment; filename={table_name}_export.json"

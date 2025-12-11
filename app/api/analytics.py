@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, case, and_, or_, desc, asc
+from sqlalchemy import func, extract, case, and_, or_, desc, asc, exists, text
 from typing import Dict, Any, List, Optional, cast
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.database import get_db
+from app.config import settings
 from app.models.customer import Customer, CustomerStatus
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.invoice import Invoice, InvoiceStatus
@@ -22,10 +23,38 @@ from app.models.accounting import PurchaseInvoice, PurchaseInvoiceStatus, Suppli
 from app.models.employee import Employee, EmploymentStatus
 from app.models.network_monitor import NetworkMonitor, MonitorState
 from app.models.ipv4_network import IPv4Network
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 
 router = APIRouter()
+
+
+def _apply_statement_timeout(db: Session) -> None:
+    """Apply per-request statement timeout for Postgres connections."""
+    timeout_ms = getattr(settings, "analytics_statement_timeout_ms", None)
+    if not timeout_ms or not db.bind or db.bind.dialect.name != "postgresql":
+        return
+    try:
+        db.execute(text("SET LOCAL statement_timeout = :ms"), {"ms": timeout_ms})
+    except Exception:
+        db.rollback()
+        return
+
+
+def get_db_with_timeout(db: Session = Depends(get_db)) -> Session:
+    """Dependency that applies statement timeout for analytics-heavy queries."""
+    _apply_statement_timeout(db)
+    return db
+
+
+def _parse_date_param(date_str: Optional[str], field: str) -> Optional[datetime]:
+    """Parse ISO date string to datetime or raise HTTP 400 for invalid input."""
+    if not date_str:
+        return None
+    try:
+        return datetime.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid {field}: {date_str}")
 
 
 def _get_active_currencies(db: Session, filters: Optional[List[Any]] = None) -> set[str]:
@@ -95,13 +124,13 @@ def calculate_mrr(db: Session, filters: Optional[List[Any]] = None, currency: Op
     return float(result or 0)
 
 
-@cached("overview", ttl=CACHE_TTL["short"])
-async def _get_overview_impl(currency: Optional[str], db: Session) -> Dict[str, Any]:
+@cached("overview", ttl=CACHE_TTL["short"], include_principal=True)
+async def _get_overview_impl(currency: Optional[str], db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of overview metrics (cached)."""
     # Customer counts
     total_customers = db.query(Customer).count()
     active_customers = db.query(Customer).filter(Customer.status == CustomerStatus.ACTIVE).count()
-    churned_customers = db.query(Customer).filter(Customer.status == CustomerStatus.CANCELLED).count()
+    churned_customers = db.query(Customer).filter(Customer.status == CustomerStatus.INACTIVE).count()
 
     resolved_currency = _resolve_currency(db, [], currency)
 
@@ -152,10 +181,58 @@ async def _get_overview_impl(currency: Optional[str], db: Session) -> Dict[str, 
 @router.get("/overview", dependencies=[Depends(Require("analytics:read"))])
 async def get_overview(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get high-level overview metrics."""
-    return await _get_overview_impl(currency, db)
+    return cast(Dict[str, Any], await _get_overview_impl(currency, db, principal))
+
+
+@router.get("/revenue", dependencies=[Depends(Require("analytics:read"))])
+async def get_revenue_summary(
+    currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
+    months: int = Query(default=12, le=36),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """Revenue summary alias endpoint (avoids 404)."""
+    resolved_currency = _resolve_currency(db, [], currency)
+    mrr = calculate_mrr(db, currency=resolved_currency)
+    outstanding = (
+        db.query(func.coalesce(func.sum(Invoice.balance), 0))
+        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
+        .scalar() or 0
+    )
+    revenue_trend = db.query(
+        extract("year", Payment.payment_date).label("year"),
+        extract("month", Payment.payment_date).label("month"),
+        func.sum(Payment.amount).label("total"),
+    ).filter(
+        Payment.status == PaymentStatus.COMPLETED,
+        Payment.payment_date.isnot(None),
+        Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30),
+    ).group_by(
+        extract("year", Payment.payment_date),
+        extract("month", Payment.payment_date),
+    ).order_by(
+        extract("year", Payment.payment_date),
+        extract("month", Payment.payment_date),
+    ).all()
+
+    return {
+        "mrr": mrr,
+        "outstanding": float(outstanding),
+        "currency": resolved_currency,
+        "revenue_trend": [
+            {
+                "year": int(row.year),
+                "month": int(row.month),
+                "period": f"{int(row.year)}-{int(row.month):02d}",
+                "revenue": float(row.total or 0),
+            }
+            for row in revenue_trend
+        ],
+    }
 
 
 @router.get("/revenue/trend", dependencies=[Depends(Require("analytics:read"))])
@@ -163,7 +240,7 @@ async def get_revenue_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get monthly revenue trend from payments."""
     if start_date and end_date:
@@ -213,112 +290,192 @@ async def get_churn_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
-    """Get monthly churn trend."""
-    if start_date and end_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        end_dt = datetime.utcnow()
-        start_dt = end_dt - timedelta(days=months * 30)
+    db: Session = Depends(get_db_with_timeout),
+) -> Dict[str, Any]:
+    """Get monthly churn trend with churn rates based on subscription expiration (no active renewal)."""
+    end_dt = _parse_date_param(end_date, "end_date") or datetime.utcnow()
+    start_dt = _parse_date_param(start_date, "start_date") or (end_dt - timedelta(days=months * 30))
 
-    churns = (
+    # Determine churn events: customers whose latest subscription end_date fell in period and have no active subs
+    last_end_sub = (
         db.query(
-            extract("year", Customer.cancellation_date).label("year"),
-            extract("month", Customer.cancellation_date).label("month"),
-            func.count(Customer.id).label("count"),
+            Subscription.customer_id.label("customer_id"),
+            func.max(Subscription.end_date).label("last_end_date"),
+        )
+        .filter(Subscription.end_date.isnot(None))
+        .group_by(Subscription.customer_id)
+        .subquery()
+    )
+
+    active_sub_exists = (
+        db.query(Subscription.id)
+        .filter(
+            Subscription.customer_id == last_end_sub.c.customer_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .exists()
+    )
+
+    churn_candidates = (
+        db.query(
+            func.date_trunc("month", last_end_sub.c.last_end_date).label("period_start"),
+            func.count(last_end_sub.c.customer_id).label("churned"),
         )
         .filter(
-            Customer.cancellation_date >= start_dt,
-            Customer.cancellation_date <= end_dt,
-            Customer.status == CustomerStatus.CANCELLED,
+            last_end_sub.c.last_end_date >= start_dt,
+            last_end_sub.c.last_end_date <= end_dt,
+            ~active_sub_exists,
         )
-        .group_by(
-            extract("year", Customer.cancellation_date),
-            extract("month", Customer.cancellation_date),
-        )
-        .order_by(
-            extract("year", Customer.cancellation_date),
-            extract("month", Customer.cancellation_date),
-        )
+        .group_by(func.date_trunc("month", last_end_sub.c.last_end_date))
         .all()
     )
 
-    return [
-        {
-            "year": int(c.year),
-            "month": int(c.month),
-            "period": f"{int(c.year)}-{int(c.month):02d}",
-            "churned_count": c.count,
-        }
-        for c in churns
-    ]
+    churn_map: Dict[str, int] = {
+        row.period_start.strftime("%Y-%m"): int(row.churned) for row in churn_candidates
+    }
 
-
-@cached("pop_performance", ttl=CACHE_TTL["long"])
-async def _get_pop_performance_impl(currency: Optional[str], db: Session) -> List[Dict[str, Any]]:
-    """Implementation of POP performance metrics (cached - expensive query)."""
-    pops = db.query(Pop).filter(Pop.is_active.is_(True)).all()
-
-    # Guard against mixed currencies globally unless caller specifies which to use
-    _resolve_currency(db, [], currency)
-
-    results = []
-    for pop in pops:
-        # Customer counts
-        total_customers = db.query(Customer).filter(Customer.pop_id == pop.id).count()
-        active_customers = db.query(Customer).filter(
-            Customer.pop_id == pop.id,
-            Customer.status == CustomerStatus.ACTIVE,
-        ).count()
-        churned_customers = db.query(Customer).filter(
-            Customer.pop_id == pop.id,
-            Customer.status == CustomerStatus.CANCELLED,
-        ).count()
-
-        # Revenue (MRR - properly normalized by billing cycle)
-        mrr_filters = [Customer.pop_id == pop.id]
-        pop_currency = _resolve_currency(db, mrr_filters, currency)
-        mrr_result = calculate_mrr(db, filters=mrr_filters, currency=pop_currency)
-
-        # Open tickets
-        open_tickets = (
-            db.query(Conversation)
-            .join(Customer, Conversation.customer_id == Customer.id)
+    def _active_count_at(point: datetime) -> int:
+        return (
+            db.query(func.count(func.distinct(Subscription.customer_id)))
             .filter(
-                Customer.pop_id == pop.id,
-                Conversation.status.in_([ConversationStatus.OPEN, ConversationStatus.PENDING]),
-            )
-            .count()
-        )
-
-        # Outstanding balance
-        outstanding_result = (
-            db.query(func.sum(Invoice.balance))
-            .join(Customer, Invoice.customer_id == Customer.id)
-            .filter(
-                Customer.pop_id == pop.id,
-                Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE]),
+                Subscription.status == SubscriptionStatus.ACTIVE,
+                Subscription.start_date <= point,
+                or_(Subscription.end_date.is_(None), Subscription.end_date >= point),
             )
             .scalar()
+            or 0
         )
 
-        churn_rate = (churned_customers / total_customers * 100) if total_customers > 0 else 0
+    active_start = _active_count_at(start_dt)
+
+    data = []
+    current = datetime(start_dt.year, start_dt.month, 1)
+    while current <= end_dt:
+        period_key = current.strftime("%Y-%m")
+        churned = churn_map.get(period_key, 0)
+
+        # Active at end of period
+        period_end = (current + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+        active_end = db.query(func.count(Customer.id)).filter(
+            Customer.status == CustomerStatus.ACTIVE,
+            Customer.signup_date <= period_end,
+        ).scalar() or 0
+
+        active_base = (active_start + active_end) / 2 if (active_start or active_end) else 0
+        churn_rate = round(churned / active_base * 100, 2) if active_base > 0 else 0
+
+        data.append(
+            {
+                "period": period_key,
+                "churned_count": churned,
+                "churn_rate": churn_rate,
+                "active_base": active_base,
+            }
+        )
+
+        active_start = active_end
+        current = (current + timedelta(days=32)).replace(day=1)
+
+    return {
+        "period": {"start": start_dt.date().isoformat(), "end": end_dt.date().isoformat()},
+        "data": data,
+    }
+
+
+@cached("pop_performance", ttl=CACHE_TTL["long"], include_principal=True)
+async def _get_pop_performance_impl(currency: Optional[str], db: Session, principal: Principal) -> List[Dict[str, Any]]:
+    """Implementation of POP performance metrics (cached - single aggregated query)."""
+    # Guard against mixed currencies globally unless caller specifies which to use
+    resolved_currency = _resolve_currency(db, [], currency)
+
+    # MRR normalized by billing cycle
+    mrr_case = case(
+        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
+        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
+        else_=Subscription.price,
+    )
+
+    # Build currency filter for MRR
+    mrr_currency_filter = Subscription.currency == resolved_currency if resolved_currency else Subscription.id.isnot(None)
+
+    # Single aggregated query for all POP metrics
+    pop_metrics = (
+        db.query(
+            Pop.id,
+            Pop.name,
+            Pop.code,
+            Pop.city,
+            func.count(func.distinct(Customer.id)).label("total_customers"),
+            func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active_customers"),
+            func.sum(case((Customer.status == CustomerStatus.INACTIVE, 1), else_=0)).label("churned_customers"),
+        )
+        .outerjoin(Customer, Customer.pop_id == Pop.id)
+        .filter(Pop.is_active.is_(True))
+        .group_by(Pop.id, Pop.name, Pop.code, Pop.city)
+        .all()
+    )
+
+    # MRR by POP (separate query to handle currency filtering properly)
+    mrr_by_pop = (
+        db.query(
+            Customer.pop_id,
+            func.sum(mrr_case).label("mrr"),
+        )
+        .join(Subscription, Subscription.customer_id == Customer.id)
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            mrr_currency_filter,
+        )
+        .group_by(Customer.pop_id)
+        .all()
+    )
+    mrr_map = {row.pop_id: float(row.mrr or 0) for row in mrr_by_pop}
+
+    # Open tickets by POP
+    tickets_by_pop = (
+        db.query(
+            Customer.pop_id,
+            func.count(Conversation.id).label("open_tickets"),
+        )
+        .join(Conversation, Conversation.customer_id == Customer.id)
+        .filter(Conversation.status.in_([ConversationStatus.OPEN, ConversationStatus.PENDING]))
+        .group_by(Customer.pop_id)
+        .all()
+    )
+    tickets_map = {row.pop_id: row.open_tickets for row in tickets_by_pop}
+
+    # Outstanding by POP
+    outstanding_by_pop = (
+        db.query(
+            Customer.pop_id,
+            func.sum(Invoice.balance).label("outstanding"),
+        )
+        .join(Invoice, Invoice.customer_id == Customer.id)
+        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE]))
+        .group_by(Customer.pop_id)
+        .all()
+    )
+    outstanding_map = {row.pop_id: float(row.outstanding or 0) for row in outstanding_by_pop}
+
+    results = []
+    for pop in pop_metrics:
+        total = pop.total_customers or 0
+        churned = pop.churned_customers or 0
+        churn_rate = (churned / total * 100) if total > 0 else 0
 
         results.append({
             "id": pop.id,
             "name": pop.name,
             "code": pop.code,
             "city": pop.city,
-            "total_customers": total_customers,
-            "active_customers": active_customers,
-            "churned_customers": churned_customers,
+            "total_customers": total,
+            "active_customers": pop.active_customers or 0,
+            "churned_customers": churned,
             "churn_rate": round(churn_rate, 2),
-            "mrr": float(mrr_result or 0),
-            "open_tickets": open_tickets,
-            "outstanding": float(outstanding_result or 0),
-            "currency": pop_currency,
+            "mrr": mrr_map.get(pop.id, 0.0),
+            "open_tickets": tickets_map.get(pop.id, 0),
+            "outstanding": outstanding_map.get(pop.id, 0.0),
+            "currency": resolved_currency,
         })
 
     # Sort by MRR descending
@@ -330,16 +487,47 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session) -> Lis
 @router.get("/pop/performance", dependencies=[Depends(Require("analytics:read"))])
 async def get_pop_performance(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
 ) -> List[Dict[str, Any]]:
     """Get performance metrics by POP."""
-    return await _get_pop_performance_impl(currency, db)
+    return cast(List[Dict[str, Any]], await _get_pop_performance_impl(currency, db, principal))
+
+
+@router.get("/customers", dependencies=[Depends(Require("analytics:read"))])
+async def get_customer_summary(
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """Customer summary alias endpoint (avoids 404)."""
+    total = db.query(func.count(Customer.id)).scalar() or 0
+    active = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.ACTIVE).scalar() or 0
+    churned = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.INACTIVE).scalar() or 0
+    new_last_30 = db.query(func.count(Customer.id)).filter(
+        Customer.signup_date.isnot(None),
+        Customer.signup_date >= datetime.utcnow() - timedelta(days=30)
+    ).scalar() or 0
+
+    by_status = db.query(
+        Customer.status,
+        func.count(Customer.id).label("count")
+    ).group_by(Customer.status).all()
+
+    return {
+        "total_customers": total,
+        "active_customers": active,
+        "churned_customers": churned,
+        "new_last_30_days": new_last_30,
+        "by_status": {
+            (row.status.value if row.status else "unknown"): row.count for row in by_status
+        },
+    }
 
 
 @router.get("/support/metrics", dependencies=[Depends(Require("analytics:read"))])
 async def get_support_metrics(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get support/ticket metrics."""
     start_date = datetime.utcnow() - timedelta(days=days)
@@ -402,13 +590,36 @@ async def get_support_metrics(
 
 
 @router.get("/invoices/aging", dependencies=[Depends(Require("analytics:read"))])
-async def get_invoice_aging(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """Get invoice aging report."""
-    # Get unpaid invoices
-    unpaid = db.query(Invoice).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
-    ).all()
+async def get_invoice_aging(db: Session = Depends(get_db_with_timeout)) -> Dict[str, Any]:
+    """Get invoice aging report using SQL-based bucket calculation."""
+    today = func.current_date()
+    days_overdue = func.greatest(
+        func.date_part('day', today - func.coalesce(Invoice.due_date, Invoice.invoice_date)),
+        0
+    )
 
+    # SQL CASE for aging buckets
+    aging_bucket = case(
+        (days_overdue <= 0, 'current'),
+        (days_overdue <= 30, '1_30_days'),
+        (days_overdue <= 60, '31_60_days'),
+        (days_overdue <= 90, '61_90_days'),
+        else_='over_90_days'
+    )
+
+    # Single aggregated query
+    aging_data = (
+        db.query(
+            aging_bucket.label("bucket"),
+            func.count(Invoice.id).label("count"),
+            func.sum(func.coalesce(Invoice.balance, Invoice.total_amount, 0)).label("amount"),
+        )
+        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
+        .group_by(aging_bucket)
+        .all()
+    )
+
+    # Initialize all buckets
     aging: Dict[str, Dict[str, float]] = {
         "current": {"count": 0.0, "amount": 0.0},
         "1_30_days": {"count": 0.0, "amount": 0.0},
@@ -417,25 +628,11 @@ async def get_invoice_aging(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "over_90_days": {"count": 0.0, "amount": 0.0},
     }
 
-    for inv in unpaid:
-        balance = float(inv.balance or inv.total_amount or 0)
-        days = inv.days_overdue
-
-        if days == 0:
-            aging["current"]["count"] += 1
-            aging["current"]["amount"] += balance
-        elif days <= 30:
-            aging["1_30_days"]["count"] += 1
-            aging["1_30_days"]["amount"] += balance
-        elif days <= 60:
-            aging["31_60_days"]["count"] += 1
-            aging["31_60_days"]["amount"] += balance
-        elif days <= 90:
-            aging["61_90_days"]["count"] += 1
-            aging["61_90_days"]["amount"] += balance
-        else:
-            aging["over_90_days"]["count"] += 1
-            aging["over_90_days"]["amount"] += balance
+    # Populate from query results
+    for row in aging_data:
+        if row.bucket in aging:
+            aging[row.bucket]["count"] = float(row.count or 0)
+            aging[row.bucket]["amount"] = float(row.amount or 0)
 
     total_outstanding = sum(a["amount"] for a in aging.values())
 
@@ -448,7 +645,7 @@ async def get_invoice_aging(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("/customers/by-plan", dependencies=[Depends(Require("analytics:read"))])
 async def get_customers_by_plan(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get customer distribution by plan."""
     resolved_currency = _resolve_currency(db, [], currency)
@@ -463,7 +660,8 @@ async def get_customers_by_plan(
     query = (
         db.query(
             Subscription.plan_name,
-            func.count(Subscription.id).label("count"),
+            func.count(func.distinct(Subscription.customer_id)).label("customer_count"),
+            func.count(Subscription.id).label("subscription_count"),
             func.sum(mrr_case).label("mrr"),
         )
         .filter(Subscription.status == SubscriptionStatus.ACTIVE)
@@ -475,15 +673,17 @@ async def get_customers_by_plan(
     plans = (
         query
         .group_by(Subscription.plan_name)
-        .order_by(func.count(Subscription.id).desc())
+        .order_by(func.count(func.distinct(Subscription.customer_id)).desc())
         .all()
     )
 
     return [
         {
             "plan_name": p.plan_name,
-            "customer_count": p.count,
+            "customer_count": p.customer_count,
+            "subscription_count": p.subscription_count,
             "mrr": float(p.mrr or 0),
+            "currency": resolved_currency,
         }
         for p in plans
     ]
@@ -494,8 +694,8 @@ async def get_customers_by_plan(
 # ==============================================================================
 
 
-@cached("dso", ttl=CACHE_TTL["long"])
-async def _get_dso_impl(months: int, db: Session) -> Dict[str, Any]:
+@cached("dso", ttl=CACHE_TTL["long"], include_principal=True)
+async def _get_dso_impl(months: int, db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of DSO calculation (cached - expensive monthly iteration)."""
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=months * 30)
@@ -538,10 +738,11 @@ async def _get_dso_impl(months: int, db: Session) -> Dict[str, Any]:
             "outstanding": float(avg_receivables),
         })
 
+    dso_values = [float(cast(Any, r["dso"])) for r in results]
     return {
         "trend": results,
-        "current_dso": results[-1]["dso"] if results else 0,
-        "average_dso": round(sum(r["dso"] for r in results) / len(results), 1) if results else 0,
+        "current_dso": dso_values[-1] if dso_values else 0,
+        "average_dso": round(sum(dso_values) / len(dso_values), 1) if dso_values else 0,
     }
 
 
@@ -550,7 +751,8 @@ async def get_days_sales_outstanding(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Calculate Days Sales Outstanding (DSO) trend - measures collection efficiency."""
     if start_date and end_date:
@@ -593,19 +795,20 @@ async def get_days_sales_outstanding(
 
             current = period_end
 
+        dso_values = [float(cast(Any, r["dso"])) for r in results]
         return {
             "trend": results,
-            "current_dso": results[-1]["dso"] if results else 0,
-            "average_dso": round(sum(r["dso"] for r in results) / len(results), 1) if results else 0,
+            "current_dso": dso_values[-1] if dso_values else 0,
+            "average_dso": round(sum(dso_values) / len(dso_values), 1) if dso_values else 0,
         }
 
-    return await _get_dso_impl(months, db)
+    return cast(Dict[str, Any], await _get_dso_impl(months, db, principal))
 
 
 @router.get("/revenue/by-territory", dependencies=[Depends(Require("analytics:read"))])
 async def get_revenue_by_territory(
     months: int = Query(default=12, le=24),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get MRR and customer distribution by territory/region."""
     mrr_case = case(
@@ -642,7 +845,7 @@ async def get_revenue_by_territory(
 
 @router.get("/revenue/cohort", dependencies=[Depends(Require("analytics:read"))])
 async def get_revenue_cohort(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Analyze revenue by customer signup cohort."""
     from sqlalchemy import literal_column
@@ -655,7 +858,7 @@ async def get_revenue_cohort(
             cohort_expr.label("cohort_month"),
             func.count(Customer.id).label("total_customers"),
             func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active"),
-            func.sum(case((Customer.status == CustomerStatus.CANCELLED, 1), else_=0)).label("churned"),
+            func.sum(case((Customer.status == CustomerStatus.INACTIVE, 1), else_=0)).label("churned"),
         )
         .filter(Customer.signup_date.isnot(None))
         .group_by(literal_column("1"))  # Group by first column (cohort_month)
@@ -690,7 +893,7 @@ async def get_revenue_cohort(
 
 
 @router.get("/collections/aging-by-segment", dependencies=[Depends(Require("analytics:read"))])
-async def get_aging_by_segment(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_aging_by_segment(db: Session = Depends(get_db_with_timeout)) -> Dict[str, Any]:
     """Get invoice aging breakdown by customer segment (type)."""
     segments: Dict[str, Dict[str, Any]] = {}
 
@@ -743,7 +946,7 @@ async def get_aging_by_segment(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("/collections/credit-notes", dependencies=[Depends(Require("analytics:read"))])
 async def get_credit_notes_summary(
     months: int = Query(default=12, le=24),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get credit notes issued trend and summary."""
     start_date = datetime.utcnow() - timedelta(days=months * 30)
@@ -800,8 +1003,8 @@ async def get_credit_notes_summary(
 # ==============================================================================
 
 
-@cached("sales_pipeline", ttl=CACHE_TTL["medium"])
-async def _get_sales_pipeline_impl(db: Session) -> Dict[str, Any]:
+@cached("sales_pipeline", ttl=CACHE_TTL["medium"], include_principal=True)
+async def _get_sales_pipeline_impl(db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of sales pipeline metrics (cached)."""
     # Quotations summary
     quotations = (
@@ -826,9 +1029,9 @@ async def _get_sales_pipeline_impl(db: Session) -> Dict[str, Any]:
     )
 
     # Calculate conversion rates
-    total_quotations = sum(q.count for q in quotations)
-    ordered_quotations = sum(q.count for q in quotations if q.status == QuotationStatus.ORDERED)
-    completed_orders = sum(o.count for o in orders if o.status == SalesOrderStatus.COMPLETED)
+    total_quotations = sum(int(getattr(q, "count", 0) or 0) for q in quotations)
+    ordered_quotations = sum(int(getattr(q, "count", 0) or 0) for q in quotations if q.status == QuotationStatus.ORDERED)
+    completed_orders = sum(int(getattr(o, "count", 0) or 0) for o in orders if o.status == SalesOrderStatus.COMPLETED)
 
     return {
         "quotations": {
@@ -849,9 +1052,12 @@ async def _get_sales_pipeline_impl(db: Session) -> Dict[str, Any]:
 
 
 @router.get("/sales/pipeline", dependencies=[Depends(Require("analytics:read"))])
-async def get_sales_pipeline(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_sales_pipeline(
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
     """Get sales pipeline funnel: Quotations → Orders → Invoices."""
-    return await _get_sales_pipeline_impl(db)
+    return cast(Dict[str, Any], await _get_sales_pipeline_impl(db, principal))
 
 
 @router.get("/sales/quotation-trend", dependencies=[Depends(Require("analytics:read"))])
@@ -859,7 +1065,7 @@ async def get_quotation_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get monthly quotation creation and conversion trend."""
     if start_date and end_date:
@@ -910,34 +1116,40 @@ async def get_quotation_trend(
 # ==============================================================================
 
 
-@cached("sla_attainment", ttl=CACHE_TTL["medium"])
-async def _get_sla_attainment_impl(days: int, db: Session) -> Dict[str, Any]:
-    """Implementation of SLA attainment metrics (cached - fetches all tickets)."""
+@cached("sla_attainment", ttl=CACHE_TTL["medium"], include_principal=True)
+async def _get_sla_attainment_impl(days: int, db: Session, principal: Principal) -> Dict[str, Any]:
+    """Implementation of SLA attainment metrics (cached - SQL aggregation)."""
     start_date = datetime.utcnow() - timedelta(days=days)
 
-    tickets = db.query(Ticket).filter(Ticket.created_at >= start_date).all()
+    # Calculate resolution hours in SQL (time_to_resolution_hours is a Python property)
+    resolution_hours_expr = func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
 
-    total = len(tickets)
-    resolved_in_sla = 0
-    overdue = 0
-    response_times = []
-    resolution_times = []
-
-    for t in tickets:
-        # Check SLA compliance
-        if t.resolution_by and t.resolution_date:
-            if t.resolution_date <= t.resolution_by:
-                resolved_in_sla += 1
-            else:
-                overdue += 1
-
-        # Collect timing metrics
-        if t.time_to_resolution_hours:
-            resolution_times.append(t.time_to_resolution_hours)
-
-        if t.first_responded_on and t.opening_date:
-            response_hours = (t.first_responded_on - t.opening_date).total_seconds() / 3600
-            response_times.append(response_hours)
+    # Single aggregated query for SLA metrics
+    sla_metrics = (
+        db.query(
+            func.count(Ticket.id).label("total"),
+            func.sum(case(
+                (and_(Ticket.resolution_by.isnot(None), Ticket.resolution_date.isnot(None), Ticket.resolution_date <= Ticket.resolution_by), 1),
+                else_=0
+            )).label("met_sla"),
+            func.sum(case(
+                (and_(Ticket.resolution_by.isnot(None), Ticket.resolution_date.isnot(None), Ticket.resolution_date > Ticket.resolution_by), 1),
+                else_=0
+            )).label("breached_sla"),
+            func.avg(resolution_hours_expr).filter(
+                Ticket.resolution_date.isnot(None),
+                Ticket.opening_date.isnot(None)
+            ).label("avg_resolution_hours"),
+            func.avg(
+                func.extract('epoch', Ticket.first_responded_on - Ticket.opening_date) / 3600
+            ).filter(
+                Ticket.first_responded_on.isnot(None),
+                Ticket.opening_date.isnot(None)
+            ).label("avg_response_hours"),
+        )
+        .filter(Ticket.created_at >= start_date)
+        .first()
+    )
 
     # By priority breakdown
     by_priority = (
@@ -950,33 +1162,39 @@ async def _get_sla_attainment_impl(days: int, db: Session) -> Dict[str, Any]:
         .all()
     )
 
+    total = sla_metrics.total or 0
+    met = sla_metrics.met_sla or 0
+    breached = sla_metrics.breached_sla or 0
+    sla_total = met + breached
+
     return {
         "period_days": days,
         "total_tickets": total,
         "sla_attainment": {
-            "met": resolved_in_sla,
-            "breached": overdue,
-            "rate": round(resolved_in_sla / (resolved_in_sla + overdue) * 100, 1) if (resolved_in_sla + overdue) > 0 else 0,
+            "met": met,
+            "breached": breached,
+            "rate": round(met / sla_total * 100, 1) if sla_total > 0 else 0,
         },
-        "avg_response_hours": round(sum(response_times) / len(response_times), 2) if response_times else 0,
-        "avg_resolution_hours": round(sum(resolution_times) / len(resolution_times), 2) if resolution_times else 0,
-        "by_priority": {p.priority.value: p.count for p in by_priority},
+        "avg_response_hours": round(float(sla_metrics.avg_response_hours or 0), 2),
+        "avg_resolution_hours": round(float(sla_metrics.avg_resolution_hours or 0), 2),
+        "by_priority": {p.priority.value: p.count for p in by_priority if p.priority},
     }
 
 
 @router.get("/support/sla-attainment", dependencies=[Depends(Require("analytics:read"))])
 async def get_sla_attainment(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get SLA attainment metrics for tickets."""
-    return await _get_sla_attainment_impl(days, db)
+    return cast(Dict[str, Any], await _get_sla_attainment_impl(days, db, principal))
 
 
 @router.get("/support/agent-productivity", dependencies=[Depends(Require("analytics:read"))])
 async def get_agent_productivity(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get ticket handling metrics by assigned employee/agent."""
     start_date = datetime.utcnow() - timedelta(days=days)
@@ -1018,7 +1236,7 @@ async def get_agent_productivity(
 @router.get("/support/by-type", dependencies=[Depends(Require("analytics:read"))])
 async def get_tickets_by_type(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get ticket distribution by type/category."""
     start_date = datetime.utcnow() - timedelta(days=days)
@@ -1041,7 +1259,7 @@ async def get_tickets_by_type(
                 "type": t.ticket_type or "Unclassified",
                 "count": t.count,
                 "resolved": t.resolved or 0,
-                "resolution_rate": round((t.resolved or 0) / t.count * 100, 1) if t.count > 0 else 0,
+                "resolution_rate": round((int(getattr(t, "resolved", 0) or 0)) / int(getattr(t, "count", 1) or 1) * 100, 1) if getattr(t, "count", 0) else 0,
             }
             for t in by_type
         ],
@@ -1055,14 +1273,24 @@ async def get_tickets_by_type(
 
 
 @router.get("/network/device-status", dependencies=[Depends(Require("analytics:read"))])
-async def get_network_device_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """Get network device status summary."""
-    devices = db.query(NetworkMonitor).filter(NetworkMonitor.active == True).all()
+async def get_network_device_status(db: Session = Depends(get_db_with_timeout)) -> Dict[str, Any]:
+    """Get network device status summary using SQL aggregation."""
+    # Single aggregated query for device status
+    status_summary = (
+        db.query(
+            func.count(NetworkMonitor.id).label("total"),
+            func.sum(case((NetworkMonitor.ping_state == MonitorState.UP, 1), else_=0)).label("up"),
+            func.sum(case((NetworkMonitor.ping_state == MonitorState.DOWN, 1), else_=0)).label("down"),
+            func.sum(case((NetworkMonitor.ping_state == MonitorState.UNKNOWN, 1), else_=0)).label("unknown"),
+        )
+        .filter(NetworkMonitor.active.is_(True))
+        .first()
+    )
 
-    total = len(devices)
-    up = sum(1 for d in devices if d.ping_state == MonitorState.UP)
-    down = sum(1 for d in devices if d.ping_state == MonitorState.DOWN)
-    unknown = sum(1 for d in devices if d.ping_state == MonitorState.UNKNOWN)
+    total = int(status_summary.total) if status_summary and status_summary.total else 0
+    up = int(status_summary.up) if status_summary and status_summary.up else 0
+    down = int(status_summary.down) if status_summary and status_summary.down else 0
+    unknown = int(status_summary.unknown) if status_summary and status_summary.unknown else 0
 
     # By location
     by_location = (
@@ -1072,7 +1300,7 @@ async def get_network_device_status(db: Session = Depends(get_db)) -> Dict[str, 
             func.sum(case((NetworkMonitor.ping_state == MonitorState.UP, 1), else_=0)).label("up"),
             func.sum(case((NetworkMonitor.ping_state == MonitorState.DOWN, 1), else_=0)).label("down"),
         )
-        .filter(NetworkMonitor.active == True)
+        .filter(NetworkMonitor.active.is_(True))
         .group_by(NetworkMonitor.location_id)
         .all()
     )
@@ -1098,7 +1326,7 @@ async def get_network_device_status(db: Session = Depends(get_db)) -> Dict[str, 
 
 
 @router.get("/network/ip-utilization", dependencies=[Depends(Require("analytics:read"))])
-async def get_ip_utilization(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_ip_utilization(db: Session = Depends(get_db_with_timeout)) -> Dict[str, Any]:
     """Get IP address pool utilization."""
     networks = db.query(IPv4Network).all()
 
@@ -1149,7 +1377,7 @@ async def get_expenses_by_category(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get expense breakdown by category."""
     if start_date and end_date:
@@ -1193,7 +1421,7 @@ async def get_expenses_by_cost_center(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get expense breakdown by cost center (department)."""
     if start_date and end_date:
@@ -1237,7 +1465,7 @@ async def get_expense_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get monthly expense trend."""
     if start_date and end_date:
@@ -1288,7 +1516,7 @@ async def get_vendor_spend(
     limit: int = Query(default=20, le=50),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get top vendors by purchase invoice spend."""
     if start_date and end_date:
@@ -1340,7 +1568,7 @@ async def get_vendor_spend(
 @router.get("/people/tickets-per-employee", dependencies=[Depends(Require("analytics:read"))])
 async def get_tickets_per_employee(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get ticket handling distribution per employee."""
     start_date = datetime.utcnow() - timedelta(days=days)
@@ -1391,7 +1619,7 @@ async def get_tickets_per_employee(
 @router.get("/people/by-department", dependencies=[Depends(Require("analytics:read"))])
 async def get_metrics_by_department(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get ticket and expense metrics aggregated by department."""
     start_date = datetime.utcnow() - timedelta(days=days)

@@ -25,11 +25,11 @@ COPY pyproject.toml poetry.lock* ./
 # Install dependencies (without dev dependencies)
 RUN poetry install --no-root --only main
 
-# Copy application code
-COPY . .
-
 # Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
+RUN useradd -m appuser
+
+# Copy application code
+COPY --chown=appuser:appuser . .
 USER appuser
 
 # Expose port
