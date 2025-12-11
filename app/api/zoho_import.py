@@ -4,11 +4,13 @@ Zoho Books Import API Endpoints
 Provides endpoints to import accounting data from Zoho Books CSV exports.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 import os
+import io
+import csv
 import structlog
 
 from app.database import get_db
@@ -211,3 +213,178 @@ def preview_directory(
             status_code=500,
             detail=f"Error scanning directory: {str(e)}"
         )
+
+
+@router.post("/upload-csv", response_model=ImportResponse)
+async def upload_csv_file(
+    file: UploadFile = File(...),
+    import_type: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload and import a single CSV file.
+
+    Supported import_type values:
+    - "bank_transactions": Import bank transaction records
+    - "gl_entries": Import general ledger entries
+    - "suppliers": Import suppliers from AP data
+
+    The file should be a CSV file exported from Zoho Books with columns:
+    date, account_name, transaction_details, transaction_id, debit, credit, etc.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="File must be a CSV file"
+        )
+
+    logger.info("Processing uploaded CSV file", filename=file.filename, type=import_type)
+
+    try:
+        # Read the file content
+        content = await file.read()
+        content_str = content.decode('utf-8-sig')
+
+        # Parse the CSV
+        csv_reader = csv.DictReader(io.StringIO(content_str))
+        rows = list(csv_reader)
+
+        if not rows:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV file is empty or has no data rows"
+            )
+
+        import_service = ZohoImportService(db)
+
+        if import_type == "bank_transactions":
+            stats = _process_bank_transactions_from_rows(import_service, rows)
+            category = "bank_transactions"
+        elif import_type == "gl_entries":
+            stats = _process_gl_entries_from_rows(import_service, rows)
+            category = "gl_entries"
+        elif import_type == "suppliers":
+            stats = _process_suppliers_from_rows(import_service, rows)
+            category = "suppliers"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid import_type: {import_type}. "
+                       f"Must be one of: bank_transactions, gl_entries, suppliers"
+            )
+
+        return ImportResponse(
+            success=True,
+            message=f"Import completed: {stats.get('created', 0)} created, "
+                   f"{stats.get('updated', 0)} updated, {stats.get('errors', 0)} errors",
+            stats={category: stats},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("CSV upload import failed", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Import failed: {str(e)}"
+        )
+
+
+@router.post("/upload-multiple-csv", response_model=ImportResponse)
+async def upload_multiple_csv_files(
+    files: List[UploadFile] = File(...),
+    import_type: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload and import multiple CSV files at once.
+    All files will be processed with the same import_type.
+    """
+    logger.info("Processing multiple CSV files", count=len(files), type=import_type)
+
+    total_stats = {"created": 0, "updated": 0, "errors": 0}
+
+    for file in files:
+        if not file.filename.endswith('.csv'):
+            logger.warning("Skipping non-CSV file", filename=file.filename)
+            continue
+
+        try:
+            content = await file.read()
+            content_str = content.decode('utf-8-sig')
+            csv_reader = csv.DictReader(io.StringIO(content_str))
+            rows = list(csv_reader)
+
+            if not rows:
+                continue
+
+            import_service = ZohoImportService(db)
+
+            if import_type == "bank_transactions":
+                stats = _process_bank_transactions_from_rows(import_service, rows)
+            elif import_type == "gl_entries":
+                stats = _process_gl_entries_from_rows(import_service, rows)
+            elif import_type == "suppliers":
+                stats = _process_suppliers_from_rows(import_service, rows)
+            else:
+                continue
+
+            total_stats["created"] += stats.get("created", 0)
+            total_stats["updated"] += stats.get("updated", 0)
+            total_stats["errors"] += stats.get("errors", 0)
+
+            logger.info("File processed", filename=file.filename, stats=stats)
+
+        except Exception as e:
+            logger.error("Error processing file", filename=file.filename, error=str(e))
+            total_stats["errors"] += 1
+
+    return ImportResponse(
+        success=True,
+        message=f"Batch import completed: {total_stats['created']} created, "
+               f"{total_stats['updated']} updated, {total_stats['errors']} errors",
+        stats={import_type: total_stats},
+    )
+
+
+def _process_bank_transactions_from_rows(service: ZohoImportService, rows: List[Dict]) -> Dict[str, int]:
+    """Process bank transaction rows from parsed CSV."""
+    for row in rows:
+        try:
+            service._process_bank_transaction_row(row)
+        except Exception as e:
+            logger.error("Error processing bank transaction row", error=str(e))
+            service.stats["bank_transactions"]["errors"] += 1
+
+    service.db.commit()
+    return service.stats["bank_transactions"]
+
+
+def _process_gl_entries_from_rows(service: ZohoImportService, rows: List[Dict]) -> Dict[str, int]:
+    """Process GL entry rows from parsed CSV."""
+    for row in rows:
+        try:
+            service._process_gl_entry_row(row)
+        except Exception as e:
+            logger.error("Error processing GL entry row", error=str(e))
+            service.stats["gl_entries"]["errors"] += 1
+
+    service.db.commit()
+    return service.stats["gl_entries"]
+
+
+def _process_suppliers_from_rows(service: ZohoImportService, rows: List[Dict]) -> Dict[str, int]:
+    """Process supplier rows from parsed CSV."""
+    suppliers_seen = {}
+    for row in rows:
+        try:
+            supplier_name = row.get("transaction_details", "").strip()
+            if not supplier_name or supplier_name in suppliers_seen:
+                continue
+            suppliers_seen[supplier_name] = True
+            service._process_supplier(supplier_name, row)
+        except Exception as e:
+            logger.error("Error processing supplier row", error=str(e))
+            service.stats["suppliers"]["errors"] += 1
+
+    service.db.commit()
+    return service.stats["suppliers"]
