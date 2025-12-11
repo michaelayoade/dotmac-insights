@@ -225,6 +225,73 @@ export default function CustomersPage() {
     setLimit(20);
   };
 
+  const recentInvoices = useMemo(() => {
+    if (customer360?.finance?.recent_invoices?.length) {
+      return customer360.finance.recent_invoices;
+    }
+    return selectedCustomer?.recent_invoices || [];
+  }, [customer360?.finance?.recent_invoices, selectedCustomer?.recent_invoices]);
+
+  const derivedOverdue = useMemo(() => {
+    if (!recentInvoices || recentInvoices.length === 0) {
+      return { count: 0, amount: 0 };
+    }
+
+    const overdueInvoices = recentInvoices.filter((inv) => {
+      const status = String((inv as any).status || '').toLowerCase();
+      const overdueDays = (inv as any).days_overdue;
+      return status === 'overdue' || status === 'unpaid' || status === 'pending' || status === 'partially_paid' || (typeof overdueDays === 'number' && overdueDays > 0);
+    });
+
+    const amount = overdueInvoices.reduce((sum, inv) => {
+      const total = Number((inv as any).total_amount ?? (inv as any).total ?? 0);
+      const paid = Number((inv as any).amount_paid ?? 0);
+      return sum + Math.max(total - paid, 0);
+    }, 0);
+
+    return { count: overdueInvoices.length, amount };
+  }, [recentInvoices]);
+
+  const mrrFromSubscriptions = useMemo(() => {
+    if (!selectedCustomer?.subscriptions) return 0;
+    return selectedCustomer.subscriptions
+      .filter((sub) => (sub.status || '').toLowerCase() === 'active')
+      .reduce((sum, sub) => sum + Number(sub.price || 0), 0);
+  }, [selectedCustomer?.subscriptions]);
+
+  const financeSummary = useMemo(() => {
+    const summary = customer360?.finance?.summary;
+    const metrics = selectedCustomer?.metrics;
+
+    const totalInvoiced = summary?.total_invoiced
+      ?? selectedCustomer?.invoiced_total
+      ?? metrics?.total_invoiced
+      ?? 0;
+
+    const totalPaid = summary?.total_paid
+      ?? selectedCustomer?.paid_total
+      ?? metrics?.total_paid
+      ?? 0;
+
+    const outstanding = summary?.outstanding_balance
+      ?? selectedCustomer?.outstanding_balance
+      ?? metrics?.outstanding
+      ?? Math.max(totalInvoiced - totalPaid, 0);
+
+    return {
+      mrr: summary?.mrr ?? selectedCustomer?.mrr ?? mrrFromSubscriptions,
+      totalInvoiced,
+      totalPaid,
+      outstanding,
+      overdueInvoices: summary?.overdue_invoices ?? derivedOverdue.count,
+      overdueAmount: summary?.overdue_amount ?? derivedOverdue.amount,
+      creditNotes: summary?.credit_notes ?? 0,
+      creditNoteTotal: summary?.credit_note_total ?? 0,
+    };
+  }, [customer360?.finance?.summary, selectedCustomer, mrrFromSubscriptions, derivedOverdue]);
+
+  const outstandingDisplay = Math.max(financeSummary.outstanding || 0, 0);
+
   if (authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -760,25 +827,19 @@ export default function CustomersPage() {
                 {/* Finance */}
                 {detailTab === 'finance' && (
                   <div className="space-y-3">
-                    {(() => {
-                      const outstandingRaw = customer360?.finance?.summary?.outstanding_balance ?? selectedCustomer.outstanding_balance ?? 0;
-                      const outstandingDisplay = outstandingRaw > 0 ? outstandingRaw : 0;
-                      return (
-                        <div className="grid grid-cols-2 gap-3">
-                          <MetricCard label="MRR" value={formatCurrency(customer360?.finance?.summary?.mrr ?? selectedCustomer.mrr)} icon={TrendingUp} />
-                          <MetricCard
-                            label="Outstanding"
-                            value={formatCurrency(outstandingDisplay)}
-                            icon={AlertTriangle}
-                            variant={outstandingDisplay > 0 ? 'warning' : 'success'}
-                          />
-                          <MetricCard label="Total Invoiced" value={formatCurrency(customer360?.finance?.summary?.total_invoiced ?? selectedCustomer.invoiced_total)} icon={TrendingUp} />
-                          <MetricCard label="Total Paid" value={formatCurrency(customer360?.finance?.summary?.total_paid ?? selectedCustomer.paid_total)} icon={TrendingUp} variant="success" />
-                          <MetricCard label="Overdue Invoices" value={(customer360?.finance?.summary?.overdue_invoices ?? 0).toString()} subValue={formatCurrency(customer360?.finance?.summary?.overdue_amount ?? 0)} icon={AlertTriangle} variant={(customer360?.finance?.summary?.overdue_invoices ?? 0) > 0 ? 'warning' : 'default'} />
-                          <MetricCard label="Credit Notes" value={(customer360?.finance?.summary?.credit_notes ?? 0).toString()} subValue={formatCurrency(customer360?.finance?.summary?.credit_note_total ?? 0)} icon={Activity} />
-                        </div>
-                      );
-                    })()}
+                    <div className="grid grid-cols-2 gap-3">
+                      <MetricCard label="MRR" value={formatCurrency(financeSummary.mrr || 0)} icon={TrendingUp} />
+                      <MetricCard
+                        label="Outstanding"
+                        value={formatCurrency(outstandingDisplay)}
+                        icon={AlertTriangle}
+                        variant={outstandingDisplay > 0 ? 'warning' : 'success'}
+                      />
+                      <MetricCard label="Total Invoiced" value={formatCurrency(financeSummary.totalInvoiced)} icon={TrendingUp} />
+                      <MetricCard label="Total Paid" value={formatCurrency(financeSummary.totalPaid)} icon={TrendingUp} variant="success" />
+                      <MetricCard label="Overdue Invoices" value={(financeSummary.overdueInvoices || 0).toString()} subValue={formatCurrency(financeSummary.overdueAmount || 0)} icon={AlertTriangle} variant={(financeSummary.overdueInvoices || 0) > 0 ? 'warning' : 'default'} />
+                      <MetricCard label="Credit Notes" value={(financeSummary.creditNotes || 0).toString()} subValue={formatCurrency(financeSummary.creditNoteTotal || 0)} icon={Activity} />
+                    </div>
 
                     {customer360?.finance?.billing_health && (
                       <div className="bg-slate-elevated/70 rounded-lg p-3 border border-slate-border/60 text-sm text-slate-muted">
@@ -792,11 +853,11 @@ export default function CustomersPage() {
                       </div>
                     )}
 
-                    {customer360?.finance?.recent_invoices && customer360.finance.recent_invoices.length > 0 && (
+                    {recentInvoices.length > 0 && (
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Recent Invoices</p>
                         <div className="space-y-2">
-                          {customer360.finance.recent_invoices.slice(0, 4).map((inv) => (
+                          {recentInvoices.slice(0, 4).map((inv) => (
                             <div key={inv.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
                                 <p className="text-white font-mono">{inv.invoice_number || `#${inv.id}`}</p>
@@ -837,7 +898,7 @@ export default function CustomersPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <MetricCard label="Total Subs" value={(customer360?.services?.summary?.total_subscriptions ?? selectedCustomer.subscriptions?.length ?? 0).toString()} icon={Activity} />
                       <MetricCard label="Active Subs" value={(customer360?.services?.summary?.active_subscriptions ?? selectedCustomer.subscriptions?.filter((s) => s.status === 'active').length ?? 0).toString()} icon={TrendingUp} variant="success" />
-                      <MetricCard label="Services MRR" value={formatCurrency(customer360?.services?.summary?.total_mrr ?? selectedCustomer.mrr)} icon={TrendingUp} />
+                      <MetricCard label="Services MRR" value={formatCurrency(customer360?.services?.summary?.total_mrr ?? selectedCustomer.mrr ?? mrrFromSubscriptions)} icon={TrendingUp} />
                       <MetricCard label="Usage 30d" value={`${customer360?.services?.usage_30d?.total_gb ?? usageData?.totals?.total_gb ?? 0} GB`} icon={Activity} />
                     </div>
 

@@ -250,7 +250,7 @@ export interface Customer {
   activation_date?: string | null;
   status: string;
   customer_type: string;
-  mrr: number;
+  mrr?: number;
   signup_date: string | null;
   city: string | null;
   state: string | null;
@@ -286,11 +286,11 @@ export interface CustomerDetail {
   signup_date: string | null;
   activation_date?: string | null;
   cancellation_date?: string | null;
-  mrr: number;
-  invoiced_total: number;
-  paid_total: number;
-  outstanding_balance: number;
-  subscriptions: Array<{
+  mrr?: number;
+  invoiced_total?: number;
+  paid_total?: number;
+  outstanding_balance?: number;
+  subscriptions?: Array<{
     id: number;
     plan_name: string;
     price: number;
@@ -298,12 +298,16 @@ export interface CustomerDetail {
     start_date: string | null;
     end_date: string | null;
   }>;
-  recent_invoices: Array<{
+  recent_invoices?: Array<{
     id: number;
     invoice_number: string | null;
-    total: number;
+    total?: number;
+    total_amount?: number;
+    amount_paid?: number;
     status: string;
     due_date: string | null;
+    invoice_date?: string | null;
+    days_overdue?: number;
   }>;
   recent_tickets: Array<{
     id: number;
@@ -1235,6 +1239,176 @@ export const api = {
   getDataAvailability: () =>
     fetchApi<DataAvailabilityResponse>('/insights/data-availability'),
 
+// Finance Domain
+  getFinanceDashboard: (currency?: string) =>
+    fetchApi<FinanceDashboard>('/finance/dashboard', {
+      params: { currency }
+    }),
+
+  getFinanceInvoices: (params?: {
+    status?: string;
+    customer_id?: number;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    overdue_only?: boolean;
+    search?: string;
+    sort_by?: 'invoice_date' | 'due_date' | 'total_amount' | 'amount_paid' | 'customer_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<FinanceInvoiceListResponse>('/finance/invoices', { params }),
+
+  getFinancePayments: (params?: {
+    status?: string;
+    payment_method?: string;
+    customer_id?: number;
+    invoice_id?: number;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'payment_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<FinancePaymentListResponse>('/finance/payments', { params }),
+
+  getFinanceCreditNotes: (params?: {
+    customer_id?: number;
+    invoice_id?: number;
+    start_date?: string;
+    end_date?: string;
+    currency?: string;
+    search?: string;
+    sort_by?: 'issue_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<FinanceCreditNoteListResponse>('/finance/credit-notes', { params }),
+
+  getFinanceRevenueTrend: (params?: { start_date?: string; end_date?: string; interval?: 'month' | 'week'; currency?: string }) =>
+    fetchApi<FinanceRevenueTrend[]>('/finance/analytics/revenue-trend', {
+      params
+    }),
+
+  getFinanceCollections: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<FinanceCollectionsAnalytics>('/finance/analytics/collections', {
+      params
+    }),
+
+  getFinanceAging: (params?: { as_of_date?: string; currency?: string }) =>
+    fetchApi<FinanceAgingAnalytics>('/finance/analytics/aging', { params }),
+
+  getFinanceRevenueBySegment: () =>
+    fetchApi<FinanceByCurrencyAnalytics>('/finance/analytics/by-currency'),
+
+  getFinancePaymentBehavior: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<FinancePaymentBehavior>('/finance/insights/payment-behavior', { params }),
+
+  getFinanceForecasts: (currency?: string) =>
+    fetchApi<FinanceForecast>('/finance/insights/forecasts', { params: { currency } }),
+
+  getFinanceInvoiceDetail: (id: number, currency?: string) =>
+    fetchApi<FinanceInvoiceDetail>(`/finance/invoices/${id}`, { params: { currency } }),
+
+  getFinancePaymentDetail: (id: number, currency?: string) =>
+    fetchApi<FinancePaymentDetail>(`/finance/payments/${id}`, { params: { currency } }),
+
+  getFinanceCreditNoteDetail: (id: number, currency?: string) =>
+    fetchApi<FinanceCreditNoteDetail>(`/finance/credit-notes/${id}`, { params: { currency } }),
+
+  // Accounting Domain
+  getAccountingDashboard: () =>
+    fetchApi<AccountingDashboard>('/accounting/dashboard'),
+
+  getAccountingChartOfAccounts: (accountType?: string) =>
+    fetchApi<AccountingChartOfAccounts>('/accounting/chart-of-accounts', {
+      params: { account_type: accountType }
+    }),
+
+  getAccountingTrialBalance: (asOfDate?: string) =>
+    fetchApi<AccountingTrialBalance>('/accounting/trial-balance', {
+      params: { as_of_date: asOfDate }
+    }),
+
+  getAccountingBalanceSheet: (asOfDate?: string) =>
+    fetchApi<AccountingBalanceSheet>('/accounting/balance-sheet', {
+      params: { as_of_date: asOfDate }
+    }),
+
+  getAccountingIncomeStatement: (startDate?: string, endDate?: string) =>
+    fetchApi<AccountingIncomeStatement>('/accounting/income-statement', {
+      params: { start_date: startDate, end_date: endDate }
+    }),
+
+  getAccountingGeneralLedger: (params?: {
+    account?: string;
+    start_date?: string;
+    end_date?: string;
+    voucher_type?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<AccountingGeneralLedgerResponse>('/accounting/general-ledger', { params }),
+
+  getAccountingCashFlow: (startDate?: string, endDate?: string) =>
+    fetchApi<AccountingCashFlow>('/accounting/cash-flow', {
+      params: { start_date: startDate, end_date: endDate }
+    }),
+
+  getAccountingPayables: (params?: {
+    supplier_id?: number;
+    min_amount?: number;
+    limit?: number;
+    offset?: number;
+    currency?: string;
+    aging_bucket?: string;
+    search?: string;
+  }) =>
+    fetchApi<AccountingPayableResponse>('/accounting/accounts-payable', { params }),
+
+  getAccountingReceivables: (params?: {
+    customer_id?: number;
+    min_amount?: number;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<AccountingReceivableResponse>('/accounting/accounts-receivable', { params }),
+
+  getAccountingJournalEntries: (params?: {
+    voucher_type?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<AccountingJournalEntryListResponse>('/accounting/journal-entries', { params }),
+
+  getAccountingSuppliers: (params?: {
+    search?: string;
+    supplier_group?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<AccountingSupplierListResponse>('/accounting/suppliers', { params }),
+
+  getAccountingBankAccounts: () =>
+    fetchApi<AccountingBankAccountListResponse>('/accounting/bank-accounts'),
+
+  getAccountingFiscalYears: () =>
+    fetchApi<AccountingFiscalYearListResponse>('/accounting/fiscal-years'),
+
+  getAccountingCostCenters: () =>
+    fetchApi<AccountingCostCenterListResponse>('/accounting/cost-centers'),
+
   // Data Explorer - Query specific entity
   // Uses /explore/tables/{table} for simple queries or /explore/query for filtered queries
   exploreEntity: async (entity: string, params: Record<string, unknown>) => {
@@ -1741,6 +1915,555 @@ export interface DataAvailabilityResponse {
     well_populated: number;
     needs_attention: number;
   };
+}
+
+// Finance Domain Types
+export interface FinanceDashboard {
+  currency: string;
+  revenue: {
+    mrr: number;
+    arr: number;
+    active_subscriptions?: number;
+  };
+  collections: {
+    last_30_days: number;
+    invoiced_30_days: number;
+    collection_rate: number;
+  };
+  outstanding: {
+    total: number;
+    overdue: number;
+  };
+  metrics: {
+    dso: number;
+  };
+  invoices_by_status?: Record<string, { count: number; total: number }>;
+  period?: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface FinanceInvoice {
+  id: number;
+  invoice_number: string | null;
+  customer_id: number | null;
+  customer_name?: string | null;
+  total_amount: number;
+  amount_paid: number;
+  balance: number;
+  status: string;
+  invoice_date: string | null;
+  due_date: string | null;
+  days_overdue: number;
+  currency: string | null;
+  source?: string | null;
+  credit_note_id?: number | null;
+  credit_note_number?: string | null;
+}
+
+export interface FinanceInvoiceDetail extends FinanceInvoice {
+  description?: string | null;
+  tax_amount?: number;
+  paid_date?: string | null;
+  category?: string | null;
+  credit_note_id?: number | null;
+  credit_note_number?: string | null;
+  external_ids?: {
+    splynx_id?: number | null;
+    erpnext_id?: number | null;
+  };
+  customer?: {
+    id: number | null;
+    name: string | null;
+    email: string | null;
+  };
+  payments?: Array<{
+    id: number;
+    amount: number;
+    payment_date: string | null;
+    payment_method: string | null;
+    status: string;
+  }>;
+}
+
+export interface FinanceInvoiceListResponse {
+  data: FinanceInvoice[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface FinancePayment {
+  id: number;
+  receipt_number: string | null;
+  customer_id: number | null;
+  customer_name?: string | null;
+  amount: number;
+  currency: string | null;
+  payment_method: string | null;
+  status: string;
+  payment_date: string | null;
+  transaction_reference: string | null;
+  gateway_reference?: string | null;
+  notes?: string | null;
+  invoice_id?: number | null;
+  source?: string | null;
+}
+
+export interface FinancePaymentDetail extends FinancePayment {
+  external_ids?: {
+    splynx_id?: number | null;
+    erpnext_id?: number | null;
+  };
+  customer?: {
+    id: number | null;
+    name: string | null;
+    email: string | null;
+  };
+  invoice?: {
+    id: number | null;
+    invoice_number: string | null;
+    total_amount: number | null;
+  };
+}
+
+export interface FinancePaymentListResponse {
+  data: FinancePayment[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface FinanceCreditNote {
+  id: number;
+  credit_note_number: string | null;
+  customer_id: number | null;
+  customer_name?: string | null;
+  amount: number;
+  currency: string | null;
+  status: string;
+  date: string | null;
+  reason: string | null;
+  invoice_id?: number | null;
+  source?: string | null;
+}
+
+export interface FinanceCreditNoteDetail extends FinanceCreditNote {
+  external_ids?: { splynx_id?: number | null };
+  customer?: { id: number | null; name: string | null; email: string | null };
+  invoice?: { id: number | null; invoice_number: string | null; total_amount?: number | null };
+  description?: string | null;
+}
+
+export interface FinanceCreditNoteListResponse {
+  data: FinanceCreditNote[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface FinanceRevenueTrend {
+  period: string;
+  year: number;
+  month: number;
+  revenue: number;
+  payment_count: number;
+}
+
+export interface FinanceCollectionsAnalytics {
+  by_method: Array<{
+    method: string;
+    count: number;
+    total: number;
+  }>;
+  payment_timing: {
+    early: number;
+    on_time: number;
+    late: number;
+    total: number;
+  };
+  daily_totals?: Array<{
+    date: string;
+    total: number;
+    paid?: number;
+  }>;
+}
+
+export interface FinanceAgingAnalytics {
+  currency?: string;
+  buckets: Array<{
+    bucket: string;
+    count: number;
+    outstanding: number;
+  }>;
+  summary: {
+    total_outstanding: number;
+    at_risk: number;
+    at_risk_percent: number;
+  };
+}
+
+export interface FinanceByCurrencyAnalytics {
+  by_currency: Array<{
+    currency: string;
+    mrr: number;
+    arr: number;
+    subscription_count: number;
+    outstanding: number;
+  }>;
+}
+
+export interface FinancePaymentBehavior {
+  summary: {
+    customers_with_payments: number;
+    customers_with_overdue: number;
+    avg_late_payment_delay_days: number;
+  };
+  recommendations: Array<{
+    priority: string;
+    issue: string;
+    action: string;
+  }>;
+}
+
+export interface FinanceForecast {
+  currency: string;
+  current: {
+    mrr: number;
+    arr: number;
+  };
+  activity_30d: {
+    new_subscriptions: number;
+  };
+  projections: {
+    month_1: number;
+    month_2: number;
+    month_3: number;
+    quarter_total: number;
+  };
+  notes?: string | null;
+}
+
+// Accounting Domain Types
+export interface AccountingAccount {
+  id: number;
+  account_number: string;
+  account_name: string;
+  account_type: string;
+  parent_account?: string | null;
+  balance: number;
+  is_group: boolean;
+  root_type?: string | null;
+  report_type?: string | null;
+  currency?: string | null;
+}
+
+export interface AccountingChartOfAccounts {
+  accounts: AccountingAccount[];
+  tree: AccountingAccountTreeNode[];
+  total_accounts: number;
+}
+
+export interface AccountingAccountTreeNode {
+  account_number: string;
+  account_name: string;
+  account_type: string;
+  balance: number;
+  is_group: boolean;
+  children: AccountingAccountTreeNode[];
+}
+
+export interface AccountingTrialBalance {
+  total_debit: number;
+  total_credit: number;
+  is_balanced: boolean;
+  difference: number;
+  accounts: Array<{
+    account_number: string;
+    account_name: string;
+    account_type: string;
+    debit: number;
+    credit: number;
+    balance: number;
+  }>;
+  as_of_date?: string;
+}
+
+export interface AccountingBalanceSheet {
+  assets: {
+    current_assets: Array<{ account: string; balance: number }>;
+    fixed_assets: Array<{ account: string; balance: number }>;
+    other_assets: Array<{ account: string; balance: number }>;
+    total: number;
+  };
+  liabilities: {
+    current_liabilities: Array<{ account: string; balance: number }>;
+    long_term_liabilities: Array<{ account: string; balance: number }>;
+    total: number;
+  };
+  equity: {
+    items: Array<{ account: string; balance: number }>;
+    retained_earnings: number;
+    total: number;
+  };
+  total_liabilities_equity: number;
+  is_balanced: boolean;
+  as_of_date?: string;
+}
+
+export interface AccountingIncomeStatement {
+  revenue: {
+    items: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  cost_of_goods_sold: {
+    items: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  gross_profit: number;
+  operating_expenses: {
+    items: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  operating_income: number;
+  other_income: {
+    items: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  other_expenses: {
+    items: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  net_income: number;
+  period?: { start: string; end: string };
+}
+
+export interface AccountingGeneralLedgerEntry {
+  id: number;
+  posting_date: string;
+  account: string;
+  account_name?: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  voucher_type?: string | null;
+  voucher_no?: string | null;
+  party_type?: string | null;
+  party?: string | null;
+  remarks?: string | null;
+  cost_center?: string | null;
+}
+
+export interface AccountingGeneralLedgerResponse {
+  entries: AccountingGeneralLedgerEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary?: {
+    total_debit: number;
+    total_credit: number;
+    opening_balance?: number;
+    closing_balance?: number;
+  };
+}
+
+export interface AccountingCashFlow {
+  operating_activities: {
+    items: Array<{ description: string; amount: number }>;
+    net: number;
+  };
+  investing_activities: {
+    items: Array<{ description: string; amount: number }>;
+    net: number;
+  };
+  financing_activities: {
+    items: Array<{ description: string; amount: number }>;
+    net: number;
+  };
+  net_change_in_cash: number;
+  opening_cash: number;
+  closing_cash: number;
+  period?: { start: string; end: string };
+}
+
+export interface AccountingPayable {
+  supplier_id: number;
+  supplier_name: string;
+  total_payable: number;
+  current: number;
+  overdue_1_30: number;
+  overdue_31_60: number;
+  overdue_61_90: number;
+  overdue_over_90: number;
+  invoice_count: number;
+  oldest_invoice_date?: string | null;
+  currency?: string | null;
+}
+
+export interface AccountingPayableResponse {
+  total_payable: number;
+  total_invoices: number;
+  aging: {
+    current: number;
+    '1_30': number;
+    '31_60': number;
+    '61_90': number;
+    over_90: number;
+  };
+  suppliers: AccountingPayable[];
+  currency?: string;
+}
+
+export interface AccountingReceivable {
+  customer_id: number;
+  customer_name: string;
+  total_receivable: number;
+  current: number;
+  overdue_1_30: number;
+  overdue_31_60: number;
+  overdue_61_90: number;
+  overdue_over_90: number;
+  invoice_count: number;
+  oldest_invoice_date?: string | null;
+  currency?: string | null;
+}
+
+export interface AccountingReceivableResponse {
+  total_receivable: number;
+  total_invoices: number;
+  aging: {
+    current: number;
+    '1_30': number;
+    '31_60': number;
+    '61_90': number;
+    over_90: number;
+  };
+  customers: AccountingReceivable[];
+  currency?: string;
+}
+
+export interface AccountingJournalEntry {
+  id: number;
+  voucher_type: string;
+  voucher_no: string;
+  posting_date: string;
+  total_debit: number;
+  total_credit: number;
+  user_remark?: string | null;
+  is_opening?: boolean;
+  docstatus?: number;
+  entries?: Array<{
+    account: string;
+    debit: number;
+    credit: number;
+    party_type?: string | null;
+    party?: string | null;
+    cost_center?: string | null;
+  }>;
+}
+
+export interface AccountingJournalEntryListResponse {
+  entries: AccountingJournalEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AccountingSupplier {
+  id: number;
+  name: string;
+  supplier_name?: string;
+  supplier_type?: string | null;
+  supplier_group?: string | null;
+  country?: string | null;
+  default_currency?: string | null;
+  payment_terms?: string | null;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  is_internal?: boolean;
+  disabled?: boolean;
+  total_outstanding?: number;
+  total_invoices?: number;
+}
+
+export interface AccountingSupplierListResponse {
+  suppliers: AccountingSupplier[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AccountingBankAccount {
+  id: number;
+  name: string;
+  account_name: string;
+  bank?: string | null;
+  account_number?: string | null;
+  account_type?: string | null;
+  currency?: string | null;
+  balance?: number;
+  is_default?: boolean;
+  is_company_account?: boolean;
+  last_integration_date?: string | null;
+}
+
+export interface AccountingBankAccountListResponse {
+  accounts: AccountingBankAccount[];
+  total: number;
+}
+
+export interface AccountingFiscalYear {
+  id: number;
+  name: string;
+  year_start_date: string;
+  year_end_date: string;
+  is_closed: boolean;
+  disabled: boolean;
+}
+
+export interface AccountingFiscalYearListResponse {
+  fiscal_years: AccountingFiscalYear[];
+  current_fiscal_year?: AccountingFiscalYear;
+  total: number;
+}
+
+export interface AccountingCostCenter {
+  id: number;
+  name: string;
+  cost_center_name: string;
+  parent_cost_center?: string | null;
+  is_group: boolean;
+  disabled: boolean;
+  company?: string | null;
+}
+
+export interface AccountingCostCenterListResponse {
+  cost_centers: AccountingCostCenter[];
+  total: number;
+}
+
+export interface AccountingDashboard {
+  summary: {
+    total_assets: number;
+    total_liabilities: number;
+    total_equity: number;
+    net_income_ytd: number;
+    cash_balance: number;
+    accounts_receivable: number;
+    accounts_payable: number;
+  };
+  kpis: {
+    current_ratio?: number;
+    quick_ratio?: number;
+    debt_to_equity?: number;
+    gross_margin?: number;
+    net_margin?: number;
+  };
+  recent_transactions?: AccountingGeneralLedgerEntry[];
+  period?: { start: string; end: string };
+  currency?: string;
 }
 
 export { ApiError };

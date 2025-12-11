@@ -481,6 +481,153 @@ export function useDataExplorer(
   );
 }
 
+// Finance Domain Hooks
+export function useFinanceDashboard(currency = 'NGN', config?: SWRConfiguration) {
+  return useSWR(
+    ['finance-dashboard', currency],
+    () => api.getFinanceDashboard(currency),
+    {
+      refreshInterval: 60000, // Refresh every minute
+      ...config,
+    }
+  );
+}
+
+export function useFinanceInvoices(
+  params?: {
+    status?: string;
+    customer_id?: number;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    overdue_only?: boolean;
+    search?: string;
+    sort_by?: 'invoice_date' | 'due_date' | 'total_amount' | 'amount_paid' | 'customer_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['finance-invoices', params],
+    () => api.getFinanceInvoices(params),
+    config
+  );
+}
+
+export function useFinancePayments(
+  params?: {
+    status?: string;
+    payment_method?: string;
+    customer_id?: number;
+    invoice_id?: number;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'payment_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['finance-payments', params],
+    () => api.getFinancePayments(params),
+    config
+  );
+}
+
+export function useFinanceCreditNotes(
+  params?: {
+    customer_id?: number;
+    invoice_id?: number;
+    start_date?: string;
+    end_date?: string;
+    currency?: string;
+    search?: string;
+    sort_by?: 'issue_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['finance-credit-notes', params],
+    () => api.getFinanceCreditNotes(params),
+    config
+  );
+}
+
+export function useFinanceRevenueTrend(
+  params?: { start_date?: string; end_date?: string; interval?: 'month' | 'week'; currency?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['finance-revenue-trend', params],
+    () => api.getFinanceRevenueTrend({ interval: 'month', ...params }),
+    config
+  );
+}
+
+export function useFinanceCollections(
+  params?: { start_date?: string; end_date?: string; currency?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['finance-collections', params],
+    () => api.getFinanceCollections(params),
+    config
+  );
+}
+
+export function useFinanceAging(params?: { as_of_date?: string; currency?: string }, config?: SWRConfiguration) {
+  return useSWR(['finance-aging', params], () => api.getFinanceAging(params), config);
+}
+
+export function useFinanceRevenueBySegment(config?: SWRConfiguration) {
+  return useSWR('finance-revenue-by-segment', () => api.getFinanceRevenueBySegment(), config);
+}
+
+export function useFinancePaymentBehavior(params?: { start_date?: string; end_date?: string; currency?: string }, config?: SWRConfiguration) {
+  return useSWR(['finance-payment-behavior', params], () => api.getFinancePaymentBehavior(params), config);
+}
+
+export function useFinanceForecasts(currency = 'NGN', config?: SWRConfiguration) {
+  return useSWR(['finance-forecasts', currency], () => api.getFinanceForecasts(currency), config);
+}
+
+export function useFinanceInvoiceDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['finance-invoice-detail', id, currency] : null,
+    () => (id ? api.getFinanceInvoiceDetail(id, currency) : null),
+    config
+  );
+}
+
+export function useFinancePaymentDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['finance-payment-detail', id, currency] : null,
+    () => (id ? api.getFinancePaymentDetail(id, currency) : null),
+    config
+  );
+}
+
+export function useFinanceCreditNoteDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['finance-credit-note-detail', id, currency] : null,
+    () => (id ? api.getFinanceCreditNoteDetail(id, currency) : null),
+    config
+  );
+}
+
 export function useTablesEnhanced(config?: SWRConfiguration) {
   return useSWR('tables-enhanced', () => api.getTablesEnhanced(), config);
 }
@@ -504,6 +651,152 @@ export function useTableDataEnhanced(
     () => (table ? api.getTableDataEnhanced(table, params) : null),
     config
   );
+}
+
+// Accounting Domain Hooks
+export function useAccountingDashboard(config?: SWRConfiguration) {
+  return useSWR('accounting-dashboard', () => api.getAccountingDashboard(), {
+    refreshInterval: 60000,
+    ...config,
+  });
+}
+
+export function useAccountingChartOfAccounts(accountType?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['accounting-chart-of-accounts', accountType],
+    () => api.getAccountingChartOfAccounts(accountType),
+    config
+  );
+}
+
+export function useAccountingTrialBalance(asOfDate?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['accounting-trial-balance', asOfDate],
+    () => api.getAccountingTrialBalance(asOfDate),
+    config
+  );
+}
+
+export function useAccountingBalanceSheet(asOfDate?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['accounting-balance-sheet', asOfDate],
+    () => api.getAccountingBalanceSheet(asOfDate),
+    config
+  );
+}
+
+export function useAccountingIncomeStatement(startDate?: string, endDate?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['accounting-income-statement', startDate, endDate],
+    () => api.getAccountingIncomeStatement(startDate, endDate),
+    config
+  );
+}
+
+export function useAccountingGeneralLedger(
+  params?: {
+    account?: string;
+    start_date?: string;
+    end_date?: string;
+    voucher_type?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-general-ledger', params],
+    () => api.getAccountingGeneralLedger(params),
+    config
+  );
+}
+
+export function useAccountingCashFlow(startDate?: string, endDate?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['accounting-cash-flow', startDate, endDate],
+    () => api.getAccountingCashFlow(startDate, endDate),
+    config
+  );
+}
+
+export function useAccountingPayables(
+  params?: {
+    supplier_id?: number;
+    min_amount?: number;
+    limit?: number;
+    offset?: number;
+    currency?: string;
+    aging_bucket?: string;
+    search?: string;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-payables', params],
+    () => api.getAccountingPayables(params),
+    config
+  );
+}
+
+export function useAccountingReceivables(
+  params?: {
+    customer_id?: number;
+    min_amount?: number;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-receivables', params],
+    () => api.getAccountingReceivables(params),
+    config
+  );
+}
+
+export function useAccountingJournalEntries(
+  params?: {
+    voucher_type?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-journal-entries', params],
+    () => api.getAccountingJournalEntries(params),
+    config
+  );
+}
+
+export function useAccountingSuppliers(
+  params?: {
+    search?: string;
+    supplier_group?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-suppliers', params],
+    () => api.getAccountingSuppliers(params),
+    config
+  );
+}
+
+export function useAccountingBankAccounts(config?: SWRConfiguration) {
+  return useSWR('accounting-bank-accounts', () => api.getAccountingBankAccounts(), config);
+}
+
+export function useAccountingFiscalYears(config?: SWRConfiguration) {
+  return useSWR('accounting-fiscal-years', () => api.getAccountingFiscalYears(), config);
+}
+
+export function useAccountingCostCenters(config?: SWRConfiguration) {
+  return useSWR('accounting-cost-centers', () => api.getAccountingCostCenters(), config);
 }
 
 // Non-hook export for triggering sync

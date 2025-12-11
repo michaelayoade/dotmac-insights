@@ -21,6 +21,8 @@ import {
   User,
   LogOut,
   Key,
+  DollarSign,
+  Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
@@ -46,6 +48,22 @@ const navigation: NavItem[] = [
       { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
     ],
+  },
+  {
+    name: 'Finance',
+    href: '/finance',
+    icon: DollarSign,
+    requiredScopes: ['analytics:read'],
+    children: [
+      { name: 'Analytics', href: '/finance/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+      { name: 'Insights', href: '/finance/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    name: 'Accounting',
+    href: '/accounting',
+    icon: Calculator,
+    requiredScopes: ['analytics:read'],
   },
   // Future/optional sections can be added below
   // { name: 'Overview', href: '/', icon: LayoutDashboard },

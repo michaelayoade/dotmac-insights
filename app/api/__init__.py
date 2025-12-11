@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import sync, customers, analytics, data_explorer, admin, insights, finance, support, network
+from app.api import sync, customers, analytics, data_explorer, admin, insights, finance, support, network, zoho_import
 
 api_router = APIRouter()
 
@@ -17,3 +17,6 @@ api_router.include_router(data_explorer.router, prefix="/explore", tags=["data-e
 # System routers
 api_router.include_router(sync.router, prefix="/sync", tags=["sync"])
 api_router.include_router(admin.router)  # Already has /admin prefix
+
+# Import routers
+api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix
