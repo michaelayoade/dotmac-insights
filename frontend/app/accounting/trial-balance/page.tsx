@@ -30,7 +30,7 @@ function getAccountTypeColor(type: string) {
 
 export default function TrialBalancePage() {
   const [asOfDate, setAsOfDate] = useState<string>('');
-  const { data, isLoading, error } = useAccountingTrialBalance(asOfDate || undefined);
+  const { data, isLoading, error } = useAccountingTrialBalance({ end_date: asOfDate || undefined });
 
   const columns = [
     {

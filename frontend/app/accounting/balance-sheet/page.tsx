@@ -87,7 +87,7 @@ function Section({ title, icon: Icon, items, total, colorClass }: SectionProps) 
 
 export default function BalanceSheetPage() {
   const [asOfDate, setAsOfDate] = useState<string>('');
-  const { data, isLoading, error } = useAccountingBalanceSheet(asOfDate || undefined);
+  const { data, isLoading, error } = useAccountingBalanceSheet({ as_of_date: asOfDate || undefined });
 
   if (error) {
     return (

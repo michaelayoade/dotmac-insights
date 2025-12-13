@@ -40,10 +40,10 @@ function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white' }:
 export default function IncomeStatementPage() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const { data, isLoading, error } = useAccountingIncomeStatement(
-    startDate || undefined,
-    endDate || undefined
-  );
+  const { data, isLoading, error } = useAccountingIncomeStatement({
+    start_date: startDate || undefined,
+    end_date: endDate || undefined,
+  });
 
   if (error) {
     return (

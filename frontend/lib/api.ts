@@ -1,5 +1,16 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
+export function buildApiUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>) {
+  const url = new URL(endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      url.searchParams.append(key, String(value));
+    });
+  }
+  return url.toString();
+}
+
 // Auth event types for global handling
 type AuthEventType = 'unauthorized' | 'forbidden' | 'token_expired';
 type AuthEventHandler = (event: AuthEventType, message?: string) => void;
@@ -287,6 +298,7 @@ export interface CustomerDetail {
   activation_date?: string | null;
   cancellation_date?: string | null;
   mrr?: number;
+  labels?: string[];
   invoiced_total?: number;
   paid_total?: number;
   outstanding_balance?: number;
@@ -308,6 +320,7 @@ export interface CustomerDetail {
     due_date: string | null;
     invoice_date?: string | null;
     days_overdue?: number;
+    write_back_status?: string | null;
   }>;
   recent_tickets: Array<{
     id: number;
@@ -364,6 +377,50 @@ export interface BlockedCustomer {
   };
   payment_history?: Array<{ date: string; amount: number; method?: string | null }>;
   outstanding_balance?: number;
+}
+
+export interface CustomerWritePayload {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  customer_type?: 'residential' | 'business' | 'enterprise';
+  status?: 'active' | 'inactive' | 'suspended' | 'prospect';
+  pop_id?: number | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  mrr?: number | null;
+  labels?: string[];
+}
+
+export interface CustomerSubscriptionPayload {
+  customer_id?: number;
+  plan_name?: string;
+  status?: 'active' | 'inactive' | 'suspended' | 'expired';
+  price?: number;
+  currency?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+export interface CustomerInvoicePayload {
+  customer_id?: number;
+  invoice_date?: string | null;
+  due_date?: string | null;
+  total?: number;
+  currency?: string;
+  status?: 'pending' | 'overdue' | 'paid' | 'partially_paid' | 'cancelled';
+}
+
+export interface CustomerPaymentPayload {
+  customer_id?: number;
+  amount?: number;
+  currency?: string;
+  payment_date?: string | null;
+  payment_method?: string | null;
+  notes?: string | null;
+  status?: 'completed' | 'pending' | 'failed' | 'cancelled';
 }
 
 export interface CustomerUsageTotals {
@@ -808,6 +865,393 @@ export interface SupportMetrics {
   by_channel: Record<string, number>;
 }
 
+export interface SupportTicketComment {
+  id: number;
+  comment: string | null;
+  comment_type: string | null;
+  commented_by: string | null;
+  commented_by_name: string | null;
+  is_public: boolean;
+  comment_date: string | null;
+  created_at: string | null;
+}
+
+export interface SupportTicketCommentPayload {
+  comment?: string | null;
+  comment_type?: string | null;
+  commented_by?: string | null;
+  commented_by_name?: string | null;
+  is_public?: boolean;
+  comment_date?: string | null;
+}
+
+export interface SupportTicketActivity {
+  id: number;
+  activity_type: string | null;
+  activity: string | null;
+  owner: string | null;
+  from_status?: string | null;
+  to_status?: string | null;
+  activity_date: string | null;
+  created_at: string | null;
+}
+
+export interface SupportTicketActivityPayload {
+  activity_type?: string | null;
+  activity?: string | null;
+  owner?: string | null;
+  from_status?: string | null;
+  to_status?: string | null;
+  activity_date?: string | null;
+}
+
+export interface SupportTicketCommunication {
+  id: number;
+  erpnext_id: string | null;
+  communication_type: string | null;
+  communication_medium: string | null;
+  subject: string | null;
+  content: string | null;
+  sender: string | null;
+  sender_full_name: string | null;
+  recipients: string | null;
+  sent_or_received: string | null;
+  communication_date: string | null;
+}
+
+export interface SupportTicketCommunicationPayload {
+  communication_type?: string | null;
+  communication_medium?: string | null;
+  subject?: string | null;
+  content?: string | null;
+  sender?: string | null;
+  sender_full_name?: string | null;
+  recipients?: string | null;
+  sent_or_received?: string | null;
+  communication_date?: string | null;
+}
+
+export interface SupportTicketDependency {
+  id: number;
+  depends_on_ticket_id: number | null;
+  depends_on_erpnext_id: string | null;
+  depends_on_subject: string | null;
+  depends_on_status: string | null;
+}
+
+export interface SupportTicketDependencyPayload {
+  depends_on_ticket_id?: number | null;
+  depends_on_erpnext_id?: string | null;
+  depends_on_subject?: string | null;
+  depends_on_status?: string | null;
+}
+
+export interface SupportTicketExpense {
+  id: number;
+  erpnext_id: string | null;
+  expense_type: string | null;
+  description: string | null;
+  total_claimed_amount: number;
+  total_sanctioned_amount: number | null;
+  status: string | null;
+  expense_date: string | null;
+}
+
+export interface SupportTicketDetail {
+  id: number;
+  ticket_number: string | null;
+  subject: string | null;
+  status: string | null;
+  priority?: string | null;
+  [key: string]: any;
+  comments?: SupportTicketComment[];
+  activities?: SupportTicketActivity[];
+  communications?: SupportTicketCommunication[];
+  depends_on?: SupportTicketDependency[];
+  expenses?: SupportTicketExpense[];
+}
+
+export interface SupportTicketPayload {
+  subject: string;
+  description?: string | null;
+  status?: 'open' | 'replied' | 'resolved' | 'closed' | 'on_hold';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  ticket_type?: string | null;
+  issue_type?: string | null;
+  customer_id?: number | null;
+  project_id?: number | null;
+  assigned_to?: string | null;
+  assigned_employee_id?: number | null;
+  resolution_by?: string | null;
+  response_by?: string | null;
+  resolution_team?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  customer_name?: string | null;
+  region?: string | null;
+  base_station?: string | null;
+}
+
+export interface SupportTicketAssigneePayload {
+  agent_id?: number | null;
+  team_id?: number | null;
+  member_id?: number | null;
+  employee_id?: number | null;
+  assigned_to?: string | null;
+}
+
+export interface SupportTicketSlaPayload {
+  response_by?: string | null;
+  resolution_by?: string | null;
+  reason?: string | null;
+}
+
+export interface SupportTicketListItem {
+  id: number;
+  ticket_number: string | null;
+  subject: string | null;
+  status: string | null;
+  priority: string | null;
+  ticket_type?: string | null;
+  assigned_to?: string | null;
+  assigned_employee_id?: number | null;
+  resolution_by?: string | null;
+  response_by?: string | null;
+  created_at?: string | null;
+  modified_at?: string | null;
+}
+
+export interface SupportTicketListResponse {
+  tickets: SupportTicketListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// Projects
+export type ProjectStatus = 'open' | 'completed' | 'cancelled' | 'on_hold';
+export type ProjectPriority = 'low' | 'medium' | 'high';
+
+export interface ProjectUser {
+  user?: string | null;
+  full_name?: string | null;
+  email?: string | null;
+  project_status?: string | null;
+  view_attachments?: boolean;
+  welcome_email_sent?: boolean;
+  idx?: number;
+}
+
+export interface ProjectListItem {
+  id: number;
+  erpnext_id: string | null;
+  project_name: string;
+  project_type: string | null;
+  status: ProjectStatus;
+  priority: ProjectPriority | null;
+  department: string | null;
+  customer_id: number | null;
+  percent_complete: number | null;
+  expected_start_date: string | null;
+  expected_end_date: string | null;
+  estimated_costing: number | null;
+  total_billed_amount: number | null;
+  is_overdue: boolean;
+  task_count: number | null;
+  created_at: string | null;
+  write_back_status?: string | null;
+}
+
+export interface ProjectListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  data: ProjectListItem[];
+}
+
+export interface ProjectDetail extends ProjectListItem {
+  company?: string | null;
+  cost_center?: string | null;
+  project_manager_id?: number | null;
+  project_manager?: string | null;
+  erpnext_customer?: string | null;
+  erpnext_sales_order?: string | null;
+  percent_complete_method?: string | null;
+  is_active?: string | null;
+  actual_time?: number | null;
+  total_consumed_material_cost?: number | null;
+  total_costing_amount?: number | null;
+  total_expense_claim?: number | null;
+  total_purchase_cost?: number | null;
+  total_sales_amount?: number | null;
+  total_billable_amount?: number | null;
+  gross_margin?: number | null;
+  per_gross_margin?: number | null;
+  collect_progress?: boolean;
+  frequency?: string | null;
+  message?: string | null;
+  notes?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
+  from_time?: string | null;
+  to_time?: string | null;
+  customer?: Record<string, any> | null;
+  users?: ProjectUser[];
+  tasks?: any[];
+  task_stats?: Record<string, any>;
+  expenses?: any[];
+  time_tracking?: Record<string, any>;
+}
+
+export interface ProjectPayload {
+  project_name?: string;
+  project_type?: string | null;
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
+  department?: string | null;
+  company?: string | null;
+  cost_center?: string | null;
+  customer_id?: number | null;
+  project_manager_id?: number | null;
+  erpnext_customer?: string | null;
+  erpnext_sales_order?: string | null;
+  percent_complete?: number | null;
+  percent_complete_method?: string | null;
+  is_active?: string | null;
+  actual_time?: number | null;
+  total_consumed_material_cost?: number | null;
+  estimated_costing?: number | null;
+  total_costing_amount?: number | null;
+  total_expense_claim?: number | null;
+  total_purchase_cost?: number | null;
+  total_sales_amount?: number | null;
+  total_billable_amount?: number | null;
+  total_billed_amount?: number | null;
+  gross_margin?: number | null;
+  per_gross_margin?: number | null;
+  collect_progress?: boolean;
+  frequency?: string | null;
+  message?: string | null;
+  notes?: string | null;
+  expected_start_date?: string | null;
+  expected_end_date?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
+  from_time?: string | null;
+  to_time?: string | null;
+  users?: ProjectUser[];
+}
+
+export interface ProjectsDashboard {
+  cards: Record<string, number>;
+  metrics?: Record<string, any>;
+}
+
+export interface SupportOverviewRequest {
+  start?: string;
+  end?: string;
+  team_id?: number;
+  agent?: string;
+  ticket_type?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  limit_overdue?: number;
+  offset_overdue?: number;
+}
+
+export interface SupportOverviewResponse {
+  summary: {
+    total: number;
+    open: number;
+    replied: number;
+    resolved: number;
+    closed: number;
+    on_hold: number;
+    sla_attainment_pct: number;
+    avg_response_hours: number;
+    avg_resolution_hours: number;
+    overdue: number;
+    unassigned: number;
+  };
+  by_priority: Array<{ priority: string; open: number; total: number; sla_breach_pct: number }>;
+  by_type: Array<{ ticket_type: string; open: number; total: number; avg_resolution_hours: number }>;
+  volume_trend: Array<{ period: string; opened: number; resolved: number; closed: number; sla_attainment_pct: number }>;
+  resolution_trend: Array<{ period: string; p50_hours: number; p75_hours: number; p90_hours: number }>;
+  backlog_age: Array<{ bucket: string; count: number }>;
+  agent_performance: Array<{ agent: string; open: number; resolved: number; avg_resolution_hours: number; sla_attainment_pct: number; csat_avg?: number }>;
+  team_performance: Array<{ team: string; open: number; resolved: number; sla_attainment_pct: number; avg_resolution_hours: number }>;
+  csat: {
+    avg_score: number;
+    response_rate_pct: number;
+    trend: Array<{ period: string; avg_score: number; responses: number }>;
+  };
+  top_drivers: Array<{ label: string; count: number; share_pct: number }>;
+  overdue_detail: Array<{ id: number; ticket_number: string | null; priority: string | null; assigned_to: string | null; resolution_by: string | null; age_hours: number }>;
+}
+
+export interface SupportDashboardResponse {
+  tickets: {
+    total: number;
+    open: number;
+    resolved: number;
+    closed: number;
+    on_hold: number;
+  };
+  by_priority: Record<string, number>;
+  sla: { met: number; breached: number; attainment_rate: number };
+  metrics: { avg_resolution_hours: number; overdue_tickets: number; unassigned_tickets: number };
+  conversations: { total: number; open: number; resolved: number };
+}
+
+export interface SupportAgent {
+  id: number;
+  email: string | null;
+  display_name?: string | null;
+  employee_id?: number | null;
+  team_id?: number | null;
+  status?: string | null;
+  domains?: Record<string, boolean>;
+  skills?: Record<string, number>;
+  channel_caps?: Record<string, boolean>;
+  routing_weight?: number | null;
+  capacity?: number | null;
+  is_active?: boolean;
+}
+
+export interface SupportTeam {
+  id: number;
+  team_name: string;
+  description?: string | null;
+  assignment_rule?: string | null;
+  ignore_restrictions?: boolean;
+  domain?: string | null;
+  is_active?: boolean;
+  members?: SupportTeamMember[];
+}
+
+export interface SupportTeamMember {
+  id: number;
+  agent_id: number | null;
+  role?: string | null;
+  user?: string | null;
+  user_name?: string | null;
+  employee_id?: number | null;
+  team_id?: number;
+}
+
+export interface SupportTeamPayload {
+  team_name?: string;
+  description?: string | null;
+  assignment_rule?: string | null;
+  domain?: string | null;
+  is_active?: boolean;
+  ignore_restrictions?: boolean;
+}
+
+export interface SupportTeamMemberPayload {
+  agent_id: number;
+  role?: string | null;
+}
+
 export interface InvoiceAging {
   total_outstanding: number;
   aging: {
@@ -936,6 +1380,196 @@ export const api = {
   getSupportMetrics: (days = 30) =>
     fetchApi<SupportMetrics>('/analytics/support/metrics', { params: { days } }),
 
+  getSupportTicketDetail: (id: number | string) =>
+    fetchApi<SupportTicketDetail>(`/support/tickets/${id}`),
+
+  createSupportTicket: (body: SupportTicketPayload) =>
+    fetchApi<{ id: number; ticket_number: string }>(`/support/tickets`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTicket: (id: number | string, body: Partial<SupportTicketPayload>) =>
+    fetchApi<SupportTicketDetail>(`/support/tickets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTicket: (id: number | string) =>
+    fetchApi<void>(`/support/tickets/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getSupportAgents: (team_id?: number, domain?: string) =>
+    fetchApi<{ agents: SupportAgent[] }>(`/support/agents`, { params: { team_id, domain } }),
+
+  createSupportAgent: (body: SupportAgentPayload) =>
+    fetchApi<SupportAgent>('/support/agents', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportAgent: (id: number, body: SupportAgentPayload) =>
+    fetchApi<SupportAgent>(`/support/agents/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportAgent: (id: number) =>
+    fetchApi<void>(`/support/agents/${id}`, { method: 'DELETE' }),
+
+  getSupportTeams: (domain?: string) =>
+    fetchApi<{ teams: SupportTeam[] }>(`/support/teams`, { params: domain ? { domain } : undefined }),
+
+  createSupportTeam: (body: SupportTeamPayload & { team_name: string }) =>
+    fetchApi<SupportTeam>(`/support/teams`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTeam: (id: number, body: SupportTeamPayload) =>
+    fetchApi<SupportTeam>(`/support/teams/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTeam: (id: number) =>
+    fetchApi<void>(`/support/teams/${id}`, { method: 'DELETE' }),
+
+  addSupportTeamMember: (teamId: number, body: SupportTeamMemberPayload) =>
+    fetchApi<SupportTeamMember>(`/support/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTeamMember: (teamId: number, memberId: number) =>
+    fetchApi<void>(`/support/teams/${teamId}/members/${memberId}`, { method: 'DELETE' }),
+
+  createSupportTicketComment: (ticketId: number | string, body: SupportTicketCommentPayload) =>
+    fetchApi<SupportTicketComment>(`/support/tickets/${ticketId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTicketComment: (ticketId: number | string, commentId: number, body: SupportTicketCommentPayload) =>
+    fetchApi<SupportTicketComment>(`/support/tickets/${ticketId}/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTicketComment: (ticketId: number | string, commentId: number) =>
+    fetchApi<void>(`/support/tickets/${ticketId}/comments/${commentId}`, { method: 'DELETE' }),
+
+  createSupportTicketActivity: (ticketId: number | string, body: SupportTicketActivityPayload) =>
+    fetchApi<SupportTicketActivity>(`/support/tickets/${ticketId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTicketActivity: (ticketId: number | string, activityId: number, body: SupportTicketActivityPayload) =>
+    fetchApi<SupportTicketActivity>(`/support/tickets/${ticketId}/activities/${activityId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTicketActivity: (ticketId: number | string, activityId: number) =>
+    fetchApi<void>(`/support/tickets/${ticketId}/activities/${activityId}`, { method: 'DELETE' }),
+
+  createSupportTicketCommunication: (ticketId: number | string, body: SupportTicketCommunicationPayload) =>
+    fetchApi<SupportTicketCommunication>(`/support/tickets/${ticketId}/communications`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTicketCommunication: (ticketId: number | string, communicationId: number, body: SupportTicketCommunicationPayload) =>
+    fetchApi<SupportTicketCommunication>(`/support/tickets/${ticketId}/communications/${communicationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTicketCommunication: (ticketId: number | string, communicationId: number) =>
+    fetchApi<void>(`/support/tickets/${ticketId}/communications/${communicationId}`, { method: 'DELETE' }),
+
+  createSupportTicketDependency: (ticketId: number | string, body: SupportTicketDependencyPayload) =>
+    fetchApi<SupportTicketDependency>(`/support/tickets/${ticketId}/depends-on`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupportTicketDependency: (ticketId: number | string, dependencyId: number, body: SupportTicketDependencyPayload) =>
+    fetchApi<SupportTicketDependency>(`/support/tickets/${ticketId}/depends-on/${dependencyId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupportTicketDependency: (ticketId: number | string, dependencyId: number) =>
+    fetchApi<void>(`/support/tickets/${ticketId}/depends-on/${dependencyId}`, { method: 'DELETE' }),
+
+  assignSupportTicket: (ticketId: number | string, body: SupportTicketAssigneePayload) =>
+    fetchApi<SupportTicketDetail>(`/support/tickets/${ticketId}/assignee`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  overrideSupportTicketSla: (ticketId: number | string, body: SupportTicketSlaPayload) =>
+    fetchApi<SupportTicketDetail>(`/support/tickets/${ticketId}/sla`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  getSupportTickets: (params?: {
+    start?: string;
+    end?: string;
+    team_id?: number;
+    agent?: string;
+    ticket_type?: string;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<SupportTicketListResponse>('/support/tickets', { params }),
+
+  getSupportOverview: (params?: SupportOverviewRequest) =>
+    fetchApi<SupportOverviewResponse>('/support/analytics/overview', { params }),
+
+  getSupportDashboard: () =>
+    fetchApi<SupportDashboardResponse>('/support/dashboard'),
+
+  // Projects
+  getProjects: (params?: {
+    status?: string;
+    priority?: ProjectPriority;
+    customer_id?: number;
+    project_type?: string;
+    department?: string;
+    search?: string;
+    overdue_only?: boolean;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }) => fetchApi<ProjectListResponse>('/projects', { params }),
+
+  getProjectDetail: (id: number) => fetchApi<ProjectDetail>(`/projects/${id}`),
+
+  createProject: (body: ProjectPayload & { project_name: string }) =>
+    fetchApi<ProjectDetail>('/projects', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateProject: (id: number, body: ProjectPayload) =>
+    fetchApi<ProjectDetail>(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteProject: (id: number) =>
+    fetchApi<{ message: string; id: number }>(`/projects/${id}`, { method: 'DELETE' }),
+
+  getProjectsDashboard: () => fetchApi<ProjectsDashboard>('/projects/dashboard'),
+
+  getProjectsStatusTrend: (months = 12) => fetchApi<any>(`/projects/analytics/status-trend`, { params: { months } }),
+  getProjectsTaskDistribution: () => fetchApi<any>('/projects/analytics/task-distribution'),
+  getProjectsPerformance: () => fetchApi<any>('/projects/analytics/project-performance'),
+  getProjectsDepartmentSummary: (months = 12) =>
+    fetchApi<any>('/projects/analytics/department-summary', { params: { months } }),
+
   getInvoiceAging: () =>
     fetchApi<InvoiceAging>('/analytics/invoices/aging'),
 
@@ -970,6 +1604,45 @@ export const api = {
 
   getCustomer360: (id: number) =>
     fetchApi<Customer360Response>(`/customers/360/${id}`),
+
+  createCustomer: (payload: CustomerWritePayload) =>
+    fetchApi<CustomerDetail>('/customers', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateCustomer: (id: number, payload: CustomerWritePayload) =>
+    fetchApi<CustomerDetail>(`/customers/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteCustomer: (id: number, soft = true) =>
+    fetchApi<void>(`/customers/${id}?soft=${soft ? 'true' : 'false'}`, { method: 'DELETE' }),
+
+  // Customer subscriptions
+  createCustomerSubscription: (payload: CustomerSubscriptionPayload) =>
+    fetchApi('/customers/subscriptions', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateCustomerSubscription: (id: number, payload: CustomerSubscriptionPayload) =>
+    fetchApi(`/customers/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteCustomerSubscription: (id: number, soft = true) =>
+    fetchApi<void>(`/customers/subscriptions/${id}?soft=${soft ? 'true' : 'false'}`, { method: 'DELETE' }),
+
+  // Customer invoices
+  createCustomerInvoice: (payload: CustomerInvoicePayload) =>
+    fetchApi('/customers/invoices', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateCustomerInvoice: (id: number, payload: CustomerInvoicePayload) =>
+    fetchApi(`/customers/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteCustomerInvoice: (id: number, soft = true) =>
+    fetchApi<void>(`/customers/invoices/${id}?soft=${soft ? 'true' : 'false'}`, { method: 'DELETE' }),
+
+  // Customer payments
+  createCustomerPayment: (payload: CustomerPaymentPayload) =>
+    fetchApi('/customers/payments', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateCustomerPayment: (id: number, payload: CustomerPaymentPayload) =>
+    fetchApi(`/customers/payments/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteCustomerPayment: (id: number, soft = true) =>
+    fetchApi<void>(`/customers/payments/${id}?soft=${soft ? 'true' : 'false'}`, { method: 'DELETE' }),
 
   getBlockedCustomers: (params?: {
     min_days_blocked?: number;
@@ -1239,9 +1912,9 @@ export const api = {
   getDataAvailability: () =>
     fetchApi<DataAvailabilityResponse>('/insights/data-availability'),
 
-// Finance Domain
+// Finance Domain (Sales/AR)
   getFinanceDashboard: (currency?: string) =>
-    fetchApi<FinanceDashboard>('/finance/dashboard', {
+    fetchApi<FinanceDashboard>('/v1/sales/dashboard', {
       params: { currency }
     }),
 
@@ -1255,12 +1928,29 @@ export const api = {
     currency?: string;
     overdue_only?: boolean;
     search?: string;
-    sort_by?: 'invoice_date' | 'due_date' | 'total_amount' | 'amount_paid' | 'customer_id' | 'status';
-    sort_dir?: 'asc' | 'desc';
-    limit?: number;
-    offset?: number;
+    sort_by?: 'invoice_date' | 'total_amount' | 'status';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
   }) =>
-    fetchApi<FinanceInvoiceListResponse>('/finance/invoices', { params }),
+    fetchApi<FinanceInvoiceListResponse>('/v1/sales/invoices', { params }),
+
+  createFinanceInvoice: (body: FinanceInvoicePayload) =>
+    fetchApi<FinanceInvoiceDetail>('/v1/sales/invoices', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinanceInvoice: (id: number, body: FinanceInvoicePayload) =>
+    fetchApi<FinanceInvoiceDetail>(`/v1/sales/invoices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFinanceInvoice: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/sales/invoices/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
 
   getFinancePayments: (params?: {
     status?: string;
@@ -1273,12 +1963,29 @@ export const api = {
     max_amount?: number;
     currency?: string;
     search?: string;
-    sort_by?: 'payment_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
-    sort_dir?: 'asc' | 'desc';
-    limit?: number;
-    offset?: number;
+    sort_by?: 'payment_date' | 'amount' | 'status';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
   }) =>
-    fetchApi<FinancePaymentListResponse>('/finance/payments', { params }),
+    fetchApi<FinancePaymentListResponse>('/v1/sales/payments', { params }),
+
+  createFinancePayment: (body: FinancePaymentPayload) =>
+    fetchApi<FinancePaymentDetail>('/v1/sales/payments', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinancePayment: (id: number, body: FinancePaymentPayload) =>
+    fetchApi<FinancePaymentDetail>(`/v1/sales/payments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFinancePayment: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/sales/payments/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
 
   getFinanceCreditNotes: (params?: {
     customer_id?: number;
@@ -1287,127 +1994,754 @@ export const api = {
     end_date?: string;
     currency?: string;
     search?: string;
-    sort_by?: 'issue_date' | 'amount' | 'customer_id' | 'invoice_id' | 'status';
-    sort_dir?: 'asc' | 'desc';
-    limit?: number;
-    offset?: number;
+    status?: string;
+    min_amount?: number;
+    max_amount?: number;
+    sort_by?: 'issue_date' | 'amount' | 'status';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
   }) =>
-    fetchApi<FinanceCreditNoteListResponse>('/finance/credit-notes', { params }),
+    fetchApi<FinanceCreditNoteListResponse>('/v1/sales/credit-notes', { params }),
+
+  createFinanceCreditNote: (body: FinanceCreditNotePayload) =>
+    fetchApi<FinanceCreditNoteDetail>('/v1/sales/credit-notes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinanceCreditNote: (id: number, body: FinanceCreditNotePayload) =>
+    fetchApi<FinanceCreditNoteDetail>(`/v1/sales/credit-notes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFinanceCreditNote: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/sales/credit-notes/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  // Accounting admin & controls
+  getAccountingFiscalPeriods: () =>
+    fetchApi<any[]>('/accounting/fiscal-periods'),
+
+  createAccountingFiscalPeriods: (body: { fiscal_year: string; frequency?: string }) =>
+    fetchApi<any>('/accounting/fiscal-periods', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  closeFiscalPeriod: (id: number | string) =>
+    fetchApi<any>(`/accounting/fiscal-periods/${id}/close`, { method: 'PATCH' }),
+
+  reopenFiscalPeriod: (id: number | string) =>
+    fetchApi<any>(`/accounting/fiscal-periods/${id}/reopen`, { method: 'PATCH' }),
+
+  generateClosingEntries: (id: number | string) =>
+    fetchApi<any>(`/accounting/fiscal-periods/${id}/closing-entries`, { method: 'POST' }),
+
+  getAccountingWorkflows: () =>
+    fetchApi<any[]>('/accounting/workflows'),
+
+  createAccountingWorkflow: (body: any) =>
+    fetchApi<any>('/accounting/workflows', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateAccountingWorkflow: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/workflows/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteAccountingWorkflow: (id: number | string) =>
+    fetchApi<void>(`/accounting/workflows/${id}`, { method: 'DELETE' }),
+
+  addAccountingWorkflowStep: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/workflows/${id}/steps`, { method: 'POST', body: JSON.stringify(body) }),
+
+  getAccountingPendingApprovals: () =>
+    fetchApi<any[]>('/accounting/approvals/pending'),
+
+  getAccountingApprovalStatus: (doctype: string, documentId: number | string) =>
+    fetchApi<any>(`/accounting/approvals/${doctype}/${documentId}`),
+
+  submitJournalEntry: (id: number | string) =>
+    fetchApi<any>(`/accounting/journal-entries/${id}/submit`, { method: 'POST' }),
+
+  approveJournalEntry: (id: number | string) =>
+    fetchApi<any>(`/accounting/journal-entries/${id}/approve`, { method: 'POST' }),
+
+  rejectJournalEntry: (id: number | string) =>
+    fetchApi<any>(`/accounting/journal-entries/${id}/reject`, { method: 'POST' }),
+
+  postJournalEntry: (id: number | string) =>
+    fetchApi<any>(`/accounting/journal-entries/${id}/post`, { method: 'POST' }),
+
+  createJournalEntry: (body: any) =>
+    fetchApi<any>('/accounting/journal-entries', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateJournalEntry: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/journal-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteJournalEntry: (id: number | string) =>
+    fetchApi<void>(`/accounting/journal-entries/${id}`, { method: 'DELETE' }),
+
+  createAccount: (body: any) =>
+    fetchApi<any>('/accounting/accounts', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateAccount: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteAccount: (id: number | string) =>
+    fetchApi<void>(`/accounting/accounts/${id}`, { method: 'DELETE' }),
+
+  createAccountingSupplier: (body: any) =>
+    fetchApi<any>('/accounting/suppliers', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateAccountingSupplier: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/suppliers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteAccountingSupplier: (id: number | string) =>
+    fetchApi<void>(`/accounting/suppliers/${id}`, { method: 'DELETE' }),
+
+  getExchangeRates: () =>
+    fetchApi<any[]>('/accounting/exchange-rates'),
+
+  getLatestExchangeRates: () =>
+    fetchApi<any>('/accounting/exchange-rates/latest'),
+
+  createExchangeRate: (body: any) =>
+    fetchApi<any>('/accounting/exchange-rates', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateExchangeRate: (id: number | string, body: any) =>
+    fetchApi<any>(`/accounting/exchange-rates/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  getAccountingControls: () =>
+    fetchApi<any>('/accounting/controls'),
+
+  updateAccountingControls: (body: any) =>
+    fetchApi<any>('/accounting/controls', { method: 'PATCH', body: JSON.stringify(body) }),
+
+  getAuditLog: (params?: { doctype?: string; document_id?: number | string; limit?: number; offset?: number }) =>
+    fetchApi<any>('/accounting/audit-log', { params }),
+
+  getAuditLogForDocument: (doctype: string, documentId: number | string) =>
+    fetchApi<any>(`/accounting/audit-log/${doctype}/${documentId}`),
+
+  previewFxRevaluation: (body: any) =>
+    fetchApi<any>('/accounting/revaluation/preview', { method: 'POST', body: JSON.stringify(body) }),
+
+  applyFxRevaluation: (body: any) =>
+    fetchApi<any>('/accounting/revaluation/apply', { method: 'POST', body: JSON.stringify(body) }),
+
+  getFxRevaluationHistory: (params?: { limit?: number; offset?: number }) =>
+    fetchApi<any>('/accounting/revaluation/history', { params }),
+
+  getTrialBalanceExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/trial-balance/export', params),
+
+  getBalanceSheetExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/balance-sheet/export', params),
+
+  getIncomeStatementExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/income-statement/export', params),
+
+  getGeneralLedgerExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/general-ledger/export', params),
+
+  getReceivablesAgingExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/receivables-aging/export', params),
+
+  getPayablesAgingExportUrl: (params?: Record<string, string | number | boolean | undefined>) =>
+    buildApiUrl('/accounting/payables-aging/export', params),
+
+  // Inventory valuation & landed cost
+  getInventoryValuation: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any>('/inventory/valuation-report', { params }),
+
+  getInventoryValuationDetail: (itemCode: string, params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any>(`/inventory/valuation-report/${itemCode}`, { params }),
+
+  createLandedCostVoucher: (body: any) =>
+    fetchApi<any>('/inventory/landed-cost-vouchers', { method: 'POST', body: JSON.stringify(body) }),
+
+  getLandedCostVouchers: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any>('/inventory/landed-cost-vouchers', { params }),
+
+  getLandedCostVoucherDetail: (id: number | string) =>
+    fetchApi<any>(`/inventory/landed-cost-vouchers/${id}`),
+
+  updateLandedCostVoucher: (id: number | string, body: any) =>
+    fetchApi<any>(`/inventory/landed-cost-vouchers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  submitLandedCostVoucher: (id: number | string) =>
+    fetchApi<any>(`/inventory/landed-cost-vouchers/${id}/submit`, { method: 'PATCH' }),
 
   getFinanceRevenueTrend: (params?: { start_date?: string; end_date?: string; interval?: 'month' | 'week'; currency?: string }) =>
-    fetchApi<FinanceRevenueTrend[]>('/finance/analytics/revenue-trend', {
+    fetchApi<FinanceRevenueTrend[]>('/v1/sales/analytics/revenue-trend', {
       params
     }),
 
   getFinanceCollections: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
-    fetchApi<FinanceCollectionsAnalytics>('/finance/analytics/collections', {
+    fetchApi<FinanceCollectionsAnalytics>('/v1/sales/analytics/collections', {
       params
     }),
 
-  getFinanceAging: (params?: { as_of_date?: string; currency?: string }) =>
-    fetchApi<FinanceAgingAnalytics>('/finance/analytics/aging', { params }),
+  getFinanceAging: (params?: { currency?: string }) =>
+    fetchApi<FinanceAgingAnalytics>('/v1/sales/aging', { params }),
 
   getFinanceRevenueBySegment: () =>
-    fetchApi<FinanceByCurrencyAnalytics>('/finance/analytics/by-currency'),
+    fetchApi<FinanceByCurrencyAnalytics>('/v1/sales/analytics/by-currency'),
 
-  getFinancePaymentBehavior: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
-    fetchApi<FinancePaymentBehavior>('/finance/insights/payment-behavior', { params }),
+  getFinancePaymentBehavior: (params?: { currency?: string }) =>
+    fetchApi<FinancePaymentBehavior>('/v1/sales/insights/payment-behavior', { params }),
 
   getFinanceForecasts: (currency?: string) =>
-    fetchApi<FinanceForecast>('/finance/insights/forecasts', { params: { currency } }),
+    fetchApi<FinanceForecast>('/v1/sales/insights/forecasts', { params: { currency } }),
 
   getFinanceInvoiceDetail: (id: number, currency?: string) =>
-    fetchApi<FinanceInvoiceDetail>(`/finance/invoices/${id}`, { params: { currency } }),
+    fetchApi<FinanceInvoiceDetail>(`/v1/sales/invoices/${id}`, { params: { currency } }),
 
   getFinancePaymentDetail: (id: number, currency?: string) =>
-    fetchApi<FinancePaymentDetail>(`/finance/payments/${id}`, { params: { currency } }),
+    fetchApi<FinancePaymentDetail>(`/v1/sales/payments/${id}`, { params: { currency } }),
 
   getFinanceCreditNoteDetail: (id: number, currency?: string) =>
-    fetchApi<FinanceCreditNoteDetail>(`/finance/credit-notes/${id}`, { params: { currency } }),
+    fetchApi<FinanceCreditNoteDetail>(`/v1/sales/credit-notes/${id}`, { params: { currency } }),
+
+  // AR credit management & dunning
+  getAccountingCustomerCreditStatus: (id: number) =>
+    fetchApi<any>(`/accounting/customers/${id}/credit-status`),
+
+  updateAccountingCustomerCreditLimit: (id: number, body: any) =>
+    fetchApi<any>(`/accounting/customers/${id}/credit-limit`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  updateAccountingCustomerCreditHold: (id: number, body: any) =>
+    fetchApi<any>(`/accounting/customers/${id}/credit-hold`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  writeOffAccountingInvoice: (id: number, body: any) =>
+    fetchApi<any>(`/accounting/invoices/${id}/write-off`, { method: 'POST', body: JSON.stringify(body) }),
+
+  waiveAccountingInvoice: (id: number, body: any) =>
+    fetchApi<any>(`/accounting/invoices/${id}/waive`, { method: 'POST', body: JSON.stringify(body) }),
+
+  getAccountingInvoiceDunningHistory: (id: number) =>
+    fetchApi<any>(`/accounting/invoices/${id}/dunning-history`),
+
+  sendAccountingDunning: (body: any) =>
+    fetchApi<any>('/accounting/dunning/send', { method: 'POST', body: JSON.stringify(body) }),
+
+  getAccountingDunningQueue: () =>
+    fetchApi<any>('/accounting/dunning/queue'),
+
+  getAccountingReceivablesAgingEnhanced: (params?: Record<string, string | number | boolean | undefined>) =>
+    fetchApi<any>('/accounting/receivables-aging-enhanced', { params }),
+
+  getFinanceOrders: (params?: {
+    customer_id?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'order_date' | 'total_amount' | 'status';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
+  }) => fetchApi<FinanceOrderListResponse>('/v1/sales/orders', { params }),
+
+  createFinanceOrder: (body: FinanceOrderPayload) =>
+    fetchApi<FinanceOrder>(`/v1/sales/orders`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinanceOrder: (id: number, body: FinanceOrderPayload) =>
+    fetchApi<FinanceOrder>(`/v1/sales/orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFinanceOrder: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/sales/orders/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getFinanceOrderDetail: (id: number, currency?: string) =>
+    fetchApi<FinanceOrder>(`/v1/sales/orders/${id}`, { params: { currency } }),
+
+  getFinanceQuotations: (params?: {
+    customer_id?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'quotation_date' | 'total_amount' | 'status';
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
+  }) => fetchApi<FinanceQuotationListResponse>('/v1/sales/quotations', { params }),
+
+  createFinanceQuotation: (body: FinanceQuotationPayload) =>
+    fetchApi<FinanceQuotation>(`/v1/sales/quotations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinanceQuotation: (id: number, body: FinanceQuotationPayload) =>
+    fetchApi<FinanceQuotation>(`/v1/sales/quotations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFinanceQuotation: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/sales/quotations/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getFinanceQuotationDetail: (id: number, currency?: string) =>
+    fetchApi<FinanceQuotation>(`/v1/sales/quotations/${id}`, { params: { currency } }),
+
+  getFinanceCustomers: (params?: { search?: string; status?: string; customer_type?: string; limit?: number; offset?: number }) =>
+    fetchApi<CustomerListResponse>('/v1/sales/customers', { params }),
+
+  createFinanceCustomer: (body: FinanceCustomerPayload) =>
+    fetchApi<CustomerDetail>(`/v1/sales/customers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFinanceCustomer: (id: number, body: FinanceCustomerPayload) =>
+    fetchApi<CustomerDetail>(`/v1/sales/customers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  getFinanceCustomerDetail: (id: number) =>
+    fetchApi<CustomerDetail>(`/v1/sales/customers/${id}`),
 
   // Accounting Domain
-  getAccountingDashboard: () =>
-    fetchApi<AccountingDashboard>('/accounting/dashboard'),
+  getAccountingDashboard: (currency?: string) =>
+    fetchApi<AccountingDashboard>('/v1/accounting/dashboard', { params: { currency } }),
 
-  getAccountingChartOfAccounts: (accountType?: string) =>
-    fetchApi<AccountingChartOfAccounts>('/accounting/chart-of-accounts', {
-      params: { account_type: accountType }
+  getAccountingChartOfAccounts: (accountType?: string, params?: { root_type?: string; is_group?: boolean; include_disabled?: boolean; search?: string; limit?: number; offset?: number }) =>
+    fetchApi<AccountingChartOfAccounts>('/v1/accounting/accounts', {
+      params: { account_type: accountType, ...params }
     }),
 
-  getAccountingTrialBalance: (asOfDate?: string) =>
-    fetchApi<AccountingTrialBalance>('/accounting/trial-balance', {
-      params: { as_of_date: asOfDate }
-    }),
+  getAccountingAccountDetail: (id: number, params?: { include_ledger?: boolean; start_date?: string; end_date?: string; limit?: number }) =>
+    fetchApi<AccountingAccountDetail>(`/v1/accounting/accounts/${id}`, { params }),
 
-  getAccountingBalanceSheet: (asOfDate?: string) =>
-    fetchApi<AccountingBalanceSheet>('/accounting/balance-sheet', {
-      params: { as_of_date: asOfDate }
-    }),
+  getAccountingTrialBalance: (params?: { fiscal_year?: string; start_date?: string; end_date?: string; currency?: string; drill?: boolean }) =>
+    fetchApi<AccountingTrialBalance>('/v1/accounting/trial-balance', { params }),
 
-  getAccountingIncomeStatement: (startDate?: string, endDate?: string) =>
-    fetchApi<AccountingIncomeStatement>('/accounting/income-statement', {
-      params: { start_date: startDate, end_date: endDate }
-    }),
+  getAccountingBalanceSheet: (params?: { fiscal_year?: string; as_of_date?: string; currency?: string; common_size?: boolean }) =>
+    fetchApi<AccountingBalanceSheet>('/v1/accounting/balance-sheet', { params }),
+
+  getAccountingIncomeStatement: (params?: {
+    fiscal_year?: string;
+    start_date?: string;
+    end_date?: string;
+    currency?: string;
+    compare_start?: string;
+    compare_end?: string;
+    show_ytd?: boolean;
+    common_size?: boolean;
+    basis?: string;
+  }) =>
+    fetchApi<AccountingIncomeStatement>('/v1/accounting/income-statement', { params }),
+
+  getAccountingTaxCategories: () =>
+    fetchApi<{ tax_categories: AccountingTaxCategory[] }>('/v1/accounting/tax-categories'),
+
+  getAccountingSalesTaxTemplates: () =>
+    fetchApi<{ sales_tax_templates: AccountingTaxTemplate[] }>('/v1/accounting/sales-tax-templates'),
+
+  getAccountingPurchaseTaxTemplates: () =>
+    fetchApi<{ purchase_tax_templates: AccountingTaxTemplate[] }>('/v1/accounting/purchase-tax-templates'),
+
+  getAccountingItemTaxTemplates: () =>
+    fetchApi<{ item_tax_templates: AccountingTaxTemplate[] }>('/v1/accounting/item-tax-templates'),
+
+  getAccountingTaxRules: () =>
+    fetchApi<{ tax_rules: AccountingTaxTemplate[] }>('/v1/accounting/tax-rules'),
+
+  getAccountingTaxPayable: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<AccountingTaxSummary>('/v1/accounting/tax-payable', { params }),
+
+  getAccountingTaxReceivable: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<AccountingTaxSummary>('/v1/accounting/tax-receivable', { params }),
 
   getAccountingGeneralLedger: (params?: {
     account?: string;
+    party?: string;
     start_date?: string;
     end_date?: string;
-    voucher_type?: string;
+    cost_center?: string;
+    fiscal_year?: string;
+    currency?: string;
     limit?: number;
     offset?: number;
   }) =>
-    fetchApi<AccountingGeneralLedgerResponse>('/accounting/general-ledger', { params }),
+    fetchApi<AccountingGeneralLedgerResponse>('/v1/accounting/general-ledger', { params }),
 
-  getAccountingCashFlow: (startDate?: string, endDate?: string) =>
-    fetchApi<AccountingCashFlow>('/accounting/cash-flow', {
-      params: { start_date: startDate, end_date: endDate }
-    }),
+  getAccountingCashFlow: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<AccountingCashFlow>('/v1/accounting/cash-flow', { params }),
 
   getAccountingPayables: (params?: {
     supplier_id?: number;
-    min_amount?: number;
-    limit?: number;
-    offset?: number;
     currency?: string;
-    aging_bucket?: string;
-    search?: string;
+    as_of_date?: string;
+    start_date?: string;
+    end_date?: string;
   }) =>
-    fetchApi<AccountingPayableResponse>('/accounting/accounts-payable', { params }),
+    fetchApi<AccountingPayableResponse>('/v1/accounting/accounts-payable', { params }),
 
   getAccountingReceivables: (params?: {
     customer_id?: number;
-    min_amount?: number;
-    limit?: number;
-    offset?: number;
+    currency?: string;
+    as_of_date?: string;
   }) =>
-    fetchApi<AccountingReceivableResponse>('/accounting/accounts-receivable', { params }),
+    fetchApi<AccountingReceivableResponse>('/v1/accounting/accounts-receivable', { params }),
+
+  getAccountingReceivablesOutstanding: (params?: { currency?: string; top?: number }) =>
+    fetchApi<AccountingOutstandingSummary>('/v1/accounting/receivables-outstanding', { params }),
+
+  getAccountingPayablesOutstanding: (params?: { currency?: string; top?: number }) =>
+    fetchApi<AccountingOutstandingSummary>('/v1/accounting/payables-outstanding', { params }),
 
   getAccountingJournalEntries: (params?: {
     voucher_type?: string;
+    party?: string;
+    cost_center?: string;
     start_date?: string;
     end_date?: string;
+    currency?: string;
+    search?: string;
     limit?: number;
     offset?: number;
   }) =>
-    fetchApi<AccountingJournalEntryListResponse>('/accounting/journal-entries', { params }),
+    fetchApi<AccountingJournalEntryListResponse>('/v1/accounting/journal-entries', { params }),
+
+  getAccountingJournalEntryDetail: (id: number) =>
+    fetchApi<AccountingJournalEntry>(`/v1/accounting/journal-entries/${id}`),
 
   getAccountingSuppliers: (params?: {
     search?: string;
-    supplier_group?: string;
     limit?: number;
     offset?: number;
   }) =>
-    fetchApi<AccountingSupplierListResponse>('/accounting/suppliers', { params }),
+    fetchApi<AccountingSupplierListResponse>('/v1/accounting/suppliers', { params }),
 
   getAccountingBankAccounts: () =>
-    fetchApi<AccountingBankAccountListResponse>('/accounting/bank-accounts'),
+    fetchApi<AccountingBankAccountListResponse>('/v1/accounting/bank-accounts'),
 
   getAccountingFiscalYears: () =>
-    fetchApi<AccountingFiscalYearListResponse>('/accounting/fiscal-years'),
+    fetchApi<AccountingFiscalYearListResponse>('/v1/accounting/fiscal-years'),
 
   getAccountingCostCenters: () =>
-    fetchApi<AccountingCostCenterListResponse>('/accounting/cost-centers'),
+    fetchApi<AccountingCostCenterListResponse>('/v1/accounting/cost-centers'),
+
+  getAccountingPurchaseInvoices: (params?: {
+    status?: string;
+    supplier_id?: number;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
+  }) => fetchApi<AccountingPurchaseInvoiceListResponse>('/v1/accounting/purchase-invoices', { params }),
+
+  getAccountingPurchaseInvoiceDetail: (id: number, currency?: string) =>
+    fetchApi<AccountingPurchaseInvoiceDetail>(`/v1/accounting/purchase-invoices/${id}`, { params: { currency } }),
+
+  getAccountingBankTransactions: (params?: {
+    status?: string;
+    account?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+    page?: number;
+    page_size?: number;
+  }) => fetchApi<AccountingBankTransactionListResponse>('/v1/accounting/bank-transactions', { params }),
+
+  getAccountingBankTransactionDetail: (id: number | string) =>
+    fetchApi<AccountingBankTransactionDetail>(`/v1/accounting/bank-transactions/${id}`),
+
+  // Purchasing Domain
+  getPurchasingDashboard: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+    fetchApi<PurchasingDashboard>('/v1/purchasing/dashboard', { params }),
+
+  getPurchasingBills: (params?: {
+    status?: string;
+    supplier?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    outstanding_only?: boolean;
+    overdue_only?: boolean;
+    search?: string;
+    sort_by?: 'posting_date' | 'due_date' | 'grand_total' | 'outstanding_amount' | 'supplier';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingBillListResponse>('/v1/purchasing/bills', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingBillDetail: (id: number) =>
+    fetchApi<PurchasingBillDetail>(`/v1/purchasing/bills/${id}`),
+
+  createPurchasingBill: (body: PurchasingBillPayload) =>
+    fetchApi<PurchasingBillDetail>('/v1/purchasing/bills', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updatePurchasingBill: (id: number, body: PurchasingBillPayload) =>
+    fetchApi<PurchasingBillDetail>(`/v1/purchasing/bills/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deletePurchasingBill: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/purchasing/bills/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getPurchasingPayments: (params?: {
+    supplier?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingPaymentListResponse>('/v1/purchasing/payments', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingPaymentDetail: (id: number) =>
+    fetchApi<PurchasingPaymentDetail>(`/v1/purchasing/payments/${id}`),
+
+  getPurchasingOrders: (params?: {
+    supplier?: string;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'transaction_date' | 'grand_total' | 'supplier_name';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingOrderListResponse>('/v1/purchasing/orders', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingOrderDetail: (id: number) =>
+    fetchApi<PurchasingOrderDetail>(`/v1/purchasing/orders/${id}`),
+
+  createPurchasingOrder: (body: PurchasingOrderPayload) =>
+    fetchApi<PurchasingOrderDetail>('/v1/purchasing/orders', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updatePurchasingOrder: (id: number, body: PurchasingOrderPayload) =>
+    fetchApi<PurchasingOrderDetail>(`/v1/purchasing/orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deletePurchasingOrder: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/purchasing/orders/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getPurchasingDebitNotes: (params?: {
+    supplier?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    currency?: string;
+    search?: string;
+    sort_by?: 'posting_date' | 'grand_total' | 'supplier_name';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingDebitNoteListResponse>('/v1/purchasing/debit-notes', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingDebitNoteDetail: (id: number) =>
+    fetchApi<PurchasingDebitNoteDetail>(`/v1/purchasing/debit-notes/${id}`),
+
+  createPurchasingDebitNote: (body: PurchasingDebitNotePayload) =>
+    fetchApi<PurchasingDebitNoteDetail>('/v1/purchasing/debit-notes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updatePurchasingDebitNote: (id: number, body: PurchasingDebitNotePayload) =>
+    fetchApi<PurchasingDebitNoteDetail>(`/v1/purchasing/debit-notes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deletePurchasingDebitNote: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/purchasing/debit-notes/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getPurchasingSuppliers: (params?: {
+    search?: string;
+    supplier_group?: string;
+    supplier_type?: string;
+    include_disabled?: boolean;
+    sort_by?: 'supplier_name' | 'supplier_group' | 'country';
+    sort_dir?: 'asc' | 'desc';
+    country?: string;
+    with_outstanding?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingSupplierListResponse>('/v1/purchasing/suppliers', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingSupplierGroups: () =>
+    fetchApi<PurchasingSupplierGroupsResponse>('/v1/purchasing/suppliers/groups'),
+
+  getPurchasingSupplierDetail: (id: number) =>
+    fetchApi<PurchasingSupplierDetail>(`/v1/purchasing/suppliers/${id}`),
+
+  getPurchasingExpenses: (params?: {
+    account?: string;
+    cost_center?: string;
+    expense_type?: string;
+    employee_id?: number;
+    project_id?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    min_amount?: number;
+    max_amount?: number;
+    currency?: string;
+    search?: string;
+    sort_by?: 'posting_date' | 'expense_date' | 'total_claimed_amount' | 'employee_name';
+    sort_dir?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+  }) => {
+    const paging =
+      params && params.limit !== undefined
+        ? {
+            page_size: params.limit,
+            page: params.offset !== undefined && params.limit > 0 ? Math.floor(params.offset / params.limit) + 1 : undefined,
+          }
+        : {};
+    return fetchApi<PurchasingExpenseListResponse>('/v1/purchasing/expenses', { params: { ...params, ...paging } });
+  },
+
+  getPurchasingExpenseTypes: (params?: {
+    start_date?: string;
+    end_date?: string;
+  }) => fetchApi<PurchasingExpenseTypesResponse>('/v1/purchasing/expenses/types', { params }),
+
+  getPurchasingExpenseDetail: (id: number) =>
+    fetchApi<PurchasingExpenseDetail>(`/v1/purchasing/expenses/${id}`),
+
+  createPurchasingExpense: (body: PurchasingExpensePayload) =>
+    fetchApi<PurchasingExpenseDetail>('/v1/purchasing/expenses', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updatePurchasingExpense: (id: number, body: PurchasingExpensePayload) =>
+    fetchApi<PurchasingExpenseDetail>(`/v1/purchasing/expenses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deletePurchasingExpense: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/purchasing/expenses/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
+
+  getPurchasingAging: (params?: {
+    as_of_date?: string;
+    supplier?: string;
+    currency?: string;
+  }) => fetchApi<PurchasingAgingResponse>('/v1/purchasing/aging', { params }),
+
+  getPurchasingBySupplier: (params?: {
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    currency?: string;
+  }) => fetchApi<PurchasingBySupplierResponse>('/v1/purchasing/analytics/by-supplier', { params }),
+
+  getPurchasingByCostCenter: (params?: {
+    start_date?: string;
+    end_date?: string;
+    currency?: string;
+  }) => fetchApi<PurchasingByCostCenterResponse>('/v1/purchasing/analytics/by-cost-center', { params }),
+
+  getPurchasingExpenseTrend: (params?: {
+    months?: number;
+    interval?: 'month' | 'week';
+    currency?: string;
+  }) => fetchApi<PurchasingExpenseTrendResponse>('/v1/purchasing/analytics/expense-trend', { params }),
 
   // Data Explorer - Query specific entity
   // Uses /explore/tables/{table} for simple queries or /explore/query for filtered queries
@@ -1472,6 +2806,472 @@ export const api = {
       };
     }
   },
+
+  // Inventory mutations
+  createInventoryItem: (body: InventoryItemPayload) =>
+    fetchApi(`/v1/inventory/items`, { method: 'POST', body: JSON.stringify(body) }),
+
+  updateInventoryItem: (id: number | string, body: Partial<InventoryItemPayload>) =>
+    fetchApi(`/v1/inventory/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteInventoryItem: (id: number | string) =>
+    fetchApi(`/v1/inventory/items/${id}?soft=true`, { method: 'DELETE' }),
+
+  createInventoryWarehouse: (body: InventoryWarehousePayload) =>
+    fetchApi(`/v1/inventory/warehouses`, { method: 'POST', body: JSON.stringify(body) }),
+
+  updateInventoryWarehouse: (id: number | string, body: Partial<InventoryWarehousePayload>) =>
+    fetchApi(`/v1/inventory/warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteInventoryWarehouse: (id: number | string) =>
+    fetchApi(`/v1/inventory/warehouses/${id}?soft=true`, { method: 'DELETE' }),
+
+  createInventoryStockEntry: (body: InventoryStockEntryPayload) =>
+    fetchApi(`/v1/inventory/stock-entries`, { method: 'POST', body: JSON.stringify(body) }),
+
+  // HR Domain
+  getHrLeaveTypes: (params?: { search?: string; is_lwp?: boolean; is_carry_forward?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrLeaveType>>('/hr/leave-types', { params }),
+
+  getHrLeaveTypeDetail: (id: number | string) =>
+    fetchApi<HrLeaveType>(`/hr/leave-types/${id}`),
+
+  getHrHolidayLists: (params?: { search?: string; company?: string; from_date?: string; to_date?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrHolidayList>>('/hr/holiday-lists', { params }),
+
+  getHrHolidayListDetail: (id: number | string) =>
+    fetchApi<HrHolidayList>(`/hr/holiday-lists/${id}`),
+
+  createHrHolidayList: (body: HrHolidayListPayload) =>
+    fetchApi<HrHolidayList>('/hr/holiday-lists', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrHolidayList: (id: number | string, body: Partial<HrHolidayListPayload>) =>
+    fetchApi<HrHolidayList>(`/hr/holiday-lists/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrHolidayList: (id: number | string) =>
+    fetchApi<void>(`/hr/holiday-lists/${id}`, { method: 'DELETE' }),
+
+  getHrLeavePolicies: (params?: { search?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrLeavePolicy>>('/hr/leave-policies', { params }),
+
+  getHrLeavePolicyDetail: (id: number | string) =>
+    fetchApi<HrLeavePolicy>(`/hr/leave-policies/${id}`),
+
+  createHrLeavePolicy: (body: HrLeavePolicyPayload) =>
+    fetchApi<HrLeavePolicy>('/hr/leave-policies', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrLeavePolicy: (id: number | string, body: Partial<HrLeavePolicyPayload>) =>
+    fetchApi<HrLeavePolicy>(`/hr/leave-policies/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrLeavePolicy: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-policies/${id}`, { method: 'DELETE' }),
+
+  getHrLeaveAllocations: (params?: { employee_id?: number; leave_type_id?: number; status?: string; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrLeaveAllocation>>('/hr/leave-allocations', { params }),
+
+  getHrLeaveAllocationDetail: (id: number | string) =>
+    fetchApi<HrLeaveAllocation>(`/hr/leave-allocations/${id}`),
+
+  createHrLeaveAllocation: (body: HrLeaveAllocationPayload) =>
+    fetchApi<HrLeaveAllocation>('/hr/leave-allocations', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrLeaveAllocation: (id: number | string, body: Partial<HrLeaveAllocationPayload>) =>
+    fetchApi<HrLeaveAllocation>(`/hr/leave-allocations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrLeaveAllocation: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-allocations/${id}`, { method: 'DELETE' }),
+
+  getHrLeaveApplications: (params?: { employee_id?: number; leave_type_id?: number; status?: string; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrLeaveApplication>>('/hr/leave-applications', { params }),
+
+  getHrLeaveApplicationDetail: (id: number | string) =>
+    fetchApi<HrLeaveApplication>(`/hr/leave-applications/${id}`),
+
+  createHrLeaveApplication: (body: HrLeaveApplicationPayload) =>
+    fetchApi<HrLeaveApplication>('/hr/leave-applications', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrLeaveApplication: (id: number | string, body: Partial<HrLeaveApplicationPayload>) =>
+    fetchApi<HrLeaveApplication>(`/hr/leave-applications/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrLeaveApplication: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-applications/${id}`, { method: 'DELETE' }),
+
+  getHrShiftTypes: (params?: { search?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrShiftType>>('/hr/shift-types', { params }),
+
+  getHrShiftTypeDetail: (id: number | string) =>
+    fetchApi<HrShiftType>(`/hr/shift-types/${id}`),
+
+  getHrShiftAssignments: (params?: { employee_id?: number; shift_type_id?: number; start_date?: string; end_date?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrShiftAssignment>>('/hr/shift-assignments', { params }),
+
+  getHrShiftAssignmentDetail: (id: number | string) =>
+    fetchApi<HrShiftAssignment>(`/hr/shift-assignments/${id}`),
+
+  createHrShiftAssignment: (body: HrShiftAssignmentPayload) =>
+    fetchApi<HrShiftAssignment>('/hr/shift-assignments', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrShiftAssignment: (id: number | string, body: Partial<HrShiftAssignmentPayload>) =>
+    fetchApi<HrShiftAssignment>(`/hr/shift-assignments/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrShiftAssignment: (id: number | string) =>
+    fetchApi<void>(`/hr/shift-assignments/${id}`, { method: 'DELETE' }),
+
+  getHrAttendances: (params?: { employee_id?: number; status?: string; attendance_date?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrAttendance>>('/hr/attendances', { params }),
+
+  getHrAttendanceDetail: (id: number | string) =>
+    fetchApi<HrAttendance>(`/hr/attendances/${id}`),
+
+  createHrAttendance: (body: HrAttendancePayload) =>
+    fetchApi<HrAttendance>('/hr/attendances', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrAttendance: (id: number | string, body: Partial<HrAttendancePayload>) =>
+    fetchApi<HrAttendance>(`/hr/attendances/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrAttendance: (id: number | string) =>
+    fetchApi<void>(`/hr/attendances/${id}`, { method: 'DELETE' }),
+
+  getHrAttendanceRequests: (params?: { employee_id?: number; status?: string; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrAttendanceRequest>>('/hr/attendance-requests', { params }),
+
+  getHrAttendanceRequestDetail: (id: number | string) =>
+    fetchApi<HrAttendanceRequest>(`/hr/attendance-requests/${id}`),
+
+  createHrAttendanceRequest: (body: HrAttendanceRequestPayload) =>
+    fetchApi<HrAttendanceRequest>('/hr/attendance-requests', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrAttendanceRequest: (id: number | string, body: Partial<HrAttendanceRequestPayload>) =>
+    fetchApi<HrAttendanceRequest>(`/hr/attendance-requests/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrAttendanceRequest: (id: number | string) =>
+    fetchApi<void>(`/hr/attendance-requests/${id}`, { method: 'DELETE' }),
+
+  getHrJobOpenings: (params?: { status?: string; company?: string; posting_date_from?: string; posting_date_to?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrJobOpening>>('/hr/job-openings', { params }),
+
+  getHrJobOpeningDetail: (id: number | string) =>
+    fetchApi<HrJobOpening>(`/hr/job-openings/${id}`),
+
+  createHrJobOpening: (body: HrJobOpeningPayload) =>
+    fetchApi<HrJobOpening>('/hr/job-openings', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrJobOpening: (id: number | string, body: Partial<HrJobOpeningPayload>) =>
+    fetchApi<HrJobOpening>(`/hr/job-openings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrJobOpening: (id: number | string) =>
+    fetchApi<void>(`/hr/job-openings/${id}`, { method: 'DELETE' }),
+
+  getHrJobApplicants: (params?: { status?: string; job_title?: string; posting_date_from?: string; posting_date_to?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrJobApplicant>>('/hr/job-applicants', { params }),
+
+  getHrJobApplicantDetail: (id: number | string) =>
+    fetchApi<HrJobApplicant>(`/hr/job-applicants/${id}`),
+
+  createHrJobApplicant: (body: HrJobApplicantPayload) =>
+    fetchApi<HrJobApplicant>('/hr/job-applicants', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrJobApplicant: (id: number | string, body: Partial<HrJobApplicantPayload>) =>
+    fetchApi<HrJobApplicant>(`/hr/job-applicants/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrJobApplicant: (id: number | string) =>
+    fetchApi<void>(`/hr/job-applicants/${id}`, { method: 'DELETE' }),
+
+  getHrJobOffers: (params?: { status?: string; company?: string; job_applicant?: string; offer_date_from?: string; offer_date_to?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrJobOffer>>('/hr/job-offers', { params }),
+
+  getHrJobOfferDetail: (id: number | string) =>
+    fetchApi<HrJobOffer>(`/hr/job-offers/${id}`),
+
+  createHrJobOffer: (body: HrJobOfferPayload) =>
+    fetchApi<HrJobOffer>('/hr/job-offers', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrJobOffer: (id: number | string, body: Partial<HrJobOfferPayload>) =>
+    fetchApi<HrJobOffer>(`/hr/job-offers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrJobOffer: (id: number | string) =>
+    fetchApi<void>(`/hr/job-offers/${id}`, { method: 'DELETE' }),
+
+  getHrSalaryComponents: (params?: { component_type?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrSalaryComponent>>('/hr/salary-components', { params }),
+
+  getHrSalaryComponentDetail: (id: number | string) =>
+    fetchApi<HrSalaryComponent>(`/hr/salary-components/${id}`),
+
+  createHrSalaryComponent: (body: HrSalaryComponentPayload) =>
+    fetchApi<HrSalaryComponent>('/hr/salary-components', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrSalaryComponent: (id: number | string, body: Partial<HrSalaryComponentPayload>) =>
+    fetchApi<HrSalaryComponent>(`/hr/salary-components/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrSalaryComponent: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-components/${id}`, { method: 'DELETE' }),
+
+  getHrSalaryStructures: (params?: { company?: string; is_active?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrSalaryStructure>>('/hr/salary-structures', { params }),
+
+  getHrSalaryStructureDetail: (id: number | string) =>
+    fetchApi<HrSalaryStructure>(`/hr/salary-structures/${id}`),
+
+  createHrSalaryStructure: (body: HrSalaryStructurePayload) =>
+    fetchApi<HrSalaryStructure>('/hr/salary-structures', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrSalaryStructure: (id: number | string, body: Partial<HrSalaryStructurePayload>) =>
+    fetchApi<HrSalaryStructure>(`/hr/salary-structures/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrSalaryStructure: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-structures/${id}`, { method: 'DELETE' }),
+
+  getHrSalaryStructureAssignments: (params?: { employee_id?: number; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrSalaryStructureAssignment>>('/hr/salary-structure-assignments', { params }),
+
+  getHrSalaryStructureAssignmentDetail: (id: number | string) =>
+    fetchApi<HrSalaryStructureAssignment>(`/hr/salary-structure-assignments/${id}`),
+
+  createHrSalaryStructureAssignment: (body: HrSalaryStructureAssignmentPayload) =>
+    fetchApi<HrSalaryStructureAssignment>('/hr/salary-structure-assignments', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrSalaryStructureAssignment: (id: number | string, body: Partial<HrSalaryStructureAssignmentPayload>) =>
+    fetchApi<HrSalaryStructureAssignment>(`/hr/salary-structure-assignments/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrSalaryStructureAssignment: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-structure-assignments/${id}`, { method: 'DELETE' }),
+
+  getHrPayrollEntries: (params?: { company?: string; posting_date_from?: string; posting_date_to?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrPayrollEntry>>('/hr/payroll-entries', { params }),
+
+  getHrPayrollEntryDetail: (id: number | string) =>
+    fetchApi<HrPayrollEntry>(`/hr/payroll-entries/${id}`),
+
+  createHrPayrollEntry: (body: HrPayrollEntryPayload) =>
+    fetchApi<HrPayrollEntry>('/hr/payroll-entries', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrPayrollEntry: (id: number | string, body: Partial<HrPayrollEntryPayload>) =>
+    fetchApi<HrPayrollEntry>(`/hr/payroll-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrPayrollEntry: (id: number | string) =>
+    fetchApi<void>(`/hr/payroll-entries/${id}`, { method: 'DELETE' }),
+
+  getHrSalarySlips: (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrSalarySlip>>('/hr/salary-slips', { params }),
+
+  getHrSalarySlipDetail: (id: number | string) =>
+    fetchApi<HrSalarySlip>(`/hr/salary-slips/${id}`),
+
+  createHrSalarySlip: (body: HrSalarySlipPayload) =>
+    fetchApi<HrSalarySlip>('/hr/salary-slips', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrSalarySlip: (id: number | string, body: Partial<HrSalarySlipPayload>) =>
+    fetchApi<HrSalarySlip>(`/hr/salary-slips/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrSalarySlip: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-slips/${id}`, { method: 'DELETE' }),
+
+  getHrTrainingPrograms: (params?: { search?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrTrainingProgram>>('/hr/training-programs', { params }),
+
+  getHrTrainingProgramDetail: (id: number | string) =>
+    fetchApi<HrTrainingProgram>(`/hr/training-programs/${id}`),
+
+  createHrTrainingProgram: (body: HrTrainingProgramPayload) =>
+    fetchApi<HrTrainingProgram>('/hr/training-programs', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrTrainingProgram: (id: number | string, body: Partial<HrTrainingProgramPayload>) =>
+    fetchApi<HrTrainingProgram>(`/hr/training-programs/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrTrainingProgram: (id: number | string) =>
+    fetchApi<void>(`/hr/training-programs/${id}`, { method: 'DELETE' }),
+
+  getHrTrainingEvents: (params?: { status?: string; company?: string; start_date?: string; end_date?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrTrainingEvent>>('/hr/training-events', { params }),
+
+  getHrTrainingEventDetail: (id: number | string) =>
+    fetchApi<HrTrainingEvent>(`/hr/training-events/${id}`),
+
+  createHrTrainingEvent: (body: HrTrainingEventPayload) =>
+    fetchApi<HrTrainingEvent>('/hr/training-events', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrTrainingEvent: (id: number | string, body: Partial<HrTrainingEventPayload>) =>
+    fetchApi<HrTrainingEvent>(`/hr/training-events/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrTrainingEvent: (id: number | string) =>
+    fetchApi<void>(`/hr/training-events/${id}`, { method: 'DELETE' }),
+
+  getHrTrainingResults: (params?: { employee_id?: number; training_event?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrTrainingResult>>('/hr/training-results', { params }),
+
+  getHrTrainingResultDetail: (id: number | string) =>
+    fetchApi<HrTrainingResult>(`/hr/training-results/${id}`),
+
+  createHrTrainingResult: (body: HrTrainingResultPayload) =>
+    fetchApi<HrTrainingResult>('/hr/training-results', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrTrainingResult: (id: number | string, body: Partial<HrTrainingResultPayload>) =>
+    fetchApi<HrTrainingResult>(`/hr/training-results/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrTrainingResult: (id: number | string) =>
+    fetchApi<void>(`/hr/training-results/${id}`, { method: 'DELETE' }),
+
+  getHrAppraisalTemplates: (params?: { company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrAppraisalTemplate>>('/hr/appraisal-templates', { params }),
+
+  getHrAppraisalTemplateDetail: (id: number | string) =>
+    fetchApi<HrAppraisalTemplate>(`/hr/appraisal-templates/${id}`),
+
+  createHrAppraisalTemplate: (body: HrAppraisalTemplatePayload) =>
+    fetchApi<HrAppraisalTemplate>('/hr/appraisal-templates', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrAppraisalTemplate: (id: number | string, body: Partial<HrAppraisalTemplatePayload>) =>
+    fetchApi<HrAppraisalTemplate>(`/hr/appraisal-templates/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrAppraisalTemplate: (id: number | string) =>
+    fetchApi<void>(`/hr/appraisal-templates/${id}`, { method: 'DELETE' }),
+
+  getHrAppraisals: (params?: { employee_id?: number; status?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrAppraisal>>('/hr/appraisals', { params }),
+
+  getHrAppraisalDetail: (id: number | string) =>
+    fetchApi<HrAppraisal>(`/hr/appraisals/${id}`),
+
+  createHrAppraisal: (body: HrAppraisalPayload) =>
+    fetchApi<HrAppraisal>('/hr/appraisals', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrAppraisal: (id: number | string, body: Partial<HrAppraisalPayload>) =>
+    fetchApi<HrAppraisal>(`/hr/appraisals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrAppraisal: (id: number | string) =>
+    fetchApi<void>(`/hr/appraisals/${id}`, { method: 'DELETE' }),
+
+  getHrEmployeeOnboardings: (params?: { employee_id?: number; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrEmployeeOnboarding>>('/hr/employee-onboardings', { params }),
+
+  getHrEmployeeOnboardingDetail: (id: number | string) =>
+    fetchApi<HrEmployeeOnboarding>(`/hr/employee-onboardings/${id}`),
+
+  createHrEmployeeOnboarding: (body: HrEmployeeOnboardingPayload) =>
+    fetchApi<HrEmployeeOnboarding>('/hr/employee-onboardings', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrEmployeeOnboarding: (id: number | string, body: Partial<HrEmployeeOnboardingPayload>) =>
+    fetchApi<HrEmployeeOnboarding>(`/hr/employee-onboardings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrEmployeeOnboarding: (id: number | string) =>
+    fetchApi<void>(`/hr/employee-onboardings/${id}`, { method: 'DELETE' }),
+
+  getHrEmployeeSeparations: (params?: { employee_id?: number; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrEmployeeSeparation>>('/hr/employee-separations', { params }),
+
+  getHrEmployeeSeparationDetail: (id: number | string) =>
+    fetchApi<HrEmployeeSeparation>(`/hr/employee-separations/${id}`),
+
+  createHrEmployeeSeparation: (body: HrEmployeeSeparationPayload) =>
+    fetchApi<HrEmployeeSeparation>('/hr/employee-separations', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrEmployeeSeparation: (id: number | string, body: Partial<HrEmployeeSeparationPayload>) =>
+    fetchApi<HrEmployeeSeparation>(`/hr/employee-separations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrEmployeeSeparation: (id: number | string) =>
+    fetchApi<void>(`/hr/employee-separations/${id}`, { method: 'DELETE' }),
+
+  getHrEmployeePromotions: (params?: { employee_id?: number; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrEmployeePromotion>>('/hr/employee-promotions', { params }),
+
+  getHrEmployeePromotionDetail: (id: number | string) =>
+    fetchApi<HrEmployeePromotion>(`/hr/employee-promotions/${id}`),
+
+  createHrEmployeePromotion: (body: HrEmployeePromotionPayload) =>
+    fetchApi<HrEmployeePromotion>('/hr/employee-promotions', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrEmployeePromotion: (id: number | string, body: Partial<HrEmployeePromotionPayload>) =>
+    fetchApi<HrEmployeePromotion>(`/hr/employee-promotions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrEmployeePromotion: (id: number | string) =>
+    fetchApi<void>(`/hr/employee-promotions/${id}`, { method: 'DELETE' }),
+
+  getHrEmployeeTransfers: (params?: { employee_id?: number; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrEmployeeTransfer>>('/hr/employee-transfers', { params }),
+
+  getHrEmployeeTransferDetail: (id: number | string) =>
+    fetchApi<HrEmployeeTransfer>(`/hr/employee-transfers/${id}`),
+
+  // HR Analytics
+  getHrAnalyticsOverview: (params?: { company?: string }) =>
+    fetchApi<HrAnalyticsOverview>('/hr/analytics/overview', { params }),
+
+  getHrAnalyticsLeaveTrend: (params?: { company?: string; months?: number }) =>
+    fetchApi<HrLeaveTrendPoint[]>('/hr/analytics/leave-trend', { params }),
+
+  getHrAnalyticsAttendanceTrend: (params?: { company?: string; days?: number }) =>
+    fetchApi<HrAttendanceTrendPoint[]>('/hr/analytics/attendance-trend', { params }),
+
+  getHrAnalyticsPayrollSummary: (params?: { company?: string; department?: string; start_date?: string; end_date?: string; status?: string }) =>
+    fetchApi<HrPayrollSummary>('/hr/analytics/payroll-summary', { params }),
+
+  getHrAnalyticsPayrollTrend: (params?: { company?: string; department?: string; start_date?: string; end_date?: string }) =>
+    fetchApi<HrPayrollTrendPoint[]>('/hr/analytics/payroll-trend', { params }),
+
+  getHrAnalyticsPayrollComponents: (params?: { component_type?: string; company?: string; start_date?: string; end_date?: string; limit?: number }) =>
+    fetchApi<HrPayrollComponentBreakdown[]>('/hr/analytics/payroll-components', { params }),
+
+  getHrAnalyticsRecruitmentFunnel: (params?: { company?: string; job_title?: string; start_date?: string; end_date?: string }) =>
+    fetchApi<HrRecruitmentFunnel>('/hr/analytics/recruitment-funnel', { params }),
+
+  getHrAnalyticsAppraisalStatus: (params?: { company?: string; department?: string; start_date?: string; end_date?: string }) =>
+    fetchApi<HrAppraisalStatusBreakdown>('/hr/analytics/appraisal-status', { params }),
+
+  getHrAnalyticsLifecycleEvents: (params?: { company?: string; start_date?: string; end_date?: string }) =>
+    fetchApi<HrLifecycleEventsBreakdown>('/hr/analytics/lifecycle-events', { params }),
+
+  createHrEmployeeTransfer: (body: HrEmployeeTransferPayload) =>
+    fetchApi<HrEmployeeTransfer>('/hr/employee-transfers', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrEmployeeTransfer: (id: number | string, body: Partial<HrEmployeeTransferPayload>) =>
+    fetchApi<HrEmployeeTransfer>(`/hr/employee-transfers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteHrEmployeeTransfer: (id: number | string) =>
+    fetchApi<void>(`/hr/employee-transfers/${id}`, { method: 'DELETE' }),
+
+  // Reports Domain
+  getReportsRevenueSummary: () =>
+    fetchApi<ReportsRevenueSummary>('/v1/reports/revenue/summary'),
+
+  getReportsRevenueTrend: () =>
+    fetchApi<ReportsRevenueTrendPoint[]>('/v1/reports/revenue/trend'),
+
+  getReportsRevenueByCustomer: () =>
+    fetchApi<ReportsRevenueByCustomer[]>('/v1/reports/revenue/by-customer'),
+
+  getReportsRevenueByProduct: () =>
+    fetchApi<ReportsRevenueByProduct[]>('/v1/reports/revenue/by-product'),
+
+  getReportsExpensesSummary: () =>
+    fetchApi<ReportsExpensesSummary>('/v1/reports/expenses/summary'),
+
+  getReportsExpensesTrend: () =>
+    fetchApi<ReportsExpenseTrendPoint[]>('/v1/reports/expenses/trend'),
+
+  getReportsExpensesByCategory: () =>
+    fetchApi<ReportsExpenseByCategory[]>('/v1/reports/expenses/by-category'),
+
+  getReportsExpensesByVendor: () =>
+    fetchApi<ReportsExpenseByVendor[]>('/v1/reports/expenses/by-vendor'),
+
+  getReportsProfitabilityMargins: () =>
+    fetchApi<ReportsProfitabilityMargins>('/v1/reports/profitability/margins'),
+
+  getReportsProfitabilityTrend: () =>
+    fetchApi<ReportsProfitabilityTrendPoint[]>('/v1/reports/profitability/trend'),
+
+  getReportsProfitabilityBySegment: () =>
+    fetchApi<ReportsProfitabilityBySegment[]>('/v1/reports/profitability/by-segment'),
+
+  getReportsCashPositionSummary: () =>
+    fetchApi<ReportsCashPositionSummary>('/v1/reports/cash-position/summary'),
+
+  getReportsCashPositionForecast: () =>
+    fetchApi<ReportsCashPositionForecastPoint[]>('/v1/reports/cash-position/forecast'),
+
+  getReportsCashPositionRunway: () =>
+    fetchApi<ReportsCashPositionRunway>('/v1/reports/cash-position/runway'),
 };
 
 // Additional types
@@ -1949,49 +3749,94 @@ export interface FinanceInvoice {
   invoice_number: string | null;
   customer_id: number | null;
   customer_name?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  tax_amount?: number | null;
   total_amount: number;
   amount_paid: number;
-  balance: number;
+  balance: number | null;
   status: string;
   invoice_date: string | null;
   due_date: string | null;
-  days_overdue: number;
+  paid_date?: string | null;
+  days_overdue?: number | null;
+  category?: string | null;
   currency: string | null;
   source?: string | null;
-  credit_note_id?: number | null;
-  credit_note_number?: string | null;
+  external_ids?: { splynx_id?: string | null; erpnext_id?: string | null };
+  write_back_status?: string | null;
 }
 
 export interface FinanceInvoiceDetail extends FinanceInvoice {
-  description?: string | null;
-  tax_amount?: number;
-  paid_date?: string | null;
-  category?: string | null;
-  credit_note_id?: number | null;
-  credit_note_number?: string | null;
-  external_ids?: {
-    splynx_id?: number | null;
-    erpnext_id?: number | null;
-  };
-  customer?: {
-    id: number | null;
-    name: string | null;
-    email: string | null;
-  };
+  customer?: { id?: number | null; name?: string | null; email?: string | null };
+  items?: Array<{
+    id?: number | string;
+    item_code?: string | null;
+    item_name?: string | null;
+    description?: string | null;
+    qty?: number;
+    stock_qty?: number;
+    uom?: string | null;
+    stock_uom?: string | null;
+    conversion_factor?: number;
+    rate?: number;
+    price_list_rate?: number;
+    discount_percentage?: number;
+    discount_amount?: number;
+    amount?: number;
+    net_amount?: number;
+    warehouse?: string | null;
+    income_account?: string | null;
+    expense_account?: string | null;
+    cost_center?: string | null;
+    sales_order?: string | null;
+    delivery_note?: string | null;
+    idx?: number;
+  }>;
   payments?: Array<{
     id: number;
     amount: number;
-    payment_date: string | null;
-    payment_method: string | null;
+    payment_method?: string | null;
     status: string;
+    payment_date: string | null;
+    currency?: string | null;
+  }>;
+  credit_notes?: Array<{
+    id: number;
+    amount: number;
+    status: string;
+    issue_date: string | null;
   }>;
 }
 
 export interface FinanceInvoiceListResponse {
-  data: FinanceInvoice[];
+  invoices: FinanceInvoice[];
   total: number;
-  limit: number;
-  offset: number;
+  page: number;
+  page_size: number;
+}
+
+export interface FinanceInvoicePayload {
+  invoice_number?: string | null;
+  customer_id?: number | null;
+  description?: string | null;
+  amount?: number | null;
+  tax_amount?: number | null;
+  amount_paid?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  invoice_date?: string | null;
+  due_date?: string | null;
+  paid_date?: string | null;
+  category?: string | null;
+  total_amount?: number | null; // fallback until backend fully aligns
+  balance?: number | null;
+  line_items?: Array<{
+    description?: string | null;
+    quantity?: number;
+    unit_price?: number;
+    tax_rate?: number;
+  }>;
 }
 
 export interface FinancePayment {
@@ -2009,140 +3854,355 @@ export interface FinancePayment {
   notes?: string | null;
   invoice_id?: number | null;
   source?: string | null;
+  external_ids?: { splynx_id?: string | null; erpnext_id?: string | null };
+  write_back_status?: string | null;
 }
 
 export interface FinancePaymentDetail extends FinancePayment {
-  external_ids?: {
-    splynx_id?: number | null;
-    erpnext_id?: number | null;
-  };
-  customer?: {
-    id: number | null;
-    name: string | null;
-    email: string | null;
-  };
+  customer?: { id?: number | null; name?: string | null; email?: string | null };
   invoice?: {
     id: number | null;
     invoice_number: string | null;
-    total_amount: number | null;
+    total_amount?: number | null;
   };
+  references?: Array<{
+    id?: number;
+    reference_doctype?: string | null;
+    reference_name?: string | null;
+    total_amount?: number | null;
+    outstanding_amount?: number | null;
+    allocated_amount?: number | null;
+    exchange_rate?: number | null;
+    exchange_gain_loss?: number | null;
+    due_date?: string | null;
+    idx?: number;
+  }>;
 }
 
 export interface FinancePaymentListResponse {
-  data: FinancePayment[];
+  payments: FinancePayment[];
   total: number;
-  limit: number;
-  offset: number;
+  page: number;
+  page_size: number;
+}
+
+export interface FinancePaymentPayload {
+  customer_id: number | null;
+  invoice_id?: number | null;
+  receipt_number?: string | null;
+  amount: number;
+  currency?: string | null;
+  payment_method?: string | null;
+  status?: string;
+  payment_date?: string | null;
+  transaction_reference?: string | null;
+  gateway_reference?: string | null;
+  notes?: string | null;
 }
 
 export interface FinanceCreditNote {
   id: number;
-  credit_note_number: string | null;
+  credit_number: string | null;
   customer_id: number | null;
   customer_name?: string | null;
   amount: number;
   currency: string | null;
   status: string;
-  date: string | null;
-  reason: string | null;
+  issue_date: string | null;
+  applied_date?: string | null;
+  description: string | null;
   invoice_id?: number | null;
   source?: string | null;
+  write_back_status?: string | null;
 }
 
 export interface FinanceCreditNoteDetail extends FinanceCreditNote {
-  external_ids?: { splynx_id?: number | null };
-  customer?: { id: number | null; name: string | null; email: string | null };
   invoice?: { id: number | null; invoice_number: string | null; total_amount?: number | null };
-  description?: string | null;
 }
 
 export interface FinanceCreditNoteListResponse {
-  data: FinanceCreditNote[];
+  credit_notes: FinanceCreditNote[];
   total: number;
-  limit: number;
-  offset: number;
+  page: number;
+  page_size: number;
+}
+
+export interface FinanceCreditNotePayload {
+  credit_number?: string | null;
+  customer_id?: number | null;
+  invoice_id?: number | null;
+  description?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  issue_date?: string | null;
+  applied_date?: string | null;
+}
+
+export interface FinanceOrderItem {
+  id?: number;
+  item_code?: string | null;
+  item_name?: string | null;
+  description?: string | null;
+  qty?: number | null;
+  stock_qty?: number | null;
+  uom?: string | null;
+  stock_uom?: string | null;
+  conversion_factor?: number | null;
+  rate?: number | null;
+  price_list_rate?: number | null;
+  discount_percentage?: number | null;
+  discount_amount?: number | null;
+  amount?: number | null;
+  net_amount?: number | null;
+  delivered_qty?: number | null;
+  billed_amt?: number | null;
+  warehouse?: string | null;
+  delivery_date?: string | null;
+  expense_account?: string | null;
+  cost_center?: string | null;
+  schedule_date?: string | null;
+  idx?: number | null;
+}
+
+export interface FinanceOrder {
+  id: number;
+  order_number: string | null;
+  customer_id: number | null;
+  customer_name?: string | null;
+  order_type?: string | null;
+  company?: string | null;
+  status: string | null;
+  total_amount: number;
+  currency: string | null;
+  order_date?: string | null;
+  transaction_date?: string | null;
+  delivery_date?: string | null;
+  description?: string | null;
+  total_qty?: number | null;
+  net_total?: number | null;
+  grand_total?: number | null;
+  rounded_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  per_delivered?: number | null;
+  per_billed?: number | null;
+  billing_status?: string | null;
+  delivery_status?: string | null;
+  erpnext_id?: string | null;
+  items?: FinanceOrderItem[];
+  write_back_status?: string | null;
+}
+
+export interface FinanceOrderListResponse {
+  orders: FinanceOrder[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface FinanceOrderPayload {
+  customer_id?: number | null;
+  customer_name?: string | null;
+  order_type?: string | null;
+  company?: string | null;
+  currency?: string | null;
+  transaction_date?: string | null;
+  delivery_date?: string | null;
+  total_qty?: number | null;
+  total?: number | null;
+  net_total?: number | null;
+  grand_total?: number | null;
+  rounded_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  per_delivered?: number | null;
+  per_billed?: number | null;
+  billing_status?: string | null;
+  delivery_status?: string | null;
+  status?: string | null;
+  sales_partner?: string | null;
+  territory?: string | null;
+  source?: string | null;
+  campaign?: string | null;
+  order_number?: string | null; // retained for UI but optional
+  description?: string | null;
+}
+
+export interface FinanceQuotationItem {
+  id?: number;
+  item_code?: string | null;
+  item_name?: string | null;
+  description?: string | null;
+  qty?: number | null;
+  stock_qty?: number | null;
+  uom?: string | null;
+  stock_uom?: string | null;
+  conversion_factor?: number | null;
+  rate?: number | null;
+  price_list_rate?: number | null;
+  discount_percentage?: number | null;
+  discount_amount?: number | null;
+  amount?: number | null;
+  net_amount?: number | null;
+  idx?: number | null;
+}
+
+export interface FinanceQuotation {
+  id: number;
+  quotation_number: string | null;
+  customer_id: number | null;
+  customer_name?: string | null;
+  quotation_to?: string | null;
+  party_name?: string | null;
+  order_type?: string | null;
+  company?: string | null;
+  status: string | null;
+  total_amount: number;
+  currency: string | null;
+  quotation_date?: string | null;
+  transaction_date?: string | null;
+  valid_till?: string | null;
+  description?: string | null;
+  total_qty?: number | null;
+  total?: number | null;
+  net_total?: number | null;
+  grand_total?: number | null;
+  rounded_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  sales_partner?: string | null;
+  territory?: string | null;
+  source?: string | null;
+  campaign?: string | null;
+  order_lost_reason?: string | null;
+  erpnext_id?: string | null;
+  items?: FinanceQuotationItem[];
+  write_back_status?: string | null;
+}
+
+export interface FinanceQuotationListResponse {
+  quotations: FinanceQuotation[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface FinanceQuotationPayload {
+  quotation_to?: string | null;
+  party_name?: string | null;
+  customer_name?: string | null;
+  order_type?: string | null;
+  company?: string | null;
+  currency?: string | null;
+  transaction_date?: string | null;
+  valid_till?: string | null;
+  total_qty?: number | null;
+  total?: number | null;
+  net_total?: number | null;
+  grand_total?: number | null;
+  rounded_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  status?: string | null;
+  sales_partner?: string | null;
+  territory?: string | null;
+  source?: string | null;
+  campaign?: string | null;
+  order_lost_reason?: string | null;
+  quotation_number?: string | null;
+  description?: string | null;
+}
+
+export interface FinanceCustomerPayload {
+  name: string;
+  email?: string | null;
+  billing_email?: string | null;
+  phone?: string | null;
+  phone_secondary?: string | null;
+  address?: string | null;
+  address_2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+  country?: string | null;
+  customer_type?: string | null;
+  status?: string | null;
+  billing_type?: string | null;
+  gps?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  signup_date?: string | null;
 }
 
 export interface FinanceRevenueTrend {
   period: string;
-  year: number;
-  month: number;
   revenue: number;
-  payment_count: number;
+  payment_count?: number;
 }
 
 export interface FinanceCollectionsAnalytics {
   by_method: Array<{
     method: string;
+    amount: number;
     count: number;
-    total: number;
   }>;
-  payment_timing: {
-    early: number;
-    on_time: number;
-    late: number;
-    total: number;
-  };
+  timing?: Record<string, number>;
   daily_totals?: Array<{
     date: string;
-    total: number;
-    paid?: number;
+    amount: number;
+    count: number;
   }>;
+  meta?: Record<string, unknown>;
 }
 
 export interface FinanceAgingAnalytics {
-  currency?: string;
-  buckets: Array<{
-    bucket: string;
-    count: number;
-    outstanding: number;
-  }>;
-  summary: {
-    total_outstanding: number;
-    at_risk: number;
-    at_risk_percent: number;
+  buckets: {
+    current: FinanceAgingBucket;
+    '1_30': FinanceAgingBucket;
+    '31_60': FinanceAgingBucket;
+    '61_90': FinanceAgingBucket;
+    over_90: FinanceAgingBucket;
   };
+  total_invoices: number;
+}
+
+export interface FinanceAgingBucket {
+  count: number;
+  total: number;
+  invoices: Array<{
+    id: number;
+    customer_name: string | null;
+    total_amount: number;
+    balance: number | null;
+    due_date: string | null;
+    status: string;
+  }>;
 }
 
 export interface FinanceByCurrencyAnalytics {
   by_currency: Array<{
     currency: string;
-    mrr: number;
-    arr: number;
-    subscription_count: number;
-    outstanding: number;
+    mrr?: number;
+    arr?: number;
+    subscription_count?: number;
+    outstanding?: number;
   }>;
 }
 
 export interface FinancePaymentBehavior {
-  summary: {
-    customers_with_payments: number;
-    customers_with_overdue: number;
-    avg_late_payment_delay_days: number;
-  };
-  recommendations: Array<{
-    priority: string;
-    issue: string;
-    action: string;
-  }>;
+  avg_days_to_pay?: number;
+  late_payments_percent?: number;
+  early_payments_percent?: number;
+  on_time_percent?: number;
+  late_count?: number;
+  early_count?: number;
+  on_time_count?: number;
+  best_payers?: Array<{ customer_name?: string | null; avg_days_to_pay?: number }>;
+  worst_payers?: Array<{ customer_name?: string | null; avg_days_to_pay?: number }>;
+  stats?: Record<string, number>;
 }
 
 export interface FinanceForecast {
-  currency: string;
-  current: {
-    mrr: number;
-    arr: number;
-  };
-  activity_30d: {
-    new_subscriptions: number;
-  };
-  projections: {
-    month_1: number;
-    month_2: number;
-    month_3: number;
-    quarter_total: number;
-  };
-  notes?: string | null;
+  baseline_mrr: number;
+  projection: Array<{ period: string; mrr: number }>;
+  assumptions?: Record<string, unknown>;
 }
 
 // Accounting Domain Types
@@ -2163,6 +4223,7 @@ export interface AccountingChartOfAccounts {
   accounts: AccountingAccount[];
   tree: AccountingAccountTreeNode[];
   total_accounts: number;
+  total?: number;
 }
 
 export interface AccountingAccountTreeNode {
@@ -2303,15 +4364,15 @@ export interface AccountingPayable {
 
 export interface AccountingPayableResponse {
   total_payable: number;
-  total_invoices: number;
-  aging: {
+  total_invoices?: number;
+  aging?: {
     current: number;
     '1_30': number;
     '31_60': number;
     '61_90': number;
     over_90: number;
   };
-  suppliers: AccountingPayable[];
+  suppliers?: AccountingPayable[];
   currency?: string;
 }
 
@@ -2331,16 +4392,54 @@ export interface AccountingReceivable {
 
 export interface AccountingReceivableResponse {
   total_receivable: number;
-  total_invoices: number;
-  aging: {
+  total_invoices?: number;
+  aging?: {
     current: number;
     '1_30': number;
     '31_60': number;
     '61_90': number;
     over_90: number;
   };
-  customers: AccountingReceivable[];
+  customers?: AccountingReceivable[];
   currency?: string;
+}
+
+export interface AccountingTaxCategory {
+  id?: number;
+  name?: string;
+  description?: string | null;
+  rate?: number | null;
+  is_withholding?: boolean;
+}
+
+export interface AccountingTaxTemplate {
+  id?: number;
+  name?: string;
+  type?: string | null;
+  description?: string | null;
+  rate?: number | null;
+  account?: string | null;
+}
+
+export interface AccountingTaxSummary {
+  total?: number;
+  period?: { start?: string; end?: string };
+  by_account?: Array<{
+    account: string;
+    account_name?: string | null;
+    amount: number;
+  }>;
+}
+
+export interface AccountingOutstandingSummary {
+  total?: number;
+  top?: Array<{
+    id?: number | string;
+    name?: string;
+    amount?: number;
+    currency?: string | null;
+  }>;
+  currency?: string | null;
 }
 
 export interface AccountingJournalEntry {
@@ -2360,6 +4459,28 @@ export interface AccountingJournalEntry {
     party_type?: string | null;
     party?: string | null;
     cost_center?: string | null;
+  }>;
+  accounts?: Array<{
+    id?: number;
+    account?: string;
+    account_type?: string | null;
+    party_type?: string | null;
+    party?: string | null;
+    debit?: number;
+    credit?: number;
+    debit_in_account_currency?: number;
+    credit_in_account_currency?: number;
+    exchange_rate?: number;
+    reference_type?: string | null;
+    reference_name?: string | null;
+    reference_due_date?: string | null;
+    cost_center?: string | null;
+    project?: string | null;
+    bank_account?: string | null;
+    cheque_no?: string | null;
+    cheque_date?: string | null;
+    user_remark?: string | null;
+    idx?: number;
   }>;
 }
 
@@ -2414,6 +4535,94 @@ export interface AccountingBankAccountListResponse {
   total: number;
 }
 
+export interface AccountingAccountDetail extends AccountingAccount {
+  ledger?: AccountingGeneralLedgerEntry[];
+}
+
+export interface AccountingPurchaseInvoice {
+  id: number;
+  invoice_number: string | null;
+  supplier_id: number | null;
+  supplier_name?: string | null;
+  status: string;
+  total_amount: number;
+  balance?: number | null;
+  currency?: string | null;
+  invoice_date: string | null;
+  due_date: string | null;
+  description?: string | null;
+}
+
+export interface AccountingPurchaseInvoiceDetail extends AccountingPurchaseInvoice {
+  lines?: Array<{
+    item?: string | null;
+    description?: string | null;
+    quantity?: number;
+    rate?: number;
+    amount?: number;
+  }>;
+  payments?: Array<{
+    id: number;
+    amount: number;
+    status: string;
+    payment_date: string | null;
+    method?: string | null;
+  }>;
+}
+
+export interface AccountingPurchaseInvoiceListResponse {
+  purchase_invoices: AccountingPurchaseInvoice[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AccountingBankTransaction {
+  id: number;
+  erpnext_id?: string | null;
+  account: string;
+  company?: string | null;
+  status: string;
+  amount: number;
+  currency?: string | null;
+  transaction_date: string | null;
+  description?: string | null;
+  reference?: string | null;
+  reference_number?: string | null;
+  transaction_id?: string | null;
+  transaction_type?: string | null;
+  deposit?: number | null;
+  withdrawal?: number | null;
+  allocated_amount?: number | null;
+  unallocated_amount?: number | null;
+  party_type?: string | null;
+  party?: string | null;
+  bank_party_name?: string | null;
+  bank_party_account_number?: string | null;
+  bank_party_iban?: string | null;
+  docstatus?: number | null;
+}
+
+export interface AccountingBankTransactionListResponse {
+  transactions: AccountingBankTransaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AccountingBankTransactionPayment {
+  id?: number;
+  erpnext_id?: string | null;
+  payment_document?: string | null;
+  payment_entry?: string | null;
+  allocated_amount?: number | null;
+  idx?: number | null;
+}
+
+export interface AccountingBankTransactionDetail extends AccountingBankTransaction {
+  payments?: AccountingBankTransactionPayment[];
+}
+
 export interface AccountingFiscalYear {
   id: number;
   name: string;
@@ -2466,4 +4675,1121 @@ export interface AccountingDashboard {
   currency?: string;
 }
 
+// Purchasing Domain Types
+export interface PurchasingDashboard {
+  as_of_date: string;
+  total_outstanding: number;
+  total_overdue: number;
+  overdue_percentage: number;
+  supplier_count: number;
+  status_breakdown: Record<string, { count: number; total: number }>;
+  due_this_week: { count: number; total: number };
+  top_suppliers: Array<{ name: string; outstanding: number; bill_count: number }>;
+}
+
+export interface PurchasingBill {
+  id: number;
+  erpnext_id: string | null;
+  supplier: string | null;
+  supplier_name: string | null;
+  posting_date: string | null;
+  due_date: string | null;
+  grand_total: number;
+  outstanding_amount: number;
+  status: string | null;
+  currency: string | null;
+  is_overdue: boolean;
+  days_overdue: number;
+  write_back_status?: string | null;
+}
+
+export interface PurchasingBillListResponse {
+  bills: PurchasingBill[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PurchasingBillDetail extends PurchasingBill {
+  net_total: number | null;
+  total_taxes_and_charges: number;
+  company: string | null;
+  cost_center: string | null;
+  remarks: string | null;
+  items?: Array<{
+    id?: number;
+    item_code?: string | null;
+    item_name?: string | null;
+    description?: string | null;
+    qty?: number;
+    stock_qty?: number;
+    uom?: string | null;
+    stock_uom?: string | null;
+    conversion_factor?: number;
+    rate?: number;
+    price_list_rate?: number;
+    discount_percentage?: number;
+    discount_amount?: number;
+    amount?: number;
+    net_amount?: number;
+    warehouse?: string | null;
+    expense_account?: string | null;
+    cost_center?: string | null;
+    purchase_order?: string | null;
+    purchase_receipt?: string | null;
+    idx?: number;
+  }>;
+  gl_entries: Array<{
+    id: number;
+    account: string;
+    debit: number;
+    credit: number;
+    cost_center: string | null;
+  }>;
+}
+
+export interface PurchasingBillPayload {
+  supplier?: string | null;
+  supplier_name?: string | null;
+  company?: string | null;
+  posting_date?: string | null;
+  due_date?: string | null;
+  grand_total?: number | null;
+  outstanding_amount?: number | null;
+  paid_amount?: number | null;
+  currency?: string | null;
+  status?: string | null;
+}
+
+export interface PurchasingPayment {
+  id: number;
+  receipt_number: string | null;
+  supplier_id?: number | null;
+  supplier_name?: string | null;
+  purchase_invoice_id?: number | null;
+  amount: number;
+  currency: string | null;
+  payment_method: string | null;
+  status: string | null;
+  payment_date: string | null;
+  transaction_reference?: string | null;
+  gateway_reference?: string | null;
+  notes?: string | null;
+}
+
+export interface PurchasingPaymentListResponse {
+  payments: PurchasingPayment[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PurchasingPaymentDetail extends PurchasingPayment {}
+
+export interface PurchasingSupplier {
+  id: number;
+  erpnext_id: string | null;
+  name: string | null;
+  group: string | null;
+  type: string | null;
+  country: string | null;
+  currency: string | null;
+  email: string | null;
+  mobile: string | null;
+  outstanding: number;
+}
+
+export interface PurchasingSupplierListResponse {
+  suppliers: PurchasingSupplier[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PurchasingSupplierDetail extends PurchasingSupplier {
+  tax_id: string | null;
+  pan: string | null;
+  total_purchases: number;
+  total_outstanding: number;
+  bill_count: number;
+  recent_bills: Array<{
+    id: number;
+    bill_no: string | null;
+    date: string | null;
+    amount: number;
+    outstanding: number;
+    status: string | null;
+  }>;
+}
+
+export interface PurchasingSupplierGroupsResponse {
+  total_groups: number;
+  groups: Array<{ name: string; count: number; outstanding: number }>;
+}
+
+export interface PurchasingExpense {
+  id: number;
+  posting_date: string | null;
+  account?: string;
+  amount: number;
+  party: string | null;
+  voucher_type: string | null;
+  voucher_no: string | null;
+  cost_center: string | null;
+  status?: string | null;
+  employee_id?: number | null;
+  purpose?: string | null;
+  total_claimed_amount?: number | null;
+  total_sanctioned_amount?: number | null;
+  total_amount_reimbursed?: number | null;
+  company?: string | null;
+  currency?: string | null;
+  write_back_status?: string | null;
+}
+
+export interface PurchasingExpenseListResponse {
+  expenses: PurchasingExpense[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary?: Record<string, any>;
+}
+
+export interface PurchasingExpenseDetail extends PurchasingExpense {
+  purpose?: string | null;
+  employee_name?: string | null;
+  expense_date?: string | null;
+  notes?: string | null;
+}
+
+export interface PurchasingExpensePayload {
+  employee_id?: number | null;
+  purpose?: string | null;
+  posting_date?: string | null;
+  total_claimed_amount?: number | null;
+  total_sanctioned_amount?: number | null;
+  total_amount_reimbursed?: number | null;
+  currency?: string | null;
+  status?: string | null;
+  company?: string | null;
+  cost_center?: string | null;
+}
+
+export interface PurchasingExpenseTypesResponse {
+  total_expenses: number;
+  expense_types: Array<{
+    account: string;
+    account_name: string | null;
+    total: number;
+    entry_count: number;
+    percentage: number;
+  }>;
+}
+
+export interface PurchasingAgingBucket {
+  count: number;
+  total: number;
+  invoices: Array<{
+    id: number;
+    invoice_no: string | null;
+    supplier: string | null;
+    posting_date: string | null;
+    due_date: string | null;
+    grand_total: number;
+    outstanding: number;
+    days_overdue: number;
+  }>;
+}
+
+export interface PurchasingAgingResponse {
+  as_of_date: string;
+  total_payable: number;
+  total_invoices: number;
+  aging: {
+    current: PurchasingAgingBucket;
+    '1_30': PurchasingAgingBucket;
+    '31_60': PurchasingAgingBucket;
+    '61_90': PurchasingAgingBucket;
+    over_90: PurchasingAgingBucket;
+  };
+}
+
+export interface PurchasingBySupplierResponse {
+  total: number;
+  suppliers: Array<{
+    name: string | null;
+    bill_count: number;
+    total_purchases: number;
+    outstanding: number;
+    percentage: number;
+  }>;
+}
+
+export interface PurchasingByCostCenterResponse {
+  total: number;
+  cost_centers: Array<{
+    name: string;
+    total: number;
+    entry_count: number;
+    percentage: number;
+  }>;
+}
+
+export interface PurchasingExpenseTrendResponse {
+  granularity: string;
+  trend: Array<{
+    period: string | null;
+    total: number;
+    entry_count: number;
+  }>;
+}
+
+export interface PurchasingDebitNote {
+  id: number;
+  erpnext_id: string | null;
+  supplier: string | null;
+  posting_date: string | null;
+  grand_total: number;
+  status: string | null;
+  return_against: string | null;
+  write_back_status?: string | null;
+}
+
+export interface PurchasingDebitNoteListResponse {
+  debit_notes: PurchasingDebitNote[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PurchasingDebitNoteDetail extends PurchasingDebitNote {
+  due_date?: string | null;
+  outstanding_amount?: number | null;
+  paid_amount?: number | null;
+  total_taxes_and_charges?: number | null;
+  currency?: string | null;
+  conversion_rate?: number | null;
+  company?: string | null;
+  items?: Array<{
+    id?: number;
+    item_code?: string | null;
+    item_name?: string | null;
+    description?: string | null;
+    qty?: number;
+    stock_qty?: number;
+    uom?: string | null;
+    stock_uom?: string | null;
+    conversion_factor?: number;
+    rate?: number;
+    amount?: number;
+    net_amount?: number;
+    expense_account?: string | null;
+    cost_center?: string | null;
+    purchase_invoice?: string | null;
+    purchase_invoice_item?: string | null;
+    idx?: number;
+  }>;
+}
+
+export interface PurchasingDebitNotePayload {
+  supplier?: string | null;
+  supplier_name?: string | null;
+  company?: string | null;
+  posting_date?: string | null;
+  due_date?: string | null;
+  return_against?: string | null;
+  grand_total?: number | null;
+  outstanding_amount?: number | null;
+  paid_amount?: number | null;
+  total_taxes_and_charges?: number | null;
+  currency?: string | null;
+  conversion_rate?: number | null;
+  status?: string | null;
+}
+
+export interface PurchasingOrder {
+  id?: number;
+  order_no: string | null;
+  supplier: string | null;
+  date: string | null;
+  total: number;
+  grand_total?: number | null;
+  schedule_date?: string | null;
+  status?: string | null;
+  currency?: string | null;
+  write_back_status?: string | null;
+}
+
+export interface PurchasingOrderListResponse {
+  orders: PurchasingOrder[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PurchasingOrderDetail extends PurchasingOrder {
+  net_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  discount_amount?: number | null;
+  per_billed?: number | null;
+  per_received?: number | null;
+  billed_amt?: number | null;
+  received_amt?: number | null;
+  company?: string | null;
+  conversion_rate?: number | null;
+  cost_center?: string | null;
+  project?: string | null;
+  payment_terms_template?: string | null;
+  items?: Array<{
+    id?: number;
+    item_code?: string | null;
+    item_name?: string | null;
+    description?: string | null;
+    qty?: number;
+    stock_qty?: number;
+    uom?: string | null;
+    stock_uom?: string | null;
+    conversion_factor?: number;
+    rate?: number;
+    price_list_rate?: number;
+    discount_percentage?: number;
+    discount_amount?: number;
+    amount?: number;
+    net_amount?: number;
+    received_qty?: number;
+    billed_amt?: number;
+    warehouse?: string | null;
+    schedule_date?: string | null;
+    expense_account?: string | null;
+    cost_center?: string | null;
+    idx?: number;
+  }>;
+}
+
+export interface PurchasingOrderPayload {
+  supplier?: string | null;
+  supplier_name?: string | null;
+  company?: string | null;
+  transaction_date?: string | null;
+  schedule_date?: string | null;
+  grand_total?: number | null;
+  net_total?: number | null;
+  total_taxes_and_charges?: number | null;
+  discount_amount?: number | null;
+  per_billed?: number | null;
+  per_received?: number | null;
+  billed_amt?: number | null;
+  received_amt?: number | null;
+  currency?: string | null;
+  conversion_rate?: number | null;
+  status?: string | null;
+  cost_center?: string | null;
+  project?: string | null;
+  payment_terms_template?: string | null;
+}
+
+// Inventory Domain Types
+export interface InventoryItemPayload {
+  item_code?: string;
+  item_name?: string;
+  description?: string | null;
+  item_group?: string | null;
+  uom?: string | null;
+  brand?: string | null;
+  is_stock_item?: boolean;
+  default_warehouse?: string | null;
+  reorder_level?: number | null;
+  reorder_qty?: number | null;
+  valuation_rate?: number | null;
+  standard_selling_rate?: number | null;
+  standard_buying_rate?: number | null;
+  serial_number_series?: string | null;
+  barcode?: string | null;
+  status?: string | null;
+}
+
+export interface InventoryWarehousePayload {
+  name?: string;
+  parent_warehouse?: string | null;
+  company?: string | null;
+  is_group?: boolean;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  contact_person?: string | null;
+  status?: string | null;
+}
+
+export interface InventoryStockEntryLine {
+  item_code: string;
+  qty: number;
+  uom: string;
+  s_warehouse?: string | null;
+  t_warehouse?: string | null;
+  rate?: number | null;
+  serial_nos?: string[] | null;
+}
+
+export interface InventoryStockEntryPayload {
+  entry_type: 'material_receipt' | 'material_issue' | 'material_transfer';
+  posting_date?: string | null;
+  company?: string | null;
+  remarks?: string | null;
+  lines: InventoryStockEntryLine[];
+}
+
+// Reports Domain Types
+export interface ReportsRevenueSummary {
+  mrr?: number;
+  arr?: number;
+  total_revenue?: number;
+  growth_rate?: number;
+  currency?: string | null;
+}
+
+export interface ReportsRevenueTrendPoint {
+  period: string;
+  revenue: number;
+  mrr?: number;
+  arr?: number;
+}
+
+export interface ReportsRevenueByCustomer {
+  customer?: string | null;
+  customer_id?: number | string | null;
+  revenue: number;
+  growth_rate?: number | null;
+}
+
+export interface ReportsRevenueByProduct {
+  product?: string | null;
+  revenue: number;
+  growth_rate?: number | null;
+}
+
+export interface ReportsExpensesSummary {
+  total_expenses?: number;
+  currency?: string | null;
+  categories?: Array<{ category: string; total: number; percentage?: number }>;
+}
+
+export interface ReportsExpenseTrendPoint {
+  period: string;
+  total: number;
+}
+
+export interface ReportsExpenseByCategory {
+  category: string;
+  total: number;
+  percentage?: number;
+}
+
+export interface ReportsExpenseByVendor {
+  vendor: string | null;
+  total: number;
+  invoice_count?: number;
+}
+
+export interface ReportsProfitabilityMargins {
+  gross_margin?: number;
+  operating_margin?: number;
+  net_margin?: number;
+}
+
+export interface ReportsProfitabilityTrendPoint {
+  period: string;
+  gross_margin?: number;
+  operating_margin?: number;
+  net_margin?: number;
+}
+
+export interface ReportsProfitabilityBySegment {
+  segment: string;
+  gross_margin?: number;
+  operating_margin?: number;
+  net_margin?: number;
+}
+
+export interface ReportsCashPositionSummary {
+  total_cash?: number;
+  currency?: string | null;
+  accounts?: Array<{ account: string; balance: number }>;
+  updated_at?: string | null;
+}
+
+export interface ReportsCashPositionForecastPoint {
+  period: string;
+  projected_cash: number;
+}
+
+export interface ReportsCashPositionRunway {
+  months_of_runway?: number;
+  burn_rate?: number;
+  currency?: string | null;
+}
+
 export { ApiError };
+export interface SupportAgentPayload {
+  employee_id?: number | null;
+  email?: string | null;
+  display_name?: string | null;
+  domains?: Record<string, boolean>;
+  skills?: Record<string, number>;
+  channel_caps?: Record<string, boolean>;
+  routing_weight?: number | null;
+  capacity?: number | null;
+  is_active?: boolean;
+}
+
+// HR Domain Types
+export interface HrListResponse<T> {
+  data: T[];
+  total: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface HrLeaveType {
+  id?: number;
+  leave_type?: string;
+  name?: string;
+  is_lwp?: boolean;
+  is_carry_forward?: boolean;
+}
+
+export interface HrHolidayItem {
+  holiday_date: string;
+  description?: string | null;
+  weekly_off?: boolean;
+  idx?: number;
+}
+
+export interface HrHolidayListPayload {
+  holiday_list_name: string;
+  from_date: string;
+  to_date: string;
+  company?: string | null;
+  weekly_off?: string | null;
+  holidays?: HrHolidayItem[];
+}
+
+export interface HrHolidayList extends HrHolidayListPayload {
+  id?: number;
+}
+
+export interface HrLeavePolicyDetail {
+  leave_type?: string;
+  annual_allocation?: number;
+  max_leaves?: number;
+  idx?: number;
+}
+
+export interface HrLeavePolicyPayload {
+  leave_policy_name: string;
+  company?: string | null;
+  details?: HrLeavePolicyDetail[];
+}
+
+export interface HrLeavePolicy extends HrLeavePolicyPayload {
+  id?: number;
+}
+
+export interface HrLeaveAllocationPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  leave_type: string;
+  leave_type_id?: number;
+  from_date: string;
+  to_date: string;
+  new_leaves_allocated?: number;
+  total_leaves_allocated?: number;
+  unused_leaves?: number;
+  carry_forwarded_leaves?: number;
+  carry_forwarded_leaves_count?: number;
+  leave_policy?: string;
+  status?: string;
+  docstatus?: number;
+  company?: string;
+}
+
+export interface HrLeaveAllocation extends HrLeaveAllocationPayload {
+  id?: number;
+}
+
+export interface HrLeaveApplicationPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  leave_type: string;
+  leave_type_id?: number;
+  from_date: string;
+  to_date: string;
+  total_leave_days?: number;
+  half_day?: boolean;
+  half_day_date?: string | null;
+  status?: string;
+  company?: string;
+  description?: string | null;
+  docstatus?: number;
+  leave_allocation?: string | null;
+}
+
+export interface HrLeaveApplication extends HrLeaveApplicationPayload {
+  id?: number;
+}
+
+export interface HrShiftType {
+  id?: number;
+  shift_type?: string;
+  name?: string;
+  company?: string;
+}
+
+export interface HrShiftAssignmentPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  shift_type: string;
+  shift_type_id?: number;
+  from_date: string;
+  to_date?: string;
+  status?: string;
+  company?: string;
+  docstatus?: number;
+}
+
+export interface HrShiftAssignment extends HrShiftAssignmentPayload {
+  id?: number;
+}
+
+export interface HrAttendancePayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  attendance_date: string;
+  status: string;
+  company?: string;
+  in_time?: string | null;
+  out_time?: string | null;
+  working_hours?: number;
+  late_entry?: boolean;
+  early_exit?: boolean;
+  docstatus?: number;
+}
+
+export interface HrAttendance extends HrAttendancePayload {
+  id?: number;
+}
+
+export interface HrAttendanceRequestPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  from_date: string;
+  to_date: string;
+  status?: string;
+  company?: string;
+  reason?: string | null;
+  docstatus?: number;
+}
+
+export interface HrAttendanceRequest extends HrAttendanceRequestPayload {
+  id?: number;
+}
+
+export interface HrJobOpeningPayload {
+  job_title: string;
+  status?: string;
+  company?: string;
+  designation?: string;
+  department?: string;
+  branch?: string;
+  posting_date?: string;
+  expected_date?: string;
+  vacancies?: number;
+  description?: string | null;
+  docstatus?: number;
+}
+
+export interface HrJobOpening extends HrJobOpeningPayload {
+  id?: number;
+}
+
+export interface HrJobApplicantPayload {
+  applicant_name: string;
+  email_id: string;
+  status?: string;
+  job_title?: string;
+  source?: string;
+  applicant_id?: string;
+  company?: string;
+  application_date?: string;
+  docstatus?: number;
+}
+
+export interface HrJobApplicant extends HrJobApplicantPayload {
+  id?: number;
+}
+
+export interface HrJobOfferTerm {
+  offer_term?: string;
+  value?: string;
+  value_type?: string;
+  idx?: number;
+}
+
+export interface HrJobOfferPayload {
+  job_applicant: string;
+  job_applicant_id?: number;
+  job_applicant_name?: string;
+  job_title?: string;
+  company?: string;
+  status?: string;
+  offer_date?: string;
+  designation?: string;
+  salary_structure?: string;
+  terms?: HrJobOfferTerm[];
+}
+
+export interface HrJobOffer extends HrJobOfferPayload {
+  id?: number;
+}
+
+export interface HrSalaryComponentPayload {
+  salary_component: string;
+  abbr?: string;
+  type: string;
+  company?: string;
+  depends_on_payment_days?: boolean;
+  do_not_include_in_total?: boolean;
+  round_to_the_nearest_integer?: boolean;
+}
+
+export interface HrSalaryComponent extends HrSalaryComponentPayload {
+  id?: number;
+}
+
+export interface HrSalaryStructureLine {
+  salary_component: string;
+  abbr?: string;
+  amount?: number;
+  default_amount?: number;
+  idx?: number;
+}
+
+export interface HrSalaryStructurePayload {
+  name: string;
+  company?: string;
+  is_active?: boolean;
+  currency?: string;
+  earnings?: HrSalaryStructureLine[];
+  deductions?: HrSalaryStructureLine[];
+}
+
+export interface HrSalaryStructure extends HrSalaryStructurePayload {
+  id?: number;
+}
+
+export interface HrSalaryStructureAssignmentPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  salary_structure: string;
+  from_date: string;
+  to_date?: string;
+  base?: number;
+  variable?: number;
+  company?: string;
+}
+
+export interface HrSalaryStructureAssignment extends HrSalaryStructureAssignmentPayload {
+  id?: number;
+}
+
+export interface HrPayrollEntryPayload {
+  company: string;
+  posting_date: string;
+  payroll_frequency: string;
+  start_date: string;
+  end_date: string;
+  status?: string;
+  docstatus?: number;
+}
+
+export interface HrPayrollEntry extends HrPayrollEntryPayload {
+  id?: number;
+}
+
+export interface HrSalarySlipPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  department?: string;
+  designation?: string;
+  branch?: string;
+  salary_structure?: string;
+  posting_date: string;
+  start_date: string;
+  end_date: string;
+  payroll_frequency?: string;
+  company: string;
+  currency?: string;
+  total_working_days?: number;
+  absent_days?: number;
+  payment_days?: number;
+  leave_without_pay?: number;
+  gross_pay?: number;
+  total_deduction?: number;
+  net_pay?: number;
+  rounded_total?: number;
+  status?: string;
+  docstatus?: number;
+  bank_name?: string | null;
+  bank_account_no?: string | null;
+  payroll_entry?: string | null;
+  earnings?: HrSalaryStructureLine[];
+  deductions?: HrSalaryStructureLine[];
+}
+
+export interface HrSalarySlip extends HrSalarySlipPayload {
+  id?: number;
+}
+
+export interface HrTrainingProgramPayload {
+  program_name: string;
+  description?: string | null;
+  company?: string;
+}
+
+export interface HrTrainingProgram extends HrTrainingProgramPayload {
+  id?: number;
+}
+
+export interface HrTrainingEventEmployee {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  attendance?: string;
+  feedback?: string | null;
+  idx?: number;
+}
+
+export interface HrTrainingEventPayload {
+  training_event_name: string;
+  training_program: string;
+  status?: string;
+  company?: string;
+  start_time?: string;
+  end_time?: string;
+  location?: string | null;
+  instructor?: string | null;
+  employees?: HrTrainingEventEmployee[];
+}
+
+export interface HrTrainingEvent extends HrTrainingEventPayload {
+  id?: number;
+}
+
+export interface HrTrainingResultPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  training_event: string;
+  result?: string;
+  score?: number;
+  company?: string;
+}
+
+export interface HrTrainingResult extends HrTrainingResultPayload {
+  id?: number;
+}
+
+export interface HrAppraisalTemplateGoal {
+  goal: string;
+  weightage?: number;
+  idx?: number;
+}
+
+export interface HrAppraisalTemplatePayload {
+  template_name: string;
+  company?: string;
+  goals?: HrAppraisalTemplateGoal[];
+}
+
+export interface HrAppraisalTemplate extends HrAppraisalTemplatePayload {
+  id?: number;
+}
+
+export interface HrAppraisalGoal {
+  goal: string;
+  weightage?: number;
+  score?: number;
+  rating?: string;
+  idx?: number;
+}
+
+export interface HrAppraisalPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  company?: string;
+  status?: string;
+  appraisal_template?: string;
+  start_date?: string;
+  end_date?: string;
+  goals?: HrAppraisalGoal[];
+}
+
+export interface HrAppraisal extends HrAppraisalPayload {
+  id?: number;
+}
+
+export interface HrOnboardingActivity {
+  activity: string;
+  status?: string;
+  idx?: number;
+}
+
+export interface HrEmployeeOnboardingPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  company?: string;
+  status?: string;
+  activities?: HrOnboardingActivity[];
+}
+
+export interface HrEmployeeOnboarding extends HrEmployeeOnboardingPayload {
+  id?: number;
+}
+
+export interface HrSeparationActivity {
+  activity: string;
+  status?: string;
+  idx?: number;
+}
+
+export interface HrEmployeeSeparationPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  company?: string;
+  reason?: string;
+  notice_date?: string;
+  relieving_date?: string;
+  status?: string;
+  activities?: HrSeparationActivity[];
+}
+
+export interface HrEmployeeSeparation extends HrEmployeeSeparationPayload {
+  id?: number;
+}
+
+export interface HrEmployeePromotionDetail {
+  promotion_based_on?: string;
+  current_designation?: string;
+  new_designation?: string;
+  idx?: number;
+}
+
+export interface HrEmployeePromotionPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  promotion_date: string;
+  company?: string;
+  status?: string;
+  details?: HrEmployeePromotionDetail[];
+}
+
+export interface HrEmployeePromotion extends HrEmployeePromotionPayload {
+  id?: number;
+}
+
+export interface HrEmployeeTransferDetail {
+  from_department?: string;
+  to_department?: string;
+  idx?: number;
+}
+
+export interface HrEmployeeTransferPayload {
+  employee: string;
+  employee_id?: number;
+  employee_name?: string;
+  company?: string;
+  transfer_date: string;
+  status?: string;
+  details?: HrEmployeeTransferDetail[];
+}
+
+export interface HrEmployeeTransfer extends HrEmployeeTransferPayload {
+  id?: number;
+}
+
+// HR Analytics Types
+export interface HrAnalyticsOverview {
+  leave_by_status?: Record<string, number>;
+  attendance_status_30d?: Record<string, number>;
+  recruitment_funnel?: Record<string, number>;
+  payroll_30d?: {
+    gross_total?: number;
+    deduction_total?: number;
+    net_total?: number;
+    slip_count?: number;
+  };
+  training_events_by_status?: Record<string, number>;
+  appraisals_by_status?: Record<string, number>;
+}
+
+export interface HrLeaveTrendPoint {
+  month: string;
+  count: number;
+}
+
+export interface HrAttendanceTrendPoint {
+  date: string;
+  status_counts?: Record<string, number>;
+  total?: number;
+}
+
+export interface HrPayrollSummary {
+  gross_total?: number;
+  deduction_total?: number;
+  net_total?: number;
+  average_gross?: number;
+  average_net?: number;
+  slip_count?: number;
+}
+
+export interface HrPayrollTrendPoint {
+  month: string;
+  gross_total?: number;
+  deduction_total?: number;
+  net_total?: number;
+  slip_count?: number;
+}
+
+export interface HrPayrollComponentBreakdown {
+  salary_component?: string;
+  component_type?: string;
+  amount?: number;
+  count?: number;
+}
+
+export interface HrRecruitmentFunnel {
+  openings?: Record<string, number>;
+  applicants?: Record<string, number>;
+  offers?: Record<string, number>;
+}
+
+export interface HrAppraisalStatusBreakdown {
+  status_counts?: Record<string, number>;
+}
+
+export interface HrLifecycleEventsBreakdown {
+  onboarding?: Record<string, number>;
+  separation?: Record<string, number>;
+  promotion?: Record<string, number>;
+  transfer?: Record<string, number>;
+}

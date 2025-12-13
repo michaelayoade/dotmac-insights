@@ -746,7 +746,7 @@ export default function CustomersPage() {
               <div className="flex flex-wrap gap-2 mb-4">
                 {[
                   { key: 'profile', label: 'Profile' },
-                  { key: 'finance', label: 'Finance' },
+                  { key: 'sales', label: 'Sales' },
                   { key: 'services', label: 'Services' },
                   { key: 'network', label: 'Network' },
                   { key: 'support', label: 'Support' },
@@ -824,7 +824,6 @@ export default function CustomersPage() {
                   </div>
                 )}
 
-                {/* Finance */}
                 {detailTab === 'finance' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">

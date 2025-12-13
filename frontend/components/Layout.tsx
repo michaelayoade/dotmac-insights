@@ -6,9 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
-  Radio,
   TrendingUp,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Activity,
@@ -21,8 +19,24 @@ import {
   User,
   LogOut,
   Key,
-  DollarSign,
   Calculator,
+  ShoppingCart,
+  FileText,
+  CreditCard,
+  Receipt,
+  ArrowLeftRight,
+  Clock,
+  BookOpen,
+  LifeBuoy,
+  ClipboardList,
+  CalendarClock,
+  Clock3,
+  Briefcase,
+  Wallet2,
+  GraduationCap,
+  Target,
+  GitMerge,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
@@ -35,40 +49,101 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string | number;
   requiredScopes?: Scope[];
-  children?: NavItem[];
 }
 
-const navigation: NavItem[] = [
+const navigationGroups: { label: string; items: NavItem[] }[] = [
   {
-    name: 'Customers',
-    href: '/customers',
-    icon: Users,
-    requiredScopes: ['customers:read', 'explore:read'],
-    children: [
+    label: 'Sales (AR)',
+    items: [
+      { name: 'Dashboard', href: '/sales', icon: LayoutDashboard, requiredScopes: ['analytics:read'] },
+      { name: 'Invoices', href: '/sales/invoices', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Payments', href: '/sales/payments', icon: CreditCard, requiredScopes: ['analytics:read'] },
+      { name: 'Credit Notes', href: '/sales/credit-notes', icon: Receipt, requiredScopes: ['analytics:read'] },
+      { name: 'Orders', href: '/sales/orders', icon: ShoppingCart, requiredScopes: ['analytics:read'] },
+      { name: 'Quotations', href: '/sales/quotations', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Customers', href: '/sales/customers', icon: Users, requiredScopes: ['analytics:read'] },
+      { name: 'Analytics', href: '/sales/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+      { name: 'Insights', href: '/sales/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'HR',
+    items: [
+      { name: 'Overview', href: '/hr', icon: LayoutDashboard, requiredScopes: ['hr:read'] },
+      { name: 'Leave', href: '/hr/leave', icon: CalendarClock, requiredScopes: ['hr:read'] },
+      { name: 'Attendance', href: '/hr/attendance', icon: Clock3, requiredScopes: ['hr:read'] },
+      { name: 'Recruitment', href: '/hr/recruitment', icon: Briefcase, requiredScopes: ['hr:read'] },
+      { name: 'Payroll', href: '/hr/payroll', icon: Wallet2, requiredScopes: ['hr:read'] },
+      { name: 'Training', href: '/hr/training', icon: GraduationCap, requiredScopes: ['hr:read'] },
+      { name: 'Appraisals', href: '/hr/appraisals', icon: Target, requiredScopes: ['hr:read'] },
+      { name: 'Lifecycle', href: '/hr/lifecycle', icon: GitMerge, requiredScopes: ['hr:read'] },
+      { name: 'Analytics', href: '/hr/analytics', icon: Activity, requiredScopes: ['hr:read'] },
+    ],
+  },
+  {
+    label: 'Purchasing (AP)',
+    items: [
+      { name: 'Dashboard', href: '/purchasing', icon: ShoppingCart, requiredScopes: ['analytics:read'] },
+      { name: 'Bills', href: '/purchasing/bills', icon: Receipt, requiredScopes: ['analytics:read'] },
+      { name: 'Payments', href: '/purchasing/payments', icon: CreditCard, requiredScopes: ['analytics:read'] },
+      { name: 'Orders', href: '/purchasing/orders', icon: ShoppingCart, requiredScopes: ['analytics:read'] },
+      { name: 'Debit Notes', href: '/purchasing/debit-notes', icon: ArrowLeftRight, requiredScopes: ['analytics:read'] },
+      { name: 'Aging', href: '/purchasing/aging', icon: Clock, requiredScopes: ['analytics:read'] },
+      { name: 'Analytics', href: '/purchasing/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Books',
+    items: [
+      { name: 'Dashboard', href: '/books', icon: LayoutDashboard, requiredScopes: ['analytics:read'] },
+      { name: 'General (GL/Statements)', href: '/books/general-ledger', icon: Activity, requiredScopes: ['analytics:read'] },
+      { name: 'Accounts Receivable', href: '/books/accounts-receivable', icon: Users, requiredScopes: ['analytics:read'] },
+      { name: 'AR Credit', href: '/books/accounts-receivable/credit', icon: Lock, requiredScopes: ['analytics:read'] },
+      { name: 'Dunning', href: '/books/accounts-receivable/dunning', icon: Bell, requiredScopes: ['analytics:read'] },
+      { name: 'Accounts Payable', href: '/books/accounts-payable', icon: ArrowLeftRight, requiredScopes: ['analytics:read'] },
+      { name: 'Banking', href: '/books/bank-transactions', icon: CreditCard, requiredScopes: ['analytics:read'] },
+      { name: 'Taxes', href: '/books/taxes', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Controls', href: '/books/controls', icon: ClipboardList, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Inventory',
+    items: [
+      { name: 'Valuation', href: '/inventory/valuation', icon: Activity, requiredScopes: ['analytics:read'] },
+      { name: 'Landed Cost', href: '/inventory/landed-cost-vouchers', icon: ShoppingCart, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
+      { name: 'Overview', href: '/reports', icon: TrendingUp, requiredScopes: ['reports:read'] },
+      { name: 'Revenue', href: '/reports/revenue', icon: FileText, requiredScopes: ['reports:read'] },
+      { name: 'Expenses', href: '/reports/expenses', icon: FileText, requiredScopes: ['reports:read'] },
+      { name: 'Profitability', href: '/reports/profitability', icon: Calculator, requiredScopes: ['reports:read'] },
+      { name: 'Cash Position', href: '/reports/cash-position', icon: CreditCard, requiredScopes: ['reports:read'] },
+    ],
+  },
+  {
+    label: 'Support',
+    items: [
+      { name: 'Tickets', href: '/support/tickets', icon: LifeBuoy, requiredScopes: ['analytics:read'] },
+      { name: 'Analytics', href: '/support/analytics', icon: Activity, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Projects',
+    items: [
+      { name: 'Projects', href: '/projects', icon: ClipboardList, requiredScopes: ['explore:read'] },
+    ],
+  },
+  {
+    label: 'Customers',
+    items: [
+      { name: 'Customer 360', href: '/customers', icon: Users, requiredScopes: ['customers:read', 'explore:read'] },
       { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
     ],
   },
-  {
-    name: 'Finance',
-    href: '/finance',
-    icon: DollarSign,
-    requiredScopes: ['analytics:read'],
-    children: [
-      { name: 'Analytics', href: '/finance/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
-      { name: 'Insights', href: '/finance/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
-    ],
-  },
-  {
-    name: 'Accounting',
-    href: '/accounting',
-    icon: Calculator,
-    requiredScopes: ['analytics:read'],
-  },
-  // Future/optional sections can be added below
-  // { name: 'Overview', href: '/', icon: LayoutDashboard },
-  // { name: 'POPs', href: '/pops', icon: Radio, requiredScopes: ['analytics:read'] },
-  // { name: 'Sync', href: '/sync', icon: RefreshCw, requiredScopes: ['sync:read'] },
 ];
 
 // Keys in sync status response that represent actual sync sources (have .status property)
@@ -264,22 +339,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const { hasAnyScope, isAuthenticated } = useAuth();
+  const isBooksShell = pathname.startsWith('/books');
+  const isHrShell = pathname.startsWith('/hr');
 
-  // Filter navigation items based on user scopes
-  type NavNode = NavItem & { accessibleSelf: boolean; visible: boolean; depth: number; children?: NavNode[] };
+  // Filter navigation groups based on user scopes
+  type NavNode = NavItem & { accessibleSelf: boolean; visible: boolean };
+  const filteredGroups = useMemo(() => {
+    const baseGroups = isBooksShell
+      ? navigationGroups.filter((group) => group.label === 'Books')
+      : isHrShell
+        ? navigationGroups.filter((group) => group.label === 'HR')
+        : navigationGroups;
 
-  const filteredNavigation: NavNode[] = useMemo(() => {
-    const mapItem = (item: NavItem, depth = 0): NavNode => {
-      const accessibleSelf = !item.requiredScopes || item.requiredScopes.length === 0
-        ? true
-        : (isAuthenticated && hasAnyScope(item.requiredScopes));
-      const children = (item.children || []).map((child) => mapItem(child, depth + 1));
-      const visible = accessibleSelf || children.some((child) => child.visible);
-      return { ...item, accessibleSelf, visible, depth, children };
-    };
-
-    return navigation.map((item) => mapItem(item));
-  }, [isAuthenticated, hasAnyScope]);
+    return baseGroups.map((group) => {
+      const items: NavNode[] = group.items.map((item) => {
+        const accessibleSelf = !item.requiredScopes || item.requiredScopes.length === 0
+          ? true
+          : (isAuthenticated && hasAnyScope(item.requiredScopes));
+        const visible = accessibleSelf;
+        return { ...item, accessibleSelf, visible };
+      }).filter((item) => item.visible);
+      return { label: group.label, items };
+    }).filter((group) => group.items.length > 0);
+  }, [isAuthenticated, hasAnyScope, isBooksShell, isHrShell]);
 
   // Load saved preference after hydration (avoids SSR mismatch)
   useEffect(() => {
@@ -295,17 +377,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [collapsed, hydrated]);
 
-  const isNodeActive = (node: NavNode): boolean => {
-    if (pathname === node.href) return true;
-    return (node.children || []).some((child) => isNodeActive(child));
+  const isNodeActive = (href: string): boolean => {
+    if (pathname === href) return true;
+    return pathname.startsWith(`${href}/`);
   };
 
   const renderDesktopNode = (node: NavNode): React.ReactNode => {
     if (!node.visible) return null;
 
-    const active = isNodeActive(node);
+    const active = isNodeActive(node.href);
     const isDisabled = !node.accessibleSelf;
-    const hasChildren = node.children?.some((child) => child.visible);
 
     const content = (
       <div
@@ -319,7 +400,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
       >
         <node.icon className={cn('w-5 h-5 shrink-0', active && 'drop-shadow-[0_0_8px_rgba(0,212,170,0.5)]')} />
-        {!collapsed && <span className="font-medium flex-1">{node.name}</span>}
+        {!collapsed && <span className="font-medium flex-1 truncate">{node.name}</span>}
         {isDisabled && !collapsed && <Lock className="w-4 h-4" />}
         {active && !isDisabled && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-teal-electric rounded-r-full" />
@@ -345,21 +426,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </Link>
     );
 
-    return (
-      <div key={node.href} className="space-y-1">
-        {wrapper}
-        {hasChildren && (
-          <div
-            className={cn(
-              'space-y-1',
-              collapsed ? 'pl-0' : 'pl-6 border-l border-slate-border/60 ml-3'
-            )}
-          >
-            {node.children?.map((child) => renderDesktopNode(child))}
-          </div>
-        )}
-      </div>
-    );
+    return <div key={node.href}>{wrapper}</div>;
   };
 
   return (
@@ -395,53 +462,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         'lg:hidden fixed top-14 left-0 bottom-0 z-40 w-64 bg-slate-card border-r border-slate-border transform transition-transform duration-300',
         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
-        <nav className="p-4 space-y-1">
-          {filteredNavigation.map((item) => {
-            if (!item.visible) return null;
+        <nav className="p-4 space-y-4">
+          {filteredGroups.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-slate-muted px-2">{group.label}</p>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const active = isNodeActive(item.href);
+                  const isDisabled = !item.accessibleSelf;
+                  const content = (
+                    <div
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                        active
+                          ? 'bg-teal-electric/10 text-teal-electric'
+                          : 'text-slate-muted hover:text-white hover:bg-slate-elevated',
+                        isDisabled && 'cursor-not-allowed text-slate-muted/50 hover:bg-transparent hover:text-slate-muted/50'
+                      )}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium flex-1">{item.name}</span>
+                      {isDisabled && <Lock className="w-4 h-4" />}
+                    </div>
+                  );
 
-            const renderNode = (node: typeof item) => {
-              const active = pathname === node.href;
-              const isDisabled = !node.accessibleSelf;
-              const paddingClass = node.depth > 0 ? 'pl-6' : '';
-              const content = (
-                <div
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                    active
-                      ? 'bg-teal-electric/10 text-teal-electric'
-                      : 'text-slate-muted hover:text-white hover:bg-slate-elevated',
-                    paddingClass,
-                    isDisabled && 'cursor-not-allowed text-slate-muted/50 hover:bg-transparent hover:text-slate-muted/50'
-                  )}
-                >
-                  <node.icon className="w-5 h-5" />
-                  <span className="font-medium flex-1">{node.name}</span>
-                  {isDisabled && <Lock className="w-4 h-4" />}
-                </div>
-              );
-
-              return isDisabled ? (
-                <div key={node.name} title="You don't have permission to access this section">
-                  {content}
-                </div>
-              ) : (
-                <Link
-                  key={node.name}
-                  href={node.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {content}
-                </Link>
-              );
-            };
-
-            return (
-              <div key={item.name} className="space-y-1">
-                {renderNode(item)}
-                {item.children?.map((child) => child.visible ? renderNode(child) : null)}
+                  return isDisabled ? (
+                    <div key={item.href} title="You don't have permission to access this section">
+                      {content}
+                    </div>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {content}
+                    </Link>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </nav>
         {/* Mobile bottom controls */}
         <div className="absolute bottom-4 left-4 right-4 space-y-3">
@@ -474,8 +535,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {filteredNavigation.map((item) => renderDesktopNode(item))}
+        <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+          {filteredGroups.map((group) => (
+            <div key={group.label} className="space-y-2">
+              {!collapsed && (
+                <p className="text-[11px] uppercase tracking-[0.12em] text-slate-muted px-2">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <div key={item.href}>{renderDesktopNode(item)}</div>
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Bottom section */}

@@ -12,7 +12,9 @@ export type Scope =
   | 'sync:write'
   | 'explore:read'
   | 'admin:read'
-  | 'admin:write';
+  | 'admin:write'
+  | 'hr:read'
+  | 'hr:write';
 
 const ALL_SCOPES: Scope[] = [
   'customers:read',
@@ -23,6 +25,8 @@ const ALL_SCOPES: Scope[] = [
   'explore:read',
   'admin:read',
   'admin:write',
+  'hr:read',
+  'hr:write',
 ];
 
 interface AuthState {

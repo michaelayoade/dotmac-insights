@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import sync, customers, analytics, data_explorer, admin, insights, finance, support, network, zoho_import, accounting
+from app.api import sync, customers, analytics, data_explorer, admin, insights, finance, support, network, zoho_import, accounting, purchasing
 
 api_router = APIRouter()
 
@@ -7,6 +7,9 @@ api_router = APIRouter()
 api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(accounting.router, prefix="/accounting", tags=["accounting"])
+api_router.include_router(purchasing.router, prefix="/purchasing", tags=["purchasing"])
+# Versioned prefixes (v1) for newer clients
+api_router.include_router(purchasing.router, prefix="/v1/purchasing", tags=["purchasing"])
 api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(network.router, prefix="/network", tags=["network"])
 
