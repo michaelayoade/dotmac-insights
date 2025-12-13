@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from decimal import Decimal
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
 
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.employee import Employee
     from app.models.project import Project
+    from app.models.expense import Expense
 
 
 class TicketStatus(enum.Enum):
@@ -107,7 +109,16 @@ class Ticket(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Sync metadata
+    # Sync metadata / audit
+    origin_system: Mapped[str] = mapped_column(String(50), default="external")
+    write_back_status: Mapped[str] = mapped_column(String(50), default="synced")
+    write_back_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    write_back_attempted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(default=False)
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Relationships
@@ -119,6 +130,41 @@ class Ticket(Base):
         foreign_keys=[assigned_employee_id]
     )
     project: Mapped[Optional[Project]] = relationship(back_populates="tickets")
+
+    # Child tables
+    comments: Mapped[List["HDTicketComment"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan"
+    )
+    activities: Mapped[List["HDTicketActivity"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan"
+    )
+    communications: Mapped[List["TicketCommunication"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan"
+    )
+    depends_on: Mapped[List["HDTicketDependency"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", foreign_keys="HDTicketDependency.ticket_id"
+    )
+    # Expense claims linked to this ticket
+    expenses: Mapped[List["Expense"]] = relationship(
+        back_populates="ticket"
+    )
+
+    # Enhancements (Phase 3)
+    tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # simple tag names
+    watchers: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)  # user IDs watching the ticket
+    custom_fields: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # field_key -> value
+    merged_into_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    merged_tickets: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)  # ticket IDs merged into this
+    parent_ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    csat_sent: Mapped[bool] = mapped_column(default=False)
+    csat_response_id: Mapped[Optional[int]] = mapped_column(ForeignKey("csat_responses.id", ondelete="SET NULL"), nullable=True)
+
+    merged_into: Mapped[Optional["Ticket"]] = relationship(
+        "Ticket", remote_side=[id], foreign_keys=[merged_into_id]
+    )
+    parent_ticket: Mapped[Optional["Ticket"]] = relationship(
+        "Ticket", remote_side=[id], foreign_keys=[parent_ticket_id]
+    )
 
     def __repr__(self) -> str:
         return f"<Ticket {self.ticket_number} - {self.status.value}>"
@@ -137,3 +183,189 @@ class Ticket(Base):
             delta = self.resolution_date - self.opening_date
             return delta.total_seconds() / 3600
         return None
+
+
+# ============= HD TICKET COMMENT (Child Table) =============
+
+class HDTicketComment(Base):
+    """Comments on HD Tickets from ERPNext.
+
+    This is the HD Ticket Comment child table that stores
+    comments/replies on tickets.
+    """
+
+    __tablename__ = "hd_ticket_comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # Comment content
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    comment_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Comment, Info, etc.
+
+    # Author info
+    commented_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    commented_by_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Visibility
+    is_public: Mapped[bool] = mapped_column(default=True)
+
+    # Timestamps
+    comment_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Relationship
+    ticket: Mapped["Ticket"] = relationship(back_populates="comments")
+
+    def __repr__(self) -> str:
+        return f"<HDTicketComment {self.id} by {self.commented_by}>"
+
+
+# ============= HD TICKET ACTIVITY (Child Table) =============
+
+class HDTicketActivity(Base):
+    """Activity log entries for HD Tickets from ERPNext.
+
+    Tracks status changes, assignments, and other activities on tickets.
+    """
+
+    __tablename__ = "hd_ticket_activities"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # Activity info
+    activity_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Status Change, Assignment, etc.
+    activity: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Who performed the activity
+    owner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Status tracking
+    from_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    to_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Timestamps
+    activity_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Relationship
+    ticket: Mapped["Ticket"] = relationship(back_populates="activities")
+
+    def __repr__(self) -> str:
+        return f"<HDTicketActivity {self.id} - {self.activity_type}>"
+
+
+# ============= COMMUNICATION (Linked emails/messages) =============
+
+class TicketCommunication(Base):
+    """Communications linked to HD Tickets from ERPNext.
+
+    Stores email communications, phone logs, and other messages
+    linked to tickets via the Communication doctype.
+    """
+
+    __tablename__ = "ticket_communications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # ERPNext reference
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    # Communication details
+    communication_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Email, Phone, Chat, etc.
+    communication_medium: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Email, Phone, etc.
+
+    # Content
+    subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Sender/Recipient
+    sender: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sender_full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    recipients: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    bcc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Direction
+    sent_or_received: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # Sent, Received
+
+    # Status
+    read_receipt: Mapped[bool] = mapped_column(default=False)
+    delivery_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Timestamps
+    communication_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Relationship
+    ticket: Mapped["Ticket"] = relationship(back_populates="communications")
+
+    def __repr__(self) -> str:
+        return f"<TicketCommunication {self.erpnext_id} - {self.communication_type}>"
+
+
+# ============= HD TICKET DEPENDENCY (Depends On Child Table) =============
+
+class HDTicketDependency(Base):
+    """Ticket dependencies from ERPNext's 'Depends On' child table.
+
+    Tracks which tickets depend on other tickets (blockers).
+    """
+
+    __tablename__ = "hd_ticket_dependencies"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # The ticket this depends on
+    depends_on_ticket_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    depends_on_erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    depends_on_subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    depends_on_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    # Relationships
+    ticket: Mapped["Ticket"] = relationship(
+        back_populates="depends_on", foreign_keys=[ticket_id]
+    )
+    depends_on_ticket: Mapped[Optional["Ticket"]] = relationship(
+        foreign_keys=[depends_on_ticket_id]
+    )
+
+    def __repr__(self) -> str:
+        return f"<HDTicketDependency {self.ticket_id} depends on {self.depends_on_erpnext_id}>"
