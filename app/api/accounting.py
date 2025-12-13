@@ -28,6 +28,9 @@ from app.models.accounting import (
     ModeOfPayment,
 )
 from app.models.invoice import Invoice, InvoiceStatus, DunningHistory, DunningLevel
+from app.models.notification import NotificationEventType
+from app.services.notification_service import NotificationService
+from app.cache import cached, CACHE_TTL
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -76,6 +79,7 @@ def _get_fiscal_year_dates(db: Session, fiscal_year: Optional[str] = None) -> tu
 # ============= DASHBOARD =============
 
 @router.get("/dashboard", dependencies=[Depends(Require("accounting:read"))])
+@cached("accounting-dashboard", ttl=60)
 async def get_accounting_dashboard(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -901,6 +905,7 @@ async def get_chart_of_accounts(
 # ============= TRIAL BALANCE =============
 
 @router.get("/trial-balance", dependencies=[Depends(Require("accounting:read"))])
+@cached("trial-balance", ttl=CACHE_TTL["medium"])
 async def get_trial_balance(
     as_of_date: Optional[str] = None,
     fiscal_year: Optional[str] = None,
@@ -1014,6 +1019,7 @@ def _get_effective_root_type(acc) -> Optional[AccountType]:
 
 
 @router.get("/balance-sheet", dependencies=[Depends(Require("accounting:read"))])
+@cached("balance-sheet", ttl=CACHE_TTL["medium"])
 async def get_balance_sheet(
     as_of_date: Optional[str] = None,
     comparative_date: Optional[str] = None,
@@ -1161,6 +1167,7 @@ async def get_balance_sheet(
 # ============= INCOME STATEMENT (P&L) =============
 
 @router.get("/income-statement", dependencies=[Depends(Require("accounting:read"))])
+@cached("income-statement", ttl=CACHE_TTL["medium"])
 async def get_income_statement(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -1449,6 +1456,7 @@ async def get_general_ledger(
 # ============= ACCOUNTS PAYABLE =============
 
 @router.get("/accounts-payable", dependencies=[Depends(Require("accounting:read"))])
+@cached("accounts-payable", ttl=60)
 async def get_accounts_payable(
     as_of_date: Optional[str] = None,
     supplier: Optional[str] = None,
@@ -1545,6 +1553,7 @@ async def get_payables_aging(
 # ============= ACCOUNTS RECEIVABLE =============
 
 @router.get("/accounts-receivable", dependencies=[Depends(Require("accounting:read"))])
+@cached("accounts-receivable", ttl=60)
 async def get_accounts_receivable(
     as_of_date: Optional[str] = None,
     customer_id: Optional[int] = None,
@@ -1644,6 +1653,7 @@ async def get_receivables_aging(
 # ============= CASH FLOW =============
 
 @router.get("/cash-flow", dependencies=[Depends(Require("accounting:read"))])
+@cached("cash-flow", ttl=CACHE_TTL["medium"])
 async def get_cash_flow(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -2626,6 +2636,7 @@ async def get_equity_statement(
 # ============= COMPARATIVE INCOME STATEMENT =============
 
 @router.get("/income-statement/comparative", dependencies=[Depends(Require("accounting:read"))])
+@cached("income-statement-comparative", ttl=CACHE_TTL["long"])
 async def get_comparative_income_statement(
     periods: int = Query(default=3, le=12, description="Number of periods to compare"),
     interval: str = Query(default="month", description="Period interval: month or quarter"),
@@ -5701,6 +5712,7 @@ async def record_tax_payment(
 
 
 @router.get("/tax/dashboard", dependencies=[Depends(Require("accounting:read"))])
+@cached("tax-dashboard", ttl=CACHE_TTL["short"])
 async def get_tax_dashboard(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -6312,6 +6324,25 @@ async def send_dunning_notices(
 
     db.commit()
 
+    # Emit notifications for sent dunning notices
+    if results["sent"]:
+        notification_service = NotificationService(db)
+        for item in results["sent"]:
+            notification_service.emit_event(
+                event_type=NotificationEventType.DUNNING_SENT,
+                payload={
+                    "invoice_id": item["invoice_id"],
+                    "invoice_number": item["invoice_number"],
+                    "customer_name": item["customer_name"],
+                    "dunning_level": item["dunning_level"],
+                    "amount_due": item["amount_due"],
+                    "days_overdue": item["days_overdue"],
+                    "delivery_method": item["delivery_method"],
+                },
+                entity_type="invoice",
+                entity_id=item["invoice_id"],
+            )
+
     return {
         "summary": {
             "total_processed": len(invoices),
@@ -6391,6 +6422,7 @@ async def get_dunning_queue(
 
 
 @router.get("/receivables-aging-enhanced", dependencies=[Depends(Require("accounting:read"))])
+@cached("receivables-aging-enhanced", ttl=60)
 async def get_enhanced_receivables_aging(
     as_of_date: Optional[str] = None,
     include_expected_date: bool = Query(False, description="Include expected payment dates"),
