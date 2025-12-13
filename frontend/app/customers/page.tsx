@@ -330,6 +330,7 @@ export default function CustomersPage() {
     (dashboard as any)?.billing_health ||
     (dashboard as any)?.overview?.billing_health ||
     {};
+  const invoiceStats: any = finance?.invoices || {};
   const blockingIn3 =
     billingHealth?.blocking_in_3_days ??
     billingHealth?.blocking_3d ??
@@ -351,8 +352,8 @@ export default function CustomersPage() {
     billingHealth?.negative_deposits;
   const health = {
     with_overdue_invoices:
-      finance?.invoices?.overdue_count ??
-      finance?.invoices?.overdue_customers ??
+      invoiceStats.overdue_count ??
+      invoiceStats.overdue_customers ??
       billingHealth?.overdue_invoices ??
       billingHealth?.overdue_customers ??
       (dashboard as any)?.health?.with_overdue_invoices ??
@@ -724,10 +725,10 @@ export default function CustomersPage() {
                     <StatusBadge status={selectedCustomer.status} />
                     <span className="text-xs text-slate-muted capitalize">{selectedCustomer.customer_type}</span>
                     {customer360?.profile?.account_number && (
-                      <Badge variant="muted" size="sm">Acct: {customer360.profile.account_number}</Badge>
+                      <Badge variant="default" size="sm">Acct: {customer360.profile.account_number}</Badge>
                     )}
                     {customer360?.profile?.billing_type && (
-                      <Badge variant="muted" size="sm">{customer360.profile.billing_type}</Badge>
+                      <Badge variant="default" size="sm">{customer360.profile.billing_type}</Badge>
                     )}
                   </div>
                   {customer360?.profile?.labels && customer360.profile.labels.length > 0 && (
@@ -799,7 +800,7 @@ export default function CustomersPage() {
                           <div className="text-slate-muted">
                             <p className="text-white">{customer360.profile.address}</p>
                             {customer360.profile.address_2 && <p>{customer360.profile.address_2}</p>}
-                            <p>{[customer360.profile.city, customer360.profile.state, customer360.profile.country].filter(Boolean).join(', ')}</p>
+                            <p>{[customer360.profile.city, customer360.profile.state, (customer360.profile as any).country].filter(Boolean).join(', ')}</p>
                           </div>
                         </div>
                       )}
@@ -813,7 +814,7 @@ export default function CustomersPage() {
                         <div className="flex flex-wrap gap-2">
                           {Object.entries(customer360.profile.external_ids).map(([key, val]) =>
                             val ? (
-                              <Badge key={key} variant="muted" size="sm" className="uppercase">
+                              <Badge key={key} variant="default" size="sm" className="uppercase">
                                 {key}: {val}
                               </Badge>
                             ) : null
@@ -863,7 +864,7 @@ export default function CustomersPage() {
                                 <p className="text-xs text-slate-muted">{inv.due_date ? formatDate(inv.due_date) : 'No due date'}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-teal-electric font-mono">{formatCurrency(inv.total_amount ?? inv.total ?? 0)}</p>
+                                <p className="text-teal-electric font-mono">{formatCurrency((inv as any).total_amount ?? (inv as any).total ?? 0)}</p>
                                 <StatusBadge status={inv.status} size="sm" />
                               </div>
                             </div>
@@ -1055,7 +1056,7 @@ export default function CustomersPage() {
                                 <p className="text-white capitalize">{c.channel}</p>
                                 <p className="text-xs text-slate-muted">{c.status} • {c.assignee || 'Unassigned'}</p>
                               </div>
-                              <Badge variant="muted" size="sm">{c.message_count} msgs</Badge>
+                              <Badge variant="default" size="sm">{c.message_count} msgs</Badge>
                             </div>
                           ))}
                         </div>

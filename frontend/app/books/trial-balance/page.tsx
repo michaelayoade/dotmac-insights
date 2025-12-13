@@ -118,14 +118,14 @@ export default function TrialBalancePage() {
             <Scale className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Debit</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.total_debit)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.total_debit || 0)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Scale className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Credit</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(data?.total_credit)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatCurrency(data?.total_credit || 0)}</p>
         </div>
         <div className={cn(
           'border rounded-xl p-5',

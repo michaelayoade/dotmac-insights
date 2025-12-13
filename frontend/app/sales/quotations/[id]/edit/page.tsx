@@ -53,13 +53,18 @@ export default function QuotationEditPage() {
     e.preventDefault();
     if (!Number.isFinite(id)) return;
     if (!validate()) return;
+    if (!data) {
+      setSubmitError('Quotation not loaded');
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const quotationData: any = data || {};
       const payload = {
         quotation_to: 'Customer',
-        party_name: data.customer_name || null,
-        customer_name: data.customer_name || null,
+        party_name: quotationData.customer_name || null,
+        customer_name: quotationData.customer_name || null,
         order_type: 'Sales',
         company: 'Dotmac',
         currency,
@@ -72,11 +77,11 @@ export default function QuotationEditPage() {
         rounded_total: totalAmount,
         total_taxes_and_charges: 0,
         status,
-        sales_partner: data.sales_partner || null,
-        territory: data.territory || null,
-        source: data.source || 'local',
-        campaign: data.campaign || null,
-        order_lost_reason: data.order_lost_reason || null,
+        sales_partner: quotationData.sales_partner || null,
+        territory: quotationData.territory || null,
+        source: quotationData.source || 'local',
+        campaign: quotationData.campaign || null,
+        order_lost_reason: quotationData.order_lost_reason || null,
         quotation_number: quotationNumber || null,
         description: description || null,
       };

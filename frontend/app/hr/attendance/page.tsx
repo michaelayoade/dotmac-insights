@@ -11,7 +11,7 @@ import {
   useHrAttendanceRequestMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
-import { CalendarClock, Clock3, Layers, Users } from 'lucide-react';
+import { CalendarClock, Clock3, Layers, Users, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -40,6 +40,48 @@ function StatCard({
         <Icon className={cn('w-5 h-5', tone)} />
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ status, type = 'attendance' }: { status: string; type?: 'attendance' | 'request' | 'shift' }) {
+  const statusLower = status?.toLowerCase() || '';
+
+  const getConfig = () => {
+    if (type === 'attendance') {
+      if (statusLower === 'present') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
+      if (statusLower === 'absent') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
+      if (statusLower === 'late') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: AlertCircle };
+      if (statusLower === 'half day') return { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/40', icon: Clock3 };
+    }
+    if (type === 'request') {
+      if (statusLower === 'approved') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
+      if (statusLower === 'rejected') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
+      if (statusLower === 'open' || statusLower === 'pending') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock3 };
+    }
+    if (type === 'shift') {
+      if (statusLower === 'active') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
+      if (statusLower === 'inactive') return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: XCircle };
+    }
+    return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: Clock3 };
+  };
+
+  const config = getConfig();
+  const Icon = config.icon;
+
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
+      <Icon className="w-3 h-3" />
+      <span className="capitalize">{status || 'Unknown'}</span>
+    </span>
+  );
+}
+
+function FormLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
+  return (
+    <label className="block text-xs text-slate-muted mb-1">
+      {children}
+      {required && <span className="text-rose-400 ml-0.5">*</span>}
+    </label>
   );
 }
 
@@ -229,125 +271,88 @@ export default function HrAttendancePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="text-white font-semibold">Record Attendance</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Employee"
-              value={attendanceForm.employee}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FormLabel required>Employee Name</FormLabel>
+              <input
+                type="text"
+                placeholder="e.g. John Smith"
+                value={attendanceForm.employee_name || attendanceForm.employee}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, employee: e.target.value, employee_name: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div>
+              <FormLabel>Company</FormLabel>
+              <input
+                type="text"
+                placeholder="e.g. Acme Corp"
+                value={attendanceForm.company || company}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, company: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FormLabel required>Date</FormLabel>
+              <input
+                type="date"
+                value={attendanceForm.attendance_date}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, attendance_date: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div>
+              <FormLabel required>Status</FormLabel>
+              <select
+                value={attendanceForm.status}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, status: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              >
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+                <option value="late">Late</option>
+                <option value="half day">Half Day</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FormLabel>Check-in Time</FormLabel>
+              <input
+                type="datetime-local"
+                value={attendanceForm.in_time}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, in_time: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div>
+              <FormLabel>Check-out Time</FormLabel>
+              <input
+                type="datetime-local"
+                value={attendanceForm.out_time}
+                onChange={(e) => setAttendanceForm({ ...attendanceForm, out_time: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+          </div>
+          <div>
+            <FormLabel>Working Hours</FormLabel>
             <input
               type="number"
-              placeholder="Employee ID"
-              value={attendanceForm.employee_id}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee_id: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Employee Name"
-              value={attendanceForm.employee_name}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee_name: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="text"
-              placeholder="Company"
-              value={attendanceForm.company}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, company: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={attendanceForm.attendance_date}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, attendance_date: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <select
-              value={attendanceForm.status}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, status: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            >
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">Late</option>
-              <option value="open">Open</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="datetime-local"
-              placeholder="In time"
-              value={attendanceForm.in_time}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, in_time: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="datetime-local"
-              placeholder="Out time"
-              value={attendanceForm.out_time}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, out_time: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              placeholder="Working hours"
+              step="0.5"
+              placeholder="e.g. 8"
               value={attendanceForm.working_hours}
               onChange={(e) => setAttendanceForm({ ...attendanceForm, working_hours: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="text"
-              placeholder="Device info"
-              value={attendanceForm.device_info}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, device_info: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Check-in latitude"
-              value={attendanceForm.check_in_latitude}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_in_latitude: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="text"
-              placeholder="Check-in longitude"
-              value={attendanceForm.check_in_longitude}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_in_longitude: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Check-out latitude"
-              value={attendanceForm.check_out_latitude}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_out_latitude: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="text"
-              placeholder="Check-out longitude"
-              value={attendanceForm.check_out_longitude}
-              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_out_longitude: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
             />
           </div>
           <button
             onClick={handleCreateAttendance}
-            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+            className="w-full bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
           >
             Save Attendance
           </button>
@@ -419,56 +424,71 @@ export default function HrAttendancePage() {
       </div>
       {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
 
-      <div className="flex flex-wrap gap-3 items-center">
-        <input
-          type="text"
-          placeholder="Company"
-          value={company}
-          onChange={(e) => {
-            setCompany(e.target.value);
-            setAttOffset(0);
-            setAssignOffset(0);
-            setRequestOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-        />
-        <input
-          type="number"
-          placeholder="Employee ID"
-          value={employeeId}
-          onChange={(e) => {
-            setEmployeeId(e.target.value);
-            setAttOffset(0);
-            setAssignOffset(0);
-            setRequestOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-        />
-        <input
-          type="date"
-          value={attendanceDate}
-          onChange={(e) => {
-            setAttendanceDate(e.target.value);
-            setAttOffset(0);
-            setRequestOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-        />
-        <select
-          value={attendanceStatus}
-          onChange={(e) => {
-            setAttendanceStatus(e.target.value);
-            setAttOffset(0);
-            setRequestOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-        >
-          <option value="">All Status</option>
-          <option value="present">Present</option>
-          <option value="absent">Absent</option>
-          <option value="late">Late</option>
-          <option value="open">Open</option>
-        </select>
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+        <p className="text-white font-semibold mb-3">Filters</p>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <FormLabel>Company</FormLabel>
+            <input
+              type="text"
+              placeholder="All companies"
+              value={company}
+              onChange={(e) => {
+                setCompany(e.target.value);
+                setAttOffset(0);
+                setAssignOffset(0);
+                setRequestOffset(0);
+              }}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            />
+          </div>
+          <div>
+            <FormLabel>Employee</FormLabel>
+            <input
+              type="text"
+              placeholder="Search by name or ID"
+              value={employeeId}
+              onChange={(e) => {
+                setEmployeeId(e.target.value);
+                setAttOffset(0);
+                setAssignOffset(0);
+                setRequestOffset(0);
+              }}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            />
+          </div>
+          <div>
+            <FormLabel>Date</FormLabel>
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={(e) => {
+                setAttendanceDate(e.target.value);
+                setAttOffset(0);
+                setRequestOffset(0);
+              }}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            />
+          </div>
+          <div>
+            <FormLabel>Status</FormLabel>
+            <select
+              value={attendanceStatus}
+              onChange={(e) => {
+                setAttendanceStatus(e.target.value);
+                setAttOffset(0);
+                setRequestOffset(0);
+              }}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            >
+              <option value="">All Status</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+              <option value="half day">Half Day</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <DataTable
@@ -489,22 +509,14 @@ export default function HrAttendancePage() {
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
             { key: 'shift_type', header: 'Shift', render: (item: any) => <span className="text-slate-muted text-sm">{item.shift_type}</span> },
             {
               key: 'from_date',
               header: 'Period',
-              render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date)} – ${formatDate(item.to_date)}`}</span>,
+              render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date) || '—'} – ${formatDate(item.to_date) || '—'}`}</span>,
             },
-            {
-              key: 'status',
-              header: 'Status',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', item.status === 'active' ? 'border-green-400 text-green-300 bg-green-500/10' : 'border-amber-400 text-amber-300 bg-amber-500/10')}>
-                  {item.status || 'active'}
-                </span>
-              ),
-            },
+            { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status || 'active'} type="shift" /> },
           ]}
           data={(shiftAssignmentList.items || []).map((item: any) => ({ ...item, id: item.id || item.employee }))}
           keyField="id"
@@ -532,24 +544,16 @@ export default function HrAttendancePage() {
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
-            { key: 'attendance_date', header: 'Date', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.attendance_date)}</span> },
-            {
-              key: 'status',
-              header: 'Status',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', item.status === 'present' ? 'border-green-400 text-green-300 bg-green-500/10' : item.status === 'absent' ? 'border-red-400 text-red-300 bg-red-500/10' : 'border-amber-400 text-amber-300 bg-amber-500/10')}>
-                  {item.status}
-                </span>
-              ),
-            },
-            { key: 'in_time', header: 'In', render: (item: any) => <span className="text-slate-muted text-sm">{formatDateTime(item.in_time)}</span> },
-            { key: 'out_time', header: 'Out', render: (item: any) => <span className="text-slate-muted text-sm">{formatDateTime(item.out_time)}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+            { key: 'attendance_date', header: 'Date', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.attendance_date) || '—'}</span> },
+            { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status} type="attendance" /> },
+            { key: 'in_time', header: 'Check-in', render: (item: any) => <span className="text-slate-muted text-sm">{formatDateTime(item.in_time) || '—'}</span> },
+            { key: 'out_time', header: 'Check-out', render: (item: any) => <span className="text-slate-muted text-sm">{formatDateTime(item.out_time) || '—'}</span> },
             {
               key: 'working_hours',
-              header: 'Hours',
+              header: 'Hours Worked',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-white">{item.working_hours ?? '—'}</span>,
+              render: (item: any) => <span className="font-mono text-white">{item.working_hours ? `${item.working_hours}h` : '—'}</span>,
             },
             {
               key: 'actions',
@@ -598,26 +602,18 @@ export default function HrAttendancePage() {
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
             {
               key: 'from_date',
-              header: 'Date(s)',
-              render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date)} – ${formatDate(item.to_date)}`}</span>,
+              header: 'Request Period',
+              render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date) || '—'} – ${formatDate(item.to_date) || '—'}`}</span>,
             },
             {
               key: 'reason',
               header: 'Reason',
               render: (item: any) => <span className="text-slate-muted text-sm truncate max-w-[200px] block">{item.reason || '—'}</span>,
             },
-            {
-              key: 'status',
-              header: 'Status',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', item.status === 'approved' ? 'border-green-400 text-green-300 bg-green-500/10' : item.status === 'rejected' ? 'border-red-400 text-red-300 bg-red-500/10' : 'border-amber-400 text-amber-300 bg-amber-500/10')}>
-                  {item.status || 'open'}
-                </span>
-              ),
-            },
+            { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status || 'open'} type="request" /> },
             {
               key: 'actions',
               header: 'Actions',
@@ -625,13 +621,13 @@ export default function HrAttendancePage() {
                 <div className="flex gap-2 text-xs">
                   <button
                     onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.approve(item.id); }}
-                    className="px-2 py-1 rounded border border-green-500 text-green-300 hover:bg-green-500/10"
+                    className="px-2 py-1 rounded border border-emerald-500 text-emerald-300 hover:bg-emerald-500/10"
                   >
                     Approve
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.reject(item.id); }}
-                    className="px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10"
+                    className="px-2 py-1 rounded border border-rose-500 text-rose-300 hover:bg-rose-500/10"
                   >
                     Reject
                   </button>

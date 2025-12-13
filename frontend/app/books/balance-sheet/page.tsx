@@ -151,7 +151,10 @@ export default function BalanceSheetPage() {
             <span className="text-slate-muted text-sm">
               as of {typeof data.as_of_date === 'string'
                 ? data.as_of_date
-                : data.as_of_date?.end_date || data.as_of_date?.start_date || '-'}
+                : (() => {
+                  const asOf: any = data.as_of_date;
+                  return asOf?.end_date || asOf?.start_date || '-';
+                })()}
             </span>
           )}
         </div>

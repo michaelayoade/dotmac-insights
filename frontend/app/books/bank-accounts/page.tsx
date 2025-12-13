@@ -99,7 +99,7 @@ export default function BankAccountsPage() {
     );
   }
 
-  const accounts = data?.accounts || data?.data || [];
+  const accounts = (data as any)?.accounts || (data as any)?.data || [];
   const totalBalance = accounts.reduce((sum: number, acc: any) => sum + (acc.balance || acc.current_balance || 0), 0);
   const activeCount = accounts.filter((acc: any) => acc.status === 'active' || acc.is_active !== false).length;
 

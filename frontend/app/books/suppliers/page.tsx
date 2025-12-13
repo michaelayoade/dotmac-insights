@@ -30,6 +30,10 @@ export default function SuppliersPage() {
     limit,
     offset,
   });
+  const supplierStats: any = data || {};
+  const totalOutstanding = supplierStats.total_outstanding ?? supplierStats.outstanding ?? 0;
+  const totalPurchases = supplierStats.total_purchases ?? supplierStats.total_invoices ?? 0;
+  const supplierRows = supplierStats.suppliers ?? supplierStats.data ?? [];
 
   const columns = [
     {
@@ -133,15 +137,15 @@ export default function SuppliersPage() {
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Active</p>
-          <p className="text-2xl font-bold text-green-400">{data?.active || data?.by_status?.active || 0}</p>
+          <p className="text-2xl font-bold text-green-400">{supplierStats?.active || supplierStats?.by_status?.active || 0}</p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
           <p className="text-orange-400 text-sm">Total Outstanding</p>
-          <p className="text-xl font-bold text-orange-400">{formatCurrency(data?.total_outstanding)}</p>
+          <p className="text-xl font-bold text-orange-400">{formatCurrency(totalOutstanding)}</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Purchases</p>
-          <p className="text-xl font-bold text-blue-400">{formatCurrency(data?.total_purchases)}</p>
+          <p className="text-xl font-bold text-blue-400">{formatCurrency(totalPurchases)}</p>
         </div>
       </div>
 
@@ -178,7 +182,7 @@ export default function SuppliersPage() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={data?.suppliers || data?.data || []}
+        data={supplierRows as any[]}
         keyField="id"
         loading={isLoading}
         emptyMessage="No suppliers found"

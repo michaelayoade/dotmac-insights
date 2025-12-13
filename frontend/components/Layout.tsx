@@ -126,7 +126,7 @@ const booksSections: BooksSection[] = [
     label: 'Reports',
     icon: TrendingUp,
     items: [
-      { name: 'Reports Home', href: '/reports', icon: TrendingUp, requiredScopes: ['reports:read'] },
+      { name: 'Reports Home', href: '/reports', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Books Docs & Exports', href: '/books/docs', icon: BookOpen, requiredScopes: ['analytics:read'] },
     ],
   },
@@ -206,11 +206,11 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Reports',
     items: [
-      { name: 'Overview', href: '/reports', icon: TrendingUp, requiredScopes: ['reports:read'] },
-      { name: 'Revenue', href: '/reports/revenue', icon: FileText, requiredScopes: ['reports:read'] },
-      { name: 'Expenses', href: '/reports/expenses', icon: FileText, requiredScopes: ['reports:read'] },
-      { name: 'Profitability', href: '/reports/profitability', icon: Calculator, requiredScopes: ['reports:read'] },
-      { name: 'Cash Position', href: '/reports/cash-position', icon: CreditCard, requiredScopes: ['reports:read'] },
+      { name: 'Overview', href: '/reports', icon: TrendingUp, requiredScopes: ['analytics:read'] },
+      { name: 'Revenue', href: '/reports/revenue', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Expenses', href: '/reports/expenses', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Profitability', href: '/reports/profitability', icon: Calculator, requiredScopes: ['analytics:read'] },
+      { name: 'Cash Position', href: '/reports/cash-position', icon: CreditCard, requiredScopes: ['analytics:read'] },
     ],
   },
   {

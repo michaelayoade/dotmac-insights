@@ -257,7 +257,7 @@ export default function GeneralLedgerPage() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={data?.entries || data?.data || []}
+        data={(data as any)?.entries || (data as any)?.data || []}
         keyField="id"
         loading={isLoading}
         emptyMessage="No ledger entries found"

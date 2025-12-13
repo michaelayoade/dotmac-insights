@@ -27,8 +27,8 @@ export default function BooksDebitNotesPage() {
     offset: (page - 1) * pageSize,
   });
 
-  const notes = data?.debit_notes || data?.data || [];
-  const total = data?.total || 0;
+  const notes = (data as any)?.debit_notes || (data as any)?.data || [];
+  const total = (data as any)?.total || 0;
 
   const columns = [
     {

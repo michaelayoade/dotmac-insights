@@ -27,8 +27,8 @@ export default function BooksCreditNotesPage() {
     page_size: pageSize,
   });
 
-  const notes = data?.credit_notes || data?.data || [];
-  const total = data?.total || 0;
+  const notes = (data as any)?.credit_notes || (data as any)?.data || [];
+  const total = (data as any)?.total || 0;
 
   const columns = [
     {

@@ -24,6 +24,7 @@ import {
   SupportTicketDependencyPayload,
   SupportTicketCommunicationPayload,
   SupportTicketAssigneePayload,
+  SupportTicketPayload,
   SupportTicketSlaPayload,
   SupportOverviewRequest,
   ProjectPayload,
@@ -34,6 +35,7 @@ import {
   HrInterviewPayload,
   HrTrainingEventPayload,
   HrTrainingResultPayload,
+  HrJobOpeningPayload,
 } from '@/lib/api';
 
 // Generic fetcher for SWR
@@ -145,6 +147,75 @@ export function useSupportTicketMutations() {
 
 export function useSupportTeams(config?: SWRConfiguration) {
   return useSWR('support-teams', () => api.getSupportTeams(), config);
+}
+
+// Extended Support
+export function useSupportAutomationRules(params?: { trigger?: string; active_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-automation-rules', params], () => api.getSupportAutomationRules(params), config);
+}
+
+export function useSupportAutomationLogs(params?: { rule_id?: number; ticket_id?: number; trigger?: string; success?: boolean; days?: number; limit?: number; offset?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-automation-logs', params], () => api.getSupportAutomationLogs(params), config);
+}
+
+export function useSupportAutomationLogsSummary(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-automation-logs-summary', params], () => api.getSupportAutomationLogsSummary(params), config);
+}
+
+export function useSupportSlaCalendars(params?: { active_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-sla-calendars', params], () => api.getSupportSlaCalendars(params), config);
+}
+
+export function useSupportSlaPolicies(params?: { active_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-sla-policies', params], () => api.getSupportSlaPolicies(params), config);
+}
+
+export function useSupportSlaBreachesSummary(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-sla-breach-summary', params], () => api.getSupportSlaBreachesSummary(params), config);
+}
+
+export function useSupportRoutingRules(params?: { team_id?: number; active_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-routing-rules', params], () => api.getSupportRoutingRules(params), config);
+}
+
+export function useSupportRoutingQueueHealth(config?: SWRConfiguration) {
+  return useSWR(['support-routing-queue-health'], () => api.getSupportRoutingQueueHealth(), config);
+}
+
+export function useSupportRoutingWorkload(teamId?: number, config?: SWRConfiguration) {
+  return useSWR(['support-routing-workload', teamId], () => api.getSupportRoutingWorkload(teamId), config);
+}
+
+export function useSupportKbCategories(params?: { parent_id?: number; include_inactive?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-kb-categories', params], () => api.getSupportKbCategories(params), config);
+}
+
+export function useSupportKbArticles(params?: { category_id?: number; status?: string; visibility?: string; search?: string; limit?: number; offset?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-kb-articles', params], () => api.getSupportKbArticles(params), config);
+}
+
+export function useSupportCannedResponses(params?: { scope?: string; category?: string; team_id?: number; search?: string; include_inactive?: boolean; limit?: number; offset?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-canned', params], () => api.getSupportCannedResponses(params), config);
+}
+
+export function useSupportCannedCategories(config?: SWRConfiguration) {
+  return useSWR(['support-canned-categories'], () => api.getSupportCannedCategories(), config);
+}
+
+export function useSupportCsatSurveys(params?: { active_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['support-csat-surveys', params], () => api.getSupportCsatSurveys(params), config);
+}
+
+export function useSupportCsatSummary(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-csat-summary', params], () => api.getSupportCsatSummary(params), config);
+}
+
+export function useSupportCsatAgentPerformance(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-csat-agents', params], () => api.getSupportCsatAgentPerformance(params), config);
+}
+
+export function useSupportCsatTrends(params?: { months?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-csat-trends', params], () => api.getSupportCsatTrends(params), config);
 }
 
 export function useSupportAgents(teamId?: number, domain?: string, config?: SWRConfiguration) {
@@ -1476,6 +1547,8 @@ export function useAccountingJournalEntryDetail(id: number | null, config?: SWRC
 export function useAccountingSuppliers(
   params?: {
     search?: string;
+    status?: string;
+    currency?: string;
     limit?: number;
     offset?: number;
   },

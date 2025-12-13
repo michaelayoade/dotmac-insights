@@ -149,18 +149,23 @@ export default function CustomerAnalyticsPage() {
 
   const normalizedCohort = useMemo(() => {
     const data = cohortData as CustomerCohortResponse | undefined;
-    const cohorts: CustomerCohortItem[] = (data?.cohorts || []).map((c) => ({
-      cohort: c.cohort,
-      total_customers: c.total_customers,
-      active: c.by_status?.active ?? c.active ?? c.current_active,
-      churned: c.by_status?.churned ?? c.churned,
-      new: c.by_status?.new ?? (c as any).new ?? (c as any).new_customers,
-      blocked: c.by_status?.blocked ?? (c as any).blocked,
-      inactive: c.by_status?.inactive ?? (c as any).inactive,
-      retention_rate: c.retention_rate ?? (c.active && c.total_customers ? (c.active / c.total_customers) * 100 : undefined),
-      total_mrr: (c as any).total_mrr,
-    }));
-    const summary = data?.summary || {};
+    const cohorts: CustomerCohortItem[] = (data?.cohorts || []).map((c) => {
+      const cohort: any = c as any;
+      return {
+        cohort: cohort.cohort,
+        total_customers: cohort.total_customers,
+        active: cohort.by_status?.active ?? cohort.active ?? cohort.current_active,
+        churned: cohort.by_status?.churned ?? cohort.churned,
+        new: cohort.by_status?.new ?? cohort.new ?? cohort.new_customers,
+        blocked: cohort.by_status?.blocked ?? cohort.blocked,
+        inactive: cohort.by_status?.inactive ?? cohort.inactive,
+        retention_rate:
+          cohort.retention_rate ??
+          (cohort.active && cohort.total_customers ? (cohort.active / cohort.total_customers) * 100 : undefined),
+        total_mrr: cohort.total_mrr,
+      };
+    });
+    const summary: any = data?.summary || {};
     return { cohorts, summary };
   }, [cohortData]);
 
@@ -922,18 +927,22 @@ export default function CustomerAnalyticsPage() {
                 <EmptyState message="No router data available" />
               ) : (
                 <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                  {normalizedByRouter.map((router) => (
-                    <div key={router.router_id} className="flex items-center justify-between text-sm border-b border-slate-border/60 pb-2">
-                      <div>
-                        <p className="text-white font-medium">{router.router_name}</p>
-                        <p className="text-xs text-slate-muted">POP {router.pop_id}</p>
+                  {normalizedByRouter.map((router) => {
+                    const routerRow: any = router as any;
+                    const routerId = routerRow.router_id ?? routerRow.router ?? routerRow.name ?? routerRow.pop_id;
+                    return (
+                      <div key={routerId} className="flex items-center justify-between text-sm border-b border-slate-border/60 pb-2">
+                        <div>
+                          <p className="text-white font-medium">{routerRow.router_name || routerRow.name || routerId}</p>
+                          <p className="text-xs text-slate-muted">POP {routerRow.pop_id || routerRow.pop}</p>
+                        </div>
+                        <div className="text-right text-slate-muted">
+                          <span className="mr-3">{routerRow.customer_count} customers</span>
+                          {routerRow.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(routerRow.mrr, 'NGN')}</span>}
+                        </div>
                       </div>
-                      <div className="text-right text-slate-muted">
-                        <span className="mr-3">{router.customer_count} customers</span>
-                        {router.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(router.mrr, 'NGN')}</span>}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </InsightCard>
@@ -1012,7 +1021,7 @@ export default function CustomerAnalyticsPage() {
                     <div>
                       <p className="text-xs uppercase text-slate-muted mb-1">Overdue by Segment</p>
                       <div className="space-y-2">
-                        {(revenueOverdue as CustomerRevenueOverdue).by_segment?.map((seg: any, idx: number) => (
+                        {((revenueOverdue as any)?.by_segment || (revenueOverdue as any)?.segments || []).map((seg: any, idx: number) => (
                           <div key={idx} className="flex justify-between">
                             <span className="text-white">
                               {seg.pop_name || seg.pop_id || ''} {seg.plan_name ? `• ${seg.plan_name}` : ''}

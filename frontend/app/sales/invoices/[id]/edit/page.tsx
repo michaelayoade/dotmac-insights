@@ -52,7 +52,7 @@ export default function InvoiceEditPage() {
       setDueDate(data.due_date || '');
       setStatus(data.status || 'draft');
       setDescription(data.description || '');
-      const liSource = (data as any).items || data.line_items || [];
+      const liSource = (data as any).items || (data as any).line_items || [];
       setLineItems(
         liSource.map((li: any, idx: number) => ({
           id: `li-${li.id || idx}`,

@@ -25,8 +25,8 @@ export default function BooksApPaymentsPage() {
     offset: (page - 1) * pageSize,
   });
 
-  const payments = data?.payments || data?.data || [];
-  const total = data?.total || 0;
+  const payments = (data as any)?.payments || (data as any)?.data || [];
+  const total = (data as any)?.total || 0;
 
   const columns = [
     {

@@ -103,7 +103,10 @@ export default function IncomeStatementPage() {
             <span className="text-slate-muted text-sm">
               {typeof data.period === 'string'
                 ? data.period
-                : `${data.period?.start_date || ''} - ${data.period?.end_date || ''}`}
+                : (() => {
+                  const period: any = data.period;
+                  return `${period?.start_date || period?.start || ''} - ${period?.end_date || period?.end || ''}`;
+                })()}
             </span>
           )}
         </div>

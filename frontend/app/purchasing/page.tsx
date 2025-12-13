@@ -345,11 +345,11 @@ export default function PurchasingDashboardPage() {
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {bill.supplier_name || bill.supplier || 'Unknown'} • {formatDate((bill as any).posting_date || bill.invoice_date)}
+                      {bill.supplier_name || bill.supplier || 'Unknown'} • {formatDate((bill as any).posting_date || (bill as any).invoice_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency((bill as any).grand_total || bill.total_amount || 0, bill.currency || currency)}</p>
+                    <p className="text-white font-mono">{formatCurrency((bill as any).grand_total || (bill as any).total_amount || 0, bill.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{bill.status}</p>
                   </div>
                 </div>
@@ -375,7 +375,7 @@ export default function PurchasingDashboardPage() {
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {pay.supplier || 'Unknown'} • {formatDate((pay as any).posting_date || pay.payment_date)}
+                      {(pay as any).supplier || (pay as any).party || 'Unknown'} • {formatDate((pay as any).posting_date || pay.payment_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
@@ -407,7 +407,7 @@ export default function PurchasingDashboardPage() {
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">PO #{order.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {order.supplier || 'Unknown'} • {formatDate((order as any).date || order.transaction_date)}
+                      {order.supplier || 'Unknown'} • {formatDate((order as any).date || (order as any).transaction_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
@@ -437,11 +437,11 @@ export default function PurchasingDashboardPage() {
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Debit #{note.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {note.supplier || 'Unknown'} • {formatDate((note as any).posting_date || note.issue_date)}
+                      {note.supplier || 'Unknown'} • {formatDate((note as any).posting_date || (note as any).issue_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency((note as any).grand_total || note.amount || 0, note.currency || currency)}</p>
+                    <p className="text-white font-mono">{formatCurrency((note as any).grand_total || (note as any).amount || 0, (note as any).currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{note.status || 'draft'}</p>
                   </div>
                 </div>

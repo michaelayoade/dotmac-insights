@@ -315,17 +315,20 @@ export default function AccountingDashboardPage() {
             <span className="text-slate-muted text-sm ml-auto">
               As of {typeof balanceSheet.as_of_date === 'string'
                 ? balanceSheet.as_of_date
-                : balanceSheet.as_of_date?.end_date || balanceSheet.as_of_date?.start_date || '-'}
+                : (() => {
+                  const asOf: any = balanceSheet.as_of_date;
+                  return asOf?.end_date || asOf?.start_date || '-';
+                })()}
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <p className="text-slate-muted text-sm mb-2">Assets ({balanceSheet.assets?.accounts?.length || 0} accounts)</p>
-              <p className="text-2xl font-bold text-blue-400">{formatCurrency(balanceSheet.total_assets)}</p>
+              <p className="text-slate-muted text-sm mb-2">Assets {((balanceSheet as any)?.assets?.accounts?.length || 0) ? `(${(balanceSheet as any).assets.accounts.length} accounts)` : ''}</p>
+              <p className="text-2xl font-bold text-blue-400">{formatCurrency((balanceSheet as any)?.total_assets || balanceSheet.assets?.total || 0)}</p>
             </div>
             <div>
-              <p className="text-slate-muted text-sm mb-2">Liabilities ({balanceSheet.liabilities?.accounts?.length || 0} accounts)</p>
-              <p className="text-2xl font-bold text-red-400">{formatCurrency(balanceSheet.liabilities?.total)}</p>
+              <p className="text-slate-muted text-sm mb-2">Liabilities {((balanceSheet as any)?.liabilities?.accounts?.length || 0) ? `(${(balanceSheet as any).liabilities.accounts.length} accounts)` : ''}</p>
+              <p className="text-2xl font-bold text-red-400">{formatCurrency((balanceSheet as any)?.liabilities?.total || 0)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-2">Equity + Retained Earnings</p>
@@ -341,7 +344,12 @@ export default function AccountingDashboardPage() {
                   ? 'bg-green-500/20 text-green-400'
                   : 'bg-yellow-500/20 text-yellow-400'
               )}>
-                {balanceSheet.is_balanced ? 'Balanced' : `Difference: ${formatCurrency(Math.abs(balanceSheet.total_assets - balanceSheet.total_liabilities_equity))}`}
+                {balanceSheet.is_balanced
+                  ? 'Balanced'
+                  : (() => {
+                    const totals: any = balanceSheet;
+                    return `Difference: ${formatCurrency(Math.abs((totals.total_assets || totals.assets?.total || 0) - (totals.total_liabilities_equity || totals.liabilities?.total || 0)))}`;
+                  })()}
               </span>
             </div>
           </div>

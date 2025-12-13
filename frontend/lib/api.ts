@@ -1360,6 +1360,52 @@ export interface DataQuality {
 
 // API Functions
 export const api = {
+  // Support Automation / SLA / Routing / KB / Canned / CSAT
+  getSupportAutomationRules: (params?: { trigger?: string; active_only?: boolean }) =>
+    fetchApi<SupportAutomationRule[]>('/support/automation/rules', { params }),
+  getSupportAutomationReference: () =>
+    fetchApi<{
+      triggers: { value: string; label: string }[];
+      action_types: { value: string; label: string }[];
+      operators: { value: string; label: string }[];
+    }>('/support/automation/reference', {}),
+  getSupportAutomationLogs: (params?: { rule_id?: number; ticket_id?: number; trigger?: string; success?: boolean; days?: number; limit?: number; offset?: number }) =>
+    fetchApi<SupportAutomationLogList>('/support/automation/logs', { params }),
+  getSupportAutomationLogsSummary: (params?: { days?: number }) =>
+    fetchApi<SupportAutomationLogSummary>('/support/automation/logs/summary', { params }),
+
+  getSupportSlaCalendars: (params?: { active_only?: boolean }) =>
+    fetchApi<SupportCalendar[]>('/support/sla/calendars', { params }),
+  getSupportSlaPolicies: (params?: { active_only?: boolean }) =>
+    fetchApi<SupportSlaPolicy[]>('/support/sla/policies', { params }),
+  getSupportSlaBreachesSummary: (params?: { days?: number }) =>
+    fetchApi<SupportSlaBreachSummary>('/support/sla/breaches/summary', { params }),
+
+  getSupportRoutingRules: (params?: { team_id?: number; active_only?: boolean }) =>
+    fetchApi<SupportRoutingRule[]>('/support/routing/rules', { params }),
+  getSupportRoutingQueueHealth: () =>
+    fetchApi<SupportQueueHealth>('/support/routing/queue-health'),
+  getSupportRoutingWorkload: (team_id?: number) =>
+    fetchApi<SupportAgentWorkload[]>('/support/routing/agent-workload', { params: team_id ? { team_id } : undefined }),
+
+  getSupportKbCategories: (params?: { parent_id?: number; include_inactive?: boolean }) =>
+    fetchApi<SupportKbCategory[]>('/support/kb/categories', { params }),
+  getSupportKbArticles: (params?: { category_id?: number; status?: string; visibility?: string; search?: string; limit?: number; offset?: number }) =>
+    fetchApi<SupportKbArticleList>('/support/kb/articles', { params }),
+
+  getSupportCannedResponses: (params?: { scope?: string; category?: string; team_id?: number; search?: string; include_inactive?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<SupportCannedResponseList>('/support/canned-responses', { params }),
+  getSupportCannedCategories: () =>
+    fetchApi<string[]>('/support/canned-responses/categories'),
+
+  getSupportCsatSurveys: (params?: { active_only?: boolean }) =>
+    fetchApi<SupportCsatSurvey[]>('/support/csat/surveys', { params }),
+  getSupportCsatSummary: (params?: { days?: number }) =>
+    fetchApi<SupportCsatSummary>('/support/csat/analytics/summary', { params }),
+  getSupportCsatAgentPerformance: (params?: { days?: number }) =>
+    fetchApi<SupportCsatAgentPerformance[]>('/support/csat/analytics/by-agent', { params }),
+  getSupportCsatTrends: (params?: { months?: number }) =>
+    fetchApi<SupportCsatTrend[]>('/support/csat/analytics/trends', { params }),
   // Overview & Analytics
   getOverview: (currency?: string) =>
     fetchApi<OverviewData>('/analytics/overview', { params: { currency } }),
@@ -1531,7 +1577,7 @@ export const api = {
     fetchApi<SupportTicketListResponse>('/support/tickets', { params }),
 
   getSupportOverview: (params?: SupportOverviewRequest) =>
-    fetchApi<SupportOverviewResponse>('/support/analytics/overview', { params }),
+    fetchApi<SupportOverviewResponse>('/support/analytics/overview', { params: params as any }),
 
   getSupportDashboard: () =>
     fetchApi<SupportDashboardResponse>('/support/dashboard'),
@@ -2485,6 +2531,8 @@ export const api = {
 
   getAccountingSuppliers: (params?: {
     search?: string;
+    status?: string;
+    currency?: string;
     limit?: number;
     offset?: number;
   }) =>

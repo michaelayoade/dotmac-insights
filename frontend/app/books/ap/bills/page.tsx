@@ -27,8 +27,8 @@ export default function BooksBillsPage() {
     offset: (page - 1) * pageSize,
   });
 
-  const bills = data?.bills || data?.data || [];
-  const total = data?.total || 0;
+  const bills = (data as any)?.bills || (data as any)?.data || [];
+  const total = (data as any)?.total || 0;
 
   const columns = [
     {

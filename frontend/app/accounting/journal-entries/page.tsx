@@ -119,11 +119,11 @@ export default function JournalEntriesPage() {
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Debit</p>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.summary?.total_debit)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency((data as any)?.summary?.total_debit)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Total Credit</p>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(data?.summary?.total_credit)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatCurrency((data as any)?.summary?.total_credit)}</p>
         </div>
       </div>
 
@@ -171,7 +171,7 @@ export default function JournalEntriesPage() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={data?.entries || data?.data || []}
+        data={(data as any)?.entries || (data as any)?.data || []}
         keyField="id"
         loading={isLoading}
         emptyMessage="No journal entries found"

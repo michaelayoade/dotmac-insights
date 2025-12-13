@@ -71,7 +71,7 @@ export default function PurchasingDebitNotesPage() {
 
   const debitNotes = data?.debit_notes || [];
   const total = data?.total || 0;
-  const summary = data?.summary || {};
+  const summary: any = (data as any)?.summary || {};
   const suppliers = suppliersData?.suppliers || [];
 
   const getStatusConfig = (noteStatus: string) => {

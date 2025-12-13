@@ -311,7 +311,7 @@ export default function SalesDashboardPage() {
                   <tr key={i} className="border-b border-slate-border/50 hover:bg-slate-elevated/30">
                     <td className="py-3 px-2 text-white">{item.period}</td>
                     <td className="py-3 px-2 text-right font-mono text-white">{formatCurrency(item.revenue, dashboard?.currency || currency)}</td>
-                    <td className="py-3 px-2 text-right font-mono text-teal-electric">{item.payment_count.toLocaleString()}</td>
+                    <td className="py-3 px-2 text-right font-mono text-teal-electric">{(item.payment_count ?? 0).toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -472,7 +472,7 @@ export default function SalesDashboardPage() {
                   <div>
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {pay.supplier || 'Unknown'} • {formatDate(pay.posting_date)}
+                      {(pay as any).supplier || (pay as any).customer || 'Unknown'} • {formatDate((pay as any).posting_date || (pay as any).payment_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">

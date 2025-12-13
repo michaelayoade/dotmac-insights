@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AlertTriangle, ArrowLeft, Clock, LifeBuoy, MessageSquare, ActivitySquare, Mail, Link2, Receipt, Send, Users, ShieldCheck } from 'lucide-react';
-import { useSupportTicketDetail, useSupportTicketCommentMutations, useSupportTicketMutations } from '@/hooks/useApi';
+import {
+  useSupportTicketDetail,
+  useSupportTicketCommentMutations,
+  useSupportTicketMutations,
+  useSupportTicketActivityMutations,
+  useSupportTicketCommunicationMutations,
+  useSupportTicketDependencyMutations,
+} from '@/hooks/useApi';
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
@@ -20,6 +27,9 @@ export default function SupportTicketDetailPage() {
   const { data, isLoading, error } = useSupportTicketDetail(id);
   const { addComment } = useSupportTicketCommentMutations(id);
   const { assignTicket, overrideSla } = useSupportTicketMutations();
+  const { addActivity } = useSupportTicketActivityMutations(id);
+  const { addCommunication } = useSupportTicketCommunicationMutations(id);
+  const { addDependency } = useSupportTicketDependencyMutations(id);
   const [newComment, setNewComment] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -29,6 +39,9 @@ export default function SupportTicketDetailPage() {
   const [slaForm, setSlaForm] = useState({ response_by: '', resolution_by: '', reason: '' });
   const [slaError, setSlaError] = useState<string | null>(null);
   const [savingSla, setSavingSla] = useState(false);
+  const [activityForm, setActivityForm] = useState({ activity_type: 'Status Change', activity: '' });
+  const [commForm, setCommForm] = useState({ communication_type: 'Email', communication_medium: 'Email', subject: '', content: '' });
+  const [depForm, setDepForm] = useState({ depends_on_ticket_id: '', depends_on_subject: '' });
 
   if (isLoading) {
     return (
@@ -120,6 +133,39 @@ export default function SupportTicketDetailPage() {
     } finally {
       setSavingSla(false);
     }
+  };
+
+  const handleAddActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activityForm.activity.trim()) return;
+    await addActivity({
+      activity_type: activityForm.activity_type || 'Update',
+      activity: activityForm.activity.trim(),
+    });
+    setActivityForm({ activity_type: 'Status Change', activity: '' });
+  };
+
+  const handleAddCommunication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commForm.subject.trim() && !commForm.content.trim()) return;
+    await addCommunication({
+      communication_type: commForm.communication_type || 'Email',
+      communication_medium: commForm.communication_medium || commForm.communication_type || 'Email',
+      subject: commForm.subject || undefined,
+      content: commForm.content || undefined,
+      sent_or_received: 'Received',
+    });
+    setCommForm({ communication_type: 'Email', communication_medium: 'Email', subject: '', content: '' });
+  };
+
+  const handleAddDependency = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!depForm.depends_on_ticket_id && !depForm.depends_on_subject) return;
+    await addDependency({
+      depends_on_ticket_id: depForm.depends_on_ticket_id ? Number(depForm.depends_on_ticket_id) : undefined,
+      depends_on_subject: depForm.depends_on_subject || undefined,
+    });
+    setDepForm({ depends_on_ticket_id: '', depends_on_subject: '' });
   };
 
   return (
@@ -333,6 +379,108 @@ export default function SupportTicketDetailPage() {
             </div>
           </form>
         </div>
+      </div>
+
+      {/* Quick add activity */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ActivitySquare className="w-4 h-4 text-teal-electric" />
+          <h3 className="text-white font-semibold">Log activity</h3>
+        </div>
+        <form onSubmit={handleAddActivity} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <select
+            value={activityForm.activity_type}
+            onChange={(e) => setActivityForm({ ...activityForm, activity_type: e.target.value })}
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          >
+            <option value="Status Change">Status Change</option>
+            <option value="Update">Update</option>
+            <option value="Note">Note</option>
+          </select>
+          <input
+            value={activityForm.activity}
+            onChange={(e) => setActivityForm({ ...activityForm, activity: e.target.value })}
+            placeholder="Activity detail"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          />
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+            >
+              Add activity
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Quick add communication */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-teal-electric" />
+          <h3 className="text-white font-semibold">Add communication</h3>
+        </div>
+        <form onSubmit={handleAddCommunication} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <input
+            value={commForm.subject}
+            onChange={(e) => setCommForm({ ...commForm, subject: e.target.value })}
+            placeholder="Subject"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          />
+          <select
+            value={commForm.communication_type}
+            onChange={(e) => setCommForm({ ...commForm, communication_type: e.target.value })}
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          >
+            <option value="Email">Email</option>
+            <option value="Chat">Chat</option>
+            <option value="Call">Call</option>
+          </select>
+          <textarea
+            value={commForm.content}
+            onChange={(e) => setCommForm({ ...commForm, content: e.target.value })}
+            placeholder="Body/content"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-h-[100px]"
+          />
+          <div className="md:col-span-2 flex justify-end">
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+            >
+              Add communication
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Quick add dependency */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Link2 className="w-4 h-4 text-teal-electric" />
+          <h3 className="text-white font-semibold">Add dependency</h3>
+        </div>
+        <form onSubmit={handleAddDependency} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            value={depForm.depends_on_ticket_id}
+            onChange={(e) => setDepForm({ ...depForm, depends_on_ticket_id: e.target.value })}
+            placeholder="Depends on ticket ID"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          />
+          <input
+            value={depForm.depends_on_subject}
+            onChange={(e) => setDepForm({ ...depForm, depends_on_subject: e.target.value })}
+            placeholder="Subject/description"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          />
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+            >
+              Add dependency
+            </button>
+          </div>
+        </form>
       </div>
 
       <Section

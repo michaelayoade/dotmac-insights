@@ -102,7 +102,7 @@ export default function PurchasingPaymentDetailPage() {
             <h3 className="text-white font-semibold">Supplier</h3>
           </div>
           <p className="text-slate-200 text-sm">
-            {data.supplier_name || data.supplier || 'Unknown supplier'}
+            {data.supplier_name || (data as any).supplier || 'Unknown supplier'}
             {data.supplier_id ? ` (#${data.supplier_id})` : ''}
           </p>
           {data.purchase_invoice_id ? (

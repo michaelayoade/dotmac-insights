@@ -1,6 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import { DataTable, Pagination } from '@/components/DataTable';
 import {
   useHrLeaveTypes,
@@ -10,9 +23,24 @@ import {
   useHrLeaveApplications,
   useHrLeaveAllocationMutations,
   useHrLeaveApplicationMutations,
+  useHrAnalyticsLeaveTrend,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
-import { CalendarClock, FileSpreadsheet, Layers, ShieldCheck, Users } from 'lucide-react';
+import {
+  CalendarClock,
+  FileSpreadsheet,
+  Layers,
+  ShieldCheck,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  Calendar,
+} from 'lucide-react';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -20,27 +48,92 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-function StatCard({
+const CHART_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4', '#84cc16', '#f43f5e'];
+
+function MetricCard({
   label,
   value,
   icon: Icon,
-  tone = 'text-teal-electric',
+  tone = 'text-amber-400',
+  hint,
 }: {
   label: string;
   value: string | number;
   icon: React.ElementType;
   tone?: string;
+  hint?: string;
 }) {
   return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
+    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-slate-muted text-sm">{label}</p>
+          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          {hint && <p className="text-slate-muted text-xs mt-1">{hint}</p>}
+        </div>
+        <div className={cn('p-2 rounded-lg', tone.includes('amber') ? 'bg-amber-500/10' : tone.includes('violet') ? 'bg-violet-500/10' : tone.includes('emerald') ? 'bg-emerald-500/10' : 'bg-slate-elevated')}>
+          <Icon className={cn('w-5 h-5', tone)} />
+        </div>
       </div>
     </div>
+  );
+}
+
+function ChartCard({ title, subtitle, children, className }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
+      <div className="mb-4">
+        <h3 className="text-white font-semibold">{title}</h3>
+        {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated/50 transition-colors rounded-xl"
+      >
+        <div className="flex items-center gap-3">
+          <Icon className="w-5 h-5 text-amber-400" />
+          <span className="text-white font-semibold">{title}</span>
+        </div>
+        {isOpen ? <ChevronUp className="w-5 h-5 text-slate-muted" /> : <ChevronDown className="w-5 h-5 text-slate-muted" />}
+      </button>
+      {isOpen && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const statusConfig: Record<string, { bg: string; text: string; border: string; icon: React.ElementType }> = {
+    approved: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 },
+    rejected: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle },
+    open: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock },
+    draft: { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: FileSpreadsheet },
+  };
+  const config = statusConfig[status.toLowerCase()] || statusConfig.draft;
+  const Icon = config.icon;
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
+      <Icon className="w-3 h-3" />
+      {status}
+    </span>
   );
 }
 
@@ -74,6 +167,7 @@ export default function HrLeavePage() {
     limit: appLimit,
     offset: appOffset,
   });
+  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
   const { bulkCreate } = useHrLeaveAllocationMutations();
   const leaveApplicationMutations = useHrLeaveApplicationMutations();
 
@@ -82,6 +176,50 @@ export default function HrLeavePage() {
   const leavePolicyList = extractList(leavePolicies);
   const allocationList = extractList(leaveAllocations);
   const applicationList = extractList(leaveApplications);
+
+  // Leave type distribution
+  const leaveTypeData = useMemo(() => {
+    const types = leaveTypeList.items || [];
+    return types.slice(0, 6).map((type: any, idx: number) => ({
+      name: type.leave_type || type.name || 'Unknown',
+      value: 1,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+      isLWP: type.is_lwp,
+      carryForward: type.is_carry_forward,
+    }));
+  }, [leaveTypeList.items]);
+
+  // Leave trend chart data
+  const trendData = useMemo(() => {
+    return (leaveTrend || []).map((item: any) => ({
+      month: item.month,
+      applications: item.count,
+    }));
+  }, [leaveTrend]);
+
+  // Allocation summary
+  const allocationSummary = useMemo(() => {
+    const allocations = allocationList.items || [];
+    const totalAllocated = allocations.reduce((sum: number, a: any) => sum + (a.total_leaves_allocated || a.new_leaves_allocated || 0), 0);
+    const totalUnused = allocations.reduce((sum: number, a: any) => sum + (a.unused_leaves || 0), 0);
+    const used = totalAllocated - totalUnused;
+    return { totalAllocated, totalUnused, used };
+  }, [allocationList.items]);
+
+  // Application status breakdown
+  const applicationStatusData = useMemo(() => {
+    const apps = applicationList.items || [];
+    const statusCounts: Record<string, number> = {};
+    apps.forEach((app: any) => {
+      const status = app.status || 'open';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    return Object.entries(statusCounts).map(([status, count], idx) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count,
+      color: status === 'approved' ? '#10b981' : status === 'rejected' ? '#ef4444' : '#f59e0b',
+    }));
+  }, [applicationList.items]);
 
   const [bulkIds, setBulkIds] = useState('');
   const [bulkPolicyId, setBulkPolicyId] = useState('');
@@ -131,7 +269,7 @@ export default function HrLeavePage() {
       return;
     }
     try {
-      await leaveApplicationMutations.create({
+      const payload: any = {
         employee: appForm.employee,
         employee_id: appForm.employee_id ? Number(appForm.employee_id) : undefined,
         employee_name: appForm.employee_name || appForm.employee,
@@ -149,7 +287,8 @@ export default function HrLeavePage() {
         status: 'open',
         docstatus: 0,
         company: appForm.company || company || undefined,
-      });
+      };
+      await leaveApplicationMutations.create(payload);
       setAppForm({
         employee: '',
         employee_id: '',
@@ -185,128 +324,83 @@ export default function HrLeavePage() {
     }
   };
 
+  const pendingCount = applicationList.items?.filter((a: any) => a.status === 'open').length || 0;
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Leave Types" value={leaveTypeList.total} icon={Layers} tone="text-blue-300" />
-        <StatCard label="Holiday Lists" value={holidayList.total} icon={CalendarClock} tone="text-amber-300" />
-        <StatCard label="Leave Policies" value={leavePolicyList.total} icon={FileSpreadsheet} tone="text-teal-electric" />
-        <StatCard label="Active Allocations" value={allocationList.total} icon={ShieldCheck} tone="text-green-300" />
-      </div>
-
-      {/* Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="space-y-2">
-          <p className="text-white font-semibold">Bulk Allocate Leave</p>
-          <input
-            type="text"
-            placeholder="Employee IDs (comma-separated)"
-            value={bulkIds}
-            onChange={(e) => setBulkIds(e.target.value)}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              placeholder="Policy ID"
-              value={bulkPolicyId}
-              onChange={(e) => setBulkPolicyId(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="text"
-              placeholder="Company"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
+      {/* Header with key metrics */}
+      <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-white">Leave Management</h2>
+            <p className="text-slate-muted text-sm mt-1">Types, allocations, and applications</p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={bulkFrom}
-              onChange={(e) => setBulkFrom(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="date"
-              value={bulkTo}
-              onChange={(e) => setBulkTo(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <button
-            onClick={handleBulkAllocate}
-            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
-          >
-            Create Allocations
-          </button>
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-amber-400" />
+              <span className="text-amber-300 text-sm font-medium">{pendingCount} pending approval{pendingCount > 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
-        <div className="space-y-2">
-          <p className="text-white font-semibold">New Leave Application</p>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Employee"
-              value={appForm.employee}
-              onChange={(e) => setAppForm({ ...appForm, employee: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="number"
-              placeholder="Employee ID"
-              value={appForm.employee_id}
-              onChange={(e) => setAppForm({ ...appForm, employee_id: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              placeholder="Leave Type"
-              value={appForm.leave_type}
-              onChange={(e) => setAppForm({ ...appForm, leave_type: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="number"
-              placeholder="Leave Type ID"
-              value={appForm.leave_type_id}
-              onChange={(e) => setAppForm({ ...appForm, leave_type_id: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={appForm.from_date}
-              onChange={(e) => setAppForm({ ...appForm, from_date: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-            <input
-              type="date"
-              value={appForm.to_date}
-              onChange={(e) => setAppForm({ ...appForm, to_date: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-            />
-          </div>
-          <textarea
-            placeholder="Description"
-            value={appForm.description}
-            onChange={(e) => setAppForm({ ...appForm, description: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-          />
-          <button
-            onClick={handleCreateApplication}
-            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
-          >
-            Submit Application
-          </button>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MetricCard label="Leave Types" value={leaveTypeList.total} icon={Layers} tone="text-violet-400" />
+          <MetricCard label="Holiday Lists" value={holidayList.total} icon={Calendar} tone="text-amber-400" />
+          <MetricCard label="Active Allocations" value={allocationList.total} icon={ShieldCheck} tone="text-emerald-400" />
+          <MetricCard label="Applications" value={applicationList.total} icon={Users} tone="text-cyan-400" />
         </div>
       </div>
-      {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
 
-      <div className="flex flex-wrap gap-3 items-center">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Leave Trend */}
+        <ChartCard title="Leave Applications" subtitle="6-month trend" className="lg:col-span-2">
+          {trendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 12 }} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Bar dataKey="applications" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Applications" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-slate-muted text-sm">No trend data available</div>
+          )}
+        </ChartCard>
+
+        {/* Allocation Summary */}
+        <ChartCard title="Leave Balance" subtitle="Allocated vs Used">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-muted text-sm">Total Allocated</span>
+              <span className="text-white font-mono font-bold">{allocationSummary.totalAllocated}</span>
+            </div>
+            <div className="h-3 bg-slate-elevated rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all"
+                style={{ width: `${allocationSummary.totalAllocated > 0 ? (allocationSummary.used / allocationSummary.totalAllocated) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="text-slate-muted">Used: {allocationSummary.used}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-slate-elevated" />
+                <span className="text-slate-muted">Remaining: {allocationSummary.totalUnused}</span>
+              </div>
+            </div>
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center bg-slate-card border border-slate-border rounded-xl p-4">
         <input
           type="text"
           placeholder="Filter by company"
@@ -316,14 +410,14 @@ export default function HrLeavePage() {
             setAllocOffset(0);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
         <input
           type="text"
           placeholder="Search leave types"
           value={leaveSearch}
           onChange={(e) => setLeaveSearch(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
         <select
           value={allocationStatus}
@@ -331,7 +425,7 @@ export default function HrLeavePage() {
             setAllocationStatus(e.target.value);
             setAllocOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Allocation Status</option>
           <option value="draft">Draft</option>
@@ -344,7 +438,7 @@ export default function HrLeavePage() {
             setApplicationStatus(e.target.value);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Application Status</option>
           <option value="open">Open</option>
@@ -353,78 +447,195 @@ export default function HrLeavePage() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DataTable
-          columns={[
-            { key: 'leave_type', header: 'Leave Type', sortable: true, render: (item: any) => <span className="text-white">{item.leave_type || item.name}</span> },
-            {
-              key: 'is_lwp',
-              header: 'Loss of Pay',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border', item.is_lwp ? 'border-red-400 text-red-300 bg-red-500/10' : 'border-green-400 text-green-300 bg-green-500/10')}>
-                  {item.is_lwp ? 'Yes' : 'No'}
-                </span>
-              ),
-            },
-            {
-              key: 'is_carry_forward',
-              header: 'Carry Forward',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border', item.is_carry_forward ? 'border-blue-400 text-blue-300 bg-blue-500/10' : 'border-slate-border text-slate-muted')}>
-                  {item.is_carry_forward ? 'Yes' : 'No'}
-                </span>
-              ),
-            },
-          ]}
-          data={(leaveTypeList.items || []).map((item: any) => ({ ...item, id: item.id || item.leave_type }))}
-          keyField="id"
-          loading={leaveTypesLoading}
-          emptyMessage="No leave types defined"
-        />
+      {/* Quick Actions */}
+      <CollapsibleSection title="Quick Actions" icon={ShieldCheck} defaultOpen={false}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
+            <p className="text-white font-semibold">Bulk Allocate Leave</p>
+            <input
+              type="text"
+              placeholder="Employee IDs (comma-separated)"
+              value={bulkIds}
+              onChange={(e) => setBulkIds(e.target.value)}
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                placeholder="Policy ID"
+                value={bulkPolicyId}
+                onChange={(e) => setBulkPolicyId(e.target.value)}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <input
+                type="text"
+                placeholder="Company"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={bulkFrom}
+                onChange={(e) => setBulkFrom(e.target.value)}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <input
+                type="date"
+                value={bulkTo}
+                onChange={(e) => setBulkTo(e.target.value)}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <button
+              onClick={handleBulkAllocate}
+              className="bg-amber-500 text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
+            >
+              Create Allocations
+            </button>
+          </div>
 
+          <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
+            <p className="text-white font-semibold">New Leave Application</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Employee"
+                value={appForm.employee}
+                onChange={(e) => setAppForm({ ...appForm, employee: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <input
+                type="text"
+                placeholder="Leave Type"
+                value={appForm.leave_type}
+                onChange={(e) => setAppForm({ ...appForm, leave_type: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                placeholder="From"
+                value={appForm.from_date}
+                onChange={(e) => setAppForm({ ...appForm, from_date: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <input
+                type="date"
+                placeholder="To"
+                value={appForm.to_date}
+                onChange={(e) => setAppForm({ ...appForm, to_date: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <textarea
+              placeholder="Description (optional)"
+              value={appForm.description}
+              onChange={(e) => setAppForm({ ...appForm, description: e.target.value })}
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white h-16"
+            />
+            <button
+              onClick={handleCreateApplication}
+              className="bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
+            >
+              Submit Application
+            </button>
+          </div>
+        </div>
+        {actionError && <p className="text-rose-400 text-sm mt-3">{actionError}</p>}
+      </CollapsibleSection>
+
+      {/* Leave Types & Holiday Lists */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Layers className="w-5 h-5 text-violet-400" />
+            <h3 className="text-white font-semibold">Leave Types</h3>
+          </div>
+          <DataTable
+            columns={[
+              { key: 'leave_type', header: 'Leave Type', sortable: true, render: (item: any) => <span className="text-white">{item.leave_type || item.name}</span> },
+              {
+                key: 'is_lwp',
+                header: 'LWP',
+                render: (item: any) => (
+                  <span className={cn('px-2 py-1 rounded-full text-xs border', item.is_lwp ? 'border-rose-400/40 text-rose-300 bg-rose-500/10' : 'border-emerald-400/40 text-emerald-300 bg-emerald-500/10')}>
+                    {item.is_lwp ? 'Yes' : 'No'}
+                  </span>
+                ),
+              },
+              {
+                key: 'is_carry_forward',
+                header: 'Carry Fwd',
+                render: (item: any) => (
+                  <span className={cn('px-2 py-1 rounded-full text-xs border', item.is_carry_forward ? 'border-violet-400/40 text-violet-300 bg-violet-500/10' : 'border-slate-border text-slate-muted')}>
+                    {item.is_carry_forward ? 'Yes' : 'No'}
+                  </span>
+                ),
+              },
+            ]}
+            data={(leaveTypeList.items || []).map((item: any) => ({ ...item, id: item.id || item.leave_type }))}
+            keyField="id"
+            loading={leaveTypesLoading}
+            emptyMessage="No leave types defined"
+          />
+        </div>
+
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5 text-amber-400" />
+            <h3 className="text-white font-semibold">Holiday Lists</h3>
+          </div>
+          <DataTable
+            columns={[
+              { key: 'holiday_list_name', header: 'Holiday List', render: (item: any) => <span className="text-white">{item.holiday_list_name}</span> },
+              { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
+              {
+                key: 'holidays',
+                header: 'Holidays',
+                align: 'right' as const,
+                render: (item: any) => <span className="font-mono text-white">{item.holidays?.length ?? 0}</span>,
+              },
+            ]}
+            data={(holidayList.items || []).map((item: any) => ({ ...item, id: item.id || item.holiday_list_name }))}
+            keyField="id"
+            loading={holidayListsLoading}
+            emptyMessage="No holiday lists"
+          />
+        </div>
+      </div>
+
+      {/* Leave Policies */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <FileSpreadsheet className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-white font-semibold">Leave Policies</h3>
+        </div>
         <DataTable
           columns={[
-            { key: 'holiday_list_name', header: 'Holiday List', render: (item: any) => <span className="text-white">{item.holiday_list_name}</span> },
+            { key: 'leave_policy_name', header: 'Policy', render: (item: any) => <span className="text-white">{item.leave_policy_name}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             {
-              key: 'from_date',
-              header: 'Period',
-              render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date)} – ${formatDate(item.to_date)}`}</span>,
-            },
-            {
-              key: 'holidays',
-              header: 'Holidays',
+              key: 'details',
+              header: 'Leave Types',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-white">{item.holidays?.length ?? 0}</span>,
+              render: (item: any) => <span className="font-mono text-white">{item.details?.length ?? 0}</span>,
             },
           ]}
-          data={(holidayList.items || []).map((item: any) => ({ ...item, id: item.id || item.holiday_list_name }))}
+          data={(leavePolicyList.items || []).map((item: any) => ({ ...item, id: item.id || item.leave_policy_name }))}
           keyField="id"
-          loading={holidayListsLoading}
-          emptyMessage="No holiday lists"
+          loading={leavePoliciesLoading}
+          emptyMessage="No leave policies"
         />
       </div>
 
-      <DataTable
-        columns={[
-          { key: 'leave_policy_name', header: 'Policy', render: (item: any) => <span className="text-white">{item.leave_policy_name}</span> },
-          { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
-          {
-            key: 'details',
-            header: 'Leave Types',
-            align: 'right' as const,
-            render: (item: any) => <span className="font-mono text-white">{item.details?.length ?? 0}</span>,
-          },
-        ]}
-        data={(leavePolicyList.items || []).map((item: any) => ({ ...item, id: item.id || item.leave_policy_name }))}
-        keyField="id"
-        loading={leavePoliciesLoading}
-        emptyMessage="No leave policies"
-      />
-
-      <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-teal-electric" />
+      {/* Leave Allocations */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck className="w-5 h-5 text-emerald-400" />
           <h3 className="text-white font-semibold">Leave Allocations</h3>
         </div>
         <DataTable
@@ -443,16 +654,12 @@ export default function HrLeavePage() {
               key: 'unused_leaves',
               header: 'Unused',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-slate-muted">{item.unused_leaves ?? 0}</span>,
+              render: (item: any) => <span className="font-mono text-emerald-400">{item.unused_leaves ?? 0}</span>,
             },
             {
               key: 'status',
               header: 'Status',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', item.status === 'approved' ? 'border-green-400 text-green-300 bg-green-500/10' : 'border-amber-400 text-amber-300 bg-amber-500/10')}>
-                  {item.status || 'draft'}
-                </span>
-              ),
+              render: (item: any) => <StatusBadge status={item.status || 'draft'} />,
             },
           ]}
           data={(allocationList.items || []).map((item: any) => ({ ...item, id: item.id || item.employee }))}
@@ -474,10 +681,23 @@ export default function HrLeavePage() {
         )}
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Leave Applications</h3>
+      {/* Leave Applications */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-amber-400" />
+            <h3 className="text-white font-semibold">Leave Applications</h3>
+          </div>
+          {applicationStatusData.length > 0 && (
+            <div className="flex items-center gap-3">
+              {applicationStatusData.map((s) => (
+                <div key={s.name} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-xs text-slate-muted">{s.name}: {s.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <DataTable
           columns={[
@@ -494,11 +714,7 @@ export default function HrLeavePage() {
             {
               key: 'status',
               header: 'Status',
-              render: (item: any) => (
-                <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', item.status === 'approved' ? 'border-green-400 text-green-300 bg-green-500/10' : item.status === 'rejected' ? 'border-red-400 text-red-300 bg-red-500/10' : 'border-amber-400 text-amber-300 bg-amber-500/10')}>
-                  {item.status || 'open'}
-                </span>
-              ),
+              render: (item: any) => <StatusBadge status={item.status || 'open'} />,
             },
             {
               key: 'actions',
@@ -507,21 +723,15 @@ export default function HrLeavePage() {
                 <div className="flex gap-2 text-xs">
                   <button
                     onClick={(e) => { e.stopPropagation(); leaveApplicationMutations.approve(item.id); }}
-                    className="px-2 py-1 rounded border border-green-500 text-green-300 hover:bg-green-500/10"
+                    className="px-2 py-1 rounded border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
                   >
                     Approve
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); leaveApplicationMutations.reject(item.id); }}
-                    className="px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10"
+                    className="px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 transition-colors"
                   >
                     Reject
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); leaveApplicationMutations.cancel(item.id); }}
-                    className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
-                  >
-                    Cancel
                   </button>
                 </div>
               ),
@@ -544,15 +754,17 @@ export default function HrLeavePage() {
             }}
           />
         )}
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-2">
-          <p className="text-white font-semibold">Bulk Approve/Reject</p>
-          <div className="grid grid-cols-2 gap-2">
+
+        {/* Bulk Actions */}
+        <div className="mt-4 p-4 bg-slate-elevated border border-slate-border rounded-lg">
+          <p className="text-white font-semibold mb-3">Bulk Approve/Reject</p>
+          <div className="flex flex-wrap gap-3 items-end">
             <input
               type="text"
               placeholder="Application IDs (comma-separated)"
               value={bulkActionIds}
               onChange={(e) => setBulkActionIds(e.target.value)}
-              className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="flex-1 min-w-[200px] bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
             />
             <select
               value={bulkAction}
@@ -562,13 +774,16 @@ export default function HrLeavePage() {
               <option value="approve">Approve</option>
               <option value="reject">Reject</option>
             </select>
+            <button
+              onClick={handleBulkAppAction}
+              className={cn(
+                'px-4 py-2 rounded-lg text-sm font-semibold transition-colors',
+                bulkAction === 'approve' ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-rose-500 text-white hover:bg-rose-400'
+              )}
+            >
+              Run Bulk {bulkAction === 'approve' ? 'Approve' : 'Reject'}
+            </button>
           </div>
-          <button
-            onClick={handleBulkAppAction}
-            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
-          >
-            Run Bulk Action
-          </button>
         </div>
       </div>
     </div>

@@ -22,6 +22,7 @@ export default function ProjectsPage() {
   const [department, setDepartment] = useState<string>('');
   const [projectType, setProjectType] = useState<string>('');
   const [search, setSearch] = useState<string>('');
+  const offset = (page - 1) * pageSize;
 
   const { data, isLoading, error } = useProjects({
     status: status || undefined,
@@ -30,7 +31,7 @@ export default function ProjectsPage() {
     project_type: projectType || undefined,
     search: search || undefined,
     limit: pageSize,
-    offset: (page - 1) * pageSize,
+    offset,
   });
 
   const { data: dashboard } = useProjectsDashboard();
@@ -229,10 +230,13 @@ export default function ProjectsPage() {
       {total > pageSize && (
         <Pagination
           total={total}
-          pageSize={pageSize}
-          page={page}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
+          limit={pageSize}
+          offset={offset}
+          onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+          onLimitChange={(newLimit) => {
+            setPageSize(newLimit);
+            setPage(1);
+          }}
         />
       )}
     </div>

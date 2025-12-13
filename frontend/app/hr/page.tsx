@@ -1,7 +1,22 @@
 'use client';
 
 import { useMemo } from 'react';
-import { DataTable } from '@/components/DataTable';
+import Link from 'next/link';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import {
   useHrLeaveTypes,
   useHrHolidayLists,
@@ -16,7 +31,22 @@ import {
   useHrAnalyticsAttendanceTrend,
 } from '@/hooks/useApi';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
-import { CalendarClock, Briefcase, ClipboardList, GraduationCap, Layers, Users } from 'lucide-react';
+import {
+  CalendarClock,
+  Briefcase,
+  ClipboardList,
+  GraduationCap,
+  Users,
+  TrendingUp,
+  Wallet2,
+  UserPlus,
+  Clock3,
+  Target,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Timer,
+} from 'lucide-react';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -24,30 +54,167 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-function StatCard({
+// Warm HR color palette
+const HR_COLORS = {
+  primary: '#f59e0b', // Amber
+  secondary: '#8b5cf6', // Violet
+  accent: '#ec4899', // Pink
+  success: '#10b981', // Emerald
+  warning: '#f97316', // Orange
+  info: '#06b6d4', // Cyan
+};
+
+const CHART_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4'];
+
+function MetricCard({
   label,
   value,
   icon: Icon,
-  tone = 'text-teal-electric',
-  hint,
+  trend,
+  trendLabel,
+  className,
 }: {
   label: string;
   value: string | number;
   icon: React.ElementType;
-  tone?: string;
-  hint?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  trendLabel?: string;
+  className?: string;
 }) {
   return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-start justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className={cn('text-2xl font-bold text-white', tone)}>{value}</p>
-        {hint && <p className="text-slate-muted text-xs mt-1">{hint}</p>}
-      </div>
-      <div className="p-2 bg-slate-elevated rounded-lg">
-        <Icon className={cn('w-5 h-5', tone)} />
+    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-slate-muted text-sm">{label}</p>
+          <p className="text-3xl font-bold text-white mt-1">{value}</p>
+          {trendLabel && (
+            <div className="flex items-center gap-1 mt-2">
+              {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
+              {trend === 'down' && <TrendingUp className="w-3 h-3 text-rose-400 rotate-180" />}
+              <span className={cn('text-xs', trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-muted')}>
+                {trendLabel}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="p-3 bg-amber-500/10 rounded-xl">
+          <Icon className="w-6 h-6 text-amber-400" />
+        </div>
       </div>
     </div>
+  );
+}
+
+function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+      <div className="mb-4">
+        <h3 className="text-white font-semibold">{title}</h3>
+        {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function WorkflowStep({
+  step,
+  title,
+  description,
+  icon: Icon,
+  href,
+  status,
+}: {
+  step: number;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  href: string;
+  status: 'active' | 'pending' | 'complete';
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'relative flex flex-col p-4 rounded-xl border transition-all group',
+        status === 'active' && 'bg-amber-500/10 border-amber-500/40 hover:border-amber-400',
+        status === 'pending' && 'bg-slate-card border-slate-border hover:border-violet-500/40',
+        status === 'complete' && 'bg-emerald-500/10 border-emerald-500/40'
+      )}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div
+          className={cn(
+            'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+            status === 'active' && 'bg-amber-500 text-slate-900',
+            status === 'pending' && 'bg-slate-elevated text-slate-muted',
+            status === 'complete' && 'bg-emerald-500 text-white'
+          )}
+        >
+          {status === 'complete' ? <CheckCircle2 className="w-4 h-4" /> : step}
+        </div>
+        <Icon className={cn('w-5 h-5', status === 'active' ? 'text-amber-400' : status === 'complete' ? 'text-emerald-400' : 'text-slate-muted')} />
+      </div>
+      <h4 className="text-white font-medium text-sm">{title}</h4>
+      <p className="text-slate-muted text-xs mt-1">{description}</p>
+      <ArrowRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+    </Link>
+  );
+}
+
+function ActionItem({
+  icon: Icon,
+  title,
+  count,
+  href,
+  urgency,
+}: {
+  icon: React.ElementType;
+  title: string;
+  count: number;
+  href: string;
+  urgency: 'high' | 'medium' | 'low';
+}) {
+  if (count === 0) return null;
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between p-3 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors group"
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            'p-2 rounded-lg',
+            urgency === 'high' && 'bg-rose-500/10',
+            urgency === 'medium' && 'bg-amber-500/10',
+            urgency === 'low' && 'bg-slate-card'
+          )}
+        >
+          <Icon
+            className={cn(
+              'w-4 h-4',
+              urgency === 'high' && 'text-rose-400',
+              urgency === 'medium' && 'text-amber-400',
+              urgency === 'low' && 'text-slate-muted'
+            )}
+          />
+        </div>
+        <span className="text-sm text-white">{title}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            'px-2 py-0.5 rounded-full text-xs font-medium',
+            urgency === 'high' && 'bg-rose-500/20 text-rose-300',
+            urgency === 'medium' && 'bg-amber-500/20 text-amber-300',
+            urgency === 'low' && 'bg-slate-card text-slate-muted'
+          )}
+        >
+          {count}
+        </span>
+        <ArrowRight className="w-4 h-4 text-slate-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+      </div>
+    </Link>
   );
 }
 
@@ -64,15 +231,6 @@ export default function HrOverviewPage() {
   const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
   const { data: attendanceTrend } = useHrAnalyticsAttendanceTrend({ days: 14 });
 
-  const holidayList = useMemo(() => extractList(holidayLists).items?.[0] || null, [holidayLists]);
-  const holidays = useMemo(
-    () =>
-      (holidayList?.holidays || [])
-        .slice(0, 5)
-        .map((h: any, idx: number) => ({ ...h, rowId: `${h.holiday_date}-${idx}` })),
-    [holidayList]
-  );
-
   const leaveAppList = extractList(leaveApplications);
   const leaveTypeList = extractList(leaveTypes);
   const jobOpeningList = extractList(jobOpenings);
@@ -81,229 +239,384 @@ export default function HrOverviewPage() {
   const onboardingList = extractList(onboardings);
   const shiftAssignmentList = extractList(shiftAssignments);
 
-  const openLeaveApplications = (leaveAppList.items || []).slice(0, 5).map((item: any) => ({
-    ...item,
-    rowId: item.id || `${item.employee}-${item.from_date}`,
-  }));
-
-  const openJobs = (jobOpeningList.items || []).slice(0, 5).map((item: any) => ({
-    ...item,
-    rowId: item.id || `${item.job_title}-${item.company || ''}`,
-  }));
-
   const leaveByStatus = analyticsOverview?.leave_by_status || {};
   const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
   const payroll30d = analyticsOverview?.payroll_30d || {};
   const recruitmentFunnel = analyticsOverview?.recruitment_funnel || {};
 
+  // Transform leave trend data for chart
+  const leaveTrendData = useMemo(() => {
+    return (leaveTrend || []).map((item: any) => ({
+      month: item.month,
+      applications: item.count,
+    }));
+  }, [leaveTrend]);
+
+  // Transform attendance trend data for chart
+  const attendanceTrendData = useMemo(() => {
+    return (attendanceTrend || []).slice(-7).map((item: any) => {
+      const counts = item.status_counts || {};
+      return {
+        date: formatDate(item.date).split(',')[0],
+        present: counts.present || counts.Present || 0,
+        absent: counts.absent || counts.Absent || 0,
+        late: counts.late || counts.Late || 0,
+      };
+    });
+  }, [attendanceTrend]);
+
+  // Leave status distribution for pie chart
+  const leaveStatusData = useMemo(() => {
+    return Object.entries(leaveByStatus).map(([status, count], idx) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count as number,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+  }, [leaveByStatus]);
+
+  // Recruitment funnel data
+  const funnelData = useMemo(() => {
+    const stages = [
+      { name: 'Applications', key: 'applications', color: '#8b5cf6' },
+      { name: 'Screened', key: 'screened', color: '#06b6d4' },
+      { name: 'Interviewed', key: 'interviewed', color: '#f59e0b' },
+      { name: 'Offered', key: 'offered', color: '#10b981' },
+      { name: 'Hired', key: 'hired', color: '#ec4899' },
+    ];
+    return stages.map((stage) => ({
+      ...stage,
+      value: recruitmentFunnel[stage.key] || 0,
+    }));
+  }, [recruitmentFunnel]);
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Leave Types" value={leaveTypeList.total} icon={Layers} tone="text-blue-300" />
-        <StatCard label="Open Leave Requests" value={leaveAppList.total} icon={CalendarClock} tone="text-amber-300" />
-        <StatCard label="Open Job Openings" value={jobOpeningList.total} icon={Briefcase} tone="text-teal-electric" />
-        <StatCard label="Active Shift Assignments" value={shiftAssignmentList.total} icon={ClipboardList} tone="text-purple-300" />
-      </div>
-
-      {/* Analytics snapshot */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-2">
-          <h3 className="text-white font-semibold">Leave by Status</h3>
-          <div className="space-y-2">
-            {Object.keys(leaveByStatus).length === 0 && <p className="text-slate-muted text-sm">No data</p>}
-            {Object.entries(leaveByStatus).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between text-sm">
-                <span className="text-slate-muted capitalize">{status}</span>
-                <span className="font-mono text-white">{count as number}</span>
-              </div>
-            ))}
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">Overview</h2>
+            <p className="text-slate-muted text-sm mt-1">People operations at a glance</p>
           </div>
-        </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-2">
-          <h3 className="text-white font-semibold">Attendance (30d)</h3>
-          <div className="space-y-2">
-            {Object.keys(attendanceStatus).length === 0 && <p className="text-slate-muted text-sm">No data</p>}
-            {Object.entries(attendanceStatus).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between text-sm">
-                <span className="text-slate-muted capitalize">{status}</span>
-                <span className="font-mono text-white">{count as number}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-2">
-          <h3 className="text-white font-semibold">Payroll (30d)</h3>
-          <div className="space-y-1 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Gross</span>
-              <span className="font-mono text-white">{formatCurrency(payroll30d.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Deductions</span>
-              <span className="font-mono text-white">{formatCurrency(payroll30d.deduction_total || 0, 'NGN', { maximumFractionDigits: 0 })}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Net</span>
-              <span className="font-mono text-white">{formatCurrency(payroll30d.net_total || 0, 'NGN', { maximumFractionDigits: 0 })}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Slips</span>
-              <span className="font-mono text-white">{payroll30d.slip_count ?? 0}</span>
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/hr/leave"
+              className="px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+            >
+              <CalendarClock className="w-4 h-4" />
+              Manage Leave
+            </Link>
+            <Link
+              href="/hr/payroll"
+              className="px-4 py-2 bg-violet-500/20 text-violet-300 rounded-lg text-sm font-medium hover:bg-violet-500/30 transition-colors flex items-center gap-2"
+            >
+              <Wallet2 className="w-4 h-4" />
+              Run Payroll
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Trends */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <CalendarClock className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Leave Trend (monthly)</h3>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'month', header: 'Month', render: (item: any) => <span className="text-white">{item.month}</span> },
-              { key: 'count', header: 'Applications', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{item.count}</span> },
-            ]}
-            data={(leaveTrend || []).map((row, idx) => ({ ...row, id: `${row.month}-${idx}` }))}
-            keyField="id"
-            emptyMessage="No leave trend data"
-          />
-        </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <ClipboardList className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Attendance Trend (daily)</h3>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'date', header: 'Date', render: (item: any) => <span className="text-white">{formatDate(item.date)}</span> },
-              { key: 'total', header: 'Total', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{item.total ?? Object.values(item.status_counts || {}).reduce((a: number, b: any) => a + (b as number), 0)}</span> },
-            ]}
-            data={(attendanceTrend || []).map((row, idx) => ({ ...row, id: `${row.date}-${idx}` }))}
-            keyField="id"
-            emptyMessage="No attendance trend data"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Upcoming Holidays</h3>
-          </div>
-          <p className="text-slate-muted text-sm">
-            {holidayList ? `${holidayList.holiday_list_name || 'Holiday List'}` : 'No holiday list loaded'}
-          </p>
-          <DataTable
-            columns={[
-              { key: 'holiday_date', header: 'Date', render: (item: any) => <span className="text-white">{formatDate(item.holiday_date)}</span> },
-              { key: 'description', header: 'Description', render: (item: any) => <span className="text-slate-muted text-sm">{item.description || '—'}</span> },
-              {
-                key: 'weekly_off',
-                header: 'Weekly Off',
-                render: (item: any) => (
-                  <span className={cn('px-2 py-1 rounded-full text-xs border', item.weekly_off ? 'text-green-400 border-green-500/40 bg-green-500/10' : 'text-slate-muted border-slate-border')}>
-                    {item.weekly_off ? 'Yes' : 'No'}
-                  </span>
-                ),
-              },
-            ]}
-            data={holidays}
-            keyField="rowId"
-            emptyMessage="No holidays scheduled"
-          />
-        </div>
-
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Open Positions</h3>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'job_title', header: 'Role', render: (item: any) => <span className="text-white">{item.job_title}</span> },
-              { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
-              { key: 'posting_date', header: 'Posted', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.posting_date)}</span> },
-              { key: 'vacancies', header: 'Slots', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{item.vacancies ?? '—'}</span> },
-            ]}
-            data={openJobs}
-            keyField="rowId"
-            emptyMessage="No open job openings"
-          />
-        </div>
-
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Pending Leave Requests</h3>
-          </div>
-          <DataTable
-            columns={[
-              { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
-              { key: 'leave_type', header: 'Type', render: (item: any) => <span className="text-slate-muted text-sm">{item.leave_type || '—'}</span> },
-              { key: 'from_date', header: 'From', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.from_date)}</span> },
-              { key: 'to_date', header: 'To', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.to_date)}</span> },
-              {
-                key: 'status',
-                header: 'Status',
-                render: (item: any) => (
-                  <span className={cn('px-2 py-1 rounded-full text-xs border capitalize', 'border-amber-400/40 text-amber-300 bg-amber-500/10')}>
-                    {item.status || 'open'}
-                  </span>
-                ),
-              },
-            ]}
-            data={openLeaveApplications}
-            keyField="rowId"
-            emptyMessage="No pending requests"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          label="Open Leave Requests"
+          value={leaveAppList.total}
+          icon={CalendarClock}
+          trend={leaveAppList.total > 5 ? 'up' : 'neutral'}
+          trendLabel={leaveAppList.total > 5 ? 'Needs attention' : 'Under control'}
+        />
+        <MetricCard
+          label="Open Positions"
+          value={jobOpeningList.total}
+          icon={Briefcase}
+          trend="neutral"
+          trendLabel="Active recruiting"
+        />
+        <MetricCard
           label="Upcoming Trainings"
           value={trainingEventList.total}
           icon={GraduationCap}
-          tone="text-cyan-300"
-          hint="Scheduled training events"
+          trend="neutral"
+          trendLabel="Scheduled"
         />
-        <StatCard
-          label="Payroll Runs"
-          value={payrollEntryList.total}
-          icon={ClipboardList}
-          tone="text-green-300"
-          hint="Payroll entries created"
-        />
-        <StatCard
+        <MetricCard
           label="Active Onboardings"
           value={onboardingList.total}
-          icon={Users}
-          tone="text-purple-300"
-          hint="Employees in onboarding flow"
+          icon={UserPlus}
+          trend={onboardingList.total > 0 ? 'up' : 'neutral'}
+          trendLabel={onboardingList.total > 0 ? 'New hires' : 'No pending'}
         />
       </div>
 
+      {/* HR Workflow */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <ClipboardList className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Recent Payroll Entries</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-white font-semibold">HR Workflow</h3>
+            <p className="text-slate-muted text-sm">Employee lifecycle management</p>
+          </div>
         </div>
-        <DataTable
-          columns={[
-            { key: 'company', header: 'Company', render: (item: any) => <span className="text-white">{item.company}</span> },
-            { key: 'posting_date', header: 'Posting', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.posting_date)}</span> },
-            { key: 'payroll_frequency', header: 'Frequency', render: (item: any) => <span className="text-slate-muted text-sm">{item.payroll_frequency || '—'}</span> },
-            { key: 'start_date', header: 'Period', render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.start_date)} – ${formatDate(item.end_date)}`}</span> },
-            { key: 'status', header: 'Status', render: (item: any) => <span className="text-teal-electric text-sm capitalize">{item.status || 'draft'}</span> },
-          ]}
-          data={(payrollEntryList.items || []).slice(0, 6).map((item: any) => ({ ...item, rowId: item.id || item.posting_date }))}
-          keyField="rowId"
-          emptyMessage="No payroll entries yet"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <WorkflowStep
+            step={1}
+            title="Recruit"
+            description="Source and hire talent"
+            icon={Briefcase}
+            href="/hr/recruitment"
+            status="active"
+          />
+          <WorkflowStep
+            step={2}
+            title="Onboard"
+            description="Welcome new employees"
+            icon={UserPlus}
+            href="/hr/lifecycle"
+            status={onboardingList.total > 0 ? 'active' : 'pending'}
+          />
+          <WorkflowStep
+            step={3}
+            title="Manage"
+            description="Leave, attendance, shifts"
+            icon={Clock3}
+            href="/hr/attendance"
+            status="pending"
+          />
+          <WorkflowStep
+            step={4}
+            title="Develop"
+            description="Training & appraisals"
+            icon={Target}
+            href="/hr/training"
+            status="pending"
+          />
+          <WorkflowStep
+            step={5}
+            title="Compensate"
+            description="Run payroll cycles"
+            icon={Wallet2}
+            href="/hr/payroll"
+            status="pending"
+          />
+        </div>
+      </div>
+
+      {/* Pending Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <h3 className="text-white font-semibold mb-3">Pending Actions</h3>
+          <div className="space-y-2">
+            <ActionItem
+              icon={CalendarClock}
+              title="Leave requests awaiting approval"
+              count={leaveAppList.total}
+              href="/hr/leave"
+              urgency={leaveAppList.total > 5 ? 'high' : leaveAppList.total > 0 ? 'medium' : 'low'}
+            />
+            <ActionItem
+              icon={Briefcase}
+              title="Job openings to review"
+              count={jobOpeningList.total}
+              href="/hr/recruitment"
+              urgency="medium"
+            />
+            <ActionItem
+              icon={UserPlus}
+              title="Employees in onboarding"
+              count={onboardingList.total}
+              href="/hr/lifecycle"
+              urgency={onboardingList.total > 0 ? 'medium' : 'low'}
+            />
+            <ActionItem
+              icon={GraduationCap}
+              title="Upcoming training sessions"
+              count={trainingEventList.total}
+              href="/hr/training"
+              urgency="low"
+            />
+          </div>
+        </div>
+
+        {/* Payroll Summary */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <h3 className="text-white font-semibold mb-1">Payroll (Last 30 Days)</h3>
+          <p className="text-slate-muted text-sm mb-4">{payroll30d.slip_count || 0} salary slips processed</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
+              <span className="text-slate-muted text-sm">Gross Pay</span>
+              <span className="text-white font-mono font-medium">
+                {formatCurrency(payroll30d.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
+              <span className="text-slate-muted text-sm">Deductions</span>
+              <span className="text-rose-400 font-mono font-medium">
+                -{formatCurrency(payroll30d.deduction_total || 0, 'NGN', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              <span className="text-emerald-400 text-sm font-medium">Net Pay</span>
+              <span className="text-emerald-400 font-mono font-bold">
+                {formatCurrency(payroll30d.net_total || 0, 'NGN', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          </div>
+          <Link
+            href="/hr/payroll"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            View Payroll Details <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {/* Leave Status Distribution */}
+        <ChartCard title="Leave Status" subtitle="Current distribution">
+          {leaveStatusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={leaveStatusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {leaveStatusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Legend
+                  formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
+                  iconType="circle"
+                  iconSize={8}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No leave data</div>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Leave Trend */}
+        <ChartCard title="Leave Applications" subtitle="Monthly trend">
+          {leaveTrendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={leaveTrendData}>
+                <defs>
+                  <linearGradient id="leaveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 12 }} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="applications"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  fill="url(#leaveGradient)"
+                  name="Applications"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">No trend data</div>
+          )}
+        </ChartCard>
+
+        {/* Attendance Trend */}
+        <ChartCard title="Attendance" subtitle="Last 7 days">
+          {attendanceTrendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={attendanceTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 12 }} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f8fafc' }}
+                />
+                <Legend
+                  formatter={(value) => <span className="text-slate-muted text-xs capitalize">{value}</span>}
+                  iconType="circle"
+                  iconSize={8}
+                />
+                <Bar dataKey="present" stackId="a" fill="#10b981" name="Present" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="late" stackId="a" fill="#f59e0b" name="Late" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="absent" stackId="a" fill="#ef4444" name="Absent" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">No attendance data</div>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Recruitment Funnel */}
+      <ChartCard title="Recruitment Funnel" subtitle="Candidate progression">
+        <div className="grid grid-cols-5 gap-2">
+          {funnelData.map((stage, idx) => {
+            const maxVal = Math.max(...funnelData.map((s) => s.value), 1);
+            const height = (stage.value / maxVal) * 100;
+            return (
+              <div key={stage.key} className="flex flex-col items-center">
+                <div className="h-32 w-full flex items-end justify-center">
+                  <div
+                    className="w-full max-w-[60px] rounded-t-lg transition-all duration-500"
+                    style={{
+                      height: `${Math.max(height, 10)}%`,
+                      backgroundColor: stage.color,
+                      opacity: stage.value > 0 ? 1 : 0.3,
+                    }}
+                  />
+                </div>
+                <span className="text-2xl font-bold text-white mt-2">{stage.value}</span>
+                <span className="text-xs text-slate-muted text-center">{stage.name}</span>
+              </div>
+            );
+          })}
+        </div>
+        <Link
+          href="/hr/recruitment"
+          className="mt-4 flex items-center justify-center gap-2 text-sm text-violet-400 hover:text-violet-300 transition-colors"
+        >
+          View Recruitment Pipeline <ArrowRight className="w-4 h-4" />
+        </Link>
+      </ChartCard>
+
+      {/* Quick Stats Footer */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-white">{leaveTypeList.total}</p>
+          <p className="text-slate-muted text-sm">Leave Types</p>
+        </div>
+        <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-white">{shiftAssignmentList.total}</p>
+          <p className="text-slate-muted text-sm">Shift Assignments</p>
+        </div>
+        <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-white">{payrollEntryList.total}</p>
+          <p className="text-slate-muted text-sm">Payroll Runs</p>
+        </div>
+        <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-white">{attendanceStatus.present || attendanceStatus.Present || 0}</p>
+          <p className="text-slate-muted text-sm">Present Today</p>
+        </div>
       </div>
     </div>
   );

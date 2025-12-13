@@ -92,7 +92,7 @@ export default function JournalEntryDetailPage() {
         </div>
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Status</p>
-          <p className="text-white font-semibold">{data.is_balanced ? 'Balanced' : 'Unbalanced'}</p>
+          <p className="text-white font-semibold">{(data as any).is_balanced ? 'Balanced' : 'Unbalanced'}</p>
         </div>
       </div>
 

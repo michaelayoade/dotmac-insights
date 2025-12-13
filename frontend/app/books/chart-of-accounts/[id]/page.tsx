@@ -53,15 +53,16 @@ export default function AccountDetailPage() {
     );
   }
 
+  const acct: any = data as any;
   const summary = [
-    { label: 'Account', value: data.name || `Account #${data.id}` },
+    { label: 'Account', value: acct.name || acct.account_name || `Account #${acct.id}` },
     { label: 'Type', value: data.account_type || data.root_type || '—' },
     { label: 'Currency', value: data.currency || 'NGN' },
-    { label: 'Balance', value: formatCurrency((data as any).balance ?? data.debit ?? 0, data.currency || 'NGN') },
-    { label: 'Debit', value: formatCurrency((data as any).debit ?? 0, data.currency || 'NGN') },
-    { label: 'Credit', value: formatCurrency((data as any).credit ?? 0, data.currency || 'NGN') },
+    { label: 'Balance', value: formatCurrency(acct.balance ?? acct.debit ?? 0, data.currency || 'NGN') },
+    { label: 'Debit', value: formatCurrency(acct.debit ?? 0, data.currency || 'NGN') },
+    { label: 'Credit', value: formatCurrency(acct.credit ?? 0, data.currency || 'NGN') },
     { label: 'Parent', value: data.parent_account || '—' },
-    { label: 'Company', value: (data as any).company || '—' },
+    { label: 'Company', value: acct.company || '—' },
   ];
 
   const ledger = (data as any).ledger || [];
@@ -77,11 +78,11 @@ export default function AccountDetailPage() {
             <ArrowLeft className="w-4 h-4" />
             Back to chart
           </Link>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Account</p>
-            <h1 className="text-xl font-semibold text-white">{data.name || `Account #${data.id}`}</h1>
-          </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Account</p>
+          <h1 className="text-xl font-semibold text-white">{acct.name || acct.account_name || `Account #${acct.id}`}</h1>
         </div>
+      </div>
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">

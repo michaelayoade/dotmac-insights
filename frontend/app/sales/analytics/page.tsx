@@ -139,9 +139,9 @@ export default function SalesAnalyticsPage() {
                   {byCurrency.by_currency.map((row) => (
                     <tr key={row.currency} className="border-b border-slate-border/50">
                       <td className="py-2 text-white">{row.currency}</td>
-                      <td className="py-2 text-right font-mono text-white">{formatCurrency(row.mrr, row.currency)}</td>
-                      <td className="py-2 text-right font-mono text-white">{formatCurrency(row.arr, row.currency)}</td>
-                      <td className="py-2 text-right font-mono text-teal-electric">{formatCurrency(row.outstanding, row.currency)}</td>
+                    <td className="py-2 text-right font-mono text-white">{formatCurrency(row.mrr || 0, row.currency)}</td>
+                    <td className="py-2 text-right font-mono text-white">{formatCurrency(row.arr || 0, row.currency)}</td>
+                    <td className="py-2 text-right font-mono text-teal-electric">{formatCurrency(row.outstanding || 0, row.currency)}</td>
                     </tr>
                   ))}
                 </tbody>

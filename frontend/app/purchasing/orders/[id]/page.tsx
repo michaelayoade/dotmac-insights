@@ -80,7 +80,7 @@ export default function PurchasingOrderDetailPage() {
   const summaryRows = [
     { label: 'Supplier', value: data.supplier || '-' },
     { label: 'Order Date', value: formatDate((data as any).transaction_date || data.date) },
-    { label: 'Schedule Date', value: formatDate((data as any).schedule_date || data.delivery_date) },
+    { label: 'Schedule Date', value: formatDate((data as any).schedule_date || (data as any).delivery_date) },
     { label: 'Status', value: data.status || 'draft' },
     { label: 'Total', value: formatCurrency((data as any).grand_total ?? data.total, data.currency || 'NGN') },
     { label: 'Net Total', value: formatCurrency((data as any).net_total ?? data.total, data.currency || 'NGN') },
@@ -125,7 +125,7 @@ export default function PurchasingOrderDetailPage() {
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Purchase Order</p>
-            <h1 className="text-xl font-semibold text-white">{data.order_no || data.order_number || `PO #${id}`}</h1>
+            <h1 className="text-xl font-semibold text-white">{data.order_no || (data as any).order_number || `PO #${id}`}</h1>
             {data.write_back_status && (
               <span className={writeBackClass}>Write-back: {data.write_back_status}</span>
             )}

@@ -13,7 +13,7 @@ export default function SupportAnalyticsPage() {
   const [priority, setPriority] = useState<string>('');
   const [ticketType, setTicketType] = useState<string>('');
   const { data, isLoading, error } = useSupportOverview({
-    priority: priority || undefined,
+    priority: (priority as any) || undefined,
     ticket_type: ticketType || undefined,
     limit_overdue: 50,
   });

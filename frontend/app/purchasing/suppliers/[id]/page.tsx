@@ -61,7 +61,7 @@ export default function PurchasingSupplierDetailPage() {
   }
 
   const summary = [
-    { label: 'Supplier', value: data.name || data.supplier_name || `Supplier #${data.id}` },
+    { label: 'Supplier', value: data.name || (data as any).supplier_name || `Supplier #${data.id}` },
     { label: 'Group', value: data.group || '—' },
     { label: 'Type', value: data.type || '—' },
     { label: 'Country', value: data.country || '—' },
@@ -83,7 +83,7 @@ export default function PurchasingSupplierDetailPage() {
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Supplier</p>
-            <h1 className="text-xl font-semibold text-white">{data.name || data.supplier_name || `Supplier #${data.id}`}</h1>
+            <h1 className="text-xl font-semibold text-white">{data.name || (data as any).supplier_name || `Supplier #${data.id}`}</h1>
           </div>
         </div>
         <Link
@@ -115,11 +115,11 @@ export default function PurchasingSupplierDetailPage() {
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-slate-200">
               <Mail className="w-4 h-4 text-slate-muted" />
-              <span>{data.email || data.email_id || '—'}</span>
+              <span>{data.email || (data as any).email_id || '—'}</span>
             </div>
             <div className="flex items-center gap-2 text-slate-200">
               <Phone className="w-4 h-4 text-slate-muted" />
-              <span>{data.mobile || data.phone || '—'}</span>
+              <span>{data.mobile || (data as any).phone || '—'}</span>
             </div>
             <p className="text-slate-muted text-sm">Currency: {data.currency || 'NGN'}</p>
           </div>

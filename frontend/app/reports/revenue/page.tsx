@@ -74,13 +74,13 @@ export default function ReportsRevenuePage() {
             columns={[
               { key: 'customer', header: 'Customer', render: (row: any) => <span className="text-white">{row.customer || `Customer #${row.customer_id}`}</span> },
               { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
-              { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
-            ]}
-            data={byCustomer.data || []}
-            keyField={(row: any) => row.customer_id || row.customer}
-            loading={byCustomer.isLoading}
-            emptyMessage="No customer data"
-          />
+            { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
+          ]}
+          data={byCustomer.data || []}
+          keyField="customer"
+          loading={byCustomer.isLoading}
+          emptyMessage="No customer data"
+        />
         </div>
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
@@ -92,13 +92,13 @@ export default function ReportsRevenuePage() {
             columns={[
               { key: 'product', header: 'Product', render: (row: any) => <span className="text-white">{row.product || '-'}</span> },
               { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
-              { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
-            ]}
-            data={byProduct.data || []}
-            keyField={(row: any) => row.product}
-            loading={byProduct.isLoading}
-            emptyMessage="No product data"
-          />
+            { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
+          ]}
+          data={byProduct.data || []}
+          keyField="product"
+          loading={byProduct.isLoading}
+          emptyMessage="No product data"
+        />
         </div>
       </div>
     </div>

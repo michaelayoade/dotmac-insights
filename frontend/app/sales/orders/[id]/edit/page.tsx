@@ -53,12 +53,17 @@ export default function OrderEditPage() {
     e.preventDefault();
     if (!Number.isFinite(id)) return;
     if (!validate()) return;
+    if (!data) {
+      setSubmitError('Order not loaded');
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
+      const orderData: any = data || {};
       const payload = {
         customer_id: customerId ? Number(customerId) : null,
-        customer_name: data.customer_name || null,
+        customer_name: orderData.customer_name || null,
         order_type: 'Sales',
         company: 'Dotmac',
         currency,
@@ -72,13 +77,13 @@ export default function OrderEditPage() {
         total_taxes_and_charges: 0,
         per_delivered: 0,
         per_billed: 0,
-        billing_status: data.billing_status || 'to_bill',
-        delivery_status: data.delivery_status || 'to_deliver',
+        billing_status: orderData.billing_status || 'to_bill',
+        delivery_status: orderData.delivery_status || 'to_deliver',
         status,
-        sales_partner: data.sales_partner || null,
-        territory: data.territory || null,
-        source: data.source || 'local',
-        campaign: data.campaign || null,
+        sales_partner: orderData.sales_partner || null,
+        territory: orderData.territory || null,
+        source: orderData.source || 'local',
+        campaign: orderData.campaign || null,
         order_number: orderNumber || null,
         description: description || null,
       };

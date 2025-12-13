@@ -52,7 +52,10 @@ export default function PurchaseInvoiceDetailPage() {
     );
   }
 
-  const balance = (data.balance ?? (data.total_amount || 0 - (data.amount_paid || 0)));
+  const amountPaid =
+    (data as any).amount_paid ??
+    (Array.isArray(data.payments) ? data.payments.reduce((sum, p) => sum + (p.amount || 0), 0) : 0);
+  const balance = data.balance ?? ((data.total_amount || 0) - amountPaid);
   const currentCurrency = data.currency || currency;
 
   return (

@@ -28,20 +28,21 @@ export default function SupportTicketsPage() {
   const [agent, setAgent] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const offset = (page - 1) * pageSize;
 
   const { data, isLoading, error } = useSupportTickets({
-    priority: priority || undefined,
+    priority: (priority as any) || undefined,
     status: status || undefined,
     ticket_type: ticketType || undefined,
     agent: agent || undefined,
     start: startDate || undefined,
     end: endDate || undefined,
     limit: pageSize,
-    offset: (page - 1) * pageSize,
+    offset,
   });
 
   const { data: overview } = useSupportOverview({
-    priority: priority || undefined,
+    priority: (priority as any) || undefined,
     ticket_type: ticketType || undefined,
     agent: agent || undefined,
     start: startDate || undefined,
@@ -261,10 +262,13 @@ export default function SupportTicketsPage() {
       {total > pageSize && (
         <Pagination
           total={total}
-          pageSize={pageSize}
-          page={page}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
+          limit={pageSize}
+          offset={offset}
+          onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+          onLimitChange={(newLimit) => {
+            setPageSize(newLimit);
+            setPage(1);
+          }}
         />
       )}
     </div>

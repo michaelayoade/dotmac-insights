@@ -84,14 +84,14 @@ export default function ReportsExpensesPage() {
             columns={[
               { key: 'vendor', header: 'Vendor', render: (row: any) => <span className="text-white">{row.vendor || '-'}</span> },
               { key: 'total', header: 'Total', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.total, summary.data?.currency || 'NGN')}</span> },
-              { key: 'invoice_count', header: 'Invoices', render: (row: any) => <span className="text-slate-muted text-sm">{row.invoice_count ?? '-'}</span> },
-            ]}
-            data={byVendor.data || []}
-            keyField={(row: any) => row.vendor}
-            loading={byVendor.isLoading}
-            emptyMessage="No vendor data"
-          />
-        </div>
+            { key: 'invoice_count', header: 'Invoices', render: (row: any) => <span className="text-slate-muted text-sm">{row.invoice_count ?? '-'}</span> },
+          ]}
+          data={byVendor.data || []}
+          keyField="vendor"
+          loading={byVendor.isLoading}
+          emptyMessage="No vendor data"
+        />
+      </div>
       </div>
     </div>
   );

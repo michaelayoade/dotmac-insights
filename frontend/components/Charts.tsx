@@ -45,22 +45,25 @@ export function ChurnChart({ data, height = 240 }: BasicChartProps) {
   );
 }
 
-export function DSOChart({ data, height = 240 }: BasicChartProps) {
-  const current = data?.current_dso;
+export function DSOChart({ data, height = 240, avgDSO }: BasicChartProps & { avgDSO?: number }) {
+  const currentPoint = Array.isArray(data) ? data[data.length - 1] : data;
+  const current = currentPoint?.current_dso || currentPoint?.dso;
   return (
     <ChartShell title="DSO" height={height}>
       <div className="text-center space-y-1">
         <p className="text-xs text-slate-muted">Days Sales Outstanding</p>
         <p className="text-2xl font-semibold text-white">{current ? `${current.toFixed(1)} days` : '—'}</p>
+        {avgDSO !== undefined && <p className="text-xs text-slate-muted">Avg: {avgDSO.toFixed(1)} days</p>}
       </div>
     </ChartShell>
   );
 }
 
-export function SLAGauge({ data, height = 240 }: BasicChartProps) {
-  const rate = data?.sla_attainment?.rate ? formatPercent(data.sla_attainment.rate) : '—';
+export function SLAGauge({ data, height = 240, value, size }: BasicChartProps & { value?: number; size?: number }) {
+  const rateValue = value !== undefined ? value : data?.sla_attainment?.rate;
+  const rate = rateValue !== undefined ? formatPercent(rateValue) : '—';
   return (
-    <ChartShell title="SLA Attainment" height={height}>
+    <ChartShell title="SLA Attainment" height={size || height}>
       <div className="text-center space-y-1">
         <p className="text-2xl font-semibold text-white">{rate}</p>
         <p className="text-xs text-slate-muted">Met: {data?.sla_attainment?.met ?? 0}</p>

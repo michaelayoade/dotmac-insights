@@ -70,11 +70,11 @@ export default function SalesOrderDetailPage() {
     { label: 'Delivery Date', value: formatDate((data as any).delivery_date) },
     {
       label: 'Total',
-      value: formatCurrency((data as any).grand_total ?? data.total_amount ?? data.total, data.currency || 'NGN'),
+      value: formatCurrency((data as any).grand_total ?? (data as any).total_amount ?? (data as any).total, data.currency || 'NGN'),
     },
     {
       label: 'Net Total',
-      value: formatCurrency((data as any).net_total ?? data.total ?? 0, data.currency || 'NGN'),
+      value: formatCurrency((data as any).net_total ?? (data as any).total ?? 0, data.currency || 'NGN'),
     },
     {
       label: 'Taxes',

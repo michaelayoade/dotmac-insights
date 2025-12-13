@@ -66,12 +66,10 @@ export default function AccountsPayablePage() {
   const [limit, setLimit] = useState(20);
   const [supplierId, setSupplierId] = useState<string>('');
   const [currency, setCurrency] = useState<string>('NGN');
-  const [minAmount, setMinAmount] = useState<string>('');
 
   const { data, isLoading, error } = useAccountingPayables({
     supplier_id: supplierId ? Number(supplierId) : undefined,
     currency: currency || undefined,
-    min_amount: minAmount ? Number(minAmount) : undefined,
     limit,
     offset,
   });
@@ -155,7 +153,8 @@ export default function AccountsPayablePage() {
     );
   }
 
-  const summary = data?.aging || {};
+  const summary = (data?.aging as any) || {};
+  const totalSuppliers = data?.suppliers?.length || 0;
 
   return (
     <div className="space-y-6">
@@ -194,15 +193,6 @@ export default function AccountsPayablePage() {
             className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="number"
-            placeholder="Min amount"
-            value={minAmount}
-            onChange={(e) => { setMinAmount(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
         <select
           value={currency}
           onChange={(e) => { setCurrency(e.target.value); setOffset(0); }}
@@ -211,9 +201,9 @@ export default function AccountsPayablePage() {
           <option value="NGN">NGN</option>
           <option value="USD">USD</option>
         </select>
-        {(supplierId || minAmount) && (
+        {supplierId && (
           <button
-            onClick={() => { setSupplierId(''); setMinAmount(''); setOffset(0); }}
+            onClick={() => { setSupplierId(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters
@@ -238,9 +228,9 @@ export default function AccountsPayablePage() {
       />
 
       {/* Pagination */}
-      {data && (data.total || 0) > limit && (
+      {totalSuppliers > limit && (
         <Pagination
-          total={data.total || 0}
+          total={totalSuppliers}
           limit={limit}
           offset={offset}
           onPageChange={setOffset}

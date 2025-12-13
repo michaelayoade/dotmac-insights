@@ -46,7 +46,10 @@ export default function BlockedCustomersPage() {
   }
 
   const customers = (data as any)?.data || data?.items || [];
-  const totalOutstanding = customers.reduce((sum, c) => sum + ((c as any).outstanding_balance || (c.billing_health?.overdue_amount ?? 0) || 0), 0);
+  const totalOutstanding = customers.reduce(
+    (sum: number, c: any) => sum + ((c as any).outstanding_balance || (c.billing_health?.overdue_amount ?? 0) || 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
