@@ -91,6 +91,11 @@ def _validate_custom_fields(db: Session, custom_fields: Optional[dict]) -> dict:
         missing = [k for k in keys if k not in def_map]
         raise HTTPException(status_code=400, detail=f"Unknown or inactive custom_fields: {missing}")
 
+    # Enforce required fields
+    required_missing = [f.field_key for f in def_map.values() if f.is_required and f.field_key not in custom_fields]
+    if required_missing:
+        raise HTTPException(status_code=400, detail=f"Missing required custom_fields: {required_missing}")
+
     sanitized: Dict[str, Any] = {}
     for key, value in custom_fields.items():
         field = def_map[key]
@@ -780,7 +785,19 @@ def update_ticket(
 
     # Validate structured fields before applying
     if payload.tags is not None:
-        ticket.tags = _validate_tags(db, payload.tags)
+        new_tags = _validate_tags(db, payload.tags)
+        # Adjust usage counts
+        current_tags = ticket.tags or []
+        added = [t for t in new_tags if t not in current_tags]
+        removed = [t for t in current_tags if t not in new_tags]
+        if added:
+            for tag in db.query(TicketTag).filter(TicketTag.name.in_(added), TicketTag.is_active == True).all():
+                tag.usage_count = (tag.usage_count or 0) + 1
+        if removed:
+            for tag in db.query(TicketTag).filter(TicketTag.name.in_(removed)).all():
+                if tag.usage_count and tag.usage_count > 0:
+                    tag.usage_count = tag.usage_count - 1
+        ticket.tags = new_tags
     if payload.watchers is not None:
         ticket.watchers = _validate_watchers(db, payload.watchers)
     if payload.custom_fields is not None:
@@ -1686,6 +1703,11 @@ def merge_tickets(
         if source.tags:
             target_tags = target.tags or []
             target.tags = list(set(target_tags + source.tags))
+            # Update usage counts for newly added tags
+            added = [t for t in source.tags if t not in target_tags]
+            if added:
+                for tag in db.query(TicketTag).filter(TicketTag.name.in_(added), TicketTag.is_active == True).all():
+                    tag.usage_count = (tag.usage_count or 0) + 1
 
         # Link source to target
         source.merged_into_id = target.id

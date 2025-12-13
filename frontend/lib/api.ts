@@ -1252,6 +1252,84 @@ export interface SupportTeamMemberPayload {
   role?: string | null;
 }
 
+// Support Analytics Types
+export interface SupportVolumeTrend {
+  year: number;
+  month: number;
+  period: string;
+  total: number;
+  resolved: number;
+  closed: number;
+  resolution_rate: number;
+}
+
+export interface SupportResolutionTimeTrend {
+  year: number;
+  month: number;
+  period: string;
+  avg_resolution_hours: number;
+  ticket_count: number;
+}
+
+export interface SupportCategoryBreakdown {
+  by_ticket_type: { type: string; count: number; resolved: number; resolution_rate: number }[];
+  by_issue_type: { type: string; count: number }[];
+}
+
+export interface SupportSlaPerformanceTrend {
+  year: number;
+  month: number;
+  period: string;
+  met: number;
+  breached: number;
+  total: number;
+  attainment_rate: number;
+}
+
+export interface SupportPatterns {
+  peak_hours: { hour: number; count: number }[];
+  peak_days: { day: string; day_num: number; count: number }[];
+  by_region: { region: string; count: number }[];
+}
+
+export interface SupportAgentPerformanceInsights {
+  by_assignee: {
+    assignee: string;
+    total_tickets: number;
+    resolved: number;
+    resolution_rate: number;
+    avg_resolution_hours: number;
+  }[];
+}
+
+export interface SupportCsatSurvey {
+  id: number;
+  name: string;
+  survey_type?: string;
+  trigger?: string;
+  is_active: boolean;
+}
+
+export interface SupportCsatSummary {
+  average_rating: number;
+  total_responses: number;
+  response_rate: number;
+}
+
+export interface SupportCsatAgentPerformance {
+  agent_id: number;
+  agent_name: string;
+  response_count: number;
+  avg_rating: number;
+  satisfaction_pct: number;
+}
+
+export interface SupportCsatTrend {
+  period: string;
+  avg_rating: number;
+  response_count: number;
+}
+
 export interface InvoiceAging {
   total_outstanding: number;
   aging: {
@@ -1406,6 +1484,26 @@ export const api = {
     fetchApi<SupportCsatAgentPerformance[]>('/support/csat/analytics/by-agent', { params }),
   getSupportCsatTrends: (params?: { months?: number }) =>
     fetchApi<SupportCsatTrend[]>('/support/csat/analytics/trends', { params }),
+
+  // Support Analytics & Insights
+  getSupportAnalyticsVolumeTrend: (params?: { months?: number }) =>
+    fetchApi<SupportVolumeTrend[]>('/support/analytics/volume-trend', { params }),
+
+  getSupportAnalyticsResolutionTime: (params?: { months?: number }) =>
+    fetchApi<SupportResolutionTimeTrend[]>('/support/analytics/resolution-time', { params }),
+
+  getSupportAnalyticsByCategory: (params?: { days?: number }) =>
+    fetchApi<SupportCategoryBreakdown>('/support/analytics/by-category', { params }),
+
+  getSupportAnalyticsSlaPerformance: (params?: { months?: number }) =>
+    fetchApi<SupportSlaPerformanceTrend[]>('/support/analytics/sla-performance', { params }),
+
+  getSupportInsightsPatterns: (params?: { days?: number }) =>
+    fetchApi<SupportPatterns>('/support/insights/patterns', { params }),
+
+  getSupportInsightsAgentPerformance: (params?: { days?: number }) =>
+    fetchApi<SupportAgentPerformanceInsights>('/support/insights/agent-performance', { params }),
+
   // Overview & Analytics
   getOverview: (currency?: string) =>
     fetchApi<OverviewData>('/analytics/overview', { params: { currency } }),

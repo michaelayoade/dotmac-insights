@@ -64,12 +64,12 @@ function getAgingBadge(daysOverdue: number | undefined | null) {
 export default function AccountsReceivablePage() {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(20);
-  const [customerId, setCustomerId] = useState<string>('');
+  const [customerSearch, setCustomerSearch] = useState<string>('');
   const [minAmount, setMinAmount] = useState<string>('');
   const [enhanced, setEnhanced] = useState(false);
 
   const params = {
-    customer_id: customerId ? Number(customerId) : undefined,
+    search: customerSearch || undefined,
     min_amount: minAmount ? Number(minAmount) : undefined,
     limit,
     offset,
@@ -98,10 +98,7 @@ export default function AccountsReceivablePage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
-          <div className="flex flex-col">
-            <span className="text-white text-sm">{item.customer_name || 'Customer'}</span>
-            <span className="text-xs text-slate-muted font-mono">#{item.customer_id}</span>
-          </div>
+          <span className="text-white text-sm">{item.customer_name || 'Unknown Customer'}</span>
         </div>
       ),
     },
@@ -199,10 +196,10 @@ export default function AccountsReceivablePage() {
       <div className="flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px] max-w-md">
           <input
-            type="number"
-            placeholder="Filter by customer id"
-            value={customerId}
-            onChange={(e) => { setCustomerId(e.target.value); setOffset(0); }}
+            type="text"
+            placeholder="Search by customer name..."
+            value={customerSearch}
+            onChange={(e) => { setCustomerSearch(e.target.value); setOffset(0); }}
             className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
@@ -219,9 +216,9 @@ export default function AccountsReceivablePage() {
           <input type="checkbox" checked={enhanced} onChange={(e) => setEnhanced(e.target.checked)} />
           Enhanced aging
         </label>
-        {(customerId || minAmount) && (
+        {(customerSearch || minAmount) && (
           <button
-            onClick={() => { setCustomerId(''); setMinAmount(''); setOffset(0); }}
+            onClick={() => { setCustomerSearch(''); setMinAmount(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters

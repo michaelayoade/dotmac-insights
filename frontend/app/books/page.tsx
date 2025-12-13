@@ -314,7 +314,7 @@ export default function AccountingDashboardPage() {
             <div className="space-y-2">
               {topCustomers.map((c: any) => (
                 <div key={c.id || c.name} className="flex items-center justify-between text-sm">
-                  <div className="text-white truncate max-w-[220px]">{c.name || `Customer ${c.id}`}</div>
+                  <div className="text-white truncate max-w-[220px]">{c.name || 'Unknown Customer'}</div>
                   <div className="font-mono text-slate-muted">{formatCurrency(c.amount || 0, c.currency || currency)}</div>
                 </div>
               ))}
@@ -335,7 +335,7 @@ export default function AccountingDashboardPage() {
             <div className="space-y-2">
               {topSuppliers.map((s: any) => (
                 <div key={s.id || s.name} className="flex items-center justify-between text-sm">
-                  <div className="text-white truncate max-w-[220px]">{s.name || `Supplier ${s.id}`}</div>
+                  <div className="text-white truncate max-w-[220px]">{s.name || 'Unknown Supplier'}</div>
                   <div className="font-mono text-slate-muted">{formatCurrency(s.amount || 0, s.currency || currency)}</div>
                 </div>
               ))}

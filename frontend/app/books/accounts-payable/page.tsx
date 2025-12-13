@@ -64,11 +64,11 @@ function getAgingBadge(daysOverdue: number | undefined | null) {
 export default function AccountsPayablePage() {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(20);
-  const [supplierId, setSupplierId] = useState<string>('');
+  const [supplierSearch, setSupplierSearch] = useState<string>('');
   const [currency, setCurrency] = useState<string>('NGN');
 
   const { data, isLoading, error } = useAccountingPayables({
-    supplier_id: supplierId ? Number(supplierId) : undefined,
+    search: supplierSearch || undefined,
     currency: currency || undefined,
     limit,
     offset,
@@ -86,10 +86,7 @@ export default function AccountsPayablePage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <ArrowDownToLine className="w-4 h-4 text-orange-400" />
-          <div className="flex flex-col">
-            <span className="text-white text-sm">{item.supplier_name || 'Supplier'}</span>
-            <span className="text-xs text-slate-muted font-mono">#{item.supplier_id}</span>
-          </div>
+          <span className="text-white text-sm">{item.supplier_name || 'Unknown Supplier'}</span>
         </div>
       ),
     },
@@ -186,10 +183,10 @@ export default function AccountsPayablePage() {
       <div className="flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px] max-w-md">
           <input
-            type="number"
-            placeholder="Filter by supplier id"
-            value={supplierId}
-            onChange={(e) => { setSupplierId(e.target.value); setOffset(0); }}
+            type="text"
+            placeholder="Search by supplier name..."
+            value={supplierSearch}
+            onChange={(e) => { setSupplierSearch(e.target.value); setOffset(0); }}
             className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
@@ -201,9 +198,9 @@ export default function AccountsPayablePage() {
           <option value="NGN">NGN</option>
           <option value="USD">USD</option>
         </select>
-        {supplierId && (
+        {supplierSearch && (
           <button
-            onClick={() => { setSupplierId(''); setOffset(0); }}
+            onClick={() => { setSupplierSearch(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters

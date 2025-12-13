@@ -4,12 +4,32 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { usePurchasingBills } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
-import { Plus, Filter, Calendar, Landmark } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Plus, Filter, Calendar, Landmark, CheckCircle2, Clock, AlertTriangle, FileEdit, XCircle } from 'lucide-react';
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
   return new Date(value).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalizedStatus = (status || '').toLowerCase();
+  const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
+    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+    submitted: { bg: 'bg-blue-500/10', border: 'border-blue-500/40', text: 'text-blue-300', icon: <Clock className="w-3 h-3" /> },
+    unpaid: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
+    paid: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
+    partially_paid: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-300', icon: <Clock className="w-3 h-3" /> },
+    overdue: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <AlertTriangle className="w-3 h-3" /> },
+    cancelled: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-400', icon: <XCircle className="w-3 h-3" /> },
+  };
+  const style = config[normalizedStatus] || config.submitted;
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', style.bg, style.border, style.text)}>
+      {style.icon}
+      <span className="capitalize">{(status || 'Submitted').replace('_', ' ')}</span>
+    </span>
+  );
 }
 
 export default function BooksBillsPage() {
@@ -65,7 +85,7 @@ export default function BooksBillsPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (item: any) => <span className="text-slate-200 capitalize text-sm">{item.status}</span>,
+      render: (item: any) => <StatusBadge status={item.status} />,
     },
     {
       key: 'due',
@@ -119,12 +139,16 @@ export default function BooksBillsPage() {
             <option value="unpaid">Unpaid</option>
             <option value="overdue">Overdue</option>
           </select>
-          <input
+          <select
             value={currency}
             onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
-            placeholder="Currency"
             className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
+          >
+            <option value="NGN">NGN</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+          </select>
         </div>
       </div>
 
