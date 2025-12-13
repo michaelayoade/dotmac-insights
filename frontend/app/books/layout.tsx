@@ -15,32 +15,68 @@ import {
   ArrowDownToLine,
   Landmark,
   CreditCard,
+  Lock,
+  Bell,
+  ShieldCheck,
+  Settings,
 } from 'lucide-react';
 
-const tabs = [
-  { name: 'Dashboard', href: '/books', icon: LayoutDashboard },
-  { name: 'Chart of Accounts', href: '/books/chart-of-accounts', icon: BookOpen },
-  { name: 'Trial Balance', href: '/books/trial-balance', icon: Scale },
-  { name: 'Balance Sheet', href: '/books/balance-sheet', icon: FileSpreadsheet },
-  { name: 'Income Statement', href: '/books/income-statement', icon: TrendingUp },
-  { name: 'General Ledger', href: '/books/general-ledger', icon: BookMarked },
-  { name: 'Journal Entries', href: '/books/journal-entries', icon: ClipboardList },
-  { name: 'Accounts Payable', href: '/books/accounts-payable', icon: ArrowDownToLine },
-  { name: 'Accounts Receivable', href: '/books/accounts-receivable', icon: Users },
-  { name: 'AR Invoices', href: '/books/ar/invoices', icon: FileSpreadsheet },
-  { name: 'AR Payments', href: '/books/ar/payments', icon: CreditCard },
-  { name: 'AR Credit Notes', href: '/books/ar/credit-notes', icon: BookOpen },
-  { name: 'AP Bills', href: '/books/ap/bills', icon: FileSpreadsheet },
-  { name: 'AP Payments', href: '/books/ap/payments', icon: CreditCard },
-  { name: 'AP Debit Notes', href: '/books/ap/debit-notes', icon: BookOpen },
-  { name: 'Taxes', href: '/books/taxes', icon: Landmark },
-  { name: 'Bank Transactions', href: '/books/bank-transactions', icon: CreditCard },
-  { name: 'Bank Accounts', href: '/books/bank-accounts', icon: CreditCard },
-  { name: 'Controls', href: '/books/controls', icon: ClipboardList },
+const tabGroups = [
+  {
+    label: 'Accounting',
+    items: [
+      { name: 'Dashboard', href: '/books', icon: LayoutDashboard },
+      { name: 'General Ledger', href: '/books/general-ledger', icon: BookMarked },
+      { name: 'Trial Balance', href: '/books/trial-balance', icon: Scale },
+      { name: 'Income Statement', href: '/books/income-statement', icon: TrendingUp },
+      { name: 'Balance Sheet', href: '/books/balance-sheet', icon: ShieldCheck },
+      { name: 'Journal Entries', href: '/books/journal-entries', icon: ClipboardList },
+      { name: 'Chart of Accounts', href: '/books/chart-of-accounts', icon: BookOpen },
+      { name: 'Taxes', href: '/books/taxes', icon: Landmark },
+      { name: 'Controls', href: '/books/controls', icon: Settings },
+    ],
+  },
+  {
+    label: 'Accounts Receivable',
+    items: [
+      { name: 'AR Overview', href: '/books/accounts-receivable', icon: Users },
+      { name: 'Invoices', href: '/books/ar/invoices', icon: FileSpreadsheet },
+      { name: 'Payments', href: '/books/ar/payments', icon: CreditCard },
+      { name: 'Credit Notes', href: '/books/ar/credit-notes', icon: BookOpen },
+      { name: 'Credit Management', href: '/books/accounts-receivable/credit', icon: Lock },
+      { name: 'Dunning', href: '/books/accounts-receivable/dunning', icon: Bell },
+    ],
+  },
+  {
+    label: 'Accounts Payable',
+    items: [
+      { name: 'AP Overview', href: '/books/accounts-payable', icon: ArrowDownToLine },
+      { name: 'Bills', href: '/books/ap/bills', icon: FileSpreadsheet },
+      { name: 'Payments', href: '/books/ap/payments', icon: CreditCard },
+      { name: 'Debit Notes', href: '/books/ap/debit-notes', icon: BookOpen },
+      { name: 'Suppliers', href: '/books/suppliers', icon: Users },
+    ],
+  },
+  {
+    label: 'Banking',
+    items: [
+      { name: 'Bank Accounts', href: '/books/bank-accounts', icon: CreditCard },
+      { name: 'Transactions', href: '/books/bank-transactions', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Docs & Help',
+    items: [
+      { name: 'Docs & Exports', href: '/books/docs', icon: BookOpen },
+    ],
+  },
 ];
 
 export default function BooksLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isActiveHref = (href: string) => (href === '/books' ? pathname === '/books' : pathname.startsWith(href));
+
+  const activeGroup = tabGroups.find((group) => group.items.some((item) => isActiveHref(item.href))) ?? tabGroups[0];
 
   return (
     <div className="space-y-6">
@@ -52,9 +88,12 @@ export default function BooksLayout({ children }: { children: React.ReactNode })
       </div>
 
       <div className="border-b border-slate-border overflow-x-auto">
+        <div className="flex items-center gap-3 mb-2 text-slate-muted text-xs px-1">
+          <span>{activeGroup.label}</span>
+        </div>
         <nav className="-mb-px flex space-x-1 min-w-max">
-          {tabs.map((tab) => {
-            const isActive = tab.href === '/books' ? pathname === '/books' : pathname.startsWith(tab.href);
+          {activeGroup.items.map((tab) => {
+            const isActive = isActiveHref(tab.href);
             const Icon = tab.icon;
             return (
               <Link

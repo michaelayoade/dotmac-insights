@@ -93,18 +93,9 @@ export default function AccountingTaxesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/books"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Books
-          </Link>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Books</p>
-            <h1 className="text-xl font-semibold text-white">Taxes & VAT</h1>
-          </div>
+        <div>
+          <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Books</p>
+          <h1 className="text-xl font-semibold text-white">Taxes & VAT</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-slate-card border border-slate-border rounded-lg px-4 py-3">

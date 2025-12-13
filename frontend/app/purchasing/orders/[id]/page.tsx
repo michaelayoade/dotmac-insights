@@ -39,6 +39,15 @@ export default function PurchasingOrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (data) {
+      setStatusInput(data.status || 'draft');
+      setPerReceived((data as any).per_received !== undefined && (data as any).per_received !== null ? String((data as any).per_received) : '');
+      setPerBilled((data as any).per_billed !== undefined && (data as any).per_billed !== null ? String((data as any).per_billed) : '');
+      setScheduleDate((data as any).schedule_date || (data as any).delivery_date || '');
+    }
+  }, [data]);
+
   if (isLoading) {
     return (
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
@@ -83,15 +92,6 @@ export default function PurchasingOrderDetailPage() {
     data.write_back_status === 'failed' && 'border-red-500/40 text-red-400 bg-red-500/10',
     data.write_back_status === 'synced' && 'border-green-500/40 text-green-400 bg-green-500/10'
   );
-
-  useEffect(() => {
-    if (data) {
-      setStatusInput(data.status || 'draft');
-      setPerReceived((data as any).per_received !== undefined && (data as any).per_received !== null ? String((data as any).per_received) : '');
-      setPerBilled((data as any).per_billed !== undefined && (data as any).per_billed !== null ? String((data as any).per_billed) : '');
-      setScheduleDate((data as any).schedule_date || (data as any).delivery_date || '');
-    }
-  }, [data]);
 
   const handleQuickUpdate = async (e: React.FormEvent) => {
     e.preventDefault();

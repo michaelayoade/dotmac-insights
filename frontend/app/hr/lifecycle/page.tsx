@@ -7,6 +7,7 @@ import {
   useHrEmployeeSeparations,
   useHrEmployeePromotions,
   useHrEmployeeTransfers,
+  useHrLifecycleMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
 import { ArrowRightLeft, Flag, Rocket, UserCheck } from 'lucide-react';
@@ -47,6 +48,17 @@ export default function HrLifecyclePage() {
   const [onboardingOffset, setOnboardingOffset] = useState(0);
   const [separationLimit, setSeparationLimit] = useState(20);
   const [separationOffset, setSeparationOffset] = useState(0);
+  const [statusForm, setStatusForm] = useState({
+    onboardingId: '',
+    onboardingStatus: 'open',
+    separationId: '',
+    separationStatus: 'open',
+    promotionId: '',
+    promotionStatus: 'draft',
+    transferId: '',
+    transferStatus: 'draft',
+  });
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: onboardings, isLoading: onboardingsLoading } = useHrEmployeeOnboardings({
     company: company || undefined,
@@ -60,11 +72,33 @@ export default function HrLifecyclePage() {
   });
   const { data: promotions, isLoading: promotionsLoading } = useHrEmployeePromotions({ company: company || undefined });
   const { data: transfers, isLoading: transfersLoading } = useHrEmployeeTransfers({ company: company || undefined });
+  const lifecycleMutations = useHrLifecycleMutations();
 
   const onboardingList = extractList(onboardings);
   const separationList = extractList(separations);
   const promotionList = extractList(promotions);
   const transferList = extractList(transfers);
+
+  const handleStatusUpdate = async (type: 'onboarding' | 'separation' | 'promotion' | 'transfer') => {
+    setActionError(null);
+    try {
+      if (type === 'onboarding') {
+        if (!statusForm.onboardingId) throw new Error('Onboarding ID required');
+        await lifecycleMutations.updateOnboardingStatus(statusForm.onboardingId, statusForm.onboardingStatus);
+      } else if (type === 'separation') {
+        if (!statusForm.separationId) throw new Error('Separation ID required');
+        await lifecycleMutations.updateSeparationStatus(statusForm.separationId, statusForm.separationStatus);
+      } else if (type === 'promotion') {
+        if (!statusForm.promotionId) throw new Error('Promotion ID required');
+        await lifecycleMutations.updatePromotionStatus(statusForm.promotionId, statusForm.promotionStatus);
+      } else {
+        if (!statusForm.transferId) throw new Error('Transfer ID required');
+        await lifecycleMutations.updateTransferStatus(statusForm.transferId, statusForm.transferStatus);
+      }
+    } catch (err: any) {
+      setActionError(err?.message || 'Update failed');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -88,6 +122,118 @@ export default function HrLifecyclePage() {
           className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         />
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
+        <div className="space-y-2">
+          <p className="text-white font-semibold">Update Onboarding / Separation</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Onboarding ID"
+              value={statusForm.onboardingId}
+              onChange={(e) => setStatusForm({ ...statusForm, onboardingId: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={statusForm.onboardingStatus}
+              onChange={(e) => setStatusForm({ ...statusForm, onboardingStatus: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <button
+            onClick={() => handleStatusUpdate('onboarding')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold bg-teal-electric text-slate-deep hover:bg-teal-glow transition-colors"
+          >
+            Update Onboarding
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Separation ID"
+              value={statusForm.separationId}
+              onChange={(e) => setStatusForm({ ...statusForm, separationId: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={statusForm.separationStatus}
+              onChange={(e) => setStatusForm({ ...statusForm, separationStatus: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <button
+            onClick={() => handleStatusUpdate('separation')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-white"
+          >
+            Update Separation
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-white font-semibold">Update Promotion / Transfer</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Promotion ID"
+              value={statusForm.promotionId}
+              onChange={(e) => setStatusForm({ ...statusForm, promotionId: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={statusForm.promotionStatus}
+              onChange={(e) => setStatusForm({ ...statusForm, promotionStatus: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <button
+            onClick={() => handleStatusUpdate('promotion')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold bg-teal-electric text-slate-deep hover:bg-teal-glow transition-colors"
+          >
+            Update Promotion
+          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Transfer ID"
+              value={statusForm.transferId}
+              onChange={(e) => setStatusForm({ ...statusForm, transferId: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={statusForm.transferStatus}
+              onChange={(e) => setStatusForm({ ...statusForm, transferStatus: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="draft">Draft</option>
+              <option value="submitted">Submitted</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <button
+            onClick={() => handleStatusUpdate('transfer')}
+            className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-white"
+          >
+            Update Transfer
+          </button>
+        </div>
+      </div>
+      {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
+
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">

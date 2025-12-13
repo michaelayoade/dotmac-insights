@@ -7,6 +7,8 @@ import {
   useHrShiftAssignments,
   useHrAttendances,
   useHrAttendanceRequests,
+  useHrAttendanceMutations,
+  useHrAttendanceRequestMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { CalendarClock, Clock3, Layers, Users } from 'lucide-react';
@@ -52,6 +54,29 @@ export default function HrAttendancePage() {
   const [assignOffset, setAssignOffset] = useState(0);
   const [requestLimit, setRequestLimit] = useState(20);
   const [requestOffset, setRequestOffset] = useState(0);
+  const [attendanceForm, setAttendanceForm] = useState({
+    employee: '',
+    employee_id: '',
+    employee_name: '',
+    attendance_date: '',
+    status: 'present',
+    in_time: '',
+    out_time: '',
+    working_hours: '',
+    company: '',
+    device_info: '',
+    check_in_latitude: '',
+    check_in_longitude: '',
+    check_out_latitude: '',
+    check_out_longitude: '',
+  });
+  const [bulkMarkIds, setBulkMarkIds] = useState('');
+  const [bulkMarkDate, setBulkMarkDate] = useState('');
+  const [bulkMarkStatus, setBulkMarkStatus] = useState('present');
+  const [requestBulkIds, setRequestBulkIds] = useState('');
+  const [requestBulkAction, setRequestBulkAction] = useState<'approve' | 'reject'>('approve');
+  const [checkPayload, setCheckPayload] = useState({ latitude: '', longitude: '', device_info: '' });
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: shiftTypes, isLoading: shiftTypesLoading } = useHrShiftTypes({ company: company || undefined });
   const { data: shiftAssignments, isLoading: shiftAssignmentsLoading } = useHrShiftAssignments({
@@ -76,11 +101,123 @@ export default function HrAttendancePage() {
     limit: requestLimit,
     offset: requestOffset,
   });
+  const attendanceMutations = useHrAttendanceMutations();
+  const attendanceRequestMutations = useHrAttendanceRequestMutations();
 
   const shiftTypeList = extractList(shiftTypes);
   const shiftAssignmentList = extractList(shiftAssignments);
   const attendanceList = extractList(attendances);
   const attendanceRequestList = extractList(attendanceRequests);
+
+  const handleCreateAttendance = async () => {
+    setActionError(null);
+    if (!attendanceForm.employee || !attendanceForm.attendance_date || !attendanceForm.status) {
+      setActionError('Employee, date, and status are required.');
+      return;
+    }
+    try {
+      await attendanceMutations.create({
+        employee: attendanceForm.employee,
+        employee_id: attendanceForm.employee_id ? Number(attendanceForm.employee_id) : undefined,
+        employee_name: attendanceForm.employee_name || attendanceForm.employee,
+        attendance_date: attendanceForm.attendance_date,
+        status: attendanceForm.status,
+        company: attendanceForm.company || company || undefined,
+        in_time: attendanceForm.in_time || undefined,
+        out_time: attendanceForm.out_time || undefined,
+        working_hours: attendanceForm.working_hours ? Number(attendanceForm.working_hours) : undefined,
+        check_in_latitude: attendanceForm.check_in_latitude ? Number(attendanceForm.check_in_latitude) : undefined,
+        check_in_longitude: attendanceForm.check_in_longitude ? Number(attendanceForm.check_in_longitude) : undefined,
+        check_out_latitude: attendanceForm.check_out_latitude ? Number(attendanceForm.check_out_latitude) : undefined,
+        check_out_longitude: attendanceForm.check_out_longitude ? Number(attendanceForm.check_out_longitude) : undefined,
+        device_info: attendanceForm.device_info || undefined,
+        late_entry: false,
+        early_exit: false,
+        docstatus: 0,
+      });
+      setAttendanceForm({
+        employee: '',
+        employee_id: '',
+        employee_name: '',
+        attendance_date: '',
+        status: 'present',
+        in_time: '',
+        out_time: '',
+        working_hours: '',
+        company: '',
+        device_info: '',
+        check_in_latitude: '',
+        check_in_longitude: '',
+        check_out_latitude: '',
+        check_out_longitude: '',
+      });
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to record attendance');
+    }
+  };
+
+  const handleBulkMark = async () => {
+    setActionError(null);
+    const ids = bulkMarkIds.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!ids.length || !bulkMarkDate || !bulkMarkStatus) {
+      setActionError('Provide employee ids, date, and status.');
+      return;
+    }
+    try {
+      await attendanceMutations.bulkMark({
+        employee_ids: ids,
+        attendance_date: bulkMarkDate,
+        status: bulkMarkStatus,
+      });
+      setBulkMarkIds('');
+    } catch (err: any) {
+      setActionError(err?.message || 'Bulk mark failed');
+    }
+  };
+
+  const handleCheckIn = async (id: number | string) => {
+    setActionError(null);
+    try {
+      await attendanceMutations.checkIn(id, {
+        latitude: checkPayload.latitude ? Number(checkPayload.latitude) : undefined,
+        longitude: checkPayload.longitude ? Number(checkPayload.longitude) : undefined,
+        device_info: checkPayload.device_info || undefined,
+      });
+    } catch (err: any) {
+      setActionError(err?.message || 'Check-in failed');
+    }
+  };
+
+  const handleCheckOut = async (id: number | string) => {
+    setActionError(null);
+    try {
+      await attendanceMutations.checkOut(id, {
+        latitude: checkPayload.latitude ? Number(checkPayload.latitude) : undefined,
+        longitude: checkPayload.longitude ? Number(checkPayload.longitude) : undefined,
+      });
+    } catch (err: any) {
+      setActionError(err?.message || 'Check-out failed');
+    }
+  };
+
+  const handleBulkRequestAction = async () => {
+    setActionError(null);
+    const ids = requestBulkIds.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!ids.length) {
+      setActionError('Provide request ids.');
+      return;
+    }
+    try {
+      if (requestBulkAction === 'approve') {
+        await attendanceRequestMutations.bulkApprove(ids);
+      } else {
+        await attendanceRequestMutations.bulkReject(ids);
+      }
+      setRequestBulkIds('');
+    } catch (err: any) {
+      setActionError(err?.message || 'Attendance request action failed');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -90,6 +227,197 @@ export default function HrAttendancePage() {
         <StatCard label="Attendance Records" value={attendanceList.total} icon={Clock3} tone="text-green-300" />
         <StatCard label="Attendance Requests" value={attendanceRequestList.total} icon={Users} tone="text-amber-300" />
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
+        <div className="space-y-2">
+          <p className="text-white font-semibold">Record Attendance</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Employee"
+              value={attendanceForm.employee}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="number"
+              placeholder="Employee ID"
+              value={attendanceForm.employee_id}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee_id: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Employee Name"
+              value={attendanceForm.employee_name}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee_name: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Company"
+              value={attendanceForm.company}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, company: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              value={attendanceForm.attendance_date}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, attendance_date: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={attendanceForm.status}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, status: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+              <option value="open">Open</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="datetime-local"
+              placeholder="In time"
+              value={attendanceForm.in_time}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, in_time: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="datetime-local"
+              placeholder="Out time"
+              value={attendanceForm.out_time}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, out_time: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              placeholder="Working hours"
+              value={attendanceForm.working_hours}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, working_hours: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Device info"
+              value={attendanceForm.device_info}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, device_info: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Check-in latitude"
+              value={attendanceForm.check_in_latitude}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_in_latitude: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Check-in longitude"
+              value={attendanceForm.check_in_longitude}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_in_longitude: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Check-out latitude"
+              value={attendanceForm.check_out_latitude}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_out_latitude: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Check-out longitude"
+              value={attendanceForm.check_out_longitude}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, check_out_longitude: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <button
+            onClick={handleCreateAttendance}
+            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+          >
+            Save Attendance
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <p className="text-white font-semibold">Bulk Mark Attendance</p>
+            <input
+              type="text"
+              placeholder="Employee IDs (comma-separated)"
+              value={bulkMarkIds}
+              onChange={(e) => setBulkMarkIds(e.target.value)}
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={bulkMarkDate}
+                onChange={(e) => setBulkMarkDate(e.target.value)}
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <select
+                value={bulkMarkStatus}
+                onChange={(e) => setBulkMarkStatus(e.target.value)}
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              >
+                <option value="present">Present</option>
+                <option value="absent">Absent</option>
+                <option value="late">Late</option>
+                <option value="open">Open</option>
+              </select>
+            </div>
+            <button
+              onClick={handleBulkMark}
+              className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+            >
+              Apply Bulk Mark
+            </button>
+          </div>
+          <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
+            <p className="text-white font-semibold text-sm">Check-in/out defaults</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Latitude"
+                value={checkPayload.latitude}
+                onChange={(e) => setCheckPayload({ ...checkPayload, latitude: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+              <input
+                type="text"
+                placeholder="Longitude"
+                value={checkPayload.longitude}
+                onChange={(e) => setCheckPayload({ ...checkPayload, longitude: e.target.value })}
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Device info"
+              value={checkPayload.device_info}
+              onChange={(e) => setCheckPayload({ ...checkPayload, device_info: e.target.value })}
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <p className="text-slate-muted text-xs">Used when triggering check-in/out actions below.</p>
+          </div>
+        </div>
+      </div>
+      {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
 
       <div className="flex flex-wrap gap-3 items-center">
         <input
@@ -223,6 +551,26 @@ export default function HrAttendancePage() {
               align: 'right' as const,
               render: (item: any) => <span className="font-mono text-white">{item.working_hours ?? '—'}</span>,
             },
+            {
+              key: 'actions',
+              header: 'Actions',
+              render: (item: any) => (
+                <div className="flex gap-2 text-xs">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCheckIn(item.id || item.employee); }}
+                    className="px-2 py-1 rounded border border-teal-electric text-teal-electric hover:bg-teal-electric/10"
+                  >
+                    Check-in
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCheckOut(item.id || item.employee); }}
+                    className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
+                  >
+                    Check-out
+                  </button>
+                </div>
+              ),
+            },
           ]}
           data={(attendanceList.items || []).map((item: any) => ({ ...item, id: item.id || `${item.employee}-${item.attendance_date}` }))}
           keyField="id"
@@ -270,6 +618,26 @@ export default function HrAttendancePage() {
                 </span>
               ),
             },
+            {
+              key: 'actions',
+              header: 'Actions',
+              render: (item: any) => (
+                <div className="flex gap-2 text-xs">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.approve(item.id); }}
+                    className="px-2 py-1 rounded border border-green-500 text-green-300 hover:bg-green-500/10"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.reject(item.id); }}
+                    className="px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10"
+                  >
+                    Reject
+                  </button>
+                </div>
+              ),
+            },
           ]}
           data={(attendanceRequestList.items || []).map((item: any) => ({ ...item, id: item.id || `${item.employee}-${item.from_date}` }))}
           keyField="id"
@@ -288,6 +656,32 @@ export default function HrAttendancePage() {
             }}
           />
         )}
+        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-2">
+          <p className="text-white font-semibold">Bulk Approve/Reject</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Request IDs (comma-separated)"
+              value={requestBulkIds}
+              onChange={(e) => setRequestBulkIds(e.target.value)}
+              className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <select
+              value={requestBulkAction}
+              onChange={(e) => setRequestBulkAction(e.target.value as 'approve' | 'reject')}
+              className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="approve">Approve</option>
+              <option value="reject">Reject</option>
+            </select>
+          </div>
+          <button
+            onClick={handleBulkRequestAction}
+            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+          >
+            Run Bulk Action
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -33,7 +33,8 @@ export default function ChartOfAccountsPage() {
   const [search, setSearch] = useState('');
   const { data, isLoading, error } = useAccountingChartOfAccounts(accountType || undefined);
 
-  const accounts = data?.accounts || data?.data || [];
+  const accounts = (data as any)?.accounts || (data as any)?.data || [];
+  const totals = (data as any) || {};
 
   // Filter accounts by search term
   const filteredAccounts = accounts.filter((account: any) => {
@@ -144,19 +145,19 @@ export default function ChartOfAccountsPage() {
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Assets</p>
-          <p className="text-2xl font-bold text-blue-400">{data?.by_root_type?.asset || data?.by_type?.asset || 0}</p>
+          <p className="text-2xl font-bold text-blue-400">{totals.by_root_type?.asset || totals.by_type?.asset || 0}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <p className="text-red-400 text-sm">Liabilities</p>
-          <p className="text-2xl font-bold text-red-400">{data?.by_root_type?.liability || data?.by_type?.liability || 0}</p>
+          <p className="text-2xl font-bold text-red-400">{totals.by_root_type?.liability || totals.by_type?.liability || 0}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Equity</p>
-          <p className="text-2xl font-bold text-green-400">{data?.by_root_type?.equity || data?.by_type?.equity || 0}</p>
+          <p className="text-2xl font-bold text-green-400">{totals.by_root_type?.equity || totals.by_type?.equity || 0}</p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
           <p className="text-orange-400 text-sm">Expenses</p>
-          <p className="text-2xl font-bold text-orange-400">{data?.by_root_type?.expense || data?.by_type?.expense || 0}</p>
+          <p className="text-2xl font-bold text-orange-400">{totals.by_root_type?.expense || totals.by_type?.expense || 0}</p>
         </div>
       </div>
 

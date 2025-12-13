@@ -1,1 +1,1 @@
-export { default } from '@/app/accounting/bank-transactions/page';
+export { default } from '@/app/books/bank-transactions/page';

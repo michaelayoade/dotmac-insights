@@ -38,6 +38,22 @@ export default function PurchasingDebitNoteDetailPage() {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (data) {
+      setStatusInput(data.status || 'draft');
+      setOutstandingInput(
+        (data as any).outstanding_amount !== undefined && (data as any).outstanding_amount !== null
+          ? String((data as any).outstanding_amount)
+          : ''
+      );
+      setPaidInput(
+        (data as any).paid_amount !== undefined && (data as any).paid_amount !== null
+          ? String((data as any).paid_amount)
+          : ''
+      );
+    }
+  }, [data]);
+
   if (isLoading) {
     return (
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
@@ -82,22 +98,6 @@ export default function PurchasingDebitNoteDetailPage() {
     (data as any).write_back_status === 'failed' && 'border-red-500/40 text-red-400 bg-red-500/10',
     (data as any).write_back_status === 'synced' && 'border-green-500/40 text-green-400 bg-green-500/10'
   );
-
-  useEffect(() => {
-    if (data) {
-      setStatusInput(data.status || 'draft');
-      setOutstandingInput(
-        (data as any).outstanding_amount !== undefined && (data as any).outstanding_amount !== null
-          ? String((data as any).outstanding_amount)
-          : ''
-      );
-      setPaidInput(
-        (data as any).paid_amount !== undefined && (data as any).paid_amount !== null
-          ? String((data as any).paid_amount)
-          : ''
-      );
-    }
-  }, [data]);
 
   const handleQuickUpdate = async (e: React.FormEvent) => {
     e.preventDefault();

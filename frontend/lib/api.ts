@@ -2173,6 +2173,59 @@ export const api = {
   submitLandedCostVoucher: (id: number | string) =>
     fetchApi<any>(`/inventory/landed-cost-vouchers/${id}/submit`, { method: 'PATCH' }),
 
+  // Notifications
+  getNotifications: (params?: { limit?: number; offset?: number; unread_only?: boolean }) =>
+    fetchApi<any>('/v1/notifications', { params }),
+
+  markNotificationRead: (id: number | string) =>
+    fetchApi<void>(`/v1/notifications/${id}/read`, { method: 'POST' }),
+
+  markAllNotificationsRead: () =>
+    fetchApi<void>('/v1/notifications/read-all', { method: 'POST' }),
+
+  getNotificationPreferences: () =>
+    fetchApi<any>('/v1/notifications/preferences'),
+
+  updateNotificationPreferences: (body: any) =>
+    fetchApi<any>('/v1/notifications/preferences', { method: 'PATCH', body: JSON.stringify(body) }),
+
+  listWebhooks: () =>
+    fetchApi<any[]>('/v1/notifications/webhooks'),
+
+  createWebhook: (body: any) =>
+    fetchApi<any>('/v1/notifications/webhooks', { method: 'POST', body: JSON.stringify(body) }),
+
+  getWebhook: (id: number | string) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${id}`),
+
+  updateWebhook: (id: number | string, body: any) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteWebhook: (id: number | string) =>
+    fetchApi<void>(`/v1/notifications/webhooks/${id}`, { method: 'DELETE' }),
+
+  testWebhook: (id: number | string) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${id}/test`, { method: 'POST' }),
+
+  getWebhookDeliveries: (id: number | string, params?: { status?: string; limit?: number; offset?: number }) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${id}/deliveries`, { params }),
+
+  retryWebhookDelivery: (deliveryId: number | string) =>
+    fetchApi<any>(`/v1/notifications/webhook-deliveries/${deliveryId}/retry`, { method: 'POST' }),
+
+  emitNotificationEvent: (body: any) =>
+    fetchApi<any>('/v1/notifications/events', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Cache metadata / export status
+  getAccountingCacheMetadata: () =>
+    fetchApi<any>('/accounting/cache-metadata'),
+
+  getReportsCacheMetadata: () =>
+    fetchApi<any>('/reports/cache-metadata'),
+
+  getAccountingExportStatus: () =>
+    fetchApi<any>('/accounting/exports/status'),
+
   getFinanceRevenueTrend: (params?: { start_date?: string; end_date?: string; interval?: 'month' | 'week'; currency?: string }) =>
     fetchApi<FinanceRevenueTrend[]>('/v1/sales/analytics/revenue-trend', {
       params
@@ -2394,6 +2447,8 @@ export const api = {
     as_of_date?: string;
     start_date?: string;
     end_date?: string;
+    limit?: number;
+    offset?: number;
   }) =>
     fetchApi<AccountingPayableResponse>('/v1/accounting/accounts-payable', { params }),
 
@@ -2401,6 +2456,8 @@ export const api = {
     customer_id?: number;
     currency?: string;
     as_of_date?: string;
+    limit?: number;
+    offset?: number;
   }) =>
     fetchApi<AccountingReceivableResponse>('/v1/accounting/accounts-receivable', { params }),
 
@@ -2896,6 +2953,24 @@ export const api = {
   deleteHrLeaveApplication: (id: number | string) =>
     fetchApi<void>(`/hr/leave-applications/${id}`, { method: 'DELETE' }),
 
+  bulkCreateHrLeaveAllocations: (body: { employee_ids: number[]; leave_policy_id: number; from_date: string; to_date: string; company?: string }) =>
+    fetchApi<{ created: number; employee_ids: number[] }>('/hr/leave-allocations/bulk', { method: 'POST', body: JSON.stringify(body) }),
+
+  approveHrLeaveApplication: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-applications/${id}/approve`, { method: 'POST' }),
+
+  rejectHrLeaveApplication: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-applications/${id}/reject`, { method: 'POST' }),
+
+  cancelHrLeaveApplication: (id: number | string) =>
+    fetchApi<void>(`/hr/leave-applications/${id}/cancel`, { method: 'POST' }),
+
+  bulkApproveHrLeaveApplications: (body: { application_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/leave-applications/bulk/approve', { method: 'POST', body: JSON.stringify(body) }),
+
+  bulkRejectHrLeaveApplications: (body: { application_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/leave-applications/bulk/reject', { method: 'POST', body: JSON.stringify(body) }),
+
   getHrShiftTypes: (params?: { search?: string; company?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrShiftType>>('/hr/shift-types', { params }),
 
@@ -2932,6 +3007,15 @@ export const api = {
   deleteHrAttendance: (id: number | string) =>
     fetchApi<void>(`/hr/attendances/${id}`, { method: 'DELETE' }),
 
+  checkInHrAttendance: (id: number | string, body?: { latitude?: number; longitude?: number; device_info?: string }) =>
+    fetchApi<HrAttendance>(`/hr/attendances/${id}/check-in`, { method: 'POST', body: JSON.stringify(body || {}) }),
+
+  checkOutHrAttendance: (id: number | string, body?: { latitude?: number; longitude?: number }) =>
+    fetchApi<HrAttendance>(`/hr/attendances/${id}/check-out`, { method: 'POST', body: JSON.stringify(body || {}) }),
+
+  bulkMarkAttendance: (body: { employee_ids: (number | string)[]; attendance_date: string; status: string }) =>
+    fetchApi<void>('/hr/attendances/bulk/mark', { method: 'POST', body: JSON.stringify(body) }),
+
   getHrAttendanceRequests: (params?: { employee_id?: number; status?: string; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrAttendanceRequest>>('/hr/attendance-requests', { params }),
 
@@ -2946,6 +3030,18 @@ export const api = {
 
   deleteHrAttendanceRequest: (id: number | string) =>
     fetchApi<void>(`/hr/attendance-requests/${id}`, { method: 'DELETE' }),
+
+  approveHrAttendanceRequest: (id: number | string) =>
+    fetchApi<void>(`/hr/attendance-requests/${id}/approve`, { method: 'POST' }),
+
+  rejectHrAttendanceRequest: (id: number | string) =>
+    fetchApi<void>(`/hr/attendance-requests/${id}/reject`, { method: 'POST' }),
+
+  bulkApproveHrAttendanceRequests: (body: { request_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/attendance-requests/bulk/approve', { method: 'POST', body: JSON.stringify(body) }),
+
+  bulkRejectHrAttendanceRequests: (body: { request_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/attendance-requests/bulk/reject', { method: 'POST', body: JSON.stringify(body) }),
 
   getHrJobOpenings: (params?: { status?: string; company?: string; posting_date_from?: string; posting_date_to?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrJobOpening>>('/hr/job-openings', { params }),
@@ -2977,6 +3073,18 @@ export const api = {
   deleteHrJobApplicant: (id: number | string) =>
     fetchApi<void>(`/hr/job-applicants/${id}`, { method: 'DELETE' }),
 
+  screenHrJobApplicant: (id: number | string) =>
+    fetchApi<void>(`/hr/job-applicants/${id}/screen`, { method: 'POST' }),
+
+  scheduleInterviewForHrJobApplicant: (id: number | string, body: { interview_date: string; interviewer: string; location?: string; notes?: string }) =>
+    fetchApi<void>(`/hr/job-applicants/${id}/schedule-interview`, { method: 'POST', body: JSON.stringify(body) }),
+
+  makeOfferForHrJobApplicant: (id: number | string, body: { offer_id: number | string }) =>
+    fetchApi<void>(`/hr/job-applicants/${id}/make-offer`, { method: 'POST', body: JSON.stringify(body) }),
+
+  withdrawHrJobApplicant: (id: number | string) =>
+    fetchApi<void>(`/hr/job-applicants/${id}/withdraw`, { method: 'POST' }),
+
   getHrJobOffers: (params?: { status?: string; company?: string; job_applicant?: string; offer_date_from?: string; offer_date_to?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrJobOffer>>('/hr/job-offers', { params }),
 
@@ -2991,6 +3099,42 @@ export const api = {
 
   deleteHrJobOffer: (id: number | string) =>
     fetchApi<void>(`/hr/job-offers/${id}`, { method: 'DELETE' }),
+
+  createHrInterview: (body: HrInterviewPayload) =>
+    fetchApi<HrInterview>('/hr/interviews', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateHrInterview: (id: number | string, body: Partial<HrInterviewPayload>) =>
+    fetchApi<HrInterview>(`/hr/interviews/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  completeHrInterview: (id: number | string, body: { feedback?: string; rating?: number; result?: string }) =>
+    fetchApi<HrInterview>(`/hr/interviews/${id}/complete`, { method: 'POST', body: JSON.stringify(body) }),
+
+  cancelHrInterview: (id: number | string) =>
+    fetchApi<void>(`/hr/interviews/${id}/cancel`, { method: 'POST' }),
+
+  markNoShowHrInterview: (id: number | string) =>
+    fetchApi<void>(`/hr/interviews/${id}/no-show`, { method: 'POST' }),
+
+  sendHrJobOffer: (id: number | string) =>
+    fetchApi<void>(`/hr/job-offers/${id}/send`, { method: 'POST' }),
+
+  voidHrJobOffer: (id: number | string, body: { void_reason: string; voided_at?: string }) =>
+    fetchApi<void>(`/hr/job-offers/${id}/void`, { method: 'POST', body: JSON.stringify(body) }),
+
+  acceptHrJobOffer: (id: number | string) =>
+    fetchApi<void>(`/hr/job-offers/${id}/accept`, { method: 'POST' }),
+
+  rejectHrJobOffer: (id: number | string) =>
+    fetchApi<void>(`/hr/job-offers/${id}/reject`, { method: 'POST' }),
+
+  bulkSendHrJobOffers: (body: { offer_ids: (number | string)[]; delivery_method?: string }) =>
+    fetchApi<void>('/hr/job-offers/bulk/send', { method: 'POST', body: JSON.stringify(body) }),
+
+  getHrInterviews: (params?: { job_applicant_id?: number; status?: string; interviewer?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<HrInterview>>('/hr/interviews', { params }),
+
+  getHrInterviewDetail: (id: number | string) =>
+    fetchApi<HrInterview>(`/hr/interviews/${id}`),
 
   getHrSalaryComponents: (params?: { component_type?: string; company?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrSalaryComponent>>('/hr/salary-components', { params }),
@@ -3052,6 +3196,12 @@ export const api = {
   deleteHrPayrollEntry: (id: number | string) =>
     fetchApi<void>(`/hr/payroll-entries/${id}`, { method: 'DELETE' }),
 
+  generateHrPayrollSlips: (id: number | string, body: { company: string; department?: string | null; branch?: string | null; designation?: string | null; start_date: string; end_date: string; regenerate?: boolean }) =>
+    fetchApi<void>(`/hr/payroll-entries/${id}/generate-slips`, { method: 'POST', body: JSON.stringify(body) }),
+
+  regenerateHrPayrollSlips: (id: number | string, body: { overwrite_drafts?: boolean }) =>
+    fetchApi<void>(`/hr/payroll-entries/${id}/regenerate-slips`, { method: 'POST', body: JSON.stringify(body) }),
+
   getHrSalarySlips: (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrSalarySlip>>('/hr/salary-slips', { params }),
 
@@ -3066,6 +3216,28 @@ export const api = {
 
   deleteHrSalarySlip: (id: number | string) =>
     fetchApi<void>(`/hr/salary-slips/${id}`, { method: 'DELETE' }),
+
+  markHrSalarySlipPaid: (id: number | string, body: { payment_reference?: string; payment_mode?: string; paid_at?: string }) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/mark-paid`, { method: 'POST', body: JSON.stringify(body) }),
+
+  voidHrSalarySlip: (id: number | string, body: { void_reason: string; voided_at?: string }) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/void`, { method: 'POST', body: JSON.stringify(body) }),
+
+  exportHrSalarySlipRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string }) => {
+    const url = buildApiUrl('/api/hr/salary-slips/register/export', params);
+    const token = getAccessToken();
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ApiError(response.status, errorText || `HTTP ${response.status}`);
+    }
+    return response.blob();
+  },
 
   getHrTrainingPrograms: (params?: { search?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrTrainingProgram>>('/hr/training-programs', { params }),
@@ -3096,6 +3268,12 @@ export const api = {
 
   deleteHrTrainingEvent: (id: number | string) =>
     fetchApi<void>(`/hr/training-events/${id}`, { method: 'DELETE' }),
+
+  enrollHrTrainingEvent: (id: number | string, body: { employee_ids: (number | string)[] }) =>
+    fetchApi<void>(`/hr/training-events/${id}/enroll`, { method: 'POST', body: JSON.stringify(body) }),
+
+  completeHrTrainingEvent: (id: number | string) =>
+    fetchApi<void>(`/hr/training-events/${id}/complete`, { method: 'POST' }),
 
   getHrTrainingResults: (params?: { employee_id?: number; training_event?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrTrainingResult>>('/hr/training-results', { params }),
@@ -3141,6 +3319,15 @@ export const api = {
 
   deleteHrAppraisal: (id: number | string) =>
     fetchApi<void>(`/hr/appraisals/${id}`, { method: 'DELETE' }),
+
+  submitHrAppraisal: (id: number | string) =>
+    fetchApi<void>(`/hr/appraisals/${id}/submit`, { method: 'POST' }),
+
+  reviewHrAppraisal: (id: number | string) =>
+    fetchApi<void>(`/hr/appraisals/${id}/review`, { method: 'POST' }),
+
+  closeHrAppraisal: (id: number | string) =>
+    fetchApi<void>(`/hr/appraisals/${id}/close`, { method: 'POST' }),
 
   getHrEmployeeOnboardings: (params?: { employee_id?: number; company?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrEmployeeOnboarding>>('/hr/employee-onboardings', { params }),
@@ -4784,7 +4971,7 @@ export interface PurchasingPaymentListResponse {
   offset: number;
 }
 
-export interface PurchasingPaymentDetail extends PurchasingPayment {}
+export type PurchasingPaymentDetail = PurchasingPayment;
 
 export interface PurchasingSupplier {
   id: number;
@@ -5369,10 +5556,18 @@ export interface HrAttendancePayload {
   employee_name?: string;
   attendance_date: string;
   status: string;
+  leave_type?: string | null;
+  leave_application?: string | null;
+  shift?: string | null;
   company?: string;
   in_time?: string | null;
   out_time?: string | null;
   working_hours?: number;
+  check_in_latitude?: number;
+  check_in_longitude?: number;
+  check_out_latitude?: number;
+  check_out_longitude?: number;
+  device_info?: string | null;
   late_entry?: boolean;
   early_exit?: boolean;
   docstatus?: number;
@@ -5453,6 +5648,22 @@ export interface HrJobOfferPayload {
 }
 
 export interface HrJobOffer extends HrJobOfferPayload {
+  id?: number;
+}
+
+export interface HrInterviewPayload {
+  job_applicant_id: number;
+  scheduled_at: string;
+  interviewer: string;
+  location?: string | null;
+  mode?: string | null;
+  feedback?: string | null;
+  rating?: number | null;
+  result?: string | null;
+  status?: string;
+}
+
+export interface HrInterview extends HrInterviewPayload {
   id?: number;
 }
 

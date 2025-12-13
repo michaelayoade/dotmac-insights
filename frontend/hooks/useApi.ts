@@ -29,6 +29,11 @@ import {
   ProjectPayload,
   ProjectPriority,
   SupportAgentPayload,
+  HrLeaveApplicationPayload,
+  HrAttendancePayload,
+  HrInterviewPayload,
+  HrTrainingEventPayload,
+  HrTrainingResultPayload,
 } from '@/lib/api';
 
 // Generic fetcher for SWR
@@ -1224,6 +1229,8 @@ export function useTableDataEnhanced(
 export function useAccountingDashboard(currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(['accounting-dashboard', currency], () => api.getAccountingDashboard(currency), {
     refreshInterval: 60000,
+    dedupingInterval: 60000,
+    revalidateOnFocus: false,
     ...config,
   });
 }
@@ -1252,7 +1259,7 @@ export function useAccountingTrialBalance(
   return useSWR(
     key,
     () => api.getAccountingTrialBalance(params),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1264,7 +1271,7 @@ export function useAccountingBalanceSheet(
   return useSWR(
     key,
     () => api.getAccountingBalanceSheet(params),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1285,7 +1292,7 @@ export function useAccountingIncomeStatement(
   return useSWR(
     key,
     () => api.getAccountingIncomeStatement(params),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1309,21 +1316,33 @@ export function useAccountingTaxPayable(
   params?: { start_date?: string; end_date?: string; currency?: string },
   config?: SWRConfiguration
 ) {
-  return useSWR(['accounting-tax-payable', params], () => api.getAccountingTaxPayable(params), config);
+  return useSWR(['accounting-tax-payable', params], () => api.getAccountingTaxPayable(params), {
+    dedupingInterval: 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useAccountingTaxReceivable(
   params?: { start_date?: string; end_date?: string; currency?: string },
   config?: SWRConfiguration
 ) {
-  return useSWR(['accounting-tax-receivable', params], () => api.getAccountingTaxReceivable(params), config);
+  return useSWR(['accounting-tax-receivable', params], () => api.getAccountingTaxReceivable(params), {
+    dedupingInterval: 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useAccountingReceivablesEnhanced(
   params?: Record<string, any>,
   config?: SWRConfiguration
 ) {
-  return useSWR(['accounting-receivables-aging-enhanced', params], () => api.getAccountingReceivablesAgingEnhanced(params), config);
+  return useSWR(['accounting-receivables-aging-enhanced', params], () => api.getAccountingReceivablesAgingEnhanced(params), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useCustomerCreditStatus(customerId: number | null, config?: SWRConfiguration) {
@@ -1363,7 +1382,7 @@ export function useAccountingCashFlow(startDate?: string, endDate?: string, conf
   return useSWR(
     ['accounting-cash-flow', startDate, endDate],
     () => api.getAccountingCashFlow({ start_date: startDate, end_date: endDate }),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1374,13 +1393,15 @@ export function useAccountingPayables(
     as_of_date?: string;
     start_date?: string;
     end_date?: string;
+    limit?: number;
+    offset?: number;
   },
   config?: SWRConfiguration
 ) {
   return useSWR(
     ['accounting-payables', params],
     () => api.getAccountingPayables(params),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1389,13 +1410,15 @@ export function useAccountingReceivables(
     customer_id?: number;
     currency?: string;
     as_of_date?: string;
+    limit?: number;
+    offset?: number;
   },
   config?: SWRConfiguration
 ) {
   return useSWR(
     ['accounting-receivables', params],
     () => api.getAccountingReceivables(params),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
@@ -1902,6 +1925,47 @@ export function useInventoryValuationDetail(itemCode: string | null, params?: Re
     config
   );
 }
+
+// Notifications
+export function useNotifications(params?: { limit?: number; offset?: number; unread_only?: boolean }, config?: SWRConfiguration) {
+  return useSWR(['notifications', params], () => api.getNotifications(params), { refreshInterval: 30000, ...config });
+}
+
+export function useNotificationPreferences(config?: SWRConfiguration) {
+  return useSWR('notification-preferences', () => api.getNotificationPreferences(), config);
+}
+
+export function useNotificationMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    markRead: async (id: number | string) => {
+      await api.markNotificationRead(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'notifications');
+    },
+    markAllRead: async () => {
+      await api.markAllNotificationsRead();
+      await mutate((key) => Array.isArray(key) && key[0] === 'notifications');
+    },
+    updatePreferences: async (payload: any) => {
+      const res = await api.updateNotificationPreferences(payload);
+      await mutate('notification-preferences');
+      return res;
+    },
+  };
+}
+
+// Cache metadata / exports status
+export function useAccountingCacheMetadata(config?: SWRConfiguration) {
+  return useSWR('accounting-cache-metadata', () => api.getAccountingCacheMetadata(), { revalidateOnFocus: false, ...config });
+}
+
+export function useReportsCacheMetadata(config?: SWRConfiguration) {
+  return useSWR('reports-cache-metadata', () => api.getReportsCacheMetadata(), { revalidateOnFocus: false, ...config });
+}
+
+export function useAccountingExportStatus(config?: SWRConfiguration) {
+  return useSWR('accounting-export-status', () => api.getAccountingExportStatus(), { revalidateOnFocus: false, ...config });
+}
 export function useExchangeRateMutations() {
   const { mutate } = useSWRConfig();
   return {
@@ -2139,11 +2203,19 @@ export function useInventoryStockEntryCreate() {
 
 // Reports Domain Hooks
 export function useReportsRevenueSummary(config?: SWRConfiguration) {
-  return useSWR('reports-revenue-summary', () => api.getReportsRevenueSummary(), config);
+  return useSWR('reports-revenue-summary', () => api.getReportsRevenueSummary(), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useReportsRevenueTrend(config?: SWRConfiguration) {
-  return useSWR<ReportsRevenueTrendPoint[]>('reports-revenue-trend', () => api.getReportsRevenueTrend(), config);
+  return useSWR<ReportsRevenueTrendPoint[]>('reports-revenue-trend', () => api.getReportsRevenueTrend(), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useReportsRevenueByCustomer(config?: SWRConfiguration) {
@@ -2155,7 +2227,11 @@ export function useReportsRevenueByProduct(config?: SWRConfiguration) {
 }
 
 export function useReportsExpensesSummary(config?: SWRConfiguration) {
-  return useSWR('reports-expenses-summary', () => api.getReportsExpensesSummary(), config);
+  return useSWR('reports-expenses-summary', () => api.getReportsExpensesSummary(), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useReportsExpensesTrend(config?: SWRConfiguration) {
@@ -2171,7 +2247,11 @@ export function useReportsExpensesByVendor(config?: SWRConfiguration) {
 }
 
 export function useReportsProfitabilityMargins(config?: SWRConfiguration) {
-  return useSWR('reports-profitability-margins', () => api.getReportsProfitabilityMargins(), config);
+  return useSWR('reports-profitability-margins', () => api.getReportsProfitabilityMargins(), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useReportsProfitabilityTrend(config?: SWRConfiguration) {
@@ -2187,19 +2267,27 @@ export function useReportsProfitabilityBySegment(config?: SWRConfiguration) {
 }
 
 export function useReportsCashPositionSummary(config?: SWRConfiguration) {
-  return useSWR('reports-cash-position-summary', () => api.getReportsCashPositionSummary(), config);
+  return useSWR('reports-cash-position-summary', () => api.getReportsCashPositionSummary(), {
+    dedupingInterval: 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 export function useReportsCashPositionForecast(config?: SWRConfiguration) {
   return useSWR<ReportsCashPositionForecastPoint[]>(
     'reports-cash-position-forecast',
     () => api.getReportsCashPositionForecast(),
-    config
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
 
 export function useReportsCashPositionRunway(config?: SWRConfiguration) {
-  return useSWR('reports-cash-position-runway', () => api.getReportsCashPositionRunway(), config);
+  return useSWR('reports-cash-position-runway', () => api.getReportsCashPositionRunway(), {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: false,
+    ...config,
+  });
 }
 
 // HR Analytics
@@ -2310,6 +2398,57 @@ export function useHrLeaveApplicationDetail(id: number | string | null, config?:
   return useSWR(id ? ['hr-leave-application-detail', id] : null, () => (id ? api.getHrLeaveApplicationDetail(id) : null), config);
 }
 
+export function useHrLeaveApplicationMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrLeaveApplicationPayload) => {
+      const res = await api.createHrLeaveApplication(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrLeaveApplicationPayload>) => {
+      const res = await api.updateHrLeaveApplication(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+      await mutate(['hr-leave-application-detail', id]);
+      return res;
+    },
+    approve: async (id: number | string) => {
+      await api.approveHrLeaveApplication(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+      await mutate(['hr-leave-application-detail', id]);
+    },
+    reject: async (id: number | string) => {
+      await api.rejectHrLeaveApplication(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+      await mutate(['hr-leave-application-detail', id]);
+    },
+    cancel: async (id: number | string) => {
+      await api.cancelHrLeaveApplication(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+      await mutate(['hr-leave-application-detail', id]);
+    },
+    bulkApprove: async (application_ids: (number | string)[]) => {
+      await api.bulkApproveHrLeaveApplications({ application_ids });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+    },
+    bulkReject: async (application_ids: (number | string)[]) => {
+      await api.bulkRejectHrLeaveApplications({ application_ids });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-applications');
+    },
+  };
+}
+
+export function useHrLeaveAllocationMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    bulkCreate: async (payload: { employee_ids: number[]; leave_policy_id: number; from_date: string; to_date: string; company?: string }) => {
+      const res = await api.bulkCreateHrLeaveAllocations(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-leave-allocations');
+      return res;
+    },
+  };
+}
+
 export function useHrShiftTypes(
   params?: { search?: string; company?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2343,6 +2482,39 @@ export function useHrAttendanceDetail(id: number | string | null, config?: SWRCo
   return useSWR(id ? ['hr-attendance-detail', id] : null, () => (id ? api.getHrAttendanceDetail(id) : null), config);
 }
 
+export function useHrAttendanceMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrAttendancePayload) => {
+      const res = await api.createHrAttendance(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendances');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrAttendancePayload>) => {
+      const res = await api.updateHrAttendance(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendances');
+      await mutate(['hr-attendance-detail', id]);
+      return res;
+    },
+    checkIn: async (id: number | string, payload?: { latitude?: number; longitude?: number; device_info?: string }) => {
+      const res = await api.checkInHrAttendance(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendances');
+      await mutate(['hr-attendance-detail', id]);
+      return res;
+    },
+    checkOut: async (id: number | string, payload?: { latitude?: number; longitude?: number }) => {
+      const res = await api.checkOutHrAttendance(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendances');
+      await mutate(['hr-attendance-detail', id]);
+      return res;
+    },
+    bulkMark: async (payload: { employee_ids: (number | string)[]; attendance_date: string; status: string }) => {
+      await api.bulkMarkAttendance(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendances');
+    },
+  };
+}
+
 export function useHrAttendanceRequests(
   params?: { employee_id?: number; status?: string; from_date?: string; to_date?: string; company?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2352,6 +2524,30 @@ export function useHrAttendanceRequests(
 
 export function useHrAttendanceRequestDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(id ? ['hr-attendance-request-detail', id] : null, () => (id ? api.getHrAttendanceRequestDetail(id) : null), config);
+}
+
+export function useHrAttendanceRequestMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    approve: async (id: number | string) => {
+      await api.approveHrAttendanceRequest(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendance-requests');
+      await mutate(['hr-attendance-request-detail', id]);
+    },
+    reject: async (id: number | string) => {
+      await api.rejectHrAttendanceRequest(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendance-requests');
+      await mutate(['hr-attendance-request-detail', id]);
+    },
+    bulkApprove: async (request_ids: (number | string)[]) => {
+      await api.bulkApproveHrAttendanceRequests({ request_ids });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendance-requests');
+    },
+    bulkReject: async (request_ids: (number | string)[]) => {
+      await api.bulkRejectHrAttendanceRequests({ request_ids });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-attendance-requests');
+    },
+  };
 }
 
 export function useHrJobOpenings(
@@ -2365,6 +2561,27 @@ export function useHrJobOpeningDetail(id: number | string | null, config?: SWRCo
   return useSWR(id ? ['hr-job-opening-detail', id] : null, () => (id ? api.getHrJobOpeningDetail(id) : null), config);
 }
 
+export function useHrJobOpeningMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrJobOpeningPayload) => {
+      const res = await api.createHrJobOpening(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-openings');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrJobOpeningPayload>) => {
+      const res = await api.updateHrJobOpening(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-openings');
+      await mutate(['hr-job-opening-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrJobOpening(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-openings');
+    },
+  };
+}
+
 export function useHrJobApplicants(
   params?: { status?: string; job_title?: string; posting_date_from?: string; posting_date_to?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2376,6 +2593,32 @@ export function useHrJobApplicantDetail(id: number | string | null, config?: SWR
   return useSWR(id ? ['hr-job-applicant-detail', id] : null, () => (id ? api.getHrJobApplicantDetail(id) : null), config);
 }
 
+export function useHrJobApplicantMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    screen: async (id: number | string) => {
+      await api.screenHrJobApplicant(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      await mutate(['hr-job-applicant-detail', id]);
+    },
+    scheduleInterview: async (id: number | string, payload: { interview_date: string; interviewer: string; location?: string; notes?: string }) => {
+      await api.scheduleInterviewForHrJobApplicant(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      await mutate(['hr-job-applicant-detail', id]);
+    },
+    makeOffer: async (id: number | string, payload: { offer_id: number | string }) => {
+      await api.makeOfferForHrJobApplicant(id, payload);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'hr-job-applicants' || key[0] === 'hr-job-offers'));
+      await mutate(['hr-job-applicant-detail', id]);
+    },
+    withdraw: async (id: number | string) => {
+      await api.withdrawHrJobApplicant(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      await mutate(['hr-job-applicant-detail', id]);
+    },
+  };
+}
+
 export function useHrJobOffers(
   params?: { status?: string; company?: string; job_applicant?: string; offer_date_from?: string; offer_date_to?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2385,6 +2628,76 @@ export function useHrJobOffers(
 
 export function useHrJobOfferDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(id ? ['hr-job-offer-detail', id] : null, () => (id ? api.getHrJobOfferDetail(id) : null), config);
+}
+
+export function useHrInterviews(
+  params?: { job_applicant_id?: number; status?: string; interviewer?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['hr-interviews', params], () => api.getHrInterviews(params), config);
+}
+
+export function useHrInterviewDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(id ? ['hr-interview-detail', id] : null, () => (id ? api.getHrInterviewDetail(id) : null), config);
+}
+
+export function useHrInterviewMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrInterviewPayload) => {
+      const res = await api.createHrInterview(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrInterviewPayload>) => {
+      const res = await api.updateHrInterview(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      return res;
+    },
+    complete: async (id: number | string, payload: { feedback?: string; rating?: number; result?: string }) => {
+      const res = await api.completeHrInterview(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+      return res;
+    },
+    cancel: async (id: number | string) => {
+      await api.cancelHrInterview(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+    },
+    markNoShow: async (id: number | string) => {
+      await api.markNoShowHrInterview(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-applicants');
+    },
+  };
+}
+
+export function useHrJobOfferMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    send: async (id: number | string) => {
+      await api.sendHrJobOffer(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-offers');
+      await mutate(['hr-job-offer-detail', id]);
+    },
+    void: async (id: number | string, payload: { void_reason: string; voided_at?: string }) => {
+      await api.voidHrJobOffer(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-offers');
+      await mutate(['hr-job-offer-detail', id]);
+    },
+    accept: async (id: number | string) => {
+      await api.acceptHrJobOffer(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-offers');
+      await mutate(['hr-job-offer-detail', id]);
+    },
+    reject: async (id: number | string) => {
+      await api.rejectHrJobOffer(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-offers');
+      await mutate(['hr-job-offer-detail', id]);
+    },
+    bulkSend: async (offer_ids: (number | string)[], delivery_method?: string) => {
+      await api.bulkSendHrJobOffers({ offer_ids, delivery_method });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-job-offers');
+    },
+  };
 }
 
 export function useHrSalaryComponents(
@@ -2435,6 +2748,25 @@ export function useHrPayrollEntryDetail(id: number | string | null, config?: SWR
   return useSWR(id ? ['hr-payroll-entry-detail', id] : null, () => (id ? api.getHrPayrollEntryDetail(id) : null), config);
 }
 
+export function useHrPayrollEntryMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    generateSlips: async (
+      id: number | string,
+      payload: { company: string; department?: string | null; branch?: string | null; designation?: string | null; start_date: string; end_date: string; regenerate?: boolean }
+    ) => {
+      await api.generateHrPayrollSlips(id, payload);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'hr-payroll-entries' || key[0] === 'hr-salary-slips'));
+      await mutate(['hr-payroll-entry-detail', id]);
+    },
+    regenerateSlips: async (id: number | string, payload: { overwrite_drafts?: boolean }) => {
+      await api.regenerateHrPayrollSlips(id, payload);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'hr-payroll-entries' || key[0] === 'hr-salary-slips'));
+      await mutate(['hr-payroll-entry-detail', id]);
+    },
+  };
+}
+
 export function useHrSalarySlips(
   params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2444,6 +2776,25 @@ export function useHrSalarySlips(
 
 export function useHrSalarySlipDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(id ? ['hr-salary-slip-detail', id] : null, () => (id ? api.getHrSalarySlipDetail(id) : null), config);
+}
+
+export function useHrSalarySlipMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    markPaid: async (id: number | string, payload: { payment_reference?: string; payment_mode?: string; paid_at?: string }) => {
+      await api.markHrSalarySlipPaid(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
+      await mutate(['hr-salary-slip-detail', id]);
+    },
+    void: async (id: number | string, payload: { void_reason: string; voided_at?: string }) => {
+      await api.voidHrSalarySlip(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
+      await mutate(['hr-salary-slip-detail', id]);
+    },
+    exportRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string }) => {
+      return api.exportHrSalarySlipRegister(params);
+    },
+  };
 }
 
 export function useHrTrainingPrograms(params?: { search?: string; limit?: number; offset?: number }, config?: SWRConfiguration) {
@@ -2465,6 +2816,28 @@ export function useHrTrainingEventDetail(id: number | string | null, config?: SW
   return useSWR(id ? ['hr-training-event-detail', id] : null, () => (id ? api.getHrTrainingEventDetail(id) : null), config);
 }
 
+export function useHrTrainingEventMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    enroll: async (id: number | string, employee_ids: (number | string)[]) => {
+      await api.enrollHrTrainingEvent(id, { employee_ids });
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-training-events');
+      await mutate(['hr-training-event-detail', id]);
+    },
+    complete: async (id: number | string) => {
+      await api.completeHrTrainingEvent(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-training-events');
+      await mutate(['hr-training-event-detail', id]);
+    },
+    update: async (id: number | string, payload: Partial<HrTrainingEventPayload>) => {
+      const res = await api.updateHrTrainingEvent(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-training-events');
+      await mutate(['hr-training-event-detail', id]);
+      return res;
+    },
+  };
+}
+
 export function useHrTrainingResults(
   params?: { employee_id?: number; training_event?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
@@ -2474,6 +2847,17 @@ export function useHrTrainingResults(
 
 export function useHrTrainingResultDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(id ? ['hr-training-result-detail', id] : null, () => (id ? api.getHrTrainingResultDetail(id) : null), config);
+}
+
+export function useHrTrainingResultMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrTrainingResultPayload) => {
+      const res = await api.createHrTrainingResult(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-training-results');
+      return res;
+    },
+  };
 }
 
 export function useHrAppraisalTemplates(
@@ -2500,6 +2884,27 @@ export function useHrAppraisals(
 
 export function useHrAppraisalDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(id ? ['hr-appraisal-detail', id] : null, () => (id ? api.getHrAppraisalDetail(id) : null), config);
+}
+
+export function useHrAppraisalMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    submit: async (id: number | string) => {
+      await api.submitHrAppraisal(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-appraisals');
+      await mutate(['hr-appraisal-detail', id]);
+    },
+    review: async (id: number | string) => {
+      await api.reviewHrAppraisal(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-appraisals');
+      await mutate(['hr-appraisal-detail', id]);
+    },
+    close: async (id: number | string) => {
+      await api.closeHrAppraisal(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-appraisals');
+      await mutate(['hr-appraisal-detail', id]);
+    },
+  };
 }
 
 export function useHrEmployeeOnboardings(
@@ -2560,6 +2965,33 @@ export function useHrEmployeeTransferDetail(id: number | string | null, config?:
     () => (id ? api.getHrEmployeeTransferDetail(id) : null),
     config
   );
+}
+
+export function useHrLifecycleMutations() {
+  const { mutate } = useSWRConfig();
+  const refresh = (keyName: string) => mutate((key) => Array.isArray(key) && key[0] === keyName);
+  return {
+    updateOnboardingStatus: async (id: number | string, status: string) => {
+      await api.updateHrEmployeeOnboarding(id, { status });
+      await refresh('hr-employee-onboardings');
+      await mutate(['hr-employee-onboarding-detail', id]);
+    },
+    updateSeparationStatus: async (id: number | string, status: string) => {
+      await api.updateHrEmployeeSeparation(id, { status });
+      await refresh('hr-employee-separations');
+      await mutate(['hr-employee-separation-detail', id]);
+    },
+    updatePromotionStatus: async (id: number | string, status: string) => {
+      await api.updateHrEmployeePromotion(id, { status });
+      await refresh('hr-employee-promotions');
+      await mutate(['hr-employee-promotion-detail', id]);
+    },
+    updateTransferStatus: async (id: number | string, status: string) => {
+      await api.updateHrEmployeeTransfer(id, { status });
+      await refresh('hr-employee-transfers');
+      await mutate(['hr-employee-transfer-detail', id]);
+    },
+  };
 }
 
 // Customer write mutations (local-only)

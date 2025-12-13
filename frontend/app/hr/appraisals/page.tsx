@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { useHrAppraisalTemplates, useHrAppraisals } from '@/hooks/useApi';
+import { useHrAppraisalTemplates, useHrAppraisals, useHrAppraisalMutations } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
 import { Award, Target } from 'lucide-react';
 
@@ -41,6 +41,7 @@ export default function HrAppraisalsPage() {
   const [company, setCompany] = useState('');
   const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: templates, isLoading: templatesLoading } = useHrAppraisalTemplates({ company: company || undefined });
   const { data: appraisals, isLoading: appraisalsLoading } = useHrAppraisals({
@@ -49,6 +50,7 @@ export default function HrAppraisalsPage() {
     limit,
     offset,
   });
+  const appraisalMutations = useHrAppraisalMutations();
 
   const templateList = extractList(templates);
   const appraisalList = extractList(appraisals);
@@ -133,6 +135,32 @@ export default function HrAppraisalsPage() {
               align: 'right' as const,
               render: (item: any) => <span className="font-mono text-white">{item.goals?.length ?? 0}</span>,
             },
+            {
+              key: 'actions',
+              header: 'Actions',
+              render: (item: any) => (
+                <div className="flex gap-2 text-xs">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); appraisalMutations.submit(item.id).catch((err: any) => setActionError(err?.message || 'Submit failed')); }}
+                    className="px-2 py-1 rounded border border-teal-electric text-teal-electric hover:bg-teal-electric/10"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); appraisalMutations.review(item.id).catch((err: any) => setActionError(err?.message || 'Review failed')); }}
+                    className="px-2 py-1 rounded border border-amber-400 text-amber-300 hover:bg-amber-500/10"
+                  >
+                    Review
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); appraisalMutations.close(item.id).catch((err: any) => setActionError(err?.message || 'Close failed')); }}
+                    className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
+                  >
+                    Close
+                  </button>
+                </div>
+              ),
+            },
           ]}
           data={(appraisalList.items || []).map((item: any) => ({ ...item, id: item.id || `${item.employee}-${item.start_date}` }))}
           keyField="id"
@@ -151,6 +179,7 @@ export default function HrAppraisalsPage() {
             }}
           />
         )}
+        {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
       </div>
     </div>
   );

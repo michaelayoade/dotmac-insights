@@ -75,9 +75,16 @@ export default function AccountsReceivablePage() {
     offset,
   };
 
-  const { data, isLoading, error } = enhanced
-    ? useAccountingReceivablesEnhanced(params)
-    : useAccountingReceivables(params);
+  const base = useAccountingReceivables(params, {
+    isPaused: () => enhanced,
+  });
+  const enhancedResult = useAccountingReceivablesEnhanced(params, {
+    isPaused: () => !enhanced,
+  });
+
+  const data = enhanced ? enhancedResult.data : base.data;
+  const isLoading = enhanced ? enhancedResult.isLoading : base.isLoading;
+  const error = enhanced ? enhancedResult.error : base.error;
 
   const exportAging = () => {
     const url = buildApiUrl('/accounting/receivables-aging/export', {});

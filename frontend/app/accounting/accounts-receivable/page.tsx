@@ -64,11 +64,9 @@ export default function AccountsReceivablePage() {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(20);
   const [customerId, setCustomerId] = useState<string>('');
-  const [minAmount, setMinAmount] = useState<string>('');
 
   const { data, isLoading, error } = useAccountingReceivables({
     customer_id: customerId ? Number(customerId) : undefined,
-    min_amount: minAmount ? Number(minAmount) : undefined,
     limit,
     offset,
   });
@@ -149,7 +147,8 @@ export default function AccountsReceivablePage() {
     );
   }
 
-  const summary = data?.aging || {};
+  const summary = (data?.aging as any) || {};
+  const totalCustomers = data?.customers?.length || 0;
 
   return (
     <div className="space-y-6">
@@ -188,18 +187,9 @@ export default function AccountsReceivablePage() {
             className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="number"
-            placeholder="Min amount"
-            value={minAmount}
-            onChange={(e) => { setMinAmount(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
-        {(customerId || minAmount) && (
+        {customerId && (
           <button
-            onClick={() => { setCustomerId(''); setMinAmount(''); setOffset(0); }}
+            onClick={() => { setCustomerId(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters
@@ -217,9 +207,9 @@ export default function AccountsReceivablePage() {
       />
 
       {/* Pagination */}
-      {data && (data.total || 0) > limit && (
+      {totalCustomers > limit && (
         <Pagination
-          total={data.total || 0}
+          total={totalCustomers}
           limit={limit}
           offset={offset}
           onPageChange={setOffset}

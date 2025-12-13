@@ -2,7 +2,13 @@
 
 import { useState } from 'react';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { useHrTrainingPrograms, useHrTrainingEvents, useHrTrainingResults } from '@/hooks/useApi';
+import {
+  useHrTrainingPrograms,
+  useHrTrainingEvents,
+  useHrTrainingResults,
+  useHrTrainingEventMutations,
+  useHrTrainingResultMutations,
+} from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { GraduationCap, MapPin, Users } from 'lucide-react';
 
@@ -43,6 +49,19 @@ export default function HrTrainingPage() {
   const [eventOffset, setEventOffset] = useState(0);
   const [resultLimit, setResultLimit] = useState(20);
   const [resultOffset, setResultOffset] = useState(0);
+  const [enrollEventId, setEnrollEventId] = useState('');
+  const [enrollEmployeeIds, setEnrollEmployeeIds] = useState('');
+  const [completeEventId, setCompleteEventId] = useState('');
+  const [resultForm, setResultForm] = useState({
+    employee: '',
+    employee_id: '',
+    employee_name: '',
+    training_event: '',
+    result: 'passed',
+    score: '',
+    company: '',
+  });
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: programs, isLoading: programsLoading } = useHrTrainingPrograms();
   const { data: events, isLoading: eventsLoading } = useHrTrainingEvents({
@@ -56,10 +75,71 @@ export default function HrTrainingPage() {
     offset: resultOffset,
     employee_id: undefined,
   });
+  const eventMutations = useHrTrainingEventMutations();
+  const resultMutations = useHrTrainingResultMutations();
 
   const programList = extractList(programs);
   const eventList = extractList(events);
   const resultList = extractList(results);
+
+  const handleEnroll = async () => {
+    setActionError(null);
+    const ids = enrollEmployeeIds.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!enrollEventId || !ids.length) {
+      setActionError('Event ID and employee IDs are required.');
+      return;
+    }
+    try {
+      await eventMutations.enroll(enrollEventId, ids);
+      setEnrollEmployeeIds('');
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to enroll');
+    }
+  };
+
+  const handleComplete = async () => {
+    setActionError(null);
+    if (!completeEventId) {
+      setActionError('Event ID is required to complete.');
+      return;
+    }
+    try {
+      await eventMutations.complete(completeEventId);
+      setCompleteEventId('');
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to complete event');
+    }
+  };
+
+  const handleCreateResult = async () => {
+    setActionError(null);
+    if (!resultForm.employee || !resultForm.training_event) {
+      setActionError('Employee and training event are required.');
+      return;
+    }
+    try {
+      await resultMutations.create({
+        employee: resultForm.employee,
+        employee_id: resultForm.employee_id ? Number(resultForm.employee_id) : undefined,
+        employee_name: resultForm.employee_name || resultForm.employee,
+        training_event: resultForm.training_event,
+        result: resultForm.result || undefined,
+        score: resultForm.score ? Number(resultForm.score) : undefined,
+        company: resultForm.company || company || undefined,
+      });
+      setResultForm({
+        employee: '',
+        employee_id: '',
+        employee_name: '',
+        training_event: '',
+        result: 'passed',
+        score: '',
+        company: '',
+      });
+    } catch (err: any) {
+      setActionError(err?.message || 'Failed to record result');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -94,6 +174,117 @@ export default function HrTrainingPage() {
           <option value="cancelled">Cancelled</option>
         </select>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
+        <div className="space-y-3">
+          <p className="text-white font-semibold">Enroll Participants</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Training Event ID"
+              value={enrollEventId}
+              onChange={(e) => setEnrollEventId(e.target.value)}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Employee IDs (comma-separated)"
+              value={enrollEmployeeIds}
+              onChange={(e) => setEnrollEmployeeIds(e.target.value)}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <button
+            onClick={handleEnroll}
+            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+          >
+            Enroll
+          </button>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Complete Event ID"
+              value={completeEventId}
+              onChange={(e) => setCompleteEventId(e.target.value)}
+              className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <button
+              onClick={handleComplete}
+              className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-white"
+            >
+              Mark Complete
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-white font-semibold">Record Training Result</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Employee"
+              value={resultForm.employee}
+              onChange={(e) => setResultForm({ ...resultForm, employee: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="number"
+              placeholder="Employee ID"
+              value={resultForm.employee_id}
+              onChange={(e) => setResultForm({ ...resultForm, employee_id: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="Employee Name"
+              value={resultForm.employee_name}
+              onChange={(e) => setResultForm({ ...resultForm, employee_name: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+            <input
+              type="text"
+              placeholder="Training Event"
+              value={resultForm.training_event}
+              onChange={(e) => setResultForm({ ...resultForm, training_event: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={resultForm.result}
+              onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            >
+              <option value="passed">Passed</option>
+              <option value="failed">Failed</option>
+              <option value="in-progress">In Progress</option>
+            </select>
+            <input
+              type="number"
+              placeholder="Score"
+              value={resultForm.score}
+              onChange={(e) => setResultForm({ ...resultForm, score: e.target.value })}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Company"
+            value={resultForm.company}
+            onChange={(e) => setResultForm({ ...resultForm, company: e.target.value })}
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+          />
+          <button
+            onClick={handleCreateResult}
+            className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
+          >
+            Save Result
+          </button>
+        </div>
+      </div>
+      {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
 
       <DataTable
         columns={[
