@@ -125,9 +125,9 @@ class CSATResponse(Base):
 
     # Relationships
     survey: Mapped["CSATSurvey"] = relationship(back_populates="responses")
-    ticket: Mapped[Optional["Ticket"]] = relationship()
-    customer: Mapped[Optional["Customer"]] = relationship()
-    agent: Mapped[Optional["Agent"]] = relationship()
+    ticket: Mapped[Optional["Ticket"]] = relationship(foreign_keys=[ticket_id])
+    customer: Mapped[Optional["Customer"]] = relationship(foreign_keys=[customer_id])
+    agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[agent_id])
 
     def __repr__(self) -> str:
         return f"<CSATResponse survey={self.survey_id} rating={self.rating}>"

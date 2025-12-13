@@ -1,7 +1,7 @@
 """Add audit fields to HR models
 
 Revision ID: 20241213_hr_audit
-Revises: 20241214_003
+Revises: 20241213_csat
 Create Date: 2024-12-13
 
 """
@@ -11,7 +11,8 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20241213_hr_audit'
-down_revision = '20241214_003'
+# Chain after the last 20241213 migration (support CSAT enhancements)
+down_revision = '20241213_csat'
 branch_labels = None
 depends_on = None
 

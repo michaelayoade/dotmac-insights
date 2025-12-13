@@ -68,7 +68,6 @@ export default function AccountsPayablePage() {
   const [currency, setCurrency] = useState<string>('NGN');
 
   const { data, isLoading, error } = useAccountingPayables({
-    search: supplierSearch || undefined,
     currency: currency || undefined,
     limit,
     offset,

@@ -33,7 +33,7 @@ from .workflows import router as workflows_router
 from .tax import router as tax_router
 from .exports import router as exports_router
 
-router = APIRouter(prefix="/accounting", tags=["accounting"])
+router = APIRouter(tags=["accounting"])
 
 # Include sub-routers
 router.include_router(dashboard_router)

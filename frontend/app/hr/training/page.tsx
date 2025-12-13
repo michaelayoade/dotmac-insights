@@ -8,7 +8,6 @@ import {
   useHrTrainingResults,
   useHrTrainingEventMutations,
   useHrTrainingResultMutations,
-  useHrEmployees,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { GraduationCap, MapPin, Users, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
@@ -115,7 +114,8 @@ export default function HrTrainingPage() {
     offset: resultOffset,
     employee_id: undefined,
   });
-  const { data: employees } = useHrEmployees({ limit: 100 });
+  // TODO: Add useHrEmployees hook when employees API is available
+  const employees = { data: [], total: 0 };
   const eventMutations = useHrTrainingEventMutations();
   const resultMutations = useHrTrainingResultMutations();
 

@@ -1,7 +1,5 @@
 'use client';
 
-'use client';
-
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -15,10 +13,16 @@ import {
   Inbox,
   Activity,
   AlertTriangle,
+  ShieldCheck,
+  Target,
+  Clock,
+  Users,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSupportDashboard, useSupportSlaBreachesSummary } from '@/hooks/useApi';
 
-type SectionKey = 'desk' | 'insights';
+type SectionKey = 'desk' | 'insights' | 'operations' | 'content' | 'config';
 
 type NavSection = {
   key: SectionKey;
@@ -72,6 +76,15 @@ const sections: NavSection[] = [
       { name: 'Canned Responses', href: '/support/canned-responses', description: 'Shortcodes & templates' },
     ],
   },
+  {
+    key: 'config',
+    label: 'Configuration',
+    description: 'Support settings',
+    icon: Settings,
+    items: [
+      { name: 'Settings', href: '/support/settings', description: 'Helpdesk configuration' },
+    ],
+  },
 ];
 
 const workflowPhases = [
@@ -102,12 +115,17 @@ function getWorkflowPhase(sectionKey: SectionKey | null): string {
 
 export default function SupportLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { data: dashboard } = useSupportDashboard();
+  const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
 
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => {
     const activeSection = getActiveSection(pathname);
     const initial: Record<SectionKey, boolean> = {
       desk: true,
       insights: false,
+      operations: false,
+      content: false,
+      config: false,
     };
     if (activeSection) initial[activeSection] = true;
     return initial;
@@ -135,6 +153,10 @@ export default function SupportLayout({ children }: { children: React.ReactNode 
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const overdueCount = slaBreach?.currently_overdue ?? dashboard?.metrics?.overdue_tickets ?? 0;
+  const openCount = dashboard?.tickets?.open ?? 0;
+  const slaAttainment = dashboard?.sla?.attainment_rate ?? 0;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
       {/* Sidebar */}
@@ -149,6 +171,40 @@ export default function SupportLayout({ children }: { children: React.ReactNode 
               <h1 className="text-lg font-semibold text-white">Support Desk</h1>
               <p className="text-slate-muted text-xs">Omnichannel helpdesk & SLA</p>
             </div>
+          </div>
+        </div>
+
+        {/* Live Status Indicators */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-slate-elevated rounded-lg p-2 text-center">
+            <div className="flex items-center justify-center gap-1">
+              <Inbox className="w-3 h-3 text-blue-400" />
+              <span className="text-lg font-bold text-white">{openCount}</span>
+            </div>
+            <p className="text-[10px] text-slate-muted">Open</p>
+          </div>
+          <div className={cn(
+            'rounded-lg p-2 text-center',
+            overdueCount > 0 ? 'bg-rose-500/10 border border-rose-500/30' : 'bg-slate-elevated'
+          )}>
+            <div className="flex items-center justify-center gap-1">
+              <AlertTriangle className={cn('w-3 h-3', overdueCount > 0 ? 'text-rose-400' : 'text-slate-muted')} />
+              <span className={cn('text-lg font-bold', overdueCount > 0 ? 'text-rose-400' : 'text-white')}>{overdueCount}</span>
+            </div>
+            <p className="text-[10px] text-slate-muted">Overdue</p>
+          </div>
+          <div className={cn(
+            'rounded-lg p-2 text-center',
+            slaAttainment < 80 ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-elevated'
+          )}>
+            <div className="flex items-center justify-center gap-1">
+              <Target className={cn('w-3 h-3', slaAttainment >= 90 ? 'text-emerald-400' : slaAttainment >= 80 ? 'text-amber-400' : 'text-rose-400')} />
+              <span className={cn(
+                'text-lg font-bold',
+                slaAttainment >= 90 ? 'text-emerald-400' : slaAttainment >= 80 ? 'text-amber-400' : 'text-rose-400'
+              )}>{slaAttainment.toFixed(0)}%</span>
+            </div>
+            <p className="text-[10px] text-slate-muted">SLA</p>
           </div>
         </div>
 
@@ -267,11 +323,16 @@ export default function SupportLayout({ children }: { children: React.ReactNode 
               <span className="text-xs text-slate-muted">Analytics</span>
             </Link>
             <Link
-              href="/support/tickets"
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
+              href="/support/sla"
+              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center relative"
             >
               <AlertTriangle className="w-4 h-4 text-rose-400 mb-1" />
               <span className="text-xs text-slate-muted">SLA Watch</span>
+              {overdueCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {overdueCount > 9 ? '9+' : overdueCount}
+                </span>
+              )}
             </Link>
           </div>
         </div>

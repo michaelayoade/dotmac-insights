@@ -1,7 +1,7 @@
 """Add geolocation and device fields to Attendance model
 
 Revision ID: 20241214_001
-Revises: 20241215_hr_module
+Revises: 20241213_hr_audit
 Create Date: 2024-12-14
 
 """
@@ -13,7 +13,8 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '20241214_001'
-down_revision: Union[str, None] = '20241215_hr_module'
+# Chain after the HR audit fields migration
+down_revision: Union[str, None] = '20241213_hr_audit'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

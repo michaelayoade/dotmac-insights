@@ -1,53 +1,254 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Calendar, Clock, ShieldCheck } from 'lucide-react';
-import { useSupportSlaBreachesSummary, useSupportSlaCalendars, useSupportSlaPolicies } from '@/hooks/useApi';
+import { AlertTriangle, Calendar, Clock, ShieldCheck, Target, Filter, CheckCircle, XCircle } from 'lucide-react';
+import { useSupportSlaBreachesSummary, useSupportSlaCalendars, useSupportSlaPolicies, useSupportAnalyticsSlaPerformance } from '@/hooks/useApi';
+import { cn } from '@/lib/utils';
+
+function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number; max: number; color?: string }) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
+      <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function SlaGauge({ attainment }: { attainment: number }) {
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (attainment / 100) * circumference;
+  const color = attainment >= 90 ? '#10B981' : attainment >= 70 ? '#F59E0B' : '#EF4444';
+
+  return (
+    <div className="relative w-28 h-28 mx-auto">
+      <svg className="w-full h-full -rotate-90">
+        <circle cx="56" cy="56" r={radius} fill="none" stroke="#1e293b" strokeWidth="8" />
+        <circle
+          cx="56"
+          cy="56"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-500"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-white">{attainment.toFixed(0)}%</span>
+        <span className="text-[10px] text-slate-muted">Attainment</span>
+      </div>
+    </div>
+  );
+}
 
 export default function SupportSlaPage() {
   const [activeOnly, setActiveOnly] = useState(true);
+  const [days, setDays] = useState(30);
   const calendars = useSupportSlaCalendars({ active_only: activeOnly });
   const policies = useSupportSlaPolicies({ active_only: activeOnly });
-  const breaches = useSupportSlaBreachesSummary({ days: 30 });
+  const breaches = useSupportSlaBreachesSummary({ days });
+  const slaPerformance = useSupportAnalyticsSlaPerformance({ months: 6 });
+
+  // Calculate overall attainment from latest month
+  const latestPerf = slaPerformance.data?.[slaPerformance.data.length - 1];
+  const overallAttainment = latestPerf?.attainment_rate ?? 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-teal-electric" />
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+        </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Support</p>
-          <h1 className="text-xl font-semibold text-white">SLA</h1>
+          <h1 className="text-2xl font-bold text-white">SLA Management</h1>
           <p className="text-slate-muted text-sm">Calendars, policies, and breach summary</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-sm text-slate-muted">
-        <label className="inline-flex items-center gap-2">
-          <input type="checkbox" checked={activeOnly} onChange={(e) => policies.mutate && setActiveOnly(e.target.checked)} />
-          Active only
-        </label>
+      {/* Filters */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-teal-electric" />
+          <span className="text-white text-sm font-medium">Filters</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="inline-flex items-center gap-2 text-slate-muted text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={activeOnly}
+              onChange={(e) => setActiveOnly(e.target.checked)}
+              className="rounded"
+            />
+            Active only
+          </label>
+          <div>
+            <label className="text-xs text-slate-muted mb-1 block">Breach window</label>
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            >
+              <option value={7}>7 days</option>
+              <option value={14}>14 days</option>
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+              <option value={90}>90 days</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-teal-electric" />
-            <span className="text-white text-sm font-medium">Business calendars</span>
+      {/* SLA Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Overall Attainment Gauge */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Target className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-white font-semibold">SLA Attainment</h3>
+          </div>
+          <SlaGauge attainment={overallAttainment} />
+          {latestPerf && (
+            <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+              <div>
+                <p className="text-xs text-slate-muted">Met</p>
+                <p className="text-lg font-bold text-emerald-400">{latestPerf.met}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-muted">Breached</p>
+                <p className="text-lg font-bold text-rose-400">{latestPerf.breached}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Breach Summary */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5 md:col-span-2">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <h3 className="text-white font-semibold">Breach Summary ({days}d)</h3>
+          </div>
+          {!breaches.data ? (
+            <p className="text-slate-muted text-sm">Loading breach data…</p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-rose-400">{breaches.data.total_breaches ?? 0}</p>
+                  <p className="text-xs text-slate-muted">Total Breaches</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-400">{breaches.data.currently_overdue ?? 0}</p>
+                  <p className="text-xs text-slate-muted">Currently Overdue</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-violet-400">
+                    {(breaches.data.by_target_type || []).reduce((s: number, t: any) => s + (t.avg_overrun_hours || 0), 0).toFixed(1)}h
+                  </p>
+                  <p className="text-xs text-slate-muted">Avg Overrun</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-400">
+                    {(breaches.data.by_target_type || []).length}
+                  </p>
+                  <p className="text-xs text-slate-muted">Target Types</p>
+                </div>
+              </div>
+
+              {(breaches.data.by_target_type || []).length > 0 && (
+                <div className="space-y-2 pt-3 border-t border-slate-border">
+                  <p className="text-xs text-slate-muted">By Target Type</p>
+                  {(breaches.data.by_target_type || []).map((row: any, idx: number) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white">{row.target_type || 'Unknown'}</span>
+                        <span className="text-slate-muted">
+                          {row.count} breaches • avg {row.avg_overrun_hours?.toFixed?.(1) ?? 0}h
+                        </span>
+                      </div>
+                      <ProgressBar
+                        value={row.count}
+                        max={breaches.data.total_breaches || 1}
+                        color="bg-rose-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SLA Trend */}
+      {slaPerformance.data?.length ? (
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Target className="w-4 h-4 text-teal-electric" />
+            <h3 className="text-white font-semibold">SLA Performance Trend (6 months)</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {slaPerformance.data.map((perf) => (
+              <div key={perf.period} className="bg-slate-elevated rounded-lg p-3 text-center">
+                <p className="text-xs text-slate-muted mb-1">{perf.period}</p>
+                <p className={cn(
+                  'text-lg font-bold',
+                  perf.attainment_rate >= 90 ? 'text-emerald-400' :
+                  perf.attainment_rate >= 70 ? 'text-amber-400' : 'text-rose-400'
+                )}>
+                  {perf.attainment_rate.toFixed(0)}%
+                </p>
+                <div className="flex items-center justify-center gap-2 mt-1 text-xs">
+                  <span className="text-emerald-400">{perf.met}</span>
+                  <span className="text-slate-muted">/</span>
+                  <span className="text-rose-400">{perf.breached}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Calendars & Policies */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Calendars */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-400" />
+              <h3 className="text-white font-semibold">Business Calendars</h3>
+            </div>
+            <span className="text-xs text-slate-muted">{calendars.data?.length ?? 0} calendars</span>
           </div>
           {!calendars.data ? (
             <p className="text-slate-muted text-sm">Loading calendars…</p>
           ) : calendars.data.length === 0 ? (
-            <p className="text-slate-muted text-sm">No calendars found.</p>
+            <p className="text-slate-muted text-sm">No calendars configured.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {calendars.data.map((cal) => (
-                <div key={cal.id} className="border border-slate-border rounded-lg px-3 py-2">
-                  <div className="flex items-center justify-between">
+                <div key={cal.id} className="border border-slate-border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-white font-semibold">{cal.name}</p>
-                      <p className="text-slate-muted text-xs">{cal.description || cal.calendar_type}</p>
+                      <p className="text-slate-muted text-xs mt-0.5">{cal.description || cal.calendar_type}</p>
                     </div>
-                    <span className="text-xs text-slate-muted px-2 py-1 rounded border border-slate-border">{cal.timezone}</span>
+                    <span className={cn(
+                      'px-2 py-0.5 rounded text-xs',
+                      cal.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-elevated text-slate-muted'
+                    )}>
+                      {cal.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-3 text-xs text-slate-muted">
+                    <span className="px-2 py-1 rounded bg-slate-elevated">{cal.timezone}</span>
+                    {cal.holidays?.length > 0 && (
+                      <span>{cal.holidays.length} holidays</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -55,54 +256,70 @@ export default function SupportSlaPage() {
           )}
         </div>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-teal-electric" />
-            <span className="text-white text-sm font-medium">Policies</span>
+        {/* Policies */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-violet-400" />
+              <h3 className="text-white font-semibold">SLA Policies</h3>
+            </div>
+            <span className="text-xs text-slate-muted">{policies.data?.length ?? 0} policies</span>
           </div>
           {!policies.data ? (
             <p className="text-slate-muted text-sm">Loading policies…</p>
           ) : policies.data.length === 0 ? (
-            <p className="text-slate-muted text-sm">No policies found.</p>
+            <p className="text-slate-muted text-sm">No policies configured.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {policies.data.map((policy) => (
-                <div key={policy.id} className="border border-slate-border rounded-lg px-3 py-2">
-                  <div className="flex items-center justify-between">
+                <div key={policy.id} className="border border-slate-border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-white font-semibold">{policy.name}</p>
-                      <p className="text-slate-muted text-xs">{policy.description || 'No description'}</p>
+                      <p className="text-slate-muted text-xs mt-0.5">{policy.description || 'No description'}</p>
                     </div>
+                    <span className={cn(
+                      'px-2 py-0.5 rounded text-xs',
+                      policy.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-elevated text-slate-muted'
+                    )}>
+                      {policy.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-muted">
                     {policy.conditions?.length ? (
-                      <span className="text-xs text-slate-muted px-2 py-1 rounded border border-slate-border">
+                      <span className="px-2 py-1 rounded bg-slate-elevated">
                         {policy.conditions.length} conditions
                       </span>
                     ) : null}
+                    {policy.targets?.length ? (
+                      <span className="px-2 py-1 rounded bg-slate-elevated">
+                        {policy.targets.length} targets
+                      </span>
+                    ) : null}
+                    {policy.priority !== undefined && (
+                      <span className="px-2 py-1 rounded bg-slate-elevated">
+                        Priority: {policy.priority}
+                      </span>
+                    )}
                   </div>
+                  {policy.targets?.length > 0 && (
+                    <div className="mt-3 pt-2 border-t border-slate-border/50 space-y-1">
+                      {policy.targets.slice(0, 3).map((target: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-muted">{target.target_type || 'Target'}</span>
+                          <span className="text-white">{target.target_hours}h</span>
+                        </div>
+                      ))}
+                      {policy.targets.length > 3 && (
+                        <p className="text-xs text-slate-muted">+{policy.targets.length - 3} more targets</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
-
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <span className="text-white text-sm font-medium">Breach summary (30d)</span>
-        </div>
-        {!breaches.data ? (
-          <p className="text-slate-muted text-sm">Loading breaches…</p>
-        ) : (
-          <div className="text-sm text-slate-muted space-y-1">
-            <p>Total breaches: {breaches.data.total_breaches ?? 0}</p>
-            <div className="space-y-1">
-              {(breaches.data.by_target_type || []).map((row, idx) => (
-                <p key={idx}>{row.target_type}: {row.count} (avg overrun {row.avg_overrun_hours?.toFixed?.(1) ?? 0}h)</p>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

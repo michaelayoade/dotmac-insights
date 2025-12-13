@@ -20,6 +20,7 @@ import {
   UserPlus,
   ClipboardList,
   TrendingUp,
+  Settings,
 } from 'lucide-react';
 
 // HR Information Flow:
@@ -30,7 +31,7 @@ import {
 // 5. DEVELOPMENT: Training, appraisals, career growth (Continuous)
 // 6. ANALYTICS: Reports, insights, compliance (Monitoring)
 
-type SectionKey = 'overview' | 'people' | 'time' | 'compensation' | 'development' | 'analytics';
+type SectionKey = 'overview' | 'people' | 'time' | 'compensation' | 'development' | 'config';
 
 type NavSection = {
   key: SectionKey;
@@ -90,6 +91,15 @@ const sections: NavSection[] = [
       { name: 'Appraisals', href: '/hr/appraisals', description: 'Performance reviews' },
     ],
   },
+  {
+    key: 'config',
+    label: 'Configuration',
+    description: 'HR policies and settings',
+    icon: Settings,
+    items: [
+      { name: 'Settings', href: '/hr/settings', description: 'HR configuration' },
+    ],
+  },
 ];
 
 // Workflow phases for contextual guidance
@@ -115,8 +125,8 @@ function getActiveSection(pathname: string): SectionKey | null {
 
 function getWorkflowPhase(sectionKey: SectionKey | null): string {
   if (!sectionKey) return 'setup';
-  if (sectionKey === 'overview' || sectionKey === 'analytics') return 'analyze';
-  if (sectionKey === 'people') return 'setup';
+  if (sectionKey === 'overview') return 'analyze';
+  if (sectionKey === 'people' || sectionKey === 'config') return 'setup';
   return 'operate';
 }
 
@@ -131,7 +141,7 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
       time: false,
       compensation: false,
       development: false,
-      analytics: false,
+      config: false,
     };
     if (activeSection) initial[activeSection] = true;
     return initial;

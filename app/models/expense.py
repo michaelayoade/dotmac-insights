@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from app.models.employee import Employee
     from app.models.pop import Pop
     from app.models.project import Project
+    from app.models.ticket import Ticket
+    from app.models.task import Task
 
 
 class ExpenseStatus(enum.Enum):
@@ -41,6 +43,12 @@ class Expense(Base):
     # Project FK
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     erpnext_project: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Ticket FK (for expenses linked to support tickets)
+    ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
+
+    # Task FK (for expenses linked to tasks)
+    task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
 
     # Expense details
     expense_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -93,9 +101,11 @@ class Expense(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    employee: Mapped[Optional[Employee]] = relationship(back_populates="expenses")
-    project: Mapped[Optional[Project]] = relationship(back_populates="expenses")
-    pop: Mapped[Optional[Pop]] = relationship(back_populates="expenses")
+    employee: Mapped[Optional["Employee"]] = relationship(back_populates="expenses")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="expenses")
+    pop: Mapped[Optional["Pop"]] = relationship(back_populates="expenses")
+    ticket: Mapped[Optional["Ticket"]] = relationship(back_populates="expenses")
+    task_rel: Mapped[Optional["Task"]] = relationship("Task", back_populates="expenses")
 
     def __repr__(self) -> str:
         return f"<Expense {self.erpnext_id} - {self.total_claimed_amount} {self.currency}>"

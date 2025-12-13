@@ -3,13 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, LifeBuoy } from 'lucide-react';
-import { useSupportTicketMutations } from '@/hooks/useApi';
+import { AlertTriangle, ArrowLeft, LifeBuoy, User, Users, Tag, Clock } from 'lucide-react';
+import { useSupportTicketMutations, useSupportAgents, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 
 export default function SupportTicketCreatePage() {
   const router = useRouter();
   const { createTicket } = useSupportTicketMutations();
+  const { data: agentsData } = useSupportAgents();
+  const { data: teamsData } = useSupportTeams();
+
+  const agents = agentsData?.agents?.filter((a) => a.is_active) || [];
+  const teams = teamsData?.teams || [];
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -17,13 +22,10 @@ export default function SupportTicketCreatePage() {
   const [priority, setPriority] = useState('medium');
   const [ticketType, setTicketType] = useState('');
   const [issueType, setIssueType] = useState('');
-  const [customerId, setCustomerId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
-  const [assignedEmployeeId, setAssignedEmployeeId] = useState('');
+  const [agentId, setAgentId] = useState('');
+  const [teamId, setTeamId] = useState('');
   const [resolutionBy, setResolutionBy] = useState('');
   const [responseBy, setResponseBy] = useState('');
-  const [resolutionTeam, setResolutionTeam] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -47,6 +49,10 @@ export default function SupportTicketCreatePage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
+      // Get assigned_to name from selected agent
+      const selectedAgent = agents.find((a) => a.id === Number(agentId));
+      const selectedTeam = teams.find((t) => t.id === Number(teamId));
+
       const payload = {
         subject: subject.trim(),
         description: description || undefined,
@@ -54,13 +60,11 @@ export default function SupportTicketCreatePage() {
         priority: priority as any,
         ticket_type: ticketType || undefined,
         issue_type: issueType || undefined,
-        customer_id: customerId ? Number(customerId) : undefined,
-        project_id: projectId ? Number(projectId) : undefined,
-        assigned_to: assignedTo || undefined,
-        assigned_employee_id: assignedEmployeeId ? Number(assignedEmployeeId) : undefined,
+        assigned_to: selectedAgent?.display_name || selectedAgent?.email || undefined,
+        assigned_employee_id: selectedAgent?.employee_id || undefined,
+        resolution_team: selectedTeam?.team_name || undefined,
         resolution_by: resolutionBy || undefined,
         response_by: responseBy || undefined,
-        resolution_team: resolutionTeam || undefined,
         customer_email: customerEmail || undefined,
         customer_phone: customerPhone || undefined,
         customer_name: customerName || undefined,
@@ -78,6 +82,7 @@ export default function SupportTicketCreatePage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -85,16 +90,17 @@ export default function SupportTicketCreatePage() {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to tickets
+            Back
           </Link>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Support</p>
-            <h1 className="text-xl font-semibold text-white">New Ticket</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-teal-electric/10 border border-teal-electric/30 flex items-center justify-center">
+              <LifeBuoy className="w-5 h-5 text-teal-electric" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">New Ticket</h1>
+              <p className="text-slate-muted text-sm">Ticket number auto-generates on create</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 text-slate-muted text-sm">
-          <LifeBuoy className="w-4 h-4" />
-          Ticket number auto-generates on create.
         </div>
       </div>
 
@@ -106,7 +112,13 @@ export default function SupportTicketCreatePage() {
       )}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
+        {/* Left Column - Basic Info */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2 pb-3 border-b border-slate-border">
+            <Tag className="w-4 h-4 text-teal-electric" />
+            <h2 className="text-white font-semibold">Ticket Details</h2>
+          </div>
+
           <div className="space-y-1">
             <label className="text-sm text-slate-muted">Subject *</label>
             <input
@@ -120,6 +132,7 @@ export default function SupportTicketCreatePage() {
             />
             {fieldErrors.subject && <p className="text-xs text-red-400">{fieldErrors.subject}</p>}
           </div>
+
           <div className="space-y-1">
             <label className="text-sm text-slate-muted">Description</label>
             <textarea
@@ -130,7 +143,8 @@ export default function SupportTicketCreatePage() {
               placeholder="Steps to reproduce, impact, etc."
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-sm text-slate-muted">Status</label>
               <select
@@ -159,7 +173,8 @@ export default function SupportTicketCreatePage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-sm text-slate-muted">Ticket Type</label>
               <input
@@ -181,128 +196,132 @@ export default function SupportTicketCreatePage() {
           </div>
         </div>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Customer ID</label>
-              <input
-                type="number"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="Optional"
-              />
+        {/* Right Column - Assignment & Customer */}
+        <div className="space-y-4">
+          {/* Assignment */}
+          <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-border">
+              <Users className="w-4 h-4 text-teal-electric" />
+              <h2 className="text-white font-semibold">Assignment</h2>
             </div>
+
             <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Project ID</label>
-              <input
-                type="number"
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+              <label className="text-sm text-slate-muted">Assign to Agent</label>
+              <select
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="Optional"
-              />
+              >
+                <option value="">-- Select an agent --</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.display_name || agent.email} {agent.capacity ? `(${agent.capacity} capacity)` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
             <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Assigned To (email)</label>
-              <input
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
+              <label className="text-sm text-slate-muted">Resolution Team</label>
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="agent@company.com"
-              />
+              >
+                <option value="">-- Select a team --</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.team_name} {team.description ? `(${team.description})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Assigned Employee ID</label>
-              <input
-                type="number"
-                value={assignedEmployeeId}
-                onChange={(e) => setAssignedEmployeeId(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="Optional"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Response By</label>
-              <input
-                type="datetime-local"
-                value={responseBy}
-                onChange={(e) => setResponseBy(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Resolution By</label>
-              <input
-                type="datetime-local"
-                value={resolutionBy}
-                onChange={(e) => setResolutionBy(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Response By</label>
+                <input
+                  type="datetime-local"
+                  value={responseBy}
+                  onChange={(e) => setResponseBy(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Resolution By</label>
+                <input
+                  type="datetime-local"
+                  value={resolutionBy}
+                  onChange={(e) => setResolutionBy(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                />
+              </div>
             </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-muted">Resolution Team</label>
-            <input
-              value={resolutionTeam}
-              onChange={(e) => setResolutionTeam(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              placeholder="Team or squad"
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+          {/* Customer */}
+          <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-border">
+              <User className="w-4 h-4 text-teal-electric" />
+              <h2 className="text-white font-semibold">Customer Information</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Customer Name</label>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  placeholder="Full name"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Customer Email</label>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  placeholder="customer@email.com"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Customer Phone</label>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  placeholder="+234..."
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-slate-muted">Region</label>
+                <input
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  placeholder="Lagos, Abuja, etc."
+                />
+              </div>
+            </div>
+
             <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Customer Name</label>
+              <label className="text-sm text-slate-muted">Base Station</label>
               <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                value={baseStation}
+                onChange={(e) => setBaseStation(e.target.value)}
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                placeholder="Station identifier"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Customer Email</label>
-              <input
-                type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="customer@email.com"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Customer Phone</label>
-              <input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                placeholder="+234..."
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-slate-muted">Region</label>
-              <input
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm text-slate-muted">Base Station</label>
-            <input
-              value={baseStation}
-              onChange={(e) => setBaseStation(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
           </div>
         </div>
 
+        {/* Form Actions */}
         <div className="lg:col-span-2 flex justify-end gap-3">
           <button
             type="button"
@@ -314,9 +333,9 @@ export default function SupportTicketCreatePage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
+            className="px-6 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
           >
-            {submitting ? 'Saving...' : 'Create Ticket'}
+            {submitting ? 'Creating...' : 'Create Ticket'}
           </button>
         </div>
       </form>

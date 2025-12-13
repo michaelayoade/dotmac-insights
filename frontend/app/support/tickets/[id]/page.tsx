@@ -3,7 +3,25 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { AlertTriangle, ArrowLeft, Clock, LifeBuoy, MessageSquare, ActivitySquare, Mail, Link2, Receipt, Send, Users, ShieldCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  LifeBuoy,
+  MessageSquare,
+  ActivitySquare,
+  Mail,
+  Link2,
+  Receipt,
+  Send,
+  Users,
+  ShieldCheck,
+  User,
+  Tag,
+  Eye,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import {
   useSupportTicketDetail,
   useSupportTicketCommentMutations,
@@ -11,12 +29,64 @@ import {
   useSupportTicketActivityMutations,
   useSupportTicketCommunicationMutations,
   useSupportTicketDependencyMutations,
+  useSupportAgents,
+  useSupportTeams,
 } from '@/hooks/useApi';
+import { cn } from '@/lib/utils';
 
 function formatDate(value?: string | null) {
   if (!value) return '-';
   const dt = new Date(value);
   return dt.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function formatTimeAgo(dateStr: string | null | undefined) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d ago`;
+  if (diffHours > 0) return `${diffHours}h ago`;
+  return 'Just now';
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  const colors: Record<string, string> = {
+    urgent: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+    high: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+    medium: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    low: 'bg-slate-500/10 text-slate-300 border-slate-500/30',
+  };
+  const color = colors[priority] || colors.medium;
+
+  return (
+    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1', color)}>
+      <Tag className="w-3 h-3" />
+      {priority}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    open: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+    in_progress: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    pending: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+    resolved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+    closed: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+    replied: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+    on_hold: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+  };
+  const color = colors[status] || colors.open;
+
+  return (
+    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border capitalize', color)}>
+      {status?.replace(/_/g, ' ')}
+    </span>
+  );
 }
 
 export default function SupportTicketDetailPage() {
@@ -30,10 +100,17 @@ export default function SupportTicketDetailPage() {
   const { addActivity } = useSupportTicketActivityMutations(id);
   const { addCommunication } = useSupportTicketCommunicationMutations(id);
   const { addDependency } = useSupportTicketDependencyMutations(id);
+
+  // Fetch agents and teams for dropdowns
+  const { data: agentsData } = useSupportAgents();
+  const { data: teamsData } = useSupportTeams();
+  const agents = agentsData?.agents || [];
+  const teams = teamsData?.teams || [];
+
   const [newComment, setNewComment] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [assignForm, setAssignForm] = useState({ agent_id: '', team_id: '', member_id: '', employee_id: '', assigned_to: '' });
+  const [assignForm, setAssignForm] = useState({ agent_id: '', team_id: '', assigned_to: '' });
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [slaForm, setSlaForm] = useState({ response_by: '', resolution_by: '', reason: '' });
@@ -96,20 +173,20 @@ export default function SupportTicketDetailPage() {
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
-    if (!assignForm.agent_id && !assignForm.team_id && !assignForm.member_id && !assignForm.employee_id && !assignForm.assigned_to) {
-      setAssignError('Provide at least one assignee field');
+    if (!assignForm.agent_id && !assignForm.team_id && !assignForm.assigned_to) {
+      setAssignError('Select an agent, team, or enter an assignee name');
       return;
     }
     setAssignError(null);
     setAssigning(true);
     try {
+      const selectedAgent = agents.find((a) => a.id === Number(assignForm.agent_id));
       await assignTicket(id, {
         agent_id: assignForm.agent_id ? Number(assignForm.agent_id) : undefined,
         team_id: assignForm.team_id ? Number(assignForm.team_id) : undefined,
-        member_id: assignForm.member_id ? Number(assignForm.member_id) : undefined,
-        employee_id: assignForm.employee_id ? Number(assignForm.employee_id) : undefined,
-        assigned_to: assignForm.assigned_to || undefined,
+        assigned_to: assignForm.assigned_to || selectedAgent?.display_name || selectedAgent?.email || undefined,
       });
+      setAssignForm({ agent_id: '', team_id: '', assigned_to: '' });
     } catch (err: any) {
       setAssignError(err?.message || 'Failed to assign ticket');
     } finally {
@@ -168,8 +245,11 @@ export default function SupportTicketDetailPage() {
     setDepForm({ depends_on_ticket_id: '', depends_on_subject: '' });
   };
 
+  const isOverdue = ticket.resolution_by && new Date(ticket.resolution_by) < new Date() && !['resolved', 'closed'].includes(ticket.status);
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
@@ -177,43 +257,152 @@ export default function SupportTicketDetailPage() {
             className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to tickets
+            Back
           </Link>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Ticket</p>
-            <h1 className="text-xl font-semibold text-white">
-              {ticket.ticket_number || `Ticket #${ticket.id}`}
-            </h1>
-            <div className="flex gap-2 mt-1 text-sm">
-              <span className="px-2 py-1 rounded-full bg-slate-elevated border border-slate-border text-slate-200">
-                Status: {ticket.status || 'Unknown'}
-              </span>
-              {ticket.priority && (
-                <span className="px-2 py-1 rounded-full bg-slate-elevated border border-slate-border text-slate-200">
-                  Priority: {ticket.priority}
-                </span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-teal-electric/10 border border-teal-electric/30 flex items-center justify-center">
+              <LifeBuoy className="w-5 h-5 text-teal-electric" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold text-white">
+                  {ticket.ticket_number || `#${ticket.id}`}
+                </h1>
+                {isOverdue && (
+                  <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 text-xs font-medium">
+                    OVERDUE
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-muted text-sm">{ticket.subject || 'No subject'}</p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={ticket.status || 'open'} />
+          <PriorityBadge priority={ticket.priority || 'medium'} />
+        </div>
+      </div>
+
+      {/* Ticket Info Card */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-3">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <User className="w-4 h-4 text-teal-electric" />
+              Customer
+            </h3>
+            <div className="space-y-1">
+              <p className="text-white font-medium">{ticket.customer_name || 'Unknown'}</p>
+              {ticket.customer_email && (
+                <p className="text-slate-muted text-sm">{ticket.customer_email}</p>
+              )}
+              {ticket.customer_phone && (
+                <p className="text-slate-muted text-sm">{ticket.customer_phone}</p>
+              )}
+              {ticket.region && (
+                <p className="text-slate-muted text-xs">Region: {ticket.region}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <Users className="w-4 h-4 text-teal-electric" />
+              Assignment
+            </h3>
+            <div className="space-y-1">
+              <p className={cn('text-sm', ticket.assigned_to ? 'text-white' : 'text-amber-400')}>
+                {ticket.assigned_to || 'Unassigned'}
+              </p>
+              {ticket.resolution_team && (
+                <p className="text-slate-muted text-sm">Team: {ticket.resolution_team}</p>
+              )}
+              {ticket.owner && (
+                <p className="text-slate-muted text-xs">Owner: {ticket.owner}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <Tag className="w-4 h-4 text-teal-electric" />
+              Details
+            </h3>
+            <div className="space-y-1">
+              {ticket.ticket_type && (
+                <p className="text-slate-200 text-sm">Type: {ticket.ticket_type}</p>
+              )}
+              {ticket.issue_type && (
+                <p className="text-slate-200 text-sm">Issue: {ticket.issue_type}</p>
+              )}
+              {ticket.category && (
+                <p className="text-slate-200 text-sm">Category: {ticket.category}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-teal-electric" />
+              SLA & Dates
+            </h3>
+            <div className="space-y-1">
+              <p className="text-slate-muted text-sm">
+                Created: {formatDate(ticket.created_at || ticket.creation)}
+              </p>
+              {ticket.response_by && (
+                <p className="text-slate-muted text-sm">
+                  Response by: {formatDate(ticket.response_by)}
+                </p>
+              )}
+              {ticket.resolution_by && (
+                <p className={cn('text-sm', isOverdue ? 'text-rose-400' : 'text-slate-muted')}>
+                  Resolution by: {formatDate(ticket.resolution_by)}
+                </p>
               )}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Subject', value: ticket.subject || '-' },
-          { label: 'Owner', value: ticket.owner || ticket.assigned_to || '-' },
-          { label: 'Customer', value: ticket.customer_name || ticket.customer || '-' },
-          { label: 'Created', value: formatDate(ticket.created_at || ticket.creation) },
-          { label: 'Last Updated', value: formatDate(ticket.modified_at || ticket.modified) },
-          { label: 'Category', value: ticket.category || '-' },
-        ].map((row) => (
-          <div key={row.label}>
-            <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className="text-white font-semibold">{row.value}</p>
+        {ticket.description && (
+          <div className="mt-4 pt-4 border-t border-slate-border">
+            <h3 className="text-white font-semibold mb-2">Description</h3>
+            <p className="text-slate-200 text-sm whitespace-pre-line">{ticket.description}</p>
           </div>
-        ))}
+        )}
+
+        {/* Tags */}
+        {ticket.tags?.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-slate-muted text-sm">Tags:</span>
+              {ticket.tags.map((tag: any, idx: number) => (
+                <span key={idx} className="px-2 py-1 rounded bg-slate-elevated text-slate-200 text-xs">
+                  {tag.tag_name || tag.name || tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Watchers */}
+        {ticket.watchers?.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Eye className="w-4 h-4 text-slate-muted" />
+              <span className="text-slate-muted text-sm">Watchers:</span>
+              {ticket.watchers.map((w: any, idx: number) => (
+                <span key={idx} className="text-slate-200 text-sm">
+                  {w.watcher_name || w.watcher || w}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Comments Section */}
       <Section
         title="Comments"
         icon={<MessageSquare className="w-4 h-4 text-teal-electric" />}
@@ -223,18 +412,26 @@ export default function SupportTicketDetailPage() {
           <div className="flex flex-col gap-1 border-b border-slate-border/60 pb-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-white font-medium">{c.commented_by_name || c.commented_by || 'Unknown'}</span>
-              <span className="text-slate-muted text-xs">{formatDate(c.comment_date || c.created_at)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-muted text-xs">{formatTimeAgo(c.comment_date || c.created_at)}</span>
+                <span className="text-slate-muted text-xs">{formatDate(c.comment_date || c.created_at)}</span>
+              </div>
             </div>
             <p className="text-slate-200 text-sm whitespace-pre-line">{c.comment}</p>
             <div className="flex gap-2 text-xs text-slate-muted">
-              <span>{c.comment_type || 'Comment'}</span>
-              <span>&bull;</span>
-              <span>{c.is_public ? 'Public' : 'Private'}</span>
+              <span className="px-2 py-0.5 rounded bg-slate-elevated">{c.comment_type || 'Comment'}</span>
+              <span className={cn(
+                'px-2 py-0.5 rounded',
+                c.is_public ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+              )}>
+                {c.is_public ? 'Public' : 'Private'}
+              </span>
             </div>
           </div>
         )}
       />
 
+      {/* Add Comment Form */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Send className="w-4 h-4 text-teal-electric" />
@@ -262,7 +459,9 @@ export default function SupportTicketDetailPage() {
         </form>
       </div>
 
+      {/* Assignment & SLA Override */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Assignment Form */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
@@ -270,54 +469,44 @@ export default function SupportTicketDetailPage() {
           </div>
           {assignError && <p className="text-red-400 text-sm">{assignError}</p>}
           <form onSubmit={handleAssign} className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm text-slate-muted">Agent ID</label>
-                <input
-                  value={assignForm.agent_id}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, agent_id: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                  placeholder="Agent id"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm text-slate-muted">Team ID</label>
-                <input
-                  value={assignForm.team_id}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, team_id: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                  placeholder="Team id"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm text-slate-muted">Member ID</label>
-                <input
-                  value={assignForm.member_id}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, member_id: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                  placeholder="Team member id"
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-muted">Select Agent</label>
+              <select
+                value={assignForm.agent_id}
+                onChange={(e) => setAssignForm((f) => ({ ...f, agent_id: e.target.value }))}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              >
+                <option value="">-- Select an agent --</option>
+                {agents.filter((a) => a.is_active).map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.display_name || agent.email} {agent.capacity ? `(${agent.capacity} capacity)` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm text-slate-muted">Employee ID</label>
-                <input
-                  value={assignForm.employee_id}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, employee_id: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                  placeholder="Employee id"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm text-slate-muted">Assigned To</label>
-                <input
-                  value={assignForm.assigned_to}
-                  onChange={(e) => setAssignForm((f) => ({ ...f, assigned_to: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-                  placeholder="Display name"
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-muted">Select Team</label>
+              <select
+                value={assignForm.team_id}
+                onChange={(e) => setAssignForm((f) => ({ ...f, team_id: e.target.value }))}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              >
+                <option value="">-- Select a team --</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.team_name} {team.description ? `(${team.description})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-slate-muted">Or enter assignee name</label>
+              <input
+                value={assignForm.assigned_to}
+                onChange={(e) => setAssignForm((f) => ({ ...f, assigned_to: e.target.value }))}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                placeholder="Display name or email"
+              />
             </div>
             <div className="flex justify-end">
               <button
@@ -331,6 +520,7 @@ export default function SupportTicketDetailPage() {
           </form>
         </div>
 
+        {/* SLA Override Form */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-teal-electric" />
@@ -363,7 +553,7 @@ export default function SupportTicketDetailPage() {
               <textarea
                 value={slaForm.reason}
                 onChange={(e) => setSlaForm((f) => ({ ...f, reason: e.target.value }))}
-                rows={3}
+                rows={2}
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Why the SLA was adjusted"
               />
@@ -491,13 +681,15 @@ export default function SupportTicketDetailPage() {
         renderRow={(a) => (
           <div className="flex items-start justify-between border-b border-slate-border/60 pb-3">
             <div className="space-y-1">
-              <p className="text-white font-semibold">{a.activity_type || 'Activity'}</p>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-slate-elevated text-slate-200 text-xs">{a.activity_type || 'Activity'}</span>
+                {(a.from_status || a.to_status) && (
+                  <span className="text-xs text-slate-muted">
+                    {a.from_status || '-'} → {a.to_status || '-'}
+                  </span>
+                )}
+              </div>
               <p className="text-slate-200 text-sm whitespace-pre-line">{a.activity}</p>
-              {(a.from_status || a.to_status) && (
-                <p className="text-xs text-slate-muted">
-                  {a.from_status || '-'} → {a.to_status || '-'}
-                </p>
-              )}
             </div>
             <span className="text-slate-muted text-xs">{formatDate(a.activity_date || a.created_at)}</span>
           </div>
@@ -515,9 +707,17 @@ export default function SupportTicketDetailPage() {
               <span className="text-white font-semibold">{c.subject || c.communication_type || 'Communication'}</span>
               <span className="text-slate-muted text-xs">{formatDate(c.communication_date)}</span>
             </div>
-            <p className="text-slate-muted text-xs">
-              {c.communication_type || c.communication_medium || '-'} &bull; {c.sent_or_received || '-'}
-            </p>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 rounded bg-slate-elevated text-slate-muted">
+                {c.communication_type || c.communication_medium || '-'}
+              </span>
+              <span className={cn(
+                'px-2 py-0.5 rounded',
+                c.sent_or_received === 'Sent' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'
+              )}>
+                {c.sent_or_received || '-'}
+              </span>
+            </div>
             <p className="text-slate-200 text-sm whitespace-pre-line line-clamp-3">{c.content || '-'}</p>
             <p className="text-xs text-slate-muted">
               From {c.sender_full_name || c.sender || '-'} → {c.recipients || '-'}
@@ -534,10 +734,10 @@ export default function SupportTicketDetailPage() {
         renderRow={(d) => (
           <div className="flex items-center justify-between border-b border-slate-border/60 pb-3">
             <div className="space-y-1">
-              <p className="text-white font-semibold">{d.depends_on_subject || d.depends_on_ticket_id || 'Linked ticket'}</p>
+              <p className="text-white font-semibold">{d.depends_on_subject || `Ticket #${d.depends_on_ticket_id}`}</p>
               <p className="text-xs text-slate-muted">Status: {d.depends_on_status || '-'}</p>
             </div>
-            <span className="text-slate-muted text-xs">{d.depends_on_erpnext_id || d.depends_on_ticket_id || ''}</span>
+            <span className="text-slate-muted text-xs font-mono">{d.depends_on_erpnext_id || d.depends_on_ticket_id || ''}</span>
           </div>
         )}
       />
@@ -552,10 +752,11 @@ export default function SupportTicketDetailPage() {
             <div className="space-y-1">
               <p className="text-white font-semibold">{e.expense_type || 'Expense'}</p>
               <p className="text-slate-200 text-sm">{e.description || '-'}</p>
-              <p className="text-xs text-slate-muted">
-                Claimed: {e.total_claimed_amount ?? 0} &bull; Sanctioned: {e.total_sanctioned_amount ?? 0}
-              </p>
-              <p className="text-xs text-slate-muted">Status: {e.status || '-'}</p>
+              <div className="flex gap-3 text-xs text-slate-muted">
+                <span>Claimed: {e.total_claimed_amount ?? 0}</span>
+                <span>Sanctioned: {e.total_sanctioned_amount ?? 0}</span>
+                <span className="px-2 py-0.5 rounded bg-slate-elevated">{e.status || '-'}</span>
+              </div>
             </div>
             <span className="text-slate-muted text-xs">{formatDate(e.expense_date)}</span>
           </div>
@@ -580,9 +781,12 @@ function Section({
 }) {
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        {icon}
-        <h3 className="text-white font-semibold">{title}</h3>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-white font-semibold">{title}</h3>
+        </div>
+        <span className="text-xs text-slate-muted">{rows.length} items</span>
       </div>
       {rows.length === 0 ? (
         <p className="text-slate-muted text-sm">{emptyText}</p>

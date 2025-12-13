@@ -333,3 +333,30 @@ body {
   visibility: visible;
   transform: translateX(-50%) translateY(-4px);
 }
+
+/* Input field */
+.input-field {
+  width: 100%;
+  background-color: var(--color-slate-elevated);
+  border: 1px solid var(--color-slate-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input-field::placeholder {
+  color: var(--color-slate-muted);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-teal-electric);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15);
+}
+
+.input-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

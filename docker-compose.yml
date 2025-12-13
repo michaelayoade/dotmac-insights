@@ -113,6 +113,29 @@ services:
     command: celery -A app.worker:celery_app beat --loglevel=info
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:8000}
+        NEXT_PUBLIC_SERVICE_TOKEN: ${NEXT_PUBLIC_SERVICE_TOKEN}
+    container_name: dotmac_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.employee import Employee
     from app.models.expense import Expense
     from app.models.ticket import Ticket
+    from app.models.task import Task
 
 
 class ProjectStatus(enum.Enum):
@@ -113,10 +114,11 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="projects")
-    project_manager: Mapped[Optional[Employee]] = relationship(back_populates="managed_projects")
-    expenses: Mapped[List[Expense]] = relationship(back_populates="project")
-    tickets: Mapped[List[Ticket]] = relationship(back_populates="project")
+    customer: Mapped[Optional["Customer"]] = relationship(back_populates="projects")
+    project_manager: Mapped[Optional["Employee"]] = relationship(back_populates="managed_projects")
+    expenses: Mapped[List["Expense"]] = relationship(back_populates="project")
+    tickets: Mapped[List["Ticket"]] = relationship(back_populates="project")
+    tasks: Mapped[List["Task"]] = relationship(back_populates="project")
 
     def __repr__(self) -> str:
         return f"<Project {self.project_name} - {self.status.value}>"

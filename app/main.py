@@ -51,19 +51,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - only allow specified origins in production
+# Configure CORS
 if settings.cors_origins_list:
-    # Production: Only allow specified origins
+    # Use configured origins
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["X-API-Key", "Content-Type", "Authorization"],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     logger.info("cors_configured", origins=settings.cors_origins_list)
-elif not settings.is_production:
-    # Development only: Allow all origins (with warning)
+else:
+    # Fallback: allow all to avoid CORS failures when origins not set
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -71,10 +71,7 @@ elif not settings.is_production:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    logger.warning("cors_permissive_mode", message="CORS allowing all origins - development only")
-else:
-    # Production without CORS configured: No CORS middleware (same-origin only)
-    logger.info("cors_disabled", message="No CORS origins configured - same-origin requests only")
+    logger.warning("cors_permissive_mode", message="CORS allowing all origins (no cors_origins configured)")
 
 
 # Include API routes with JWT/RBAC authentication

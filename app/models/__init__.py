@@ -7,10 +7,11 @@ from app.models.payment import Payment
 from app.models.conversation import Conversation, Message
 from app.models.sync_log import SyncLog
 from app.models.employee import Employee
+from app.models.project import Project
+from app.models.task import Task, TaskDependency, TaskStatus, TaskPriority
+from app.models.ticket import Ticket
 from app.models.expense import Expense
 from app.models.credit_note import CreditNote
-from app.models.ticket import Ticket
-from app.models.project import Project
 from app.models.tariff import Tariff
 from app.models.router import Router
 from app.models.accounting import (
@@ -81,6 +82,10 @@ __all__ = [
     "CreditNote",
     "Ticket",
     "Project",
+    "Task",
+    "TaskDependency",
+    "TaskStatus",
+    "TaskPriority",
     "Tariff",
     "Router",
     "Supplier",

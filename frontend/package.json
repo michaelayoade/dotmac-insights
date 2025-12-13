@@ -9,8 +9,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@dotmac/core": "file:../../dotmac-component-library/packages/core/dotmac-core-1.0.0.tgz",
-    "@dotmac/design-tokens": "file:../../dotmac-component-library/packages/design-tokens/dotmac-design-tokens-1.0.0.tgz",
+    "@dotmac/core": "file:./deps/dotmac-core-1.0.0.tgz",
+    "@dotmac/design-tokens": "file:./deps/dotmac-design-tokens-1.0.0.tgz",
     "clsx": "^2.1.0",
     "lucide-react": "^0.303.0",
     "next": "14.0.4",

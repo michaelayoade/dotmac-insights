@@ -3605,6 +3605,125 @@ export const api = {
 
   getReportsCashPositionRunway: () =>
     fetchApi<ReportsCashPositionRunway>('/v1/reports/cash-position/runway'),
+
+  // Books Settings API
+  getBooksSettings: (params?: { company?: string }) =>
+    fetchApi<BooksSettingsResponse>('/books/settings', { params }),
+
+  updateBooksSettings: (body: BooksSettingsUpdate, company?: string) =>
+    fetchApi<BooksSettingsResponse>('/books/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      params: company ? { company } : undefined,
+    }),
+
+  seedBooksDefaults: () =>
+    fetchApi<{ message: string }>('/books/settings/seed-defaults', { method: 'POST' }),
+
+  // Document Number Formats
+  getNumberFormats: (params?: { company?: string; document_type?: string; is_active?: boolean }) =>
+    fetchApi<DocumentNumberFormatResponse[]>('/books/settings/number-formats', { params }),
+
+  createNumberFormat: (body: DocumentNumberFormatCreate) =>
+    fetchApi<DocumentNumberFormatResponse>('/books/settings/number-formats', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getNumberFormat: (id: number) =>
+    fetchApi<DocumentNumberFormatResponse>(`/books/settings/number-formats/${id}`),
+
+  updateNumberFormat: (id: number, body: DocumentNumberFormatUpdate) =>
+    fetchApi<DocumentNumberFormatResponse>(`/books/settings/number-formats/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteNumberFormat: (id: number) =>
+    fetchApi<void>(`/books/settings/number-formats/${id}`, { method: 'DELETE' }),
+
+  previewNumberFormat: (body: NumberFormatPreviewRequest) =>
+    fetchApi<NumberFormatPreviewResponse>('/books/settings/number-formats/preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getNextNumber: (documentType: string, params?: { company?: string; posting_date?: string }) =>
+    fetchApi<NextNumberResponse>(`/books/settings/number-formats/${documentType}/next`, {
+      method: 'POST',
+      params,
+    }),
+
+  resetNumberSequence: (id: number, body: { new_starting_number: number }) =>
+    fetchApi<{ message: string }>(`/books/settings/number-formats/${id}/reset`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // Currency Settings
+  getCurrencies: (params?: { is_enabled?: boolean }) =>
+    fetchApi<CurrencySettingsResponse[]>('/books/settings/currencies', { params }),
+
+  createCurrency: (body: CurrencySettingsCreate) =>
+    fetchApi<CurrencySettingsResponse>('/books/settings/currencies', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getCurrency: (code: string) =>
+    fetchApi<CurrencySettingsResponse>(`/books/settings/currencies/${code}`),
+
+  updateCurrency: (code: string, body: CurrencySettingsUpdate) =>
+    fetchApi<CurrencySettingsResponse>(`/books/settings/currencies/${code}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  formatAmount: (body: { amount: number; currency_code: string; show_symbol?: boolean }) =>
+    fetchApi<{ formatted: string; rounded: number }>('/books/settings/currencies/format-amount', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // HR Settings API
+  getHRSettings: (params?: { company?: string }) =>
+    fetchApi<HRSettingsResponse>('/hr/settings', { params }),
+
+  updateHRSettings: (body: HRSettingsUpdate, company?: string) =>
+    fetchApi<HRSettingsResponse>('/hr/settings', {
+      method: 'PUT',
+      params: company ? { company } : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  seedHRDefaults: () =>
+    fetchApi<{ message: string; id: number }>('/hr/settings/seed-defaults', { method: 'POST' }),
+
+  getHolidayCalendars: (params?: { company?: string; year?: number; is_active?: boolean }) =>
+    fetchApi<HolidayCalendarResponse[]>('/hr/settings/holiday-calendars', { params }),
+
+  getSalaryBands: (params?: { company?: string; is_active?: boolean }) =>
+    fetchApi<SalaryBandResponse[]>('/hr/settings/salary-bands', { params }),
+
+  // Support Settings API
+  getSupportSettings: (params?: { company?: string }) =>
+    fetchApi<SupportSettingsResponse>('/support/settings', { params }),
+
+  updateSupportSettings: (body: SupportSettingsUpdate, company?: string) =>
+    fetchApi<SupportSettingsResponse>('/support/settings', {
+      method: 'PUT',
+      params: company ? { company } : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  seedSupportDefaults: () =>
+    fetchApi<{ message: string; id: number }>('/support/settings/seed-defaults', { method: 'POST' }),
+
+  getSupportQueues: (params?: { company?: string; is_active?: boolean; include_system?: boolean }) =>
+    fetchApi<SupportQueueResponse[]>('/support/settings/queues', { params }),
+
+  getEscalationPolicies: (params?: { company?: string; is_active?: boolean }) =>
+    fetchApi<EscalationPolicyResponse[]>('/support/settings/escalation-policies', { params }),
 };
 
 // Additional types
@@ -6149,4 +6268,686 @@ export interface HrLifecycleEventsBreakdown {
   separation?: Record<string, number>;
   promotion?: Record<string, number>;
   transfer?: Record<string, number>;
+}
+
+// ============================================================================
+// BOOKS SETTINGS TYPES
+// ============================================================================
+
+// Enums
+export type DocumentType =
+  | 'invoice'
+  | 'bill'
+  | 'payment'
+  | 'receipt'
+  | 'credit_note'
+  | 'debit_note'
+  | 'journal_entry'
+  | 'purchase_order'
+  | 'sales_order'
+  | 'quotation'
+  | 'delivery_note'
+  | 'goods_receipt';
+
+export type ResetFrequency = 'never' | 'yearly' | 'monthly' | 'quarterly';
+
+export type RoundingMethod =
+  | 'round_half_up'
+  | 'round_half_down'
+  | 'round_down'
+  | 'round_up'
+  | 'bankers';
+
+export type SymbolPosition = 'before' | 'after';
+
+export type DateFormatType = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD-MMM-YYYY';
+
+export type NumberFormatType = '1,234.56' | '1.234,56' | '1 234,56' | '1,23,456.78';
+
+export type NegativeFormat = 'minus' | 'parentheses' | 'minus_after';
+
+// Books Settings
+export interface BooksSettingsResponse {
+  id: number;
+  company: string | null;
+
+  // General
+  base_currency: string;
+  currency_precision: number;
+  quantity_precision: number;
+  rate_precision: number;
+  exchange_rate_precision: number;
+  rounding_method: RoundingMethod;
+
+  // Fiscal Year
+  fiscal_year_start_month: number;
+  fiscal_year_start_day: number;
+  auto_create_fiscal_years: boolean;
+  auto_create_fiscal_periods: boolean;
+
+  // Display Formats
+  date_format: DateFormatType;
+  number_format: NumberFormatType;
+  negative_format: NegativeFormat;
+  currency_symbol_position: SymbolPosition;
+
+  // Posting Controls
+  backdating_days_allowed: number;
+  future_posting_days_allowed: number;
+  require_posting_in_open_period: boolean;
+
+  // Document Control
+  auto_voucher_numbering: boolean;
+  allow_duplicate_party_invoice: boolean;
+
+  // Attachment Requirements
+  require_attachment_journal_entry: boolean;
+  require_attachment_expense: boolean;
+  require_attachment_payment: boolean;
+  require_attachment_invoice: boolean;
+
+  // Approval Requirements
+  require_approval_journal_entry: boolean;
+  require_approval_expense: boolean;
+  require_approval_payment: boolean;
+
+  // Default Accounts
+  retained_earnings_account: string | null;
+  fx_gain_account: string | null;
+  fx_loss_account: string | null;
+  default_receivable_account: string | null;
+  default_payable_account: string | null;
+  default_income_account: string | null;
+  default_expense_account: string | null;
+
+  // Inventory
+  allow_negative_stock: boolean;
+  default_valuation_method: string;
+
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BooksSettingsUpdate {
+  base_currency?: string;
+  currency_precision?: number;
+  quantity_precision?: number;
+  rate_precision?: number;
+  exchange_rate_precision?: number;
+  rounding_method?: RoundingMethod;
+  fiscal_year_start_month?: number;
+  fiscal_year_start_day?: number;
+  auto_create_fiscal_years?: boolean;
+  auto_create_fiscal_periods?: boolean;
+  date_format?: DateFormatType;
+  number_format?: NumberFormatType;
+  negative_format?: NegativeFormat;
+  currency_symbol_position?: SymbolPosition;
+  backdating_days_allowed?: number;
+  future_posting_days_allowed?: number;
+  require_posting_in_open_period?: boolean;
+  auto_voucher_numbering?: boolean;
+  allow_duplicate_party_invoice?: boolean;
+  require_attachment_journal_entry?: boolean;
+  require_attachment_expense?: boolean;
+  require_attachment_payment?: boolean;
+  require_attachment_invoice?: boolean;
+  require_approval_journal_entry?: boolean;
+  require_approval_expense?: boolean;
+  require_approval_payment?: boolean;
+  retained_earnings_account?: string | null;
+  fx_gain_account?: string | null;
+  fx_loss_account?: string | null;
+  default_receivable_account?: string | null;
+  default_payable_account?: string | null;
+  default_income_account?: string | null;
+  default_expense_account?: string | null;
+  allow_negative_stock?: boolean;
+  default_valuation_method?: string;
+}
+
+// Document Number Formats
+export interface DocumentNumberFormatResponse {
+  id: number;
+  document_type: DocumentType;
+  company: string | null;
+  prefix: string;
+  format_pattern: string;
+  min_digits: number;
+  starting_number: number;
+  current_number: number;
+  reset_frequency: ResetFrequency;
+  last_reset_date: string | null;
+  last_reset_period: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentNumberFormatCreate {
+  document_type: DocumentType;
+  company?: string | null;
+  prefix: string;
+  format_pattern: string;
+  min_digits?: number;
+  starting_number?: number;
+  reset_frequency?: ResetFrequency;
+  is_active?: boolean;
+}
+
+export interface DocumentNumberFormatUpdate {
+  prefix?: string;
+  format_pattern?: string;
+  min_digits?: number;
+  starting_number?: number;
+  reset_frequency?: ResetFrequency;
+  is_active?: boolean;
+}
+
+export interface NumberFormatPreviewRequest {
+  format_pattern: string;
+  prefix: string;
+  min_digits?: number;
+  sequence_number?: number;
+  posting_date?: string;
+}
+
+export interface NumberFormatPreviewResponse {
+  preview: string;
+  tokens_used: string[];
+}
+
+export interface NextNumberResponse {
+  document_number: string;
+  sequence_number: number;
+}
+
+// Currency Settings
+export interface CurrencySettingsResponse {
+  id: number;
+  currency_code: string;
+  currency_name: string;
+  symbol: string;
+  symbol_position: SymbolPosition;
+  decimal_places: number;
+  thousands_separator: string;
+  decimal_separator: string;
+  smallest_unit: number;
+  rounding_method: RoundingMethod;
+  is_base_currency: boolean;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CurrencySettingsCreate {
+  currency_code: string;
+  currency_name: string;
+  symbol: string;
+  symbol_position?: SymbolPosition;
+  decimal_places?: number;
+  thousands_separator?: string;
+  decimal_separator?: string;
+  smallest_unit?: number;
+  rounding_method?: RoundingMethod;
+  is_base_currency?: boolean;
+  is_enabled?: boolean;
+}
+
+export interface CurrencySettingsUpdate {
+  currency_name?: string;
+  symbol?: string;
+  symbol_position?: SymbolPosition;
+  decimal_places?: number;
+  thousands_separator?: string;
+  decimal_separator?: string;
+  smallest_unit?: number;
+  rounding_method?: RoundingMethod;
+  is_base_currency?: boolean;
+  is_enabled?: boolean;
+}
+
+// ============================================================================
+// HR SETTINGS TYPES
+// ============================================================================
+
+export type LeaveAccountingFrequency = 'ANNUAL' | 'MONTHLY' | 'QUARTERLY' | 'BIANNUAL';
+export type ProRataMethod = 'LINEAR' | 'CALENDAR_DAYS' | 'WORKING_DAYS' | 'MONTHLY';
+export type PayrollFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'SEMIMONTHLY';
+export type OvertimeCalculation = 'HOURLY_RATE' | 'DAILY_RATE' | 'MONTHLY_RATE';
+export type GratuityCalculation = 'LAST_SALARY' | 'AVERAGE_SALARY' | 'BASIC_SALARY';
+export type EmployeeIDFormat = 'NUMERIC' | 'ALPHANUMERIC' | 'YEAR_BASED' | 'DEPARTMENT_BASED';
+export type AttendanceMarkingMode = 'MANUAL' | 'BIOMETRIC' | 'GEOLOCATION' | 'HYBRID';
+export type AppraisalFrequency = 'ANNUAL' | 'SEMIANNUAL' | 'QUARTERLY' | 'MONTHLY';
+export type WeekDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
+export interface HRSettingsResponse {
+  id: number;
+  company: string | null;
+  leave_accounting_frequency: LeaveAccountingFrequency;
+  pro_rata_method: ProRataMethod;
+  max_carryforward_days: number;
+  carryforward_expiry_months: number;
+  min_leave_notice_days: number;
+  allow_negative_leave_balance: boolean;
+  allow_leave_overlap: boolean;
+  sick_leave_auto_approve_days: number;
+  medical_certificate_required_after_days: number;
+  attendance_marking_mode: AttendanceMarkingMode;
+  allow_backdated_attendance: boolean;
+  backdated_attendance_days: number;
+  auto_mark_absent_enabled: boolean;
+  late_entry_grace_minutes: number;
+  early_exit_grace_minutes: number;
+  half_day_hours_threshold: number;
+  full_day_hours_threshold: number;
+  require_checkout: boolean;
+  geolocation_required: boolean;
+  geolocation_radius_meters: number;
+  max_weekly_hours: number;
+  night_shift_allowance_percent: number;
+  shift_change_notice_days: number;
+  payroll_frequency: PayrollFrequency;
+  salary_payment_day: number;
+  payroll_cutoff_day: number;
+  allow_salary_advance: boolean;
+  max_advance_percent: number;
+  max_advance_months: number;
+  salary_currency: string;
+  overtime_enabled: boolean;
+  overtime_calculation: OvertimeCalculation;
+  overtime_multiplier_weekday: number;
+  overtime_multiplier_weekend: number;
+  overtime_multiplier_holiday: number;
+  min_overtime_hours: number;
+  require_overtime_approval: boolean;
+  gratuity_enabled: boolean;
+  gratuity_calculation: GratuityCalculation;
+  gratuity_eligibility_years: number;
+  gratuity_days_per_year: number;
+  pf_enabled: boolean;
+  pf_employer_percent: number;
+  pf_employee_percent: number;
+  pension_enabled: boolean;
+  pension_employer_percent: number;
+  pension_employee_percent: number;
+  nhf_enabled: boolean;
+  nhf_percent: number;
+  default_probation_months: number;
+  max_probation_extension_months: number;
+  default_notice_period_days: number;
+  require_exit_interview: boolean;
+  final_settlement_days: number;
+  require_clearance_before_settlement: boolean;
+  job_posting_validity_days: number;
+  offer_validity_days: number;
+  default_interview_duration_minutes: number;
+  require_background_check: boolean;
+  document_submission_days: number;
+  allow_offer_negotiation: boolean;
+  offer_negotiation_window_days: number;
+  appraisal_frequency: AppraisalFrequency;
+  appraisal_cycle_start_month: number;
+  appraisal_rating_scale: number;
+  require_self_review: boolean;
+  require_peer_review: boolean;
+  enable_360_feedback: boolean;
+  min_rating_for_promotion: number;
+  mandatory_training_hours_yearly: number;
+  require_training_approval: boolean;
+  training_completion_threshold_percent: number;
+  work_week_days: WeekDay[];
+  standard_work_hours_per_day: number;
+  max_work_hours_per_day: number;
+  employee_id_format: EmployeeIDFormat;
+  employee_id_prefix: string;
+  employee_id_min_digits: number;
+  notify_leave_balance_below: number;
+  notify_appraisal_due_days: number;
+  notify_probation_end_days: number;
+  notify_contract_expiry_days: number;
+  notify_document_expiry_days: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HRSettingsUpdate {
+  leave_accounting_frequency?: LeaveAccountingFrequency;
+  pro_rata_method?: ProRataMethod;
+  max_carryforward_days?: number;
+  carryforward_expiry_months?: number;
+  min_leave_notice_days?: number;
+  allow_negative_leave_balance?: boolean;
+  allow_leave_overlap?: boolean;
+  sick_leave_auto_approve_days?: number;
+  medical_certificate_required_after_days?: number;
+  attendance_marking_mode?: AttendanceMarkingMode;
+  allow_backdated_attendance?: boolean;
+  backdated_attendance_days?: number;
+  auto_mark_absent_enabled?: boolean;
+  late_entry_grace_minutes?: number;
+  early_exit_grace_minutes?: number;
+  half_day_hours_threshold?: number;
+  full_day_hours_threshold?: number;
+  require_checkout?: boolean;
+  geolocation_required?: boolean;
+  geolocation_radius_meters?: number;
+  max_weekly_hours?: number;
+  night_shift_allowance_percent?: number;
+  shift_change_notice_days?: number;
+  payroll_frequency?: PayrollFrequency;
+  salary_payment_day?: number;
+  payroll_cutoff_day?: number;
+  allow_salary_advance?: boolean;
+  max_advance_percent?: number;
+  max_advance_months?: number;
+  salary_currency?: string;
+  overtime_enabled?: boolean;
+  overtime_calculation?: OvertimeCalculation;
+  overtime_multiplier_weekday?: number;
+  overtime_multiplier_weekend?: number;
+  overtime_multiplier_holiday?: number;
+  min_overtime_hours?: number;
+  require_overtime_approval?: boolean;
+  gratuity_enabled?: boolean;
+  gratuity_calculation?: GratuityCalculation;
+  gratuity_eligibility_years?: number;
+  gratuity_days_per_year?: number;
+  pf_enabled?: boolean;
+  pf_employer_percent?: number;
+  pf_employee_percent?: number;
+  pension_enabled?: boolean;
+  pension_employer_percent?: number;
+  pension_employee_percent?: number;
+  nhf_enabled?: boolean;
+  nhf_percent?: number;
+  default_probation_months?: number;
+  max_probation_extension_months?: number;
+  default_notice_period_days?: number;
+  require_exit_interview?: boolean;
+  final_settlement_days?: number;
+  require_clearance_before_settlement?: boolean;
+  job_posting_validity_days?: number;
+  offer_validity_days?: number;
+  default_interview_duration_minutes?: number;
+  require_background_check?: boolean;
+  document_submission_days?: number;
+  allow_offer_negotiation?: boolean;
+  offer_negotiation_window_days?: number;
+  appraisal_frequency?: AppraisalFrequency;
+  appraisal_cycle_start_month?: number;
+  appraisal_rating_scale?: number;
+  require_self_review?: boolean;
+  require_peer_review?: boolean;
+  enable_360_feedback?: boolean;
+  min_rating_for_promotion?: number;
+  mandatory_training_hours_yearly?: number;
+  require_training_approval?: boolean;
+  training_completion_threshold_percent?: number;
+  work_week_days?: WeekDay[];
+  standard_work_hours_per_day?: number;
+  max_work_hours_per_day?: number;
+  employee_id_format?: EmployeeIDFormat;
+  employee_id_prefix?: string;
+  employee_id_min_digits?: number;
+  notify_leave_balance_below?: number;
+  notify_appraisal_due_days?: number;
+  notify_probation_end_days?: number;
+  notify_contract_expiry_days?: number;
+  notify_document_expiry_days?: number;
+}
+
+export interface HolidayCalendarResponse {
+  id: number;
+  name: string;
+  company: string | null;
+  location: string | null;
+  year: number;
+  is_default: boolean;
+  is_active: boolean;
+  holidays?: HRHolidayResponse[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HRHolidayResponse {
+  id: number;
+  calendar_id: number;
+  name: string;
+  date: string;
+  is_optional: boolean;
+  is_recurring: boolean;
+  description: string | null;
+}
+
+export interface SalaryBandResponse {
+  id: number;
+  company: string | null;
+  name: string;
+  grade: string | null;
+  currency: string;
+  min_salary: number;
+  max_salary: number;
+  mid_salary: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================================
+// SUPPORT SETTINGS TYPES
+// ============================================================================
+
+export type WorkingHoursType = 'STANDARD' | 'EXTENDED' | 'ROUND_THE_CLOCK' | 'CUSTOM';
+export type DefaultRoutingStrategy = 'ROUND_ROBIN' | 'LEAST_BUSY' | 'SKILL_BASED' | 'LOAD_BALANCED' | 'MANUAL';
+export type TicketAutoCloseAction = 'CLOSE' | 'ARCHIVE' | 'NOTIFY_ONLY';
+export type EscalationTrigger = 'SLA_BREACH' | 'SLA_WARNING' | 'IDLE_TIME' | 'CUSTOMER_ESCALATION' | 'REOPEN_COUNT';
+export type NotificationChannel = 'EMAIL' | 'IN_APP' | 'SMS' | 'SLACK' | 'WEBHOOK';
+export type TicketPriorityDefault = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type CSATSurveyTrigger = 'ON_RESOLVE' | 'ON_CLOSE' | 'MANUAL' | 'DISABLED';
+
+export interface WeeklyScheduleDay {
+  start: string;
+  end: string;
+  closed: boolean;
+}
+
+export interface SupportSettingsResponse {
+  id: number;
+  company: string | null;
+  working_hours_type: WorkingHoursType;
+  timezone: string;
+  weekly_schedule: Record<WeekDay, WeeklyScheduleDay>;
+  holiday_calendar_id: number | null;
+  default_sla_policy_id: number | null;
+  sla_warning_threshold_percent: number;
+  sla_include_holidays: boolean;
+  sla_include_weekends: boolean;
+  default_first_response_hours: number;
+  default_resolution_hours: number;
+  default_routing_strategy: DefaultRoutingStrategy;
+  default_team_id: number | null;
+  fallback_team_id: number | null;
+  auto_assign_enabled: boolean;
+  max_tickets_per_agent: number;
+  rebalance_threshold_percent: number;
+  default_priority: TicketPriorityDefault;
+  default_ticket_type: string | null;
+  allow_customer_priority_selection: boolean;
+  allow_customer_team_selection: boolean;
+  auto_close_enabled: boolean;
+  auto_close_resolved_days: number;
+  auto_close_action: TicketAutoCloseAction;
+  auto_close_notify_customer: boolean;
+  allow_customer_reopen: boolean;
+  reopen_window_days: number;
+  max_reopens_allowed: number;
+  escalation_enabled: boolean;
+  default_escalation_team_id: number | null;
+  escalation_notify_manager: boolean;
+  idle_escalation_enabled: boolean;
+  idle_hours_before_escalation: number;
+  reopen_escalation_enabled: boolean;
+  reopen_count_for_escalation: number;
+  csat_enabled: boolean;
+  csat_survey_trigger: CSATSurveyTrigger;
+  csat_delay_hours: number;
+  csat_reminder_enabled: boolean;
+  csat_reminder_days: number;
+  csat_survey_expiry_days: number;
+  default_csat_survey_id: number | null;
+  portal_enabled: boolean;
+  portal_ticket_creation_enabled: boolean;
+  portal_show_ticket_history: boolean;
+  portal_show_knowledge_base: boolean;
+  portal_show_faq: boolean;
+  portal_require_login: boolean;
+  kb_enabled: boolean;
+  kb_public_access: boolean;
+  kb_suggest_articles_on_create: boolean;
+  kb_track_article_helpfulness: boolean;
+  notification_channels: NotificationChannel[];
+  notification_events: Record<string, boolean>;
+  notify_assigned_agent: boolean;
+  notify_team_on_unassigned: boolean;
+  notify_customer_on_status_change: boolean;
+  notify_customer_on_reply: boolean;
+  unassigned_warning_minutes: number;
+  overdue_highlight_enabled: boolean;
+  queue_refresh_seconds: number;
+  email_to_ticket_enabled: boolean;
+  email_reply_to_address: string | null;
+  sync_to_erpnext: boolean;
+  sync_to_splynx: boolean;
+  sync_to_chatwoot: boolean;
+  archive_closed_tickets_days: number;
+  delete_archived_tickets_days: number;
+  ticket_id_prefix: string;
+  ticket_id_min_digits: number;
+  date_format: string;
+  time_format: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupportSettingsUpdate {
+  working_hours_type?: WorkingHoursType;
+  timezone?: string;
+  weekly_schedule?: Record<WeekDay, WeeklyScheduleDay>;
+  holiday_calendar_id?: number | null;
+  default_sla_policy_id?: number | null;
+  sla_warning_threshold_percent?: number;
+  sla_include_holidays?: boolean;
+  sla_include_weekends?: boolean;
+  default_first_response_hours?: number;
+  default_resolution_hours?: number;
+  default_routing_strategy?: DefaultRoutingStrategy;
+  default_team_id?: number | null;
+  fallback_team_id?: number | null;
+  auto_assign_enabled?: boolean;
+  max_tickets_per_agent?: number;
+  rebalance_threshold_percent?: number;
+  default_priority?: TicketPriorityDefault;
+  default_ticket_type?: string | null;
+  allow_customer_priority_selection?: boolean;
+  allow_customer_team_selection?: boolean;
+  auto_close_enabled?: boolean;
+  auto_close_resolved_days?: number;
+  auto_close_action?: TicketAutoCloseAction;
+  auto_close_notify_customer?: boolean;
+  allow_customer_reopen?: boolean;
+  reopen_window_days?: number;
+  max_reopens_allowed?: number;
+  escalation_enabled?: boolean;
+  default_escalation_team_id?: number | null;
+  escalation_notify_manager?: boolean;
+  idle_escalation_enabled?: boolean;
+  idle_hours_before_escalation?: number;
+  reopen_escalation_enabled?: boolean;
+  reopen_count_for_escalation?: number;
+  csat_enabled?: boolean;
+  csat_survey_trigger?: CSATSurveyTrigger;
+  csat_delay_hours?: number;
+  csat_reminder_enabled?: boolean;
+  csat_reminder_days?: number;
+  csat_survey_expiry_days?: number;
+  default_csat_survey_id?: number | null;
+  portal_enabled?: boolean;
+  portal_ticket_creation_enabled?: boolean;
+  portal_show_ticket_history?: boolean;
+  portal_show_knowledge_base?: boolean;
+  portal_show_faq?: boolean;
+  portal_require_login?: boolean;
+  kb_enabled?: boolean;
+  kb_public_access?: boolean;
+  kb_suggest_articles_on_create?: boolean;
+  kb_track_article_helpfulness?: boolean;
+  notification_channels?: NotificationChannel[];
+  notification_events?: Record<string, boolean>;
+  notify_assigned_agent?: boolean;
+  notify_team_on_unassigned?: boolean;
+  notify_customer_on_status_change?: boolean;
+  notify_customer_on_reply?: boolean;
+  unassigned_warning_minutes?: number;
+  overdue_highlight_enabled?: boolean;
+  queue_refresh_seconds?: number;
+  email_to_ticket_enabled?: boolean;
+  email_reply_to_address?: string | null;
+  sync_to_erpnext?: boolean;
+  sync_to_splynx?: boolean;
+  sync_to_chatwoot?: boolean;
+  archive_closed_tickets_days?: number;
+  delete_archived_tickets_days?: number;
+  ticket_id_prefix?: string;
+  ticket_id_min_digits?: number;
+  date_format?: string;
+  time_format?: string;
+}
+
+export interface SupportQueueResponse {
+  id: number;
+  company: string | null;
+  name: string;
+  description: string | null;
+  queue_type: 'SYSTEM' | 'CUSTOM';
+  filters: Array<{ field: string; operator: string; value: unknown }>;
+  sort_by: string;
+  sort_direction: 'ASC' | 'DESC';
+  is_public: boolean;
+  owner_id: number | null;
+  display_order: number;
+  icon: string | null;
+  color: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EscalationPolicyResponse {
+  id: number;
+  company: string | null;
+  name: string;
+  description: string | null;
+  conditions: Array<{ field: string; operator: string; value: unknown }>;
+  priority: number;
+  is_active: boolean;
+  levels?: EscalationLevelResponse[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EscalationLevelResponse {
+  id: number;
+  policy_id: number;
+  level: number;
+  trigger: EscalationTrigger;
+  trigger_hours: number;
+  escalate_to_team_id: number | null;
+  escalate_to_user_id: number | null;
+  notify_current_assignee: boolean;
+  notify_team_lead: boolean;
+  reassign_ticket: boolean;
+  change_priority: boolean;
+  new_priority: string | null;
 }

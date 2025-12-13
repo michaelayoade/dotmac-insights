@@ -33,7 +33,6 @@ const tabGroups = [
       { name: 'Journal Entries', href: '/books/journal-entries', icon: ClipboardList },
       { name: 'Chart of Accounts', href: '/books/chart-of-accounts', icon: BookOpen },
       { name: 'Taxes', href: '/books/taxes', icon: Landmark },
-      { name: 'Controls', href: '/books/controls', icon: Settings },
     ],
   },
   {
@@ -62,6 +61,13 @@ const tabGroups = [
     items: [
       { name: 'Bank Accounts', href: '/books/bank-accounts', icon: CreditCard },
       { name: 'Transactions', href: '/books/bank-transactions', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Configuration',
+    items: [
+      { name: 'Settings', href: '/books/settings', icon: Settings },
+      { name: 'Controls', href: '/books/controls', icon: Lock },
     ],
   },
   {

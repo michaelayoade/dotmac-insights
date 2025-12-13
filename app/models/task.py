@@ -130,7 +130,7 @@ class Task(Base):
         back_populates="dependent_task",
         foreign_keys="TaskDependency.dependent_task_id"
     )
-    expenses: Mapped[List["Expense"]] = relationship(back_populates="task")
+    expenses: Mapped[List["Expense"]] = relationship(back_populates="task_rel")
 
     def __repr__(self) -> str:
         return f"<Task {self.subject} ({self.status.value})>"

@@ -218,6 +218,31 @@ export function useSupportCsatTrends(params?: { months?: number }, config?: SWRC
   return useSWR(['support-csat-trends', params], () => api.getSupportCsatTrends(params), config);
 }
 
+// Support Analytics & Insights Hooks
+export function useSupportAnalyticsVolumeTrend(params?: { months?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-analytics-volume-trend', params], () => api.getSupportAnalyticsVolumeTrend(params), config);
+}
+
+export function useSupportAnalyticsResolutionTime(params?: { months?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-analytics-resolution-time', params], () => api.getSupportAnalyticsResolutionTime(params), config);
+}
+
+export function useSupportAnalyticsByCategory(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-analytics-by-category', params], () => api.getSupportAnalyticsByCategory(params), config);
+}
+
+export function useSupportAnalyticsSlaPerformance(params?: { months?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-analytics-sla-performance', params], () => api.getSupportAnalyticsSlaPerformance(params), config);
+}
+
+export function useSupportInsightsPatterns(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-insights-patterns', params], () => api.getSupportInsightsPatterns(params), config);
+}
+
+export function useSupportInsightsAgentPerformance(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['support-insights-agent-performance', params], () => api.getSupportInsightsAgentPerformance(params), config);
+}
+
 export function useSupportAgents(teamId?: number, domain?: string, config?: SWRConfiguration) {
   return useSWR(['support-agents', teamId, domain], () => api.getSupportAgents(teamId, domain), config);
 }
@@ -3145,6 +3170,185 @@ export function useCustomerPaymentMutations() {
     deletePayment: async (id: number, soft = true) => {
       await api.deleteCustomerPayment(id, soft);
       await mutate('customers');
+    },
+  };
+}
+
+// ============================================================================
+// BOOKS SETTINGS HOOKS
+// ============================================================================
+
+export function useBooksSettings(params?: { company?: string }) {
+  return useSWR(
+    ['books-settings', params?.company],
+    () => api.getBooksSettings(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useNumberFormats(params?: { company?: string; document_type?: string; is_active?: boolean }) {
+  return useSWR(
+    ['number-formats', params?.company, params?.document_type, params?.is_active],
+    () => api.getNumberFormats(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useCurrencies(params?: { is_enabled?: boolean }) {
+  return useSWR(
+    ['currencies', params?.is_enabled],
+    () => api.getCurrencies(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useBooksSettingsMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    updateSettings: async (body: Parameters<typeof api.updateBooksSettings>[0], company?: string) => {
+      const res = await api.updateBooksSettings(body, company);
+      await mutate((key) => Array.isArray(key) && key[0] === 'books-settings');
+      return res;
+    },
+    seedDefaults: async () => {
+      const res = await api.seedBooksDefaults();
+      await mutate((key) => Array.isArray(key) && (key[0] === 'books-settings' || key[0] === 'number-formats' || key[0] === 'currencies'));
+      return res;
+    },
+  };
+}
+
+export function useNumberFormatMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createFormat: async (body: Parameters<typeof api.createNumberFormat>[0]) => {
+      const res = await api.createNumberFormat(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'number-formats');
+      return res;
+    },
+    updateFormat: async (id: number, body: Parameters<typeof api.updateNumberFormat>[1]) => {
+      const res = await api.updateNumberFormat(id, body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'number-formats');
+      return res;
+    },
+    deleteFormat: async (id: number) => {
+      await api.deleteNumberFormat(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'number-formats');
+    },
+    previewFormat: async (body: Parameters<typeof api.previewNumberFormat>[0]) => {
+      return api.previewNumberFormat(body);
+    },
+    resetSequence: async (id: number, newStartingNumber: number) => {
+      const res = await api.resetNumberSequence(id, { new_starting_number: newStartingNumber });
+      await mutate((key) => Array.isArray(key) && key[0] === 'number-formats');
+      return res;
+    },
+  };
+}
+
+export function useCurrencyMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createCurrency: async (body: Parameters<typeof api.createCurrency>[0]) => {
+      const res = await api.createCurrency(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'currencies');
+      return res;
+    },
+    updateCurrency: async (code: string, body: Parameters<typeof api.updateCurrency>[1]) => {
+      const res = await api.updateCurrency(code, body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'currencies');
+      return res;
+    },
+    formatAmount: async (amount: number, currencyCode: string, showSymbol?: boolean) => {
+      return api.formatAmount({ amount, currency_code: currencyCode, show_symbol: showSymbol });
+    },
+  };
+}
+
+// ============================================================================
+// HR SETTINGS HOOKS
+// ============================================================================
+
+export function useHRSettings(params?: { company?: string }) {
+  return useSWR(
+    ['hr-settings', params?.company],
+    () => api.getHRSettings(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useHolidayCalendars(params?: { company?: string; year?: number; is_active?: boolean }) {
+  return useSWR(
+    ['holiday-calendars', params?.company, params?.year, params?.is_active],
+    () => api.getHolidayCalendars(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useSalaryBands(params?: { company?: string; is_active?: boolean }) {
+  return useSWR(
+    ['salary-bands', params?.company, params?.is_active],
+    () => api.getSalaryBands(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useHRSettingsMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    updateSettings: async (body: Parameters<typeof api.updateHRSettings>[0], company?: string) => {
+      const res = await api.updateHRSettings(body, company);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-settings');
+      return res;
+    },
+    seedDefaults: async () => {
+      const res = await api.seedHRDefaults();
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-settings');
+      return res;
+    },
+  };
+}
+
+// ============================================================================
+// SUPPORT SETTINGS HOOKS
+// ============================================================================
+
+export function useSupportSettings(params?: { company?: string }) {
+  return useSWR(
+    ['support-settings', params?.company],
+    () => api.getSupportSettings(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useSupportQueues(params?: { company?: string; is_active?: boolean; include_system?: boolean }) {
+  return useSWR(
+    ['support-queues', params?.company, params?.is_active, params?.include_system],
+    () => api.getSupportQueues(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useEscalationPolicies(params?: { company?: string; is_active?: boolean }) {
+  return useSWR(
+    ['escalation-policies', params?.company, params?.is_active],
+    () => api.getEscalationPolicies(params),
+    { revalidateOnFocus: false }
+  );
+}
+
+export function useSupportSettingsMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    updateSettings: async (body: Parameters<typeof api.updateSupportSettings>[0], company?: string) => {
+      const res = await api.updateSupportSettings(body, company);
+      await mutate((key) => Array.isArray(key) && key[0] === 'support-settings');
+      return res;
+    },
+    seedDefaults: async () => {
+      const res = await api.seedSupportDefaults();
+      await mutate((key) => Array.isArray(key) && (key[0] === 'support-settings' || key[0] === 'support-queues'));
+      return res;
     },
   };
 }
