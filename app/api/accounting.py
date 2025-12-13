@@ -905,7 +905,7 @@ async def get_chart_of_accounts(
 # ============= TRIAL BALANCE =============
 
 @router.get("/trial-balance", dependencies=[Depends(Require("accounting:read"))])
-@cached("trial-balance", ttl=CACHE_TTL["medium"])
+@cached("trial-balance", ttl=60)
 async def get_trial_balance(
     as_of_date: Optional[str] = None,
     fiscal_year: Optional[str] = None,
@@ -1019,7 +1019,7 @@ def _get_effective_root_type(acc) -> Optional[AccountType]:
 
 
 @router.get("/balance-sheet", dependencies=[Depends(Require("accounting:read"))])
-@cached("balance-sheet", ttl=CACHE_TTL["medium"])
+@cached("balance-sheet", ttl=60)
 async def get_balance_sheet(
     as_of_date: Optional[str] = None,
     comparative_date: Optional[str] = None,
@@ -1167,7 +1167,7 @@ async def get_balance_sheet(
 # ============= INCOME STATEMENT (P&L) =============
 
 @router.get("/income-statement", dependencies=[Depends(Require("accounting:read"))])
-@cached("income-statement", ttl=CACHE_TTL["medium"])
+@cached("income-statement", ttl=60)
 async def get_income_statement(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -1653,7 +1653,7 @@ async def get_receivables_aging(
 # ============= CASH FLOW =============
 
 @router.get("/cash-flow", dependencies=[Depends(Require("accounting:read"))])
-@cached("cash-flow", ttl=CACHE_TTL["medium"])
+@cached("cash-flow", ttl=60)
 async def get_cash_flow(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -2636,7 +2636,7 @@ async def get_equity_statement(
 # ============= COMPARATIVE INCOME STATEMENT =============
 
 @router.get("/income-statement/comparative", dependencies=[Depends(Require("accounting:read"))])
-@cached("income-statement-comparative", ttl=CACHE_TTL["long"])
+@cached("income-statement-comparative", ttl=300)
 async def get_comparative_income_statement(
     periods: int = Query(default=3, le=12, description="Number of periods to compare"),
     interval: str = Query(default="month", description="Period interval: month or quarter"),
@@ -5712,7 +5712,7 @@ async def record_tax_payment(
 
 
 @router.get("/tax/dashboard", dependencies=[Depends(Require("accounting:read"))])
-@cached("tax-dashboard", ttl=CACHE_TTL["short"])
+@cached("tax-dashboard", ttl=60)
 async def get_tax_dashboard(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
