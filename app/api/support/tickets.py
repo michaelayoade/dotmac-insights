@@ -32,6 +32,137 @@ router = APIRouter()
 
 
 # =============================================================================
+# VALIDATION HELPERS
+# =============================================================================
+
+def _validate_tags(db: Session, tags: Optional[List[str]]) -> List[str]:
+    """Ensure provided tags exist and are active; returns deduped list."""
+    if not tags:
+        return []
+    clean = [t.strip() for t in tags if t and t.strip()]
+    clean = list(dict.fromkeys(clean))  # preserve order, de-dupe
+    if not clean:
+        return []
+
+    existing = db.query(TicketTag).filter(
+        TicketTag.name.in_(clean),
+        TicketTag.is_active == True,
+    ).all()
+    found = {t.name for t in existing}
+    missing = [t for t in clean if t not in found]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Unknown or inactive tags: {missing}")
+    return clean
+
+
+def _validate_watchers(db: Session, watcher_ids: Optional[List[int]]) -> List[int]:
+    """Ensure watcher IDs refer to existing users; returns deduped list."""
+    if not watcher_ids:
+        return []
+    unique_ids = list(dict.fromkeys([wid for wid in watcher_ids if wid is not None]))
+    if not unique_ids:
+        return []
+    rows = db.query(User.id).filter(User.id.in_(unique_ids)).all()
+    found_ids = {row.id for row in rows}
+    missing = [wid for wid in unique_ids if wid not in found_ids]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Unknown watcher user_ids: {missing}")
+    return unique_ids
+
+
+def _validate_custom_fields(db: Session, custom_fields: Optional[dict]) -> dict:
+    """Validate custom field payload against definitions; returns sanitized dict."""
+    if custom_fields is None:
+        return {}
+    if not isinstance(custom_fields, dict):
+        raise HTTPException(status_code=400, detail="custom_fields must be an object")
+
+    keys = list(custom_fields.keys())
+    if not keys:
+        return {}
+
+    defs = db.query(TicketCustomField).filter(
+        TicketCustomField.field_key.in_(keys),
+        TicketCustomField.is_active == True,
+    ).all()
+    def_map = {f.field_key: f for f in defs}
+
+    if len(def_map) != len(keys):
+        missing = [k for k in keys if k not in def_map]
+        raise HTTPException(status_code=400, detail=f"Unknown or inactive custom_fields: {missing}")
+
+    sanitized: Dict[str, Any] = {}
+    for key, value in custom_fields.items():
+        field = def_map[key]
+        ftype = field.field_type or CustomFieldType.TEXT.value
+
+        # Type checks
+        if ftype == CustomFieldType.TEXT.value or ftype == CustomFieldType.URL.value or ftype == CustomFieldType.EMAIL.value:
+            if value is None:
+                sanitized[key] = value
+            elif not isinstance(value, str):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be a string")
+            else:
+                sanitized[key] = value
+        elif ftype == CustomFieldType.NUMBER.value:
+            if not isinstance(value, (int, float)):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be a number")
+            sanitized[key] = value
+        elif ftype == CustomFieldType.DROPDOWN.value:
+            options = [opt.get("value") for opt in (field.options or []) if isinstance(opt, dict)]
+            if value not in options:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be one of {options}")
+            sanitized[key] = value
+        elif ftype == CustomFieldType.MULTI_SELECT.value:
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be a list")
+            options = [opt.get("value") for opt in (field.options or []) if isinstance(opt, dict)]
+            invalid = [v for v in value if v not in options]
+            if invalid:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' has invalid options: {invalid}")
+            sanitized[key] = value
+        elif ftype == CustomFieldType.DATE.value:
+            if not isinstance(value, str):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be an ISO date string")
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be an ISO date (YYYY-MM-DD)")
+            sanitized[key] = value
+        elif ftype == CustomFieldType.DATETIME.value:
+            if not isinstance(value, str):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be an ISO datetime string")
+            try:
+                datetime.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be an ISO datetime")
+            sanitized[key] = value
+        elif ftype == CustomFieldType.CHECKBOX.value:
+            if not isinstance(value, bool):
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be a boolean")
+            sanitized[key] = value
+        else:
+            sanitized[key] = value
+
+        # Length and regex constraints for string-like fields
+        if isinstance(sanitized.get(key), str):
+            sval = sanitized[key]
+            if field.min_length is not None and len(sval) < field.min_length:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be at least {field.min_length} characters")
+            if field.max_length is not None and len(sval) > field.max_length:
+                raise HTTPException(status_code=400, detail=f"Field '{key}' must be at most {field.max_length} characters")
+            if field.regex_pattern:
+                try:
+                    if not re.fullmatch(field.regex_pattern, sval):
+                        raise HTTPException(status_code=400, detail=f"Field '{key}' does not match required pattern")
+                except re.error:
+                    # Invalid regex in definition; treat as server error
+                    raise HTTPException(status_code=500, detail=f"Invalid regex for field '{key}'")
+
+    return sanitized
+
+
+# =============================================================================
 # PYDANTIC MODELS
 # =============================================================================
 
@@ -589,6 +720,10 @@ def create_ticket(
     principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a ticket locally (no upstream ERP write-back)."""
+    valid_tags = _validate_tags(db, payload.tags)
+    valid_watchers = _validate_watchers(db, payload.watchers)
+    valid_custom_fields = _validate_custom_fields(db, payload.custom_fields)
+
     ticket = Ticket(
         ticket_number=generate_local_ticket_number(),
         subject=payload.subject,
@@ -609,9 +744,9 @@ def create_ticket(
         customer_name=payload.customer_name,
         region=payload.region,
         base_station=payload.base_station,
-        tags=payload.tags,
-        watchers=payload.watchers,
-        custom_fields=payload.custom_fields,
+        tags=valid_tags,
+        watchers=valid_watchers,
+        custom_fields=valid_custom_fields,
         parent_ticket_id=payload.parent_ticket_id,
         merged_into_id=payload.merged_into_id,
         origin_system="local",
@@ -643,12 +778,19 @@ def update_ticket(
     status = parse_ticket_status(payload.status)
     priority = parse_ticket_priority(payload.priority)
 
+    # Validate structured fields before applying
+    if payload.tags is not None:
+        ticket.tags = _validate_tags(db, payload.tags)
+    if payload.watchers is not None:
+        ticket.watchers = _validate_watchers(db, payload.watchers)
+    if payload.custom_fields is not None:
+        ticket.custom_fields = _validate_custom_fields(db, payload.custom_fields)
+
     for field in [
         "subject", "description", "ticket_type", "issue_type", "customer_id",
         "project_id", "assigned_to", "assigned_employee_id", "resolution_by",
         "response_by", "resolution_team", "customer_email", "customer_phone",
-        "customer_name", "region", "base_station", "tags", "watchers",
-        "custom_fields", "parent_ticket_id", "merged_into_id",
+        "customer_name", "region", "base_station", "parent_ticket_id", "merged_into_id",
     ]:
         value = getattr(payload, field)
         if value is not None:
@@ -1397,11 +1539,13 @@ def add_ticket_tags(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    validated_tags = _validate_tags(db, payload.tags)
+
     current_tags = ticket.tags or []
-    new_tags = list(set(current_tags + payload.tags))
+    new_tags = list(dict.fromkeys(current_tags + validated_tags))
 
     # Validate tags exist and update usage counts
-    for tag_name in payload.tags:
+    for tag_name in validated_tags:
         if tag_name not in current_tags:
             tag = db.query(TicketTag).filter(TicketTag.name == tag_name, TicketTag.is_active == True).first()
             if tag:
@@ -1458,8 +1602,10 @@ def add_ticket_watchers(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    validated_watchers = _validate_watchers(db, payload.user_ids)
+
     current_watchers = ticket.watchers or []
-    new_watchers = list(set(current_watchers + payload.user_ids))
+    new_watchers = list(dict.fromkeys(current_watchers + validated_watchers))
 
     ticket.watchers = new_watchers
     ticket.updated_at = datetime.utcnow()
