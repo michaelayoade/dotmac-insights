@@ -218,17 +218,20 @@ interface TabProps {
 
 function HoursTab({ form, setForm }: TabProps) {
   const updateSchedule = (day: WeekDay, field: keyof WeeklyScheduleDay, value: string | boolean) => {
-    const current = form.weekly_schedule || {};
-    setForm((p) => ({
-      ...p,
-      weekly_schedule: {
-        ...current,
-        [day]: {
-          ...(current[day] || { start: '09:00', end: '17:00', closed: false }),
-          [field]: value,
-        },
-      },
-    }));
+    setForm((p) => {
+      const current = p.weekly_schedule || {} as Record<WeekDay, WeeklyScheduleDay>;
+      const daySchedule = current[day] || { start: '09:00', end: '17:00', closed: false };
+      return {
+        ...p,
+        weekly_schedule: {
+          ...current,
+          [day]: {
+            ...daySchedule,
+            [field]: value,
+          },
+        } as Record<WeekDay, WeeklyScheduleDay>,
+      };
+    });
   };
 
   return (
