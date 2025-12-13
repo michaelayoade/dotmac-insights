@@ -205,7 +205,7 @@ export default function HrPayrollPage() {
   const payrollEntryList = extractList(payrollEntries);
   const salarySlipList = extractList(salarySlips);
 
-  const payroll30d = analyticsOverview?.payroll_30d || {};
+  const payroll30d = useMemo(() => analyticsOverview?.payroll_30d || {}, [analyticsOverview]);
 
   // Calculate payroll summary from slips
   const payrollSummary = useMemo(() => {

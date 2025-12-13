@@ -239,10 +239,8 @@ export default function HrOverviewPage() {
   const onboardingList = extractList(onboardings);
   const shiftAssignmentList = extractList(shiftAssignments);
 
-  const leaveByStatus = analyticsOverview?.leave_by_status || {};
   const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
-  const payroll30d = analyticsOverview?.payroll_30d || {};
-  const recruitmentFunnel = analyticsOverview?.recruitment_funnel || {};
+  const payroll30d = useMemo(() => analyticsOverview?.payroll_30d || {}, [analyticsOverview]);
 
   // Transform leave trend data for chart
   const leaveTrendData = useMemo(() => {
@@ -267,15 +265,17 @@ export default function HrOverviewPage() {
 
   // Leave status distribution for pie chart
   const leaveStatusData = useMemo(() => {
+    const leaveByStatus = analyticsOverview?.leave_by_status || {};
     return Object.entries(leaveByStatus).map(([status, count], idx) => ({
       name: status.charAt(0).toUpperCase() + status.slice(1),
       value: count as number,
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }));
-  }, [leaveByStatus]);
+  }, [analyticsOverview]);
 
   // Recruitment funnel data
   const funnelData = useMemo(() => {
+    const recruitmentFunnel = analyticsOverview?.recruitment_funnel || {};
     const stages = [
       { name: 'Applications', key: 'applications', color: '#8b5cf6' },
       { name: 'Screened', key: 'screened', color: '#06b6d4' },
@@ -287,7 +287,7 @@ export default function HrOverviewPage() {
       ...stage,
       value: recruitmentFunnel[stage.key] || 0,
     }));
-  }, [recruitmentFunnel]);
+  }, [analyticsOverview]);
 
   return (
     <div className="space-y-6">
