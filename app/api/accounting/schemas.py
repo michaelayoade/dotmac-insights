@@ -45,6 +45,189 @@ class PeriodStatus(str, Enum):
     HARD_CLOSED = "hard_closed"
 
 
+class ValidationSeverity(str, Enum):
+    """Severity levels for validation issues."""
+    ERROR = "error"
+    WARNING = "warning"
+
+
+class NonCashTransactionType(str, Enum):
+    """Types of non-cash transactions for IAS 7 disclosure."""
+    LEASE_INCEPTION = "lease_inception"
+    DEBT_CONVERSION = "debt_conversion"
+    ASSET_EXCHANGE = "asset_exchange"
+    BARTER = "barter"
+    SHARE_BASED_PAYMENT = "share_based_payment"
+    OTHER = "other"
+
+
+class ClassificationBasis(str, Enum):
+    """Income statement classification basis."""
+    BY_NATURE = "by_nature"
+    BY_FUNCTION = "by_function"
+
+
+class InterestDividendClassification(str, Enum):
+    """IAS 7 classification policy for interest and dividends."""
+    OPERATING = "operating"
+    INVESTING = "investing"
+    FINANCING = "financing"
+
+
+# =============================================================================
+# Validation Schemas
+# =============================================================================
+
+class ValidationIssue(BaseModel):
+    """A single validation error or warning."""
+    code: str = Field(..., description="Error/warning code for programmatic handling")
+    message: str = Field(..., description="Human-readable description")
+    field: Optional[str] = Field(None, description="Field path that caused the issue")
+    expected: Optional[Any] = Field(None, description="Expected value")
+    actual: Optional[Any] = Field(None, description="Actual value found")
+
+
+class ValidationResultSchema(BaseModel):
+    """Validation result included in all financial statement responses."""
+    is_valid: bool = Field(..., description="True if all validation checks pass")
+    errors: List[ValidationIssue] = Field(default_factory=list, description="Blocking validation errors")
+    warnings: List[ValidationIssue] = Field(default_factory=list, description="Non-blocking warnings")
+
+
+# =============================================================================
+# FX and Currency Schemas
+# =============================================================================
+
+class FXMetadata(BaseModel):
+    """FX metadata for financial statements."""
+    functional_currency: str = Field("NGN", description="Entity's functional currency")
+    presentation_currency: str = Field("NGN", description="Currency used for presentation")
+    is_same_currency: bool = Field(True, description="True if functional = presentation")
+    average_rate: Optional[float] = Field(1.0, description="Average FX rate for period")
+    closing_rate: Optional[float] = Field(1.0, description="Closing FX rate")
+
+
+# =============================================================================
+# EPS Schemas (IAS 33)
+# =============================================================================
+
+class DilutiveInstrument(BaseModel):
+    """A dilutive financial instrument for EPS calculation."""
+    instrument_type: str = Field(..., description="Type of instrument (options, convertibles, etc.)")
+    shares_equivalent: int = Field(..., description="Number of shares if converted/exercised")
+    dilutive_effect: float = Field(..., description="Effect on diluted EPS")
+
+
+class EarningsPerShare(BaseModel):
+    """Earnings per share data (IAS 33)."""
+    basic_eps: Optional[float] = Field(None, description="Basic earnings per share")
+    diluted_eps: Optional[float] = Field(None, description="Diluted earnings per share")
+    weighted_average_shares_basic: Optional[int] = Field(None, description="Weighted average shares - basic")
+    weighted_average_shares_diluted: Optional[int] = Field(None, description="Weighted average shares - diluted")
+    dilutive_instruments: List[DilutiveInstrument] = Field(default_factory=list)
+    note: Optional[str] = Field(None, description="EPS calculation note or disclaimer")
+
+
+# =============================================================================
+# Tax Reconciliation Schema (IAS 12)
+# =============================================================================
+
+class TaxReconciliationItem(BaseModel):
+    """A line item in tax reconciliation."""
+    description: str
+    amount: float
+    rate_effect: Optional[float] = None
+
+
+class TaxReconciliation(BaseModel):
+    """Tax expense reconciliation (IAS 12)."""
+    profit_before_tax: float = Field(..., description="PBT from income statement")
+    statutory_rate: float = Field(..., description="Applicable statutory tax rate")
+    tax_at_statutory_rate: float = Field(..., description="PBT * statutory rate")
+    reconciling_items: List[TaxReconciliationItem] = Field(default_factory=list)
+    effective_tax_expense: float = Field(..., description="Actual tax expense")
+    effective_tax_rate: float = Field(..., description="Effective tax rate")
+
+
+# =============================================================================
+# Non-Cash Transaction Schema (IAS 7)
+# =============================================================================
+
+class NonCashTransaction(BaseModel):
+    """A non-cash transaction for IAS 7 disclosure."""
+    transaction_type: NonCashTransactionType
+    description: str
+    amount: float
+    debit_account: Optional[str] = None
+    credit_account: Optional[str] = None
+
+
+# =============================================================================
+# Cash Flow Classification Policy (IAS 7)
+# =============================================================================
+
+class CashFlowClassificationPolicy(BaseModel):
+    """IAS 7 classification policy choices."""
+    interest_paid: InterestDividendClassification = Field(
+        InterestDividendClassification.OPERATING,
+        description="Classification for interest paid"
+    )
+    interest_received: InterestDividendClassification = Field(
+        InterestDividendClassification.OPERATING,
+        description="Classification for interest received"
+    )
+    dividends_paid: InterestDividendClassification = Field(
+        InterestDividendClassification.FINANCING,
+        description="Classification for dividends paid"
+    )
+    dividends_received: InterestDividendClassification = Field(
+        InterestDividendClassification.OPERATING,
+        description="Classification for dividends received"
+    )
+    taxes_paid: InterestDividendClassification = Field(
+        InterestDividendClassification.OPERATING,
+        description="Classification for income taxes paid"
+    )
+
+
+# =============================================================================
+# OCI Components Schema (IAS 1)
+# =============================================================================
+
+class OCIComponent(BaseModel):
+    """Other Comprehensive Income component."""
+    description: str
+    amount: float
+    may_be_reclassified: bool = Field(..., description="True if may be reclassified to P&L")
+    reclassification_adjustment: Optional[float] = Field(None, description="Amount reclassified this period")
+
+
+class OtherComprehensiveIncome(BaseModel):
+    """Other Comprehensive Income breakdown (IAS 1)."""
+    items_may_be_reclassified: List[OCIComponent] = Field(
+        default_factory=list,
+        description="Items that may be reclassified to P&L (hedges, FX translation)"
+    )
+    items_not_reclassified: List[OCIComponent] = Field(
+        default_factory=list,
+        description="Items that will not be reclassified (revaluations, actuarial)"
+    )
+    total_may_be_reclassified: float = 0.0
+    total_not_reclassified: float = 0.0
+    total_oci: float = 0.0
+
+
+# =============================================================================
+# Comparative Period Schema
+# =============================================================================
+
+class ComparativePeriod(BaseModel):
+    """Prior period comparative data."""
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    as_of_date: Optional[str] = None
+
+
 # =============================================================================
 # Base/Common Schemas
 # =============================================================================

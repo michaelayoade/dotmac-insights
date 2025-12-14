@@ -85,8 +85,9 @@ function FormLabel({ children, required }: { children: React.ReactNode; required
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrAttendancePage() {
-  const [company, setCompany] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [attendanceStatus, setAttendanceStatus] = useState('');
   const [attendanceDate, setAttendanceDate] = useState('');
@@ -120,7 +121,7 @@ export default function HrAttendancePage() {
   const [checkPayload, setCheckPayload] = useState({ latitude: '', longitude: '', device_info: '' });
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { data: shiftTypes, isLoading: shiftTypesLoading } = useHrShiftTypes({ company: company || undefined });
+  const { data: shiftTypes, isLoading: shiftTypesLoading } = useHrShiftTypes({ company: SINGLE_COMPANY || undefined });
   const { data: shiftAssignments, isLoading: shiftAssignmentsLoading } = useHrShiftAssignments({
     employee_id: employeeId ? Number(employeeId) : undefined,
     limit: assignLimit,
@@ -130,7 +131,7 @@ export default function HrAttendancePage() {
     employee_id: employeeId ? Number(employeeId) : undefined,
     status: attendanceStatus || undefined,
     attendance_date: attendanceDate || undefined,
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: attLimit,
     offset: attOffset,
   });
@@ -139,7 +140,7 @@ export default function HrAttendancePage() {
     status: attendanceStatus || undefined,
     from_date: attendanceDate || undefined,
     to_date: attendanceDate || undefined,
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: requestLimit,
     offset: requestOffset,
   });
@@ -164,7 +165,7 @@ export default function HrAttendancePage() {
         employee_name: attendanceForm.employee_name || attendanceForm.employee,
         attendance_date: attendanceForm.attendance_date,
         status: attendanceForm.status,
-        company: attendanceForm.company || company || undefined,
+        company: attendanceForm.company || SINGLE_COMPANY || undefined,
         in_time: attendanceForm.in_time || undefined,
         out_time: attendanceForm.out_time || undefined,
         working_hours: attendanceForm.working_hours ? Number(attendanceForm.working_hours) : undefined,
@@ -273,27 +274,15 @@ export default function HrAttendancePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="space-y-3">
           <p className="text-white font-semibold">Record Attendance</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <FormLabel required>Employee Name</FormLabel>
-              <input
-                type="text"
-                placeholder="e.g. John Smith"
-                value={attendanceForm.employee_name || attendanceForm.employee}
-                onChange={(e) => setAttendanceForm({ ...attendanceForm, employee: e.target.value, employee_name: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-              />
-            </div>
-            <div>
-              <FormLabel>Company</FormLabel>
-              <input
-                type="text"
-                placeholder="e.g. Acme Corp"
-                value={attendanceForm.company || company}
-                onChange={(e) => setAttendanceForm({ ...attendanceForm, company: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-              />
-            </div>
+          <div>
+            <FormLabel required>Employee Name</FormLabel>
+            <input
+              type="text"
+              placeholder="e.g. John Smith"
+              value={attendanceForm.employee_name || attendanceForm.employee}
+              onChange={(e) => setAttendanceForm({ ...attendanceForm, employee: e.target.value, employee_name: e.target.value })}
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -427,21 +416,6 @@ export default function HrAttendancePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <p className="text-white font-semibold mb-3">Filters</p>
         <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Company</FormLabel>
-            <input
-              type="text"
-              placeholder="All companies"
-              value={company}
-              onChange={(e) => {
-                setCompany(e.target.value);
-                setAttOffset(0);
-                setAssignOffset(0);
-                setRequestOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
           <div>
             <FormLabel>Employee</FormLabel>
             <input

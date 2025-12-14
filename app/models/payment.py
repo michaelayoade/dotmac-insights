@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index, text
+from sqlalchemy import String, Text, ForeignKey, Enum, Index, text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.invoice import Invoice
+    from app.models.payment_allocation import PaymentAllocation
 
 
 class PaymentStatus(enum.Enum):
@@ -33,10 +34,11 @@ class PaymentMethod(enum.Enum):
 class PaymentSource(enum.Enum):
     SPLYNX = "splynx"
     ERPNEXT = "erpnext"
+    INTERNAL = "internal"
 
 
 class Payment(Base):
-    """Payment records from all sources."""
+    """Payment records from all sources (AR - customer payments)."""
 
     __tablename__ = "payments"
 
@@ -58,9 +60,22 @@ class Payment(Base):
     amount: Mapped[Decimal] = mapped_column(nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="NGN")
 
+    # FX fields
+    base_currency: Mapped[str] = mapped_column(String(10), default="NGN")
+    conversion_rate: Mapped[Decimal] = mapped_column(Numeric(18, 10), default=Decimal("1"))
+    base_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+
+    # Allocation tracking
+    total_allocated: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+    unallocated_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+
     # Method & Status
     payment_method: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), default=PaymentMethod.BANK_TRANSFER)
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.COMPLETED, index=True)
+
+    # Workflow
+    workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    docstatus: Mapped[int] = mapped_column(default=0)  # 0=Draft, 1=Submitted, 2=Cancelled
 
     # Transaction reference
     transaction_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -72,6 +87,12 @@ class Payment(Base):
     # Notes
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Additional links
+    bank_account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("bank_accounts.id"), nullable=True)
+    fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
+    journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
@@ -80,6 +101,11 @@ class Payment(Base):
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
+    allocations: Mapped[List["PaymentAllocation"]] = relationship(
+        back_populates="payment",
+        foreign_keys="PaymentAllocation.payment_id",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index(

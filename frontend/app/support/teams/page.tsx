@@ -1,9 +1,35 @@
 'use client';
 
-import { useState } from 'react';
-import { AlertTriangle, Plus, Shield, Users, UserPlus, Trash2, User } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertTriangle, Plus, Shield, Users, UserPlus, Trash2, User, Filter, Search, RefreshCw, Scale } from 'lucide-react';
 import { useSupportTeams, useSupportTeamMutations, useSupportAgents } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+  colorClass = 'text-teal-electric',
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
+  colorClass?: string;
+}) {
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-muted text-sm">{label}</p>
+          <p className={cn('text-2xl font-bold mt-1', colorClass)}>{value}</p>
+        </div>
+        <div className="p-2 rounded-lg bg-slate-elevated">
+          <Icon className={cn('w-5 h-5', colorClass)} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SupportTeamsPage() {
   const { data, error, isLoading } = useSupportTeams();
@@ -13,10 +39,34 @@ export default function SupportTeamsPage() {
   const agents = agentsData?.agents || [];
   const teams = data?.teams || [];
 
+  const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const [teamForm, setTeamForm] = useState({ team_name: '', description: '', assignment_rule: 'round_robin' });
   const [memberForms, setMemberForms] = useState<Record<number, { agent_id: string; role: string }>>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    const totalMembers = teams.reduce((sum, t) => sum + ((t.members || []).length), 0);
+    const roundRobinCount = teams.filter((t) => t.assignment_rule === 'round_robin').length;
+    const loadBalancedCount = teams.filter((t) => t.assignment_rule === 'load_balanced').length;
+    return {
+      totalTeams: teams.length,
+      totalMembers,
+      roundRobin: roundRobinCount,
+      loadBalanced: loadBalancedCount,
+    };
+  }, [teams]);
+
+  // Filter teams
+  const filteredTeams = useMemo(() => {
+    if (!search) return teams;
+    return teams.filter((team) =>
+      team.team_name?.toLowerCase().includes(search.toLowerCase()) ||
+      team.description?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [teams, search]);
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,16 +100,26 @@ export default function SupportTeamsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-          <Shield className="w-5 h-5 text-violet-400" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
+            <Shield className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Teams</h1>
+            <p className="text-slate-muted text-sm">Manage queues, routing rules, and membership</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Teams</h1>
-          <p className="text-slate-muted text-sm">Manage queues, routing rules, and membership</p>
-        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+        >
+          <Plus className="w-4 h-4" />
+          Create Team
+        </button>
       </div>
 
+      {/* Error State */}
       {(error || formError) && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
@@ -67,64 +127,110 @@ export default function SupportTeamsPage() {
         </div>
       )}
 
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard label="Total Teams" value={metrics.totalTeams} icon={Shield} colorClass="text-violet-400" />
+        <MetricCard label="Total Members" value={metrics.totalMembers} icon={Users} colorClass="text-blue-400" />
+        <MetricCard label="Round Robin" value={metrics.roundRobin} icon={RefreshCw} colorClass="text-emerald-400" />
+        <MetricCard label="Load Balanced" value={metrics.loadBalanced} icon={Scale} colorClass="text-amber-400" />
+      </div>
+
       {/* Create Team Form */}
-      <form onSubmit={handleCreateTeam} className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Plus className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Create team</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            value={teamForm.team_name}
-            onChange={(e) => setTeamForm({ ...teamForm, team_name: e.target.value })}
-            placeholder="Team name"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-          <input
-            value={teamForm.description}
-            onChange={(e) => setTeamForm({ ...teamForm, description: e.target.value })}
-            placeholder="Description"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-          <select
-            value={teamForm.assignment_rule}
-            onChange={(e) => setTeamForm({ ...teamForm, assignment_rule: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="round_robin">Round robin</option>
-            <option value="load_balanced">Load balanced</option>
-          </select>
-          <div className="flex justify-end md:col-span-3">
+      {showForm && (
+        <form onSubmit={handleCreateTeam} className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Plus className="w-4 h-4 text-teal-electric" />
+            <span className="text-white font-semibold">Create New Team</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm text-slate-muted">Team Name</label>
+              <input
+                value={teamForm.team_name}
+                onChange={(e) => setTeamForm({ ...teamForm, team_name: e.target.value })}
+                placeholder="e.g., Support Tier 1"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm text-slate-muted">Description</label>
+              <input
+                value={teamForm.description}
+                onChange={(e) => setTeamForm({ ...teamForm, description: e.target.value })}
+                placeholder="Team description"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm text-slate-muted">Assignment Rule</label>
+              <select
+                value={teamForm.assignment_rule}
+                onChange={(e) => setTeamForm({ ...teamForm, assignment_rule: e.target.value })}
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              >
+                <option value="round_robin">Round robin</option>
+                <option value="load_balanced">Load balanced</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-border">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white text-sm"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
               disabled={saving}
-              className={cn(
-                'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60'
-              )}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
             >
-              {saving ? 'Saving…' : 'Create team'}
+              {saving ? 'Creating…' : 'Create Team'}
             </button>
           </div>
+        </form>
+      )}
+
+      {/* Filter */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-teal-electric" />
+          <span className="text-white text-sm font-medium">Filter</span>
         </div>
-      </form>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
+          <input
+            type="text"
+            placeholder="Search teams by name or description..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          />
+        </div>
+      </div>
 
       {/* Teams List */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-teal-electric" />
-            <span className="text-white text-sm font-medium">Teams</span>
+            <Users className="w-4 h-4 text-violet-400" />
+            <h3 className="text-white font-semibold">Teams</h3>
           </div>
-          <span className="text-xs text-slate-muted">{teams.length} teams</span>
+          <span className="text-xs text-slate-muted">{filteredTeams.length} teams</span>
         </div>
 
         {isLoading ? (
           <p className="text-slate-muted text-sm">Loading teams…</p>
-        ) : teams.length === 0 ? (
-          <p className="text-slate-muted text-sm">No teams found.</p>
+        ) : filteredTeams.length === 0 ? (
+          <div className="text-center py-8">
+            <Shield className="w-12 h-12 text-slate-muted mx-auto mb-3" />
+            <p className="text-slate-muted text-sm">No teams found.</p>
+            <p className="text-slate-muted text-xs mt-1">Try adjusting your search or create a new team.</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {teams.map((team) => {
+            {filteredTeams.map((team) => {
               const availableAgents = getAvailableAgents(team.id);
               return (
                 <div key={team.id} className="border border-slate-border rounded-lg p-4 space-y-3">

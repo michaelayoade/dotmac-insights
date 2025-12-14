@@ -18,6 +18,36 @@ router = APIRouter()
 
 
 # =============================================================================
+# SUPPORTED DOCTYPES
+# =============================================================================
+
+SUPPORTED_WORKFLOW_DOCTYPES = [
+    {"doctype": "journal_entry", "name": "Journal Entry", "description": "General ledger journal entries"},
+    {"doctype": "expense", "name": "Expense", "description": "Expense claims and reimbursements"},
+    {"doctype": "payment", "name": "Customer Payment", "description": "Payments received from customers"},
+    {"doctype": "supplier_payment", "name": "Supplier Payment", "description": "Payments made to suppliers"},
+    {"doctype": "invoice", "name": "Sales Invoice", "description": "Customer invoices (AR)"},
+    {"doctype": "purchase_invoice", "name": "Purchase Invoice", "description": "Supplier bills (AP)"},
+    {"doctype": "credit_note", "name": "Credit Note", "description": "Customer credit notes (AR)"},
+    {"doctype": "debit_note", "name": "Debit Note", "description": "Supplier debit notes (AP)"},
+    {"doctype": "bank_transaction", "name": "Bank Transaction", "description": "Bank transactions for reconciliation"},
+]
+
+
+@router.get("/doctypes", dependencies=[Depends(Require("books:read"))])
+def list_workflow_doctypes() -> Dict[str, Any]:
+    """List document types that support approval workflows.
+
+    Returns:
+        List of supported document types with descriptions
+    """
+    return {
+        "total": len(SUPPORTED_WORKFLOW_DOCTYPES),
+        "doctypes": SUPPORTED_WORKFLOW_DOCTYPES,
+    }
+
+
+# =============================================================================
 # APPROVAL WORKFLOWS
 # =============================================================================
 
@@ -428,9 +458,18 @@ def get_accounting_controls(
             "require_attachment_expense": controls.require_attachment_expense,
             "require_attachment_payment": controls.require_attachment_payment,
             "require_attachment_invoice": controls.require_attachment_invoice,
+            "require_attachment_supplier_payment": controls.require_attachment_supplier_payment,
+            "require_attachment_purchase_invoice": controls.require_attachment_purchase_invoice,
+            "require_attachment_credit_note": controls.require_attachment_credit_note,
+            "require_attachment_debit_note": controls.require_attachment_debit_note,
+            "require_attachment_bank_transaction": controls.require_attachment_bank_transaction,
             "require_approval_journal_entry": controls.require_approval_journal_entry,
             "require_approval_expense": controls.require_approval_expense,
             "require_approval_payment": controls.require_approval_payment,
+            "require_approval_supplier_payment": controls.require_approval_supplier_payment,
+            "require_approval_purchase_invoice": controls.require_approval_purchase_invoice,
+            "require_approval_credit_note": controls.require_approval_credit_note,
+            "require_approval_debit_note": controls.require_approval_debit_note,
             "auto_create_fiscal_periods": controls.auto_create_fiscal_periods,
             "default_period_type": controls.default_period_type,
             "retained_earnings_account": controls.retained_earnings_account,
@@ -447,8 +486,20 @@ def update_accounting_controls(
     auto_voucher_numbering: Optional[bool] = None,
     require_attachment_journal_entry: Optional[bool] = None,
     require_attachment_expense: Optional[bool] = None,
+    require_attachment_payment: Optional[bool] = None,
+    require_attachment_invoice: Optional[bool] = None,
+    require_attachment_supplier_payment: Optional[bool] = None,
+    require_attachment_purchase_invoice: Optional[bool] = None,
+    require_attachment_credit_note: Optional[bool] = None,
+    require_attachment_debit_note: Optional[bool] = None,
+    require_attachment_bank_transaction: Optional[bool] = None,
     require_approval_journal_entry: Optional[bool] = None,
     require_approval_expense: Optional[bool] = None,
+    require_approval_payment: Optional[bool] = None,
+    require_approval_supplier_payment: Optional[bool] = None,
+    require_approval_purchase_invoice: Optional[bool] = None,
+    require_approval_credit_note: Optional[bool] = None,
+    require_approval_debit_note: Optional[bool] = None,
     retained_earnings_account: Optional[str] = None,
     fx_gain_account: Optional[str] = None,
     fx_loss_account: Optional[str] = None,
@@ -461,10 +512,8 @@ def update_accounting_controls(
         backdating_days_allowed: Days of backdating allowed
         future_posting_days_allowed: Days of future posting allowed
         auto_voucher_numbering: Auto-number vouchers
-        require_attachment_journal_entry: Require attachments on JEs
-        require_attachment_expense: Require attachments on expenses
-        require_approval_journal_entry: Require approval for JEs
-        require_approval_expense: Require approval for expenses
+        require_attachment_*: Require attachments on various doc types
+        require_approval_*: Require approval for various doc types
         retained_earnings_account: Retained earnings account
         fx_gain_account: FX gain account
         fx_loss_account: FX loss account
@@ -486,21 +535,51 @@ def update_accounting_controls(
     else:
         old_values = serialize_for_audit(controls)
 
-    # Apply updates
+    # Apply updates - posting controls
     if backdating_days_allowed is not None:
         controls.backdating_days_allowed = backdating_days_allowed
     if future_posting_days_allowed is not None:
         controls.future_posting_days_allowed = future_posting_days_allowed
     if auto_voucher_numbering is not None:
         controls.auto_voucher_numbering = auto_voucher_numbering
+
+    # Attachment requirements
     if require_attachment_journal_entry is not None:
         controls.require_attachment_journal_entry = require_attachment_journal_entry
     if require_attachment_expense is not None:
         controls.require_attachment_expense = require_attachment_expense
+    if require_attachment_payment is not None:
+        controls.require_attachment_payment = require_attachment_payment
+    if require_attachment_invoice is not None:
+        controls.require_attachment_invoice = require_attachment_invoice
+    if require_attachment_supplier_payment is not None:
+        controls.require_attachment_supplier_payment = require_attachment_supplier_payment
+    if require_attachment_purchase_invoice is not None:
+        controls.require_attachment_purchase_invoice = require_attachment_purchase_invoice
+    if require_attachment_credit_note is not None:
+        controls.require_attachment_credit_note = require_attachment_credit_note
+    if require_attachment_debit_note is not None:
+        controls.require_attachment_debit_note = require_attachment_debit_note
+    if require_attachment_bank_transaction is not None:
+        controls.require_attachment_bank_transaction = require_attachment_bank_transaction
+
+    # Approval requirements
     if require_approval_journal_entry is not None:
         controls.require_approval_journal_entry = require_approval_journal_entry
     if require_approval_expense is not None:
         controls.require_approval_expense = require_approval_expense
+    if require_approval_payment is not None:
+        controls.require_approval_payment = require_approval_payment
+    if require_approval_supplier_payment is not None:
+        controls.require_approval_supplier_payment = require_approval_supplier_payment
+    if require_approval_purchase_invoice is not None:
+        controls.require_approval_purchase_invoice = require_approval_purchase_invoice
+    if require_approval_credit_note is not None:
+        controls.require_approval_credit_note = require_approval_credit_note
+    if require_approval_debit_note is not None:
+        controls.require_approval_debit_note = require_approval_debit_note
+
+    # Special accounts
     if retained_earnings_account is not None:
         controls.retained_earnings_account = retained_earnings_account
     if fx_gain_account is not None:

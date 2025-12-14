@@ -571,6 +571,74 @@ def seed_default_currencies(db: Session) -> None:
     db.flush()
 
 
+def generate_voucher_number(db: Session, doctype: str, company: Optional[str] = None) -> str:
+    """
+    Convenience function to generate a document number.
+
+    This function maps doctype strings to DocumentType enum values and
+    generates the next number in sequence. If no format is configured,
+    falls back to a simple pattern.
+
+    Args:
+        db: Database session
+        doctype: Document type string (e.g., "supplier_payment", "invoice")
+        company: Optional company scope
+
+    Returns:
+        Generated document number string
+    """
+    from datetime import datetime
+
+    # Map common doctype strings to enum values
+    DOCTYPE_MAP = {
+        "supplier_payment": DocumentType.PAYMENT,
+        "customer_payment": DocumentType.RECEIPT,
+        "payment": DocumentType.PAYMENT,
+        "receipt": DocumentType.RECEIPT,
+        "invoice": DocumentType.INVOICE,
+        "sales_invoice": DocumentType.INVOICE,
+        "bill": DocumentType.BILL,
+        "purchase_invoice": DocumentType.BILL,
+        "credit_note": DocumentType.CREDIT_NOTE,
+        "debit_note": DocumentType.DEBIT_NOTE,
+        "journal_entry": DocumentType.JOURNAL_ENTRY,
+        "purchase_order": DocumentType.PURCHASE_ORDER,
+        "sales_order": DocumentType.SALES_ORDER,
+        "quotation": DocumentType.QUOTATION,
+        "delivery_note": DocumentType.DELIVERY_NOTE,
+        "goods_receipt": DocumentType.GOODS_RECEIPT,
+    }
+
+    doc_type_enum = DOCTYPE_MAP.get(doctype.lower())
+
+    if doc_type_enum:
+        generator = NumberGenerator(db)
+        try:
+            return generator.get_next_number(doc_type_enum, company=company)
+        except FormatNotFoundError:
+            pass  # Fall through to default generation
+
+    # Fallback: Generate a simple numbered format
+    prefix_map = {
+        "supplier_payment": "SP",
+        "customer_payment": "CP",
+        "payment": "PAY",
+        "receipt": "RCP",
+        "invoice": "INV",
+        "bill": "BILL",
+        "credit_note": "CN",
+        "debit_note": "DN",
+        "journal_entry": "JV",
+    }
+
+    prefix = prefix_map.get(doctype.lower(), doctype.upper()[:3])
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    import uuid
+    unique_suffix = uuid.uuid4().hex[:4].upper()
+
+    return f"{prefix}-{timestamp}-{unique_suffix}"
+
+
 def seed_default_settings(db: Session) -> None:
     """Seed default books settings if none exist."""
     from sqlalchemy import func

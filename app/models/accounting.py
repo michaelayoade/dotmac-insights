@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date
+from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, date
 from decimal import Decimal
@@ -234,25 +234,56 @@ class PurchaseInvoice(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
 
+    # Bill number
+    bill_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+
     supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     supplier_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # Supplier info (denormalized)
+    supplier_tax_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    supplier_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
+    # Amounts (document currency)
     grand_total: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     outstanding_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     paid_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    tax_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     currency: Mapped[str] = mapped_column(String(10), default="NGN")
+
+    # FX fields (base currency)
+    base_currency: Mapped[str] = mapped_column(String(10), default="NGN")
+    conversion_rate: Mapped[Decimal] = mapped_column(Numeric(18, 10), default=Decimal("1"))
+    base_grand_total: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+    base_tax_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+
+    # Payment terms
+    payment_terms_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("payment_terms_templates.id"), nullable=True
+    )
 
     status: Mapped[PurchaseInvoiceStatus] = mapped_column(Enum(PurchaseInvoiceStatus), default=PurchaseInvoiceStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
+
+    # Workflow
+    workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Additional links
+    fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
+    journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships - imported lazily to avoid circular imports
+    # lines: Mapped[List["BillLine"]] = relationship(back_populates="purchase_invoice")
 
     def __repr__(self) -> str:
         return f"<PurchaseInvoice {self.erpnext_id} - {self.supplier_name}>"
@@ -342,7 +373,7 @@ class BankTransactionStatus(enum.Enum):
 
 
 class BankTransaction(Base):
-    """Bank transactions from ERPNext - imported bank statement lines."""
+    """Bank transactions from ERPNext - imported bank statement lines or manual entries."""
 
     __tablename__ = "bank_transactions"
 
@@ -354,14 +385,31 @@ class BankTransaction(Base):
     bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # Amounts (document currency)
     deposit: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     withdrawal: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     currency: Mapped[str] = mapped_column(String(10), default="NGN")
+
+    # FX fields (base currency)
+    base_currency: Mapped[str] = mapped_column(String(10), default="NGN")
+    conversion_rate: Mapped[Decimal] = mapped_column(Numeric(18, 10), default=Decimal("1"))
+    base_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
 
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     reference_number: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     transaction_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     transaction_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Payee information
+    payee_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    payee_account: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Statement reference
+    statement_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    statement_line_no: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Manual entry flag
+    is_manual_entry: Mapped[bool] = mapped_column(default=False)
 
     # Reconciliation
     allocated_amount: Mapped[Decimal] = mapped_column(default=Decimal("0"))
@@ -374,11 +422,20 @@ class BankTransaction(Base):
     bank_party_account_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     bank_party_iban: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    # Workflow
+    workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     docstatus: Mapped[int] = mapped_column(default=0)
+
+    # Audit
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships - splits for line-level allocation
+    # splits: Mapped[List["BankTransactionSplit"]] = relationship(back_populates="bank_transaction")
 
     def __repr__(self) -> str:
         return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"

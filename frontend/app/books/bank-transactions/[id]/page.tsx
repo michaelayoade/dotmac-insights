@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Landmark, FileText } from 'lucide-react';
 import { useAccountingBankTransactionDetail } from '@/hooks/useApi';
 import { formatCurrency } from '@/lib/utils';
+import { ReconciliationPanel } from '@/components/bank/ReconciliationPanel';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -154,6 +155,14 @@ export default function BankTransactionDetailPage() {
           </div>
         </div>
       ) : null}
+
+      {/* Reconciliation Panel */}
+      <ReconciliationPanel
+        transactionId={data.id}
+        transactionAmount={data.amount ?? data.deposit ?? data.withdrawal ?? 0}
+        currentAllocated={data.allocated_amount ?? 0}
+        currency={currency}
+      />
     </div>
   );
 }

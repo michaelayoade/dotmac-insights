@@ -17,11 +17,157 @@ T = TypeVar("T")
 
 
 # =============================================================================
+# Sign Convention Documentation
+# =============================================================================
+"""
+IFRS Sign Conventions (enforced throughout the system):
+
+BALANCE SHEET (cumulative balances):
+- Assets: Positive debit balance (debit - credit > 0)
+- Liabilities: Positive credit balance (stored as positive in API responses)
+- Equity: Positive credit balance (stored as positive in API responses)
+
+INCOME STATEMENT (period flows):
+- Revenue: Positive amounts (credit increases)
+- Expenses: Positive amounts (debit increases)
+- Net Income = Revenue - Expenses (positive = profit)
+
+CASH FLOW STATEMENT:
+- Inflows: Positive amounts
+- Outflows: Negative amounts
+- Net change = Opening + Net Flow = Closing
+
+STATEMENT OF CHANGES IN EQUITY:
+- Opening balances: Positive
+- Increases (profit, issues): Positive
+- Decreases (losses, dividends, buybacks): Negative
+- Closing balance = Opening + all movements
+"""
+
+
+# =============================================================================
 # Constants
 # =============================================================================
 
 LIABILITY_ACCOUNT_TYPES = {"Payable", "Current Liability"}
 ASSET_ACCOUNT_TYPES = {"Receivable", "Bank", "Cash", "Fixed Asset", "Stock", "Current Asset"}
+
+# Cost of Goods Sold account types for Income Statement classification
+COGS_ACCOUNT_TYPES = {"Cost of Goods Sold", "Stock Adjustment", "Stock Received But Not Billed"}
+COGS_ACCOUNT_KEYWORDS = {"cost of goods", "cogs", "cost of sales", "direct cost", "stock adjustment"}
+
+# Operating expense categories for better P&L presentation
+OPERATING_EXPENSE_TYPES = {
+    "Expense Account", "Indirect Expense", "Administrative Expense",
+    "Selling Expense", "Marketing Expense",
+}
+
+# Current vs Non-Current classification for Balance Sheet (GAAP/IFRS)
+CURRENT_ASSET_TYPES = {
+    "Bank", "Cash", "Receivable", "Stock", "Current Asset",
+    "Temporary Asset", "Prepaid Expense",
+}
+NON_CURRENT_ASSET_TYPES = {
+    "Fixed Asset", "Capital Work in Progress", "Accumulated Depreciation",
+    "Investment", "Long Term Investment", "Intangible Asset",
+}
+CURRENT_LIABILITY_TYPES = {
+    "Payable", "Current Liability", "Tax Liability", "Short Term Loan",
+    "Accrued Liability",
+}
+NON_CURRENT_LIABILITY_TYPES = {
+    "Long Term Liability", "Loan", "Deferred Tax", "Long Term Loan",
+    "Provision",
+}
+
+# Equity component classification for IFRS Statement of Changes in Equity
+SHARE_CAPITAL_TYPES = {
+    "Share Capital", "Ordinary Share Capital", "Preference Share Capital",
+    "Common Stock", "Preferred Stock", "Capital Stock",
+}
+SHARE_PREMIUM_TYPES = {
+    "Share Premium", "Additional Paid-In Capital", "Capital Surplus",
+    "Share Premium Account",
+}
+RESERVE_TYPES = {
+    "Reserve", "Statutory Reserve", "General Reserve", "Legal Reserve",
+    "Revaluation Reserve", "Capital Reserve", "Revenue Reserve",
+}
+TREASURY_SHARE_TYPES = {
+    "Treasury Stock", "Treasury Shares", "Own Shares",
+}
+OCI_RESERVE_TYPES = {
+    "Other Comprehensive Income", "OCI Reserve", "Revaluation Surplus",
+    "Foreign Currency Translation Reserve", "Fair Value Reserve",
+    "Cash Flow Hedge Reserve", "Available for Sale Reserve",
+}
+RETAINED_EARNINGS_TYPES = {
+    "Retained Earnings", "Accumulated Profit", "Accumulated Loss",
+    "Profit and Loss Account", "Undistributed Profits",
+}
+
+# Finance income/cost account types for IFRS Income Statement
+FINANCE_INCOME_TYPES = {
+    "Interest Income", "Investment Income", "Dividend Income",
+    "Finance Income", "Bank Interest",
+}
+FINANCE_COST_TYPES = {
+    "Interest Expense", "Finance Cost", "Bank Charges", "Interest on Loan",
+    "Finance Charges", "Loan Interest",
+}
+TAX_EXPENSE_TYPES = {
+    "Income Tax", "Tax Expense", "Corporate Tax", "Deferred Tax Expense",
+    "Current Tax", "Tax Provision",
+}
+
+# IFRS 16 - Lease accounting classifications
+RIGHT_OF_USE_ASSET_TYPES = {
+    "Right of Use Asset", "ROU Asset", "Lease Asset",
+    "Right-of-Use Asset", "Operating Lease Asset",
+}
+LEASE_LIABILITY_TYPES = {
+    "Lease Liability", "Operating Lease Liability", "Finance Lease Liability",
+    "Lease Obligation", "Right of Use Liability",
+}
+
+# IAS 12 - Deferred tax classifications
+DEFERRED_TAX_ASSET_TYPES = {
+    "Deferred Tax Asset", "DTA", "Deferred Tax Receivable",
+}
+DEFERRED_TAX_LIABILITY_TYPES = {
+    "Deferred Tax Liability", "DTL", "Deferred Tax Payable",
+}
+
+# IAS 37 - Provisions and contingent liabilities
+PROVISION_TYPES = {
+    "Provision", "Provision for", "Warranty Provision",
+    "Restructuring Provision", "Legal Provision", "Environmental Provision",
+    "Contingency Reserve",
+}
+
+# IFRS 2 - Share-based payment classifications
+SHARE_BASED_PAYMENT_TYPES = {
+    "Share Based Payment", "Stock Compensation", "Share Option Reserve",
+    "Employee Share Scheme", "ESOP Reserve", "Stock Based Compensation",
+}
+
+# OCI classifications for may/may-not reclassify split (IAS 1)
+OCI_MAY_RECLASSIFY_TYPES = {
+    "Cash Flow Hedge Reserve", "Foreign Currency Translation Reserve",
+    "Available for Sale Reserve", "Hedging Reserve", "Translation Reserve",
+}
+OCI_NOT_RECLASSIFY_TYPES = {
+    "Revaluation Surplus", "Actuarial Gains Losses", "FVOCI Equity Reserve",
+    "Remeasurement Reserve", "Property Revaluation Reserve",
+}
+
+# Depreciation and amortization for D&A tracking
+DEPRECIATION_TYPES = {
+    "Depreciation", "Accumulated Depreciation", "Depreciation Expense",
+}
+AMORTIZATION_TYPES = {
+    "Amortization", "Accumulated Amortization", "Amortization Expense",
+}
 
 REPORT_CACHE_KEYS = [
     "accounting-dashboard",
@@ -231,6 +377,213 @@ def get_effective_root_type(acc: Account) -> Optional[AccountType]:
         return AccountType.LIABILITY
 
     return acc.root_type
+
+
+def is_cogs_account(acc: Account) -> bool:
+    """Determine if an expense account is Cost of Goods Sold.
+
+    COGS accounts are identified by:
+    1. Account type being in COGS_ACCOUNT_TYPES
+    2. Account name containing COGS-related keywords
+
+    Args:
+        acc: Account model instance
+
+    Returns:
+        True if account is COGS, False otherwise
+    """
+    if not acc:
+        return False
+
+    # Check account type
+    if acc.account_type in COGS_ACCOUNT_TYPES:
+        return True
+
+    # Check account name for COGS keywords
+    acc_name_lower = (acc.account_name or "").lower()
+    for keyword in COGS_ACCOUNT_KEYWORDS:
+        if keyword in acc_name_lower:
+            return True
+
+    return False
+
+
+def is_finance_income_account(acc: Account) -> bool:
+    """Determine if an account is finance income (IAS 1)."""
+    if not acc:
+        return False
+    if acc.account_type in FINANCE_INCOME_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["interest income", "finance income", "investment income"])
+
+
+def is_finance_cost_account(acc: Account) -> bool:
+    """Determine if an account is finance cost (IAS 1)."""
+    if not acc:
+        return False
+    if acc.account_type in FINANCE_COST_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["interest expense", "finance cost", "bank charges"])
+
+
+def is_tax_expense_account(acc: Account) -> bool:
+    """Determine if an account is tax expense (IAS 12)."""
+    if not acc:
+        return False
+    if acc.account_type in TAX_EXPENSE_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["income tax", "tax expense", "corporate tax"])
+
+
+def is_depreciation_account(acc: Account) -> bool:
+    """Determine if an account is depreciation or amortization."""
+    if not acc:
+        return False
+    if acc.account_type in DEPRECIATION_TYPES or acc.account_type in AMORTIZATION_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["depreciation", "amortization"])
+
+
+def is_lease_asset_account(acc: Account) -> bool:
+    """Determine if an account is a right-of-use asset (IFRS 16)."""
+    if not acc:
+        return False
+    if acc.account_type in RIGHT_OF_USE_ASSET_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["right of use", "rou asset", "lease asset"])
+
+
+def is_lease_liability_account(acc: Account) -> bool:
+    """Determine if an account is a lease liability (IFRS 16)."""
+    if not acc:
+        return False
+    if acc.account_type in LEASE_LIABILITY_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["lease liability", "lease obligation"])
+
+
+def is_deferred_tax_asset_account(acc: Account) -> bool:
+    """Determine if an account is a deferred tax asset (IAS 12)."""
+    if not acc:
+        return False
+    if acc.account_type in DEFERRED_TAX_ASSET_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return "deferred tax asset" in acc_name_lower or "dta" in acc_name_lower
+
+
+def is_deferred_tax_liability_account(acc: Account) -> bool:
+    """Determine if an account is a deferred tax liability (IAS 12)."""
+    if not acc:
+        return False
+    if acc.account_type in DEFERRED_TAX_LIABILITY_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return "deferred tax liability" in acc_name_lower or "dtl" in acc_name_lower
+
+
+def is_provision_account(acc: Account) -> bool:
+    """Determine if an account is a provision (IAS 37)."""
+    if not acc:
+        return False
+    if acc.account_type in PROVISION_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return "provision" in acc_name_lower
+
+
+def is_share_based_payment_account(acc: Account) -> bool:
+    """Determine if an account is share-based payment related (IFRS 2)."""
+    if not acc:
+        return False
+    if acc.account_type in SHARE_BASED_PAYMENT_TYPES:
+        return True
+    acc_name_lower = (acc.account_name or "").lower()
+    return any(kw in acc_name_lower for kw in ["share based", "stock compensation", "esop", "share option"])
+
+
+def classify_oci_account(acc: Account) -> Optional[str]:
+    """Classify an OCI account as may-reclassify or not-reclassify.
+
+    Args:
+        acc: Account model instance
+
+    Returns:
+        "may_reclassify", "not_reclassify", or None if not OCI
+    """
+    if not acc:
+        return None
+
+    if acc.account_type in OCI_MAY_RECLASSIFY_TYPES:
+        return "may_reclassify"
+    if acc.account_type in OCI_NOT_RECLASSIFY_TYPES:
+        return "not_reclassify"
+
+    # Check by name
+    acc_name_lower = (acc.account_name or "").lower()
+    if any(kw in acc_name_lower for kw in ["hedge", "translation", "available for sale"]):
+        return "may_reclassify"
+    if any(kw in acc_name_lower for kw in ["revaluation", "actuarial", "remeasurement"]):
+        return "not_reclassify"
+
+    return None
+
+
+def get_equity_component_type(acc: Account) -> Optional[str]:
+    """Classify an equity account into its IFRS component type.
+
+    Args:
+        acc: Account model instance
+
+    Returns:
+        One of: "share_capital", "share_premium", "reserves", "oci",
+        "retained_earnings", "treasury_shares", "share_based_payments", or None
+    """
+    if not acc or acc.root_type != AccountType.EQUITY:
+        return None
+
+    acc_type = acc.account_type
+    acc_name_lower = (acc.account_name or "").lower()
+
+    # Check account type first
+    if acc_type in SHARE_CAPITAL_TYPES:
+        return "share_capital"
+    if acc_type in SHARE_PREMIUM_TYPES:
+        return "share_premium"
+    if acc_type in TREASURY_SHARE_TYPES:
+        return "treasury_shares"
+    if acc_type in OCI_RESERVE_TYPES or acc_type in OCI_MAY_RECLASSIFY_TYPES or acc_type in OCI_NOT_RECLASSIFY_TYPES:
+        return "oci"
+    if acc_type in RETAINED_EARNINGS_TYPES:
+        return "retained_earnings"
+    if acc_type in SHARE_BASED_PAYMENT_TYPES:
+        return "share_based_payments"
+    if acc_type in RESERVE_TYPES:
+        return "reserves"
+
+    # Fall back to name-based classification
+    if any(kw in acc_name_lower for kw in ["share capital", "common stock", "capital stock"]):
+        return "share_capital"
+    if any(kw in acc_name_lower for kw in ["share premium", "additional paid"]):
+        return "share_premium"
+    if any(kw in acc_name_lower for kw in ["treasury", "own shares"]):
+        return "treasury_shares"
+    if any(kw in acc_name_lower for kw in ["oci", "comprehensive income", "hedge", "translation", "revaluation"]):
+        return "oci"
+    if any(kw in acc_name_lower for kw in ["retained", "accumulated profit", "accumulated loss"]):
+        return "retained_earnings"
+    if any(kw in acc_name_lower for kw in ["share based", "stock compensation", "esop"]):
+        return "share_based_payments"
+    if "reserve" in acc_name_lower:
+        return "reserves"
+
+    return "retained_earnings"  # Default for unclassified equity
 
 
 def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:

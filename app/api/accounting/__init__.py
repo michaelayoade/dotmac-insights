@@ -12,11 +12,17 @@ Sub-modules:
 - journal_entries: Journal entry CRUD and posting workflows
 - receivables: AR, aging, dunning, credit management
 - payables: AP, suppliers, aging
-- banking: Bank accounts, transactions, reconciliation
+- banking: Bank accounts, transactions, reconciliation, CRUD
 - fiscal: Fiscal years, periods, cost centers
 - workflows: Approval workflows, controls, audit log
 - tax: Tax templates, filing, payments
 - exports: Report exports (CSV/PDF)
+- tax_codes: Tax code entities with rates and jurisdiction
+- payment_terms: Payment terms templates and due date calculation
+- ap_payments: Supplier payments with allocations and workflow
+- ar_payments: Customer payments with allocations
+- notes: Credit notes (AR) and debit notes (AP)
+- attachments: Document attachment upload and management
 """
 
 from fastapi import APIRouter
@@ -32,6 +38,12 @@ from .fiscal import router as fiscal_router
 from .workflows import router as workflows_router
 from .tax import router as tax_router
 from .exports import router as exports_router
+from .tax_codes import router as tax_codes_router
+from .payment_terms import router as payment_terms_router
+from .ap_payments import router as ap_payments_router
+from .ar_payments import router as ar_payments_router
+from .notes import router as notes_router
+from .attachments import router as attachments_router
 
 router = APIRouter(tags=["accounting"])
 
@@ -47,6 +59,12 @@ router.include_router(fiscal_router, tags=["Accounting - Fiscal"])
 router.include_router(workflows_router, tags=["Accounting - Workflows"])
 router.include_router(tax_router, tags=["Accounting - Tax"])
 router.include_router(exports_router, tags=["Accounting - Exports"])
+router.include_router(tax_codes_router, tags=["Accounting - Tax Codes"])
+router.include_router(payment_terms_router, tags=["Accounting - Payment Terms"])
+router.include_router(ap_payments_router, tags=["Accounting - AP Payments"])
+router.include_router(ar_payments_router, tags=["Accounting - AR Payments"])
+router.include_router(notes_router, tags=["Accounting - Credit/Debit Notes"])
+router.include_router(attachments_router, tags=["Accounting - Attachments"])
 
 # Re-export common items for convenience
 from .helpers import (

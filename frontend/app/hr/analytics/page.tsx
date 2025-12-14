@@ -55,17 +55,18 @@ function PillList({ data, label }: { data: Record<string, number>; label?: strin
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrAnalyticsPage() {
-  const [company, setCompany] = useState('');
-  const { data: overview } = useHrAnalyticsOverview({ company: company || undefined });
-  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ company: company || undefined, months: 6 });
-  const { data: attendanceTrend } = useHrAnalyticsAttendanceTrend({ company: company || undefined, days: 14 });
-  const { data: payrollSummary } = useHrAnalyticsPayrollSummary({ company: company || undefined });
-  const { data: payrollTrend } = useHrAnalyticsPayrollTrend({ company: company || undefined });
-  const { data: payrollComponents } = useHrAnalyticsPayrollComponents({ company: company || undefined, limit: 20 });
-  const { data: recruitmentFunnel } = useHrAnalyticsRecruitmentFunnel({ company: company || undefined });
-  const { data: appraisalStatus } = useHrAnalyticsAppraisalStatus({ company: company || undefined });
-  const { data: lifecycleEvents } = useHrAnalyticsLifecycleEvents({ company: company || undefined });
+  const { data: overview } = useHrAnalyticsOverview({ company: SINGLE_COMPANY || undefined });
+  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ company: SINGLE_COMPANY || undefined, months: 6 });
+  const { data: attendanceTrend } = useHrAnalyticsAttendanceTrend({ company: SINGLE_COMPANY || undefined, days: 14 });
+  const { data: payrollSummary } = useHrAnalyticsPayrollSummary({ company: SINGLE_COMPANY || undefined });
+  const { data: payrollTrend } = useHrAnalyticsPayrollTrend({ company: SINGLE_COMPANY || undefined });
+  const { data: payrollComponents } = useHrAnalyticsPayrollComponents({ company: SINGLE_COMPANY || undefined, limit: 20 });
+  const { data: recruitmentFunnel } = useHrAnalyticsRecruitmentFunnel({ company: SINGLE_COMPANY || undefined });
+  const { data: appraisalStatus } = useHrAnalyticsAppraisalStatus({ company: SINGLE_COMPANY || undefined });
+  const { data: lifecycleEvents } = useHrAnalyticsLifecycleEvents({ company: SINGLE_COMPANY || undefined });
 
   const payrollComponentRows = useMemo(
     () => (payrollComponents || []).map((item, idx) => ({ ...item, id: item.salary_component || idx })),
@@ -74,23 +75,6 @@ export default function HrAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <p className="text-xs text-slate-muted mb-3">Filter Analytics</p>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Company</FormLabel>
-            <input
-              type="text"
-              placeholder="All companies"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Stat label="Leave Applications (30d)" value={Object.values(overview?.leave_by_status || {}).reduce((a, b) => a + b, 0)} tone="text-amber-300" />

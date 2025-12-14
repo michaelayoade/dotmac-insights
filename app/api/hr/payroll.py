@@ -31,6 +31,15 @@ from app.models.hr_payroll import (
 )
 from app.models.employee import Employee
 from .helpers import decimal_or_default, csv_response, validate_date_order, status_counts, now
+from app.api.integrations.transfers import get_transfer_client, generate_transfer_reference
+from app.models.transfer import Transfer, TransferType, TransferStatus
+from app.models.gateway_transaction import GatewayProvider
+from app.integrations.payments.base import TransferRecipient, TransferRequest
+from app.models.hr_payroll import SalarySlipStatus
+from app.integrations.payments.config import get_payment_settings
+
+# Nigerian Tax Integration
+from app.api.tax.payroll_integration import calculate_slip_deductions, STATUTORY_COMPONENTS
 
 router = APIRouter()
 
@@ -71,6 +80,23 @@ class SalaryComponentUpdate(BaseModel):
     do_not_include_in_total: Optional[bool] = None
     disabled: Optional[bool] = None
     default_account: Optional[str] = None
+
+
+# =============================================================================
+# Payroll payout schemas
+# =============================================================================
+
+class PayrollPayoutItem(BaseModel):
+    salary_slip_id: int
+    account_number: str = Field(..., min_length=10, max_length=20)
+    bank_code: str = Field(..., min_length=2, max_length=10)
+    account_name: Optional[str] = None
+
+
+class PayrollPayoutRequest(BaseModel):
+    payouts: List[PayrollPayoutItem]
+    provider: Optional[str] = None  # paystack/flutterwave
+    currency: Optional[str] = "NGN"
 
 
 @router.get("/salary-components", dependencies=[Depends(Require("hr:read"))])
@@ -1485,18 +1511,77 @@ async def generate_payroll_slips(
             })
             continue
 
-        # Calculate totals from structure
+        # Calculate totals from structure and categorize earnings
         gross_pay = Decimal("0")
-        total_deduction = Decimal("0")
+        basic_salary = Decimal("0")
+        housing_allowance = Decimal("0")
+        transport_allowance = Decimal("0")
+        other_allowances = Decimal("0")
+        structure_deductions = Decimal("0")
 
+        # Categorize earnings for tax calculation
         for earning in structure.earnings:
-            if not earning.statistical_component and not earning.do_not_include_in_total:
-                gross_pay += earning.amount or Decimal("0")
+            if earning.statistical_component or earning.do_not_include_in_total:
+                continue
+            amount = earning.amount or Decimal("0")
+            gross_pay += amount
+            comp_name = (earning.salary_component or "").lower()
 
+            if "basic" in comp_name:
+                basic_salary += amount
+            elif "housing" in comp_name:
+                housing_allowance += amount
+            elif "transport" in comp_name:
+                transport_allowance += amount
+            else:
+                other_allowances += amount
+
+        # If no basic salary component found, use base from assignment
+        if basic_salary == Decimal("0") and assignment.base:
+            basic_salary = assignment.base
+
+        # Get employee for employment type
+        employee = db.query(Employee).filter(Employee.id == assignment.employee_id).first()
+        employment_type = None
+        months_of_service = None
+        if employee:
+            # Use enum value if available, otherwise fall back to string field
+            if hasattr(employee, 'employment_type_enum') and employee.employment_type_enum:
+                employment_type = employee.employment_type_enum.value if hasattr(employee.employment_type_enum, 'value') else str(employee.employment_type_enum)
+            else:
+                employment_type = employee.employment_type
+
+            # Calculate months of service for pension eligibility
+            if employee.date_of_joining:
+                from datetime import datetime
+                today = entry.posting_date or datetime.now().date()
+                delta = today - employee.date_of_joining.date() if hasattr(employee.date_of_joining, 'date') else today - employee.date_of_joining
+                months_of_service = delta.days // 30
+
+        # Calculate statutory deductions using Nigerian tax module
+        # Respects employment type eligibility (e.g., INTERN, NYSC exempt from some deductions)
+        statutory = calculate_slip_deductions(
+            basic_salary=basic_salary,
+            housing_allowance=housing_allowance,
+            transport_allowance=transport_allowance,
+            other_allowances=other_allowances,
+            employment_type=employment_type,
+            months_of_service=months_of_service,
+            db=db,
+            payroll_date=entry.posting_date,
+        )
+
+        # Sum non-statutory deductions from structure
         for deduction in structure.deductions:
             if not deduction.statistical_component and not deduction.do_not_include_in_total:
-                total_deduction += deduction.amount or Decimal("0")
+                # Skip statutory components that we'll add from tax calc
+                comp_name = (deduction.salary_component or "").lower()
+                if any(x in comp_name for x in ["paye", "pension", "nhf", "nhis"]):
+                    continue
+                structure_deductions += deduction.amount or Decimal("0")
 
+        # Total deduction = statutory + structure deductions
+        total_deduction = statutory["total_employee_deductions"] + structure_deductions
         net_pay = gross_pay - total_deduction
 
         # Create salary slip
@@ -1536,8 +1621,75 @@ async def generate_payroll_slips(
             )
             db.add(slip_earning)
 
-        # Copy deductions from structure
-        for idx, deduction in enumerate(structure.deductions):
+        # Add statutory deductions from Nigerian tax calculation
+        deduction_idx = 0
+
+        # PAYE (only if not exempt)
+        if statutory["paye"] > Decimal("0"):
+            slip_deduction = SalarySlipDeduction(
+                salary_slip_id=slip.id,
+                salary_component=STATUTORY_COMPONENTS["PAYE"]["name"],
+                abbr=STATUTORY_COMPONENTS["PAYE"]["abbr"],
+                amount=statutory["paye"],
+                default_amount=statutory["paye"],
+                statistical_component=False,
+                do_not_include_in_total=False,
+                idx=deduction_idx,
+            )
+            db.add(slip_deduction)
+            deduction_idx += 1
+
+        # Pension - Employee
+        if statutory["pension_employee"] > Decimal("0"):
+            slip_deduction = SalarySlipDeduction(
+                salary_slip_id=slip.id,
+                salary_component=STATUTORY_COMPONENTS["PENSION_EMPLOYEE"]["name"],
+                abbr=STATUTORY_COMPONENTS["PENSION_EMPLOYEE"]["abbr"],
+                amount=statutory["pension_employee"],
+                default_amount=statutory["pension_employee"],
+                statistical_component=False,
+                do_not_include_in_total=False,
+                idx=deduction_idx,
+            )
+            db.add(slip_deduction)
+            deduction_idx += 1
+
+        # NHF
+        if statutory["nhf"] > Decimal("0"):
+            slip_deduction = SalarySlipDeduction(
+                salary_slip_id=slip.id,
+                salary_component=STATUTORY_COMPONENTS["NHF"]["name"],
+                abbr=STATUTORY_COMPONENTS["NHF"]["abbr"],
+                amount=statutory["nhf"],
+                default_amount=statutory["nhf"],
+                statistical_component=False,
+                do_not_include_in_total=False,
+                idx=deduction_idx,
+            )
+            db.add(slip_deduction)
+            deduction_idx += 1
+
+        # NHIS - Employee
+        if statutory["nhis_employee"] > Decimal("0"):
+            slip_deduction = SalarySlipDeduction(
+                salary_slip_id=slip.id,
+                salary_component=STATUTORY_COMPONENTS["NHIS_EMPLOYEE"]["name"],
+                abbr=STATUTORY_COMPONENTS["NHIS_EMPLOYEE"]["abbr"],
+                amount=statutory["nhis_employee"],
+                default_amount=statutory["nhis_employee"],
+                statistical_component=False,
+                do_not_include_in_total=False,
+                idx=deduction_idx,
+            )
+            db.add(slip_deduction)
+            deduction_idx += 1
+
+        # Add non-statutory deductions from structure (skip statutory ones)
+        for deduction in structure.deductions:
+            comp_name = (deduction.salary_component or "").lower()
+            # Skip statutory components already added
+            if any(x in comp_name for x in ["paye", "pension", "nhf", "nhis"]):
+                continue
             slip_deduction = SalarySlipDeduction(
                 salary_slip_id=slip.id,
                 salary_component=deduction.salary_component,
@@ -1546,9 +1698,10 @@ async def generate_payroll_slips(
                 default_amount=deduction.amount or Decimal("0"),
                 statistical_component=deduction.statistical_component,
                 do_not_include_in_total=deduction.do_not_include_in_total,
-                idx=idx,
+                idx=deduction_idx,
             )
             db.add(slip_deduction)
+            deduction_idx += 1
 
         created.append({
             "id": slip.id,
@@ -1556,6 +1709,9 @@ async def generate_payroll_slips(
             "employee_id": assignment.employee_id,
             "gross_pay": float(gross_pay),
             "net_pay": float(net_pay),
+            "paye": float(statutory["paye"]),
+            "pension": float(statutory["pension_employee"]),
+            "is_paye_exempt": statutory["is_paye_exempt"],
         })
 
     # Mark entry as having slips created
@@ -1695,6 +1851,272 @@ async def void_salary_slip(
 
     db.commit()
     return await get_salary_slip(slip_id, db)
+
+
+# =============================================================================
+# PAYROLL PAYOUTS VIA PAYMENT INTEGRATIONS
+# =============================================================================
+
+@router.post(
+    "/payroll-entries/{entry_id}/payouts",
+    dependencies=[Depends(Require("hr:write"))],
+)
+async def initiate_payroll_payouts(
+    entry_id: int,
+    payload: PayrollPayoutRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Initiate bank transfers for salary slips in a payroll entry.
+    """
+    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Payroll entry not found")
+
+    if not payload.payouts:
+        raise HTTPException(status_code=400, detail="No payouts supplied")
+
+    slip_ids = [p.salary_slip_id for p in payload.payouts]
+    slips = (
+        db.query(SalarySlip)
+        .filter(SalarySlip.id.in_(slip_ids))
+        .all()
+    )
+    slip_map = {s.id: s for s in slips}
+
+    missing = [sid for sid in slip_ids if sid not in slip_map]
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Salary slips not found: {missing}",
+        )
+
+    # Ensure slips belong to this payroll entry and are payable
+    for slip in slips:
+        if slip.payroll_entry != f"PAYROLL-{entry.id}":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Slip {slip.id} does not belong to payroll entry {entry.id}",
+            )
+        if slip.status not in (SalarySlipStatus.SUBMITTED, SalarySlipStatus.DRAFT):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Slip {slip.id} is not payable (status: {slip.status.value})",
+            )
+
+    client = get_transfer_client(payload.provider)
+    try:
+        transfer_requests: List[TransferRequest] = []
+        for payout in payload.payouts:
+            slip = slip_map[payout.salary_slip_id]
+            amount = slip.net_pay or Decimal("0")
+            if amount <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Slip {slip.id} has no payable amount",
+                )
+
+            currency = payload.currency or slip.currency or "NGN"
+            recipient = TransferRecipient(
+                account_number=payout.account_number,
+                bank_code=payout.bank_code,
+                account_name=payout.account_name or slip.employee_name or slip.employee,
+                currency=currency,
+            )
+
+            transfer_requests.append(
+                TransferRequest(
+                    amount=amount,
+                    currency=currency,
+                    recipient=recipient,
+                    reference=generate_transfer_reference(),
+                    reason=f"Payroll {entry.id} - {slip.employee}",
+                    metadata={"salary_slip_id": slip.id, "payroll_entry_id": entry.id},
+                )
+            )
+
+        # Initiate transfers (bulk when more than one)
+        if len(transfer_requests) > 1:
+            results = await client.initiate_bulk_transfer(transfer_requests)
+        else:
+            single_result = await client.initiate_transfer(transfer_requests[0])
+            results = [single_result]
+
+        status_map = {
+            "success": TransferStatus.SUCCESS,
+            "failed": TransferStatus.FAILED,
+            "pending": TransferStatus.PENDING,
+            "processing": TransferStatus.PROCESSING,
+            "reversed": TransferStatus.REVERSED,
+        }
+        provider_value = (payload.provider or "").lower()
+        provider_enum = (
+            GatewayProvider.FLUTTERWAVE
+            if provider_value == GatewayProvider.FLUTTERWAVE.value
+            else GatewayProvider.PAYSTACK
+        )
+
+        response_items = []
+        for transfer_request, result in zip(transfer_requests, results):
+            slip_id = transfer_request.metadata.get("salary_slip_id")
+            slip = slip_map[slip_id]
+
+            transfer_record = Transfer(
+                reference=result.reference,
+                provider=provider_enum,
+                provider_reference=result.provider_reference,
+                transfer_type=TransferType.PAYROLL,
+                amount=transfer_request.amount,
+                currency=transfer_request.currency,
+                status=status_map.get(result.status.value, TransferStatus.PENDING),
+                recipient_account=transfer_request.recipient.account_number,
+                recipient_bank_code=transfer_request.recipient.bank_code,
+                recipient_name=transfer_request.recipient.account_name,
+                recipient_code=result.recipient_code,
+                reason=transfer_request.reason,
+                fee=result.fee,
+                employee_id=slip.employee_id,
+                salary_slip_id=slip.id,
+                payroll_run_id=entry.id,
+                company=slip.company,
+                created_by_id=current_user.id if current_user else None,
+            )
+            db.add(transfer_record)
+
+            # Update slip payment info
+            slip.payment_reference = result.reference
+            slip.payment_mode = "bank_transfer"
+            slip.paid_at = now()
+            slip.paid_by_id = current_user.id if current_user else None
+            if result.status.value == "success":
+                slip.status = SalarySlipStatus.PAID
+
+            response_items.append(
+                {
+                    "reference": result.reference,
+                    "provider_reference": result.provider_reference,
+                    "status": result.status.value,
+                    "amount": float(result.amount),
+                    "salary_slip_id": slip.id,
+                }
+            )
+
+        db.commit()
+
+        return {
+            "count": len(response_items),
+            "transfers": response_items,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+    finally:
+        await client.close()
+
+
+# =============================================================================
+# HANDOFF TO BOOKS
+# =============================================================================
+
+@router.post(
+    "/payroll-entries/{entry_id}/handoff",
+    dependencies=[Depends(Require("hr:write"))],
+)
+async def handoff_payroll_to_books(
+    entry_id: int,
+    payload: PayrollPayoutRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Create transfer drafts for a payroll entry without initiating payouts.
+
+    Accounting can pay these from the Books gateway UI.
+    """
+    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Payroll entry not found")
+
+    if not payload.payouts:
+        raise HTTPException(status_code=400, detail="No payouts supplied")
+
+    slip_ids = [p.salary_slip_id for p in payload.payouts]
+    slips = (
+        db.query(SalarySlip)
+        .filter(SalarySlip.id.in_(slip_ids))
+        .all()
+    )
+    slip_map = {s.id: s for s in slips}
+
+    missing = [sid for sid in slip_ids if sid not in slip_map]
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Salary slips not found: {missing}",
+        )
+
+    for slip in slips:
+        if slip.payroll_entry != f"PAYROLL-{entry.id}":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Slip {slip.id} does not belong to payroll entry {entry.id}",
+            )
+
+    settings = get_payment_settings()
+    provider_value = (payload.provider or settings.default_transfer_provider).lower()
+    provider_enum = (
+        GatewayProvider.FLUTTERWAVE
+        if provider_value == GatewayProvider.FLUTTERWAVE.value
+        else GatewayProvider.PAYSTACK
+    )
+
+    drafts = []
+    for payout in payload.payouts:
+        slip = slip_map[payout.salary_slip_id]
+        amount = slip.net_pay or Decimal("0")
+        if amount <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Slip {slip.id} has no payable amount",
+            )
+
+        reference = generate_transfer_reference()
+        transfer = Transfer(
+            reference=reference,
+            provider=provider_enum,
+            transfer_type=TransferType.PAYROLL,
+            amount=amount,
+            currency=payload.currency or slip.currency or "NGN",
+            status=TransferStatus.PENDING,
+            recipient_account=payout.account_number,
+            recipient_bank_code=payout.bank_code,
+            recipient_name=payout.account_name or slip.employee_name or slip.employee,
+            reason=f"Payroll {entry.id} - {slip.employee}",
+            employee_id=slip.employee_id,
+            salary_slip_id=slip.id,
+            payroll_run_id=entry.id,
+            company=slip.company,
+            created_by_id=current_user.id if current_user else None,
+        )
+        db.add(transfer)
+        drafts.append({"reference": reference, "salary_slip_id": slip.id})
+
+        # Mark slip as submitted for payment
+        if slip.status == SalarySlipStatus.DRAFT:
+            slip.status = SalarySlipStatus.SUBMITTED
+
+    db.commit()
+
+    return {
+        "count": len(drafts),
+        "drafts": drafts,
+    }
 
 
 # =============================================================================

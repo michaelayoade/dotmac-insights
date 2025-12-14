@@ -63,16 +63,17 @@ function StatCard({
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrAppraisalsPage() {
   const [status, setStatus] = useState('draft');
-  const [company, setCompany] = useState('');
   const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { data: templates, isLoading: templatesLoading } = useHrAppraisalTemplates({ company: company || undefined });
+  const { data: templates, isLoading: templatesLoading } = useHrAppraisalTemplates({ company: SINGLE_COMPANY || undefined });
   const { data: appraisals, isLoading: appraisalsLoading } = useHrAppraisals({
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     status: status || undefined,
     limit,
     offset,
@@ -94,19 +95,6 @@ export default function HrAppraisalsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <p className="text-xs text-slate-muted mb-3">Filter Appraisals</p>
         <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Company</FormLabel>
-            <input
-              type="text"
-              placeholder="All companies"
-              value={company}
-              onChange={(e) => {
-                setCompany(e.target.value);
-                setOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            />
-          </div>
           <div>
             <FormLabel>Status</FormLabel>
             <select

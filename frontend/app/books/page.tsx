@@ -1,5 +1,19 @@
 'use client';
 
+import { useMemo } from 'react';
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import {
   useAccountingBalanceSheet,
   useAccountingIncomeStatement,
@@ -11,6 +25,7 @@ import {
   useAccountingDashboard,
   useAccountingReceivablesOutstanding,
   useAccountingPayablesOutstanding,
+  useAccountingCashFlow,
 } from '@/hooks/useApi';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -34,6 +49,13 @@ import {
   FileText,
   Plus,
 } from 'lucide-react';
+
+// Chart color palette matching the teal/finance theme
+const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899'];
+const TOOLTIP_STYLE = {
+  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' },
+  labelStyle: { color: '#f8fafc' },
+};
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -113,6 +135,28 @@ function RatioCard({ title, value, description, status }: RatioCardProps) {
   );
 }
 
+function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        {Icon && <Icon className="w-5 h-5 text-teal-electric" />}
+        <div>
+          <h3 className="text-white font-semibold">{title}</h3>
+          {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function formatCompactCurrency(value: number): string {
+  if (value >= 1000000000) return `₦${(value / 1000000000).toFixed(1)}B`;
+  if (value >= 1000000) return `₦${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `₦${(value / 1000).toFixed(0)}K`;
+  return `₦${value.toFixed(0)}`;
+}
+
 export default function AccountingDashboardPage() {
   const currency = 'NGN';
   // Fetch data from multiple endpoints
@@ -126,6 +170,7 @@ export default function AccountingDashboardPage() {
   const { data: fiscalYears } = useAccountingFiscalYears();
   const { data: receivablesOutstanding } = useAccountingReceivablesOutstanding({ currency, top: 5 });
   const { data: payablesOutstanding } = useAccountingPayablesOutstanding({ currency, top: 5 });
+  const { data: cashFlow } = useAccountingCashFlow();
 
   const loading = bsLoading || isLoading || dashboardLoading;
 
@@ -172,6 +217,65 @@ export default function AccountingDashboardPage() {
   const apOutstanding = payablesOutstanding?.total || 0;
   const topCustomers = receivablesOutstanding?.top || [];
   const topSuppliers = payablesOutstanding?.top || [];
+
+  // Chart data: Balance sheet composition
+  const balanceSheetData = useMemo(() => {
+    return [
+      { name: 'Assets', value: totalAssets, color: '#3b82f6' },
+      { name: 'Liabilities', value: totalLiabilities, color: '#ef4444' },
+      { name: 'Equity', value: totalEquity, color: '#10b981' },
+    ].filter(item => item.value > 0);
+  }, [totalAssets, totalLiabilities, totalEquity]);
+
+  // Chart data: Revenue vs Expenses comparison
+  const revenueExpenseData = useMemo(() => {
+    const cogs = incomeStatement?.cost_of_goods_sold?.total || 0;
+    const opex = incomeStatement?.operating_expenses?.total || 0;
+    const otherExp = incomeStatement?.other_expenses?.total || 0;
+    const otherInc = incomeStatement?.other_income?.total || 0;
+
+    return [
+      { name: 'Revenue', amount: totalRevenue, fill: '#10b981' },
+      { name: 'COGS', amount: cogs, fill: '#f59e0b' },
+      { name: 'Operating', amount: opex, fill: '#8b5cf6' },
+      { name: 'Other Exp', amount: otherExp, fill: '#ef4444' },
+      { name: 'Other Inc', amount: otherInc, fill: '#2dd4bf' },
+      { name: 'Net Income', amount: netIncome, fill: netIncome >= 0 ? '#10b981' : '#ef4444' },
+    ];
+  }, [incomeStatement, totalRevenue, netIncome]);
+
+  // Chart data: AR vs AP comparison
+  const arApData = useMemo(() => {
+    return [
+      { name: 'Receivables', AR: arOutstanding || accountsReceivable, AP: 0 },
+      { name: 'Payables', AR: 0, AP: apOutstanding },
+    ];
+  }, [arOutstanding, apOutstanding, accountsReceivable]);
+
+  // Chart data: Top customers/suppliers for horizontal bar
+  const topPartiesData = useMemo(() => {
+    const customers = topCustomers.slice(0, 5).map((c: any) => ({
+      name: (c.name || 'Customer').substring(0, 15),
+      amount: c.amount || 0,
+      type: 'AR',
+    }));
+    const suppliers = topSuppliers.slice(0, 5).map((s: any) => ({
+      name: (s.name || 'Supplier').substring(0, 15),
+      amount: s.amount || 0,
+      type: 'AP',
+    }));
+    return [...customers, ...suppliers];
+  }, [topCustomers, topSuppliers]);
+
+  // Cash flow data
+  const cashFlowData = useMemo(() => {
+    if (!cashFlow) return [];
+    return [
+      { name: 'Operating', value: cashFlow.operating_activities?.net || 0, fill: '#10b981' },
+      { name: 'Investing', value: cashFlow.investing_activities?.net || 0, fill: '#3b82f6' },
+      { name: 'Financing', value: cashFlow.financing_activities?.net || 0, fill: '#8b5cf6' },
+    ];
+  }, [cashFlow]);
 
   return (
     <div className="space-y-6">
@@ -268,7 +372,154 @@ export default function AccountingDashboardPage() {
         </div>
       </div>
 
-      {/* Revenue & Expenses */}
+      {/* Charts Row 1: Balance Sheet & Income Statement */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Balance Sheet Composition */}
+        <ChartCard title="Balance Sheet Composition" subtitle="Assets, Liabilities & Equity" icon={Building2}>
+          {balanceSheetData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={balanceSheetData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
+                >
+                  {balanceSheetData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  {...TOOLTIP_STYLE}
+                  formatter={(value: number) => formatCompactCurrency(value)}
+                />
+                <Legend
+                  formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
+                  iconType="circle"
+                  iconSize={8}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">
+              No balance sheet data available
+            </div>
+          )}
+        </ChartCard>
+
+        {/* Income Statement Breakdown */}
+        <ChartCard title="Income Statement" subtitle="Revenue, expenses & net income" icon={TrendingUp}>
+          {revenueExpenseData.some(d => d.amount > 0) ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={revenueExpenseData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <XAxis
+                  type="number"
+                  stroke="#64748b"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v) => formatCompactCurrency(v)}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  stroke="#64748b"
+                  tick={{ fontSize: 11 }}
+                  width={70}
+                />
+                <Tooltip
+                  {...TOOLTIP_STYLE}
+                  formatter={(value: number) => formatCurrency(value)}
+                />
+                <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                  {revenueExpenseData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">
+              No income statement data available
+            </div>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Charts Row 2: AR/AP & Cash Flow */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* AR vs AP */}
+        <ChartCard title="Receivables vs Payables" subtitle="Outstanding amounts" icon={DollarSign}>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={arApData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
+              <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
+              <Bar dataKey="AR" name="Receivables" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="AP" name="Payables" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-slate-muted">AR: {formatCurrency(arOutstanding || accountsReceivable)}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-slate-muted">AP: {formatCurrency(apOutstanding)}</span>
+              </span>
+            </div>
+            <span className={cn(
+              'font-semibold',
+              (arOutstanding || accountsReceivable) > apOutstanding ? 'text-blue-400' : 'text-amber-400'
+            )}>
+              Net: {formatCurrency((arOutstanding || accountsReceivable) - apOutstanding)}
+            </span>
+          </div>
+        </ChartCard>
+
+        {/* Cash Flow */}
+        <ChartCard title="Cash Flow" subtitle="Operating, investing & financing" icon={Wallet}>
+          {cashFlowData.length > 0 && cashFlowData.some(d => d.value !== 0) ? (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={cashFlowData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
+                  <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
+                    {cashFlowData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-2 pt-2 border-t border-slate-border flex items-center justify-between text-sm">
+                <span className="text-slate-muted">Net Change in Cash</span>
+                <span className={cn(
+                  'font-bold',
+                  (cashFlow?.net_change_in_cash || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                )}>
+                  {formatCurrency(cashFlow?.net_change_in_cash || 0)}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center text-slate-muted text-sm">
+              No cash flow data available
+            </div>
+          )}
+        </ChartCard>
+      </div>
+
+      {/* Revenue & Expenses Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -349,8 +600,8 @@ export default function AccountingDashboardPage() {
       {/* Quick actions */}
       <div className="flex flex-wrap gap-2">
         {[
-          { href: '/books/ar/invoices/new', label: 'New Invoice' },
-          { href: '/books/ar/payments/new', label: 'New Payment' },
+          { href: '/books/accounts-receivable/invoices/new', label: 'New Invoice' },
+          { href: '/books/accounts-receivable/payments/new', label: 'New Payment' },
         ].map((action) => (
           <Link
             key={action.href}

@@ -9,6 +9,88 @@ from typing import Optional, List
 from app.database import Base
 
 
+# ============= TAX CODE =============
+class TaxType(enum.Enum):
+    """Type of tax applicability."""
+    SALES = "sales"
+    PURCHASE = "purchase"
+    BOTH = "both"
+
+
+class RoundingMethod(enum.Enum):
+    """Tax amount rounding method."""
+    ROUND = "round"
+    FLOOR = "floor"
+    CEIL = "ceil"
+
+
+class TaxCode(Base):
+    """
+    Tax codes for line-level tax calculation.
+
+    Distinct from templates - this represents an actual tax code
+    that can be applied to document lines.
+    """
+
+    __tablename__ = "tax_codes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Identification
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Tax rate and type
+    rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    tax_type: Mapped[TaxType] = mapped_column(Enum(TaxType), default=TaxType.BOTH)
+
+    # Tax calculation settings
+    is_tax_inclusive: Mapped[bool] = mapped_column(default=False)
+    rounding_method: Mapped[RoundingMethod] = mapped_column(
+        Enum(RoundingMethod), default=RoundingMethod.ROUND
+    )
+    rounding_precision: Mapped[int] = mapped_column(default=2)
+
+    # Jurisdiction
+    jurisdiction: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # GL posting
+    account_head: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Validity period
+    valid_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    valid_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Status
+    is_active: Mapped[bool] = mapped_column(default=True, index=True)
+
+    # Company scope
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Audit
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<TaxCode {self.code} @ {self.rate}%>"
+
+    @property
+    def is_valid(self) -> bool:
+        """Check if tax code is currently valid."""
+        if not self.is_active:
+            return False
+        today = date.today()
+        if self.valid_from and today < self.valid_from:
+            return False
+        if self.valid_to and today > self.valid_to:
+            return False
+        return True
+
+
 # ============= TAX CATEGORY =============
 class TaxCategory(Base):
     """Tax categories from ERPNext for VAT classification."""

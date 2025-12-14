@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@dotmac/design-tokens';
+import { useAuth } from '@/lib/auth-context';
 import {
   LayoutDashboard,
   CalendarClock,
@@ -21,6 +23,12 @@ import {
   ClipboardList,
   TrendingUp,
   Settings,
+  Sun,
+  Moon,
+  User,
+  LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 
 // HR Information Flow:
@@ -104,8 +112,8 @@ const sections: NavSection[] = [
 
 // Workflow phases for contextual guidance
 const workflowPhases = [
-  { key: 'setup', label: 'Setup', description: 'Configure HR policies' },
-  { key: 'operate', label: 'Operate', description: 'Daily HR operations' },
+  { key: 'setup', label: 'Setup', description: 'Configure people policies' },
+  { key: 'operate', label: 'Operate', description: 'Daily people operations' },
   { key: 'analyze', label: 'Analyze', description: 'Review & improve' },
 ];
 
@@ -132,6 +140,8 @@ function getWorkflowPhase(sectionKey: SectionKey | null): string {
 
 export default function HrLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isDarkMode, setColorScheme } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
 
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => {
     const activeSection = getActiveSection(pathname);
@@ -170,10 +180,202 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-      {/* Sidebar Navigation */}
-      <aside className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4 h-fit">
+    <div className="space-y-4">
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-card border-b border-slate-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-300 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-slate-deep" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display font-bold text-white tracking-tight">Dotmac People</span>
+              <span className="text-[10px] text-slate-muted uppercase tracking-widest">People</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
+              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop top bar */}
+      <div className="hidden lg:flex items-center justify-between bg-slate-card border border-slate-border rounded-xl px-4 py-3">
+        <Link href="/hr" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-300 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-slate-deep" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display font-bold text-white tracking-tight">Dotmac People</span>
+            <span className="text-[10px] text-slate-muted uppercase tracking-widest">People</span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
+            className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="p-2 text-amber-300">
+              <User className="w-5 h-5" />
+            </div>
+            {isAuthenticated && (
+              <button
+                onClick={logout}
+                className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-elevated rounded-lg transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black/40 backdrop-blur-sm"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <div
+        className={cn(
+          'lg:hidden fixed top-[64px] bottom-0 left-0 z-40 w-72 max-w-[85vw] bg-slate-card border-r border-slate-border transform transition-transform duration-300 overflow-y-auto',
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/hr/leave"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
+            >
+              <CalendarClock className="w-4 h-4 text-amber-400 mb-1" />
+              <span className="text-[11px] text-slate-muted">Leave</span>
+            </Link>
+            <Link
+              href="/hr/payroll"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
+            >
+              <Wallet2 className="w-4 h-4 text-violet-400 mb-1" />
+              <span className="text-[11px] text-slate-muted">Payroll</span>
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              const open = openSections[section.key];
+              const isActiveSection = activeSection === section.key;
+
+              return (
+                <div
+                  key={section.key}
+                  className={cn(
+                    'border rounded-lg transition-colors',
+                    isActiveSection ? 'border-amber-500/40 bg-amber-500/5' : 'border-slate-border'
+                  )}
+                >
+                  <button
+                    onClick={() => toggleSection(section.key)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-white hover:bg-slate-elevated/50 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={cn('w-4 h-4', isActiveSection ? 'text-amber-400' : 'text-slate-muted')} />
+                      <div className="text-left">
+                        <span className={cn('block', isActiveSection && 'text-amber-300')}>{section.label}</span>
+                        <span className="text-[10px] text-slate-muted">{section.description}</span>
+                      </div>
+                    </div>
+                    {open ? (
+                      <ChevronDown className="w-4 h-4 text-slate-muted" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-muted" />
+                    )}
+                  </button>
+                  {open && (
+                    <div className="pb-2 px-2">
+                      {section.items.map((item) => {
+                        const isActive = activeHref === item.href;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'block px-3 py-2 text-sm rounded-lg transition-colors group',
+                              isActive
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'text-slate-muted hover:text-white hover:bg-slate-elevated/50'
+                            )}
+                          >
+                            <span className="block">{item.name}</span>
+                            {item.description && (
+                              <span className={cn(
+                                'text-[10px] block',
+                                isActive ? 'text-amber-400/70' : 'text-slate-muted group-hover:text-slate-muted'
+                              )}>
+                                {item.description}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-3 border-t border-slate-border space-y-2">
+            <button
+              onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 text-sm text-slate-muted transition-colors"
+            >
+              <span>{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => { logout(); setMobileMenuOpen(false); }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-elevated text-sm text-slate-muted hover:bg-slate-border/30 transition-colors"
+                title="Sign out"
+              >
+                <span>Sign out</span>
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 pt-[64px] lg:pt-0">
+        {/* Sidebar Navigation */}
+        <aside className="hidden lg:block bg-slate-card border border-slate-border rounded-xl p-4 space-y-4 h-fit">
         {/* Header */}
         <div className="pb-3 border-b border-slate-border">
           <h1 className="text-lg font-semibold text-white">Human Resources</h1>
@@ -305,9 +507,9 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* HR Workflow Guide */}
+        {/* People Workflow Guide */}
         <div className="pt-3 border-t border-slate-border">
-          <p className="text-xs text-slate-muted mb-2 px-1">HR Workflow</p>
+          <p className="text-xs text-slate-muted mb-2 px-1">People Workflow</p>
           <div className="space-y-1 text-[10px] text-slate-muted px-1">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[8px] font-bold">1</div>
@@ -335,6 +537,7 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className="space-y-6">{children}</div>
+      </div>
     </div>
   );
 }

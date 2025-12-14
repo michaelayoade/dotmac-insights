@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Layout from '@/components/Layout';
 import { Providers } from '@/components/Providers';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'Dotmac Insights',
@@ -17,7 +17,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-          <Layout>{children}</Layout>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

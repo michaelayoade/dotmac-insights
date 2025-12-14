@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAccountingGeneralLedger } from '@/hooks/useApi';
+import { AccountingGeneralLedgerEntry } from '@/lib/api';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, BookMarked, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -40,19 +41,32 @@ export default function GeneralLedgerPage() {
     offset,
   });
 
+  const entries = data?.entries || [];
+  const totals = useMemo(
+    () =>
+      entries.reduce(
+        (acc, entry) => ({
+          total_debit: acc.total_debit + (entry.debit || 0),
+          total_credit: acc.total_credit + (entry.credit || 0),
+        }),
+        { total_debit: 0, total_credit: 0 }
+      ),
+    [entries]
+  );
+
   const columns = [
     {
       key: 'date',
       header: 'Date',
       sortable: true,
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <span className="text-slate-muted">{formatDate(item.posting_date)}</span>
       ),
     },
     {
       key: 'account',
       header: 'Account',
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <div>
           <span className="font-mono text-teal-electric text-sm">{item.account}</span>
           <span className="text-white ml-2">{item.account_name || ''}</span>
@@ -62,7 +76,7 @@ export default function GeneralLedgerPage() {
     {
       key: 'description',
       header: 'Description',
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <span className="text-slate-300 text-sm truncate max-w-[250px] block">
           {item.remarks || item.voucher_no || item.party || '-'}
         </span>
@@ -72,7 +86,7 @@ export default function GeneralLedgerPage() {
       key: 'debit',
       header: 'Debit',
       align: 'right' as const,
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <div className="flex items-center justify-end gap-1">
           {(item.debit || 0) > 0 && <ArrowUpRight className="w-3 h-3 text-blue-400" />}
           <span className={cn('font-mono', (item.debit || 0) > 0 ? 'text-blue-400' : 'text-slate-muted')}>
@@ -85,7 +99,7 @@ export default function GeneralLedgerPage() {
       key: 'credit',
       header: 'Credit',
       align: 'right' as const,
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <div className="flex items-center justify-end gap-1">
           {(item.credit || 0) > 0 && <ArrowDownRight className="w-3 h-3 text-green-400" />}
           <span className={cn('font-mono', (item.credit || 0) > 0 ? 'text-green-400' : 'text-slate-muted')}>
@@ -98,19 +112,21 @@ export default function GeneralLedgerPage() {
       key: 'balance',
       header: 'Running Balance',
       align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn(
-          'font-mono font-semibold',
-          (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
-        )}>
-          {formatCurrency(item.balance)}
+      render: (item: AccountingGeneralLedgerEntry) => (
+        <span
+          className={cn(
+            'font-mono font-semibold',
+            (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
+          )}
+        >
+          {item.balance !== undefined && item.balance !== null ? formatCurrency(item.balance) : '-'}
         </span>
       ),
     },
     {
       key: 'reference',
       header: 'Reference',
-      render: (item: any) => (
+      render: (item: AccountingGeneralLedgerEntry) => (
         <div className="text-slate-muted text-xs font-mono space-y-0.5">
           <div>{item.voucher_no || '-'}</div>
           {item.voucher_type && <div className="uppercase tracking-wide">{item.voucher_type}</div>}
@@ -131,27 +147,29 @@ export default function GeneralLedgerPage() {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      {data?.summary && (
+      {!!entries.length && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">Total Entries</p>
-            <p className="text-2xl font-bold text-white">{data.total || 0}</p>
+            <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
           </div>
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
             <p className="text-blue-400 text-sm">Total Debits</p>
-            <p className="text-2xl font-bold text-blue-400">{formatCurrency(data.summary.total_debit)}</p>
+            <p className="text-2xl font-bold text-blue-400">{formatCurrency(totals.total_debit)}</p>
           </div>
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
             <p className="text-green-400 text-sm">Total Credits</p>
-            <p className="text-2xl font-bold text-green-400">{formatCurrency(data.summary.total_credit)}</p>
+            <p className="text-2xl font-bold text-green-400">{formatCurrency(totals.total_credit)}</p>
           </div>
           <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">Net Change</p>
-            <p className={cn(
-              'text-2xl font-bold',
-              ((data.summary.total_debit || 0) - (data.summary.total_credit || 0)) >= 0 ? 'text-green-400' : 'text-red-400'
-            )}>
-              {formatCurrency((data.summary.total_debit || 0) - (data.summary.total_credit || 0))}
+            <p
+              className={cn(
+                'text-2xl font-bold',
+                (totals.total_debit - totals.total_credit) >= 0 ? 'text-green-400' : 'text-red-400'
+              )}
+            >
+              {formatCurrency(totals.total_debit - totals.total_credit)}
             </p>
           </div>
         </div>
@@ -197,7 +215,7 @@ export default function GeneralLedgerPage() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={(data as any)?.entries || (data as any)?.data || []}
+        data={entries}
         keyField="id"
         loading={isLoading}
         emptyMessage="No ledger entries found"

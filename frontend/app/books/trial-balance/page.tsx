@@ -174,7 +174,7 @@ export default function TrialBalancePage() {
           type="date"
           value={asOfDate}
           onChange={(e) => setAsOfDate(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         />
         <label className="flex items-center gap-2 text-slate-muted text-sm">
           <input type="checkbox" checked={drill} onChange={(e) => setDrill(e.target.checked)} />

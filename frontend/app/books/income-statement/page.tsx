@@ -4,7 +4,24 @@ import { useState } from 'react';
 import { useAccountingIncomeStatement } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, TrendingUp, TrendingDown, Calendar, Loader2, DollarSign, Minus, Equal, Download, BarChart2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Loader2,
+  DollarSign,
+  Minus,
+  Equal,
+  Download,
+  BarChart2,
+  ChevronDown,
+  ChevronRight,
+  Percent,
+  Calculator,
+  Banknote,
+  Receipt,
+} from 'lucide-react';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -16,24 +33,117 @@ function formatCurrency(value: number | undefined | null, currency = 'NGN'): str
   }).format(value);
 }
 
+function formatPercent(value: number | undefined | null): string {
+  if (value === undefined || value === null) return '0.0%';
+  return `${value.toFixed(1)}%`;
+}
+
 interface LineItemProps {
   name: string;
   amount: number;
   indent?: number;
   bold?: boolean;
   colorClass?: string;
+  pct?: number;
 }
 
-function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white' }: LineItemProps) {
+function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white', pct }: LineItemProps) {
   return (
-    <div className={cn(
-      'flex justify-between items-center py-2',
-      bold && 'font-semibold border-t border-slate-border pt-3 mt-2'
-    )} style={{ paddingLeft: `${indent * 1.5}rem` }}>
+    <div
+      className={cn(
+        'flex justify-between items-center py-2',
+        bold && 'font-semibold border-t border-slate-border pt-3 mt-2'
+      )}
+      style={{ paddingLeft: `${indent * 1.5}rem` }}
+    >
       <span className={bold ? colorClass : 'text-slate-300'}>{name}</span>
-      <span className={cn('font-mono', colorClass)}>
-        {formatCurrency(amount)}
-      </span>
+      <div className="flex items-center gap-4">
+        {pct !== undefined && (
+          <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
+        )}
+        <span className={cn('font-mono w-32 text-right', colorClass)}>{formatCurrency(amount)}</span>
+      </div>
+    </div>
+  );
+}
+
+interface CollapsibleSectionProps {
+  title: string;
+  icon: React.ElementType;
+  items: Array<{ account?: string; name?: string; amount: number; pct_of_revenue?: number }>;
+  total: number;
+  colorClass: string;
+  defaultOpen?: boolean;
+  showPct?: boolean;
+}
+
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  items,
+  total,
+  colorClass,
+  defaultOpen = true,
+  showPct,
+}: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={cn('w-5 h-5', colorClass)} />
+          <h3 className={cn('text-lg font-semibold', colorClass)}>{title}</h3>
+          <span className="text-slate-muted text-sm">({items.length} items)</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(total)}</span>
+          {isOpen ? (
+            <ChevronDown className="w-5 h-5 text-slate-muted" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-slate-muted" />
+          )}
+        </div>
+      </button>
+      {isOpen && items.length > 0 && (
+        <div className="px-4 pb-4 space-y-1">
+          {items.map((item, index) => (
+            <LineItem
+              key={index}
+              name={item.account || item.name || 'Unknown'}
+              amount={item.amount}
+              colorClass={colorClass}
+              pct={showPct ? item.pct_of_revenue : undefined}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MetricCardProps {
+  label: string;
+  value: number;
+  pct?: number;
+  colorClass: string;
+  icon?: React.ElementType;
+}
+
+function MetricCard({ label, value, pct, colorClass, icon: Icon }: MetricCardProps) {
+  return (
+    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-4')}>
+      <div className="flex items-center gap-2 mb-2">
+        {Icon && <Icon className={cn('w-4 h-4', colorClass)} />}
+        <span className="text-slate-muted text-sm">{label}</span>
+      </div>
+      <p className={cn('text-xl font-bold font-mono', colorClass)}>{formatCurrency(value)}</p>
+      {pct !== undefined && (
+        <p className="text-slate-muted text-sm mt-1">{formatPercent(pct)} of revenue</p>
+      )}
     </div>
   );
 }
@@ -81,34 +191,45 @@ export default function IncomeStatementPage() {
     );
   }
 
-  const revenue = data?.revenue || { items: [], total: 0 };
-  const cogs = data?.cost_of_goods_sold || { items: [], total: 0 };
-  const operatingExpenses = data?.operating_expenses || { items: [], total: 0 };
-  const otherIncome = data?.other_income || { items: [], total: 0 };
-  const otherExpenses = data?.other_expenses || { items: [], total: 0 };
+  // Extract IFRS structure data
+  const currency = data?.currency || 'NGN';
+  const revenue = data?.revenue || { accounts: [], total: 0 };
+  const cogs = data?.cost_of_goods_sold || { accounts: [], total: 0 };
+  const operatingExpenses = data?.operating_expenses || { accounts: [], total: 0 };
+  const financeIncome = data?.finance_income || { accounts: [], total: 0 };
+  const financeCosts = data?.finance_costs || { accounts: [], total: 0 };
+  const taxExpense = data?.tax_expense || { accounts: [], total: 0 };
 
-  const grossProfit = data?.gross_profit ?? (revenue.total - cogs.total);
-  const operatingIncome = data?.operating_income ?? (grossProfit - operatingExpenses.total);
-  const expensesTotal = cogs.total + operatingExpenses.total + otherExpenses.total;
-  const netIncome = data?.net_income ?? (operatingIncome + otherIncome.total - otherExpenses.total);
+  // Key IFRS metrics
+  const grossProfit = data?.gross_profit ?? revenue.total - cogs.total;
+  const operatingIncome = data?.operating_income ?? data?.ebit ?? grossProfit - operatingExpenses.total;
+  const ebitda = data?.ebitda ?? operatingIncome;
+  const netFinance = data?.net_finance_income ?? financeIncome.total - financeCosts.total;
+  const profitBeforeTax = data?.profit_before_tax ?? data?.ebt ?? operatingIncome + netFinance;
+  const netIncome = data?.net_income ?? data?.profit_after_tax ?? profitBeforeTax - taxExpense.total;
+
+  // Margins
+  const grossMargin = data?.gross_margin ?? (revenue.total > 0 ? (grossProfit / revenue.total) * 100 : 0);
+  const operatingMargin = data?.operating_margin ?? (revenue.total > 0 ? (operatingIncome / revenue.total) * 100 : 0);
+  const ebitdaMargin = data?.ebitda_margin ?? (revenue.total > 0 ? (ebitda / revenue.total) * 100 : 0);
+  const netMargin = data?.net_margin ?? (revenue.total > 0 ? (netIncome / revenue.total) * 100 : 0);
+  const effectiveTaxRate = data?.effective_tax_rate ?? (profitBeforeTax > 0 ? (taxExpense.total / profitBeforeTax) * 100 : 0);
+
+  const totalExpenses = cogs.total + operatingExpenses.total + financeCosts.total + taxExpense.total;
 
   return (
     <div className="space-y-6">
-      {/* Header with date range */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Income Statement</h2>
+          <h2 className="text-lg font-semibold text-white">Statement of Profit or Loss</h2>
           {data?.period && (
             <span className="text-slate-muted text-sm">
-              {typeof data.period === 'string'
-                ? data.period
-                : (() => {
-                  const period: any = data.period;
-                  return `${period?.start_date || period?.start || ''} - ${period?.end_date || period?.end || ''}`;
-                })()}
+              {data.period.start_date} to {data.period.end_date}
             </span>
           )}
+          {currency && <span className="text-slate-muted text-xs ml-2">({currency})</span>}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -118,7 +239,7 @@ export default function IncomeStatementPage() {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               placeholder="Start Date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
             <span className="text-slate-muted">to</span>
             <input
@@ -126,51 +247,23 @@ export default function IncomeStatementPage() {
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               placeholder="End Date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-muted text-sm">Compare:</span>
-            <input
-              type="date"
-              value={compareStart}
-              onChange={(e) => setCompareStart(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-            <span className="text-slate-muted">to</span>
-            <input
-              type="date"
-              value={compareEnd}
-              onChange={(e) => setCompareEnd(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
           </div>
           <label className="flex items-center gap-2 text-slate-muted text-sm">
-            <input
-              type="checkbox"
-              checked={showYtd}
-              onChange={(e) => setShowYtd(e.target.checked)}
-            />
-            Show YTD
-          </label>
-          <label className="flex items-center gap-2 text-slate-muted text-sm">
-            <input
-              type="checkbox"
-              checked={commonSize}
-              onChange={(e) => setCommonSize(e.target.checked)}
-            />
+            <input type="checkbox" checked={commonSize} onChange={(e) => setCommonSize(e.target.checked)} />
             Common size
           </label>
           <select
             value={basis}
             onChange={(e) => setBasis(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           >
             <option value="">Basis</option>
             <option value="accrual">Accrual</option>
             <option value="cash">Cash</option>
           </select>
-          {(startDate || endDate || compareStart || compareEnd || showYtd || commonSize || basis) && (
+          {(startDate || endDate || commonSize || basis) && (
             <button
               onClick={() => {
                 setStartDate('');
@@ -205,152 +298,269 @@ export default function IncomeStatementPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Key Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-5 h-5 text-green-400" />
-            <p className="text-green-400 text-sm">Total Revenue</p>
+            <p className="text-green-400 text-sm">Revenue</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(revenue.total)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatCurrency(revenue.total, currency)}</p>
         </div>
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingDown className="w-5 h-5 text-red-400" />
-            <p className="text-red-400 text-sm">Total Expenses</p>
+            <Calculator className="w-5 h-5 text-orange-400" />
+            <p className="text-orange-400 text-sm">Gross Profit</p>
           </div>
-          <p className="text-2xl font-bold text-red-400">{formatCurrency(expensesTotal)}</p>
+          <p className="text-2xl font-bold text-orange-400">{formatCurrency(grossProfit, currency)}</p>
+          <p className="text-orange-300 text-sm mt-1">{formatPercent(grossMargin)} margin</p>
         </div>
-        <div className={cn(
-          'border rounded-xl p-5',
-          netIncome >= 0
-            ? 'bg-teal-500/10 border-teal-500/30'
-            : 'bg-orange-500/10 border-orange-500/30'
-        )}>
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <DollarSign className={cn('w-5 h-5', netIncome >= 0 ? 'text-teal-400' : 'text-orange-400')} />
-            <p className={cn('text-sm', netIncome >= 0 ? 'text-teal-400' : 'text-orange-400')}>Net Income</p>
+            <BarChart2 className="w-5 h-5 text-blue-400" />
+            <p className="text-blue-400 text-sm">EBITDA</p>
           </div>
-          <p className={cn('text-2xl font-bold', netIncome >= 0 ? 'text-teal-400' : 'text-orange-400')}>
-            {formatCurrency(netIncome)}
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency(ebitda, currency)}</p>
+          <p className="text-blue-300 text-sm mt-1">{formatPercent(ebitdaMargin)} margin</p>
+        </div>
+        <div
+          className={cn(
+            'border rounded-xl p-5',
+            netIncome >= 0 ? 'bg-teal-500/10 border-teal-500/30' : 'bg-red-500/10 border-red-500/30'
+          )}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className={cn('w-5 h-5', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')} />
+            <p className={cn('text-sm', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>Net Income</p>
+          </div>
+          <p className={cn('text-2xl font-bold', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
+            {formatCurrency(netIncome, currency)}
+          </p>
+          <p className={cn('text-sm mt-1', netIncome >= 0 ? 'text-teal-300' : 'text-red-300')}>
+            {formatPercent(netMargin)} margin
           </p>
         </div>
       </div>
 
-      {/* Income Statement Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Section */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-green-400" />
-            <h3 className="text-lg font-semibold text-green-400">Revenue</h3>
-          </div>
-          <div className="space-y-1">
-            {(revenue.items || []).map((item: any, index: number) => (
-              <LineItem
-                key={index}
-                name={item.name}
-                amount={item.amount}
-                colorClass="text-green-400"
-              />
-            ))}
-            <LineItem
-              name="Total Revenue"
-              amount={revenue.total}
-              bold
-              colorClass="text-green-400"
-            />
+      {/* IFRS P&L Structure */}
+      <div className="space-y-4">
+        {/* Revenue */}
+        <CollapsibleSection
+          title="Revenue"
+          icon={TrendingUp}
+          items={revenue.accounts || []}
+          total={revenue.total}
+          colorClass="text-green-400"
+          showPct={commonSize}
+        />
+
+        {/* Cost of Goods Sold */}
+        {cogs.total !== 0 && (
+          <CollapsibleSection
+            title="Cost of Goods Sold"
+            icon={Receipt}
+            items={cogs.accounts || []}
+            total={cogs.total}
+            colorClass="text-orange-400"
+            showPct={commonSize}
+          />
+        )}
+
+        {/* Gross Profit Line */}
+        <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-orange-400" />
+              <span className="text-white font-semibold">Gross Profit</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-slate-muted text-sm">{formatPercent(grossMargin)}</span>
+              <span className="font-mono font-bold text-orange-400">{formatCurrency(grossProfit, currency)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Expenses Section */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingDown className="w-5 h-5 text-red-400" />
-            <h3 className="text-lg font-semibold text-red-400">Expenses</h3>
+        {/* Operating Expenses */}
+        <CollapsibleSection
+          title="Operating Expenses"
+          icon={TrendingDown}
+          items={operatingExpenses.accounts || []}
+          total={operatingExpenses.total}
+          colorClass="text-red-400"
+          showPct={commonSize}
+        />
+
+        {/* Operating Income / EBIT Line */}
+        <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-blue-400" />
+              <span className="text-white font-semibold">Operating Income (EBIT)</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-slate-muted text-sm">{formatPercent(operatingMargin)}</span>
+              <span className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</span>
+            </div>
           </div>
-          <div className="space-y-1">
-            {(cogs.items || []).map((item: any, index: number) => (
-              <LineItem key={`cogs-${index}`} name={item.name} amount={item.amount} colorClass="text-orange-300" />
-            ))}
-            {cogs.total !== 0 && <LineItem name="Cost of Goods Sold" amount={cogs.total} bold colorClass="text-orange-300" />}
-            {(operatingExpenses.items || []).map((item: any, index: number) => (
-              <LineItem key={`op-${index}`} name={item.name} amount={item.amount} colorClass="text-red-400" />
-            ))}
-            {operatingExpenses.total !== 0 && (
-              <LineItem name="Operating Expenses" amount={operatingExpenses.total} bold colorClass="text-red-400" />
-            )}
-            {(otherExpenses.items || []).map((item: any, index: number) => (
-              <LineItem key={`otherexp-${index}`} name={item.name} amount={item.amount} colorClass="text-red-400" />
-            ))}
-            {otherExpenses.total !== 0 && (
-              <LineItem name="Other Expenses" amount={otherExpenses.total} bold colorClass="text-red-400" />
-            )}
-            <LineItem
-              name="Total Expenses"
-              amount={expensesTotal}
-              bold
-              colorClass="text-red-400"
-            />
+          {data?.depreciation_amortization !== undefined && data.depreciation_amortization > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-border flex justify-between items-center text-sm">
+              <span className="text-slate-muted">EBITDA (add back D&A: {formatCurrency(data.depreciation_amortization)})</span>
+              <span className="font-mono text-blue-300">{formatCurrency(ebitda, currency)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Finance Income */}
+        {financeIncome.total !== 0 && (
+          <CollapsibleSection
+            title="Finance Income"
+            icon={Banknote}
+            items={financeIncome.accounts || []}
+            total={financeIncome.total}
+            colorClass="text-green-300"
+            defaultOpen={false}
+            showPct={commonSize}
+          />
+        )}
+
+        {/* Finance Costs */}
+        {financeCosts.total !== 0 && (
+          <CollapsibleSection
+            title="Finance Costs"
+            icon={Percent}
+            items={financeCosts.accounts || []}
+            total={financeCosts.total}
+            colorClass="text-red-300"
+            defaultOpen={false}
+            showPct={commonSize}
+          />
+        )}
+
+        {/* Profit Before Tax Line */}
+        <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-purple-400" />
+              <span className="text-white font-semibold">Profit Before Tax (EBT)</span>
+            </div>
+            <span className="font-mono font-bold text-purple-400">{formatCurrency(profitBeforeTax, currency)}</span>
+          </div>
+        </div>
+
+        {/* Tax Expense */}
+        {taxExpense.total !== 0 && (
+          <CollapsibleSection
+            title="Income Tax Expense"
+            icon={Receipt}
+            items={taxExpense.accounts || []}
+            total={taxExpense.total}
+            colorClass="text-amber-400"
+            defaultOpen={false}
+            showPct={commonSize}
+          />
+        )}
+
+        {/* Net Income Line */}
+        <div
+          className={cn(
+            'border rounded-xl p-4',
+            netIncome >= 0 ? 'bg-teal-500/10 border-teal-500/30' : 'bg-red-500/10 border-red-500/30'
+          )}
+        >
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <DollarSign className={cn('w-5 h-5', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')} />
+              <span className={cn('font-semibold', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
+                Profit for the Period
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className={cn('text-sm', netIncome >= 0 ? 'text-teal-300' : 'text-red-300')}>
+                {formatPercent(netMargin)}
+              </span>
+              <span className={cn('font-mono font-bold text-xl', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
+                {formatCurrency(netIncome, currency)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Net Income Calculation */}
+      {/* Profitability Summary */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-6">
+        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <Percent className="w-5 h-5 text-teal-electric" />
+          Profitability Metrics (IAS 1)
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <MetricCard label="Gross Margin" value={grossProfit} pct={grossMargin} colorClass="text-orange-400" />
+          <MetricCard label="Operating Margin" value={operatingIncome} pct={operatingMargin} colorClass="text-blue-400" />
+          <MetricCard label="EBITDA Margin" value={ebitda} pct={ebitdaMargin} colorClass="text-blue-300" />
+          <MetricCard label="Net Margin" value={netIncome} pct={netMargin} colorClass="text-teal-400" />
+          <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Receipt className="w-4 h-4 text-amber-400" />
+              <span className="text-slate-muted text-sm">Effective Tax Rate</span>
+            </div>
+            <p className="text-xl font-bold font-mono text-amber-400">{formatPercent(effectiveTaxRate)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* P&L Summary */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">Net Income Calculation</h3>
-        <div className="flex items-center justify-center gap-6 text-lg flex-wrap">
+        <h3 className="text-white font-semibold mb-4">P&L Waterfall</h3>
+        <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Revenue</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(revenue.total)}</p>
+            <p className="font-mono font-bold text-green-400">{formatCurrency(revenue.total, currency)}</p>
           </div>
           <Minus className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
-            <p className="text-slate-muted text-sm">Expenses</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(expensesTotal)}</p>
+            <p className="text-slate-muted text-sm">COGS</p>
+            <p className="font-mono font-bold text-orange-400">{formatCurrency(cogs.total, currency)}</p>
+          </div>
+          <Equal className="w-5 h-5 text-slate-muted" />
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">Gross Profit</p>
+            <p className="font-mono font-bold text-orange-300">{formatCurrency(grossProfit, currency)}</p>
+          </div>
+          <Minus className="w-5 h-5 text-slate-muted" />
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">OpEx</p>
+            <p className="font-mono font-bold text-red-400">{formatCurrency(operatingExpenses.total, currency)}</p>
+          </div>
+          <Equal className="w-5 h-5 text-slate-muted" />
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">Operating</p>
+            <p className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-4 text-lg flex-wrap mt-4 pt-4 border-t border-slate-border">
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">Operating</p>
+            <p className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</p>
+          </div>
+          <span className="text-slate-muted">±</span>
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">Net Finance</p>
+            <p className={cn('font-mono font-bold', netFinance >= 0 ? 'text-green-400' : 'text-red-400')}>
+              {formatCurrency(netFinance, currency)}
+            </p>
+          </div>
+          <Minus className="w-5 h-5 text-slate-muted" />
+          <div className="text-center">
+            <p className="text-slate-muted text-sm">Tax</p>
+            <p className="font-mono font-bold text-amber-400">{formatCurrency(taxExpense.total, currency)}</p>
           </div>
           <Equal className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Net Income</p>
-            <p className={cn(
-              'font-mono font-bold text-xl',
-              netIncome >= 0 ? 'text-teal-400' : 'text-orange-400'
-            )}>
-              {formatCurrency(netIncome)}
+            <p className={cn('font-mono font-bold text-xl', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
+              {formatCurrency(netIncome, currency)}
             </p>
           </div>
         </div>
-
-        {/* Profit Margins */}
-        {grossProfit !== 0 && (
-          <div className="mt-6 pt-4 border-t border-slate-border">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
-              {grossProfit !== 0 && (
-                <div>
-                  <p className="text-slate-muted text-sm">Gross Profit</p>
-                  <p className="font-mono font-semibold text-white">{formatCurrency(grossProfit)}</p>
-                </div>
-              )}
-              {operatingIncome !== 0 && (
-                <div>
-                  <p className="text-slate-muted text-sm">Operating Income</p>
-                  <p className="font-mono font-semibold text-white">{formatCurrency(operatingIncome)}</p>
-                </div>
-              )}
-              {revenue.total > 0 && (
-                <div>
-                  <p className="text-slate-muted text-sm">Net Margin</p>
-                  <p className={cn(
-                    'font-mono font-semibold',
-                    netIncome >= 0 ? 'text-green-400' : 'text-red-400'
-                  )}>
-                    {((netIncome / revenue.total) * 100).toFixed(1)}%
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

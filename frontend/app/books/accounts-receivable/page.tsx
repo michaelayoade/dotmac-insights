@@ -200,7 +200,7 @@ export default function AccountsReceivablePage() {
             placeholder="Search by customer name..."
             value={customerSearch}
             onChange={(e) => { setCustomerSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <div className="flex-1 min-w-[200px] max-w-md">
@@ -209,7 +209,7 @@ export default function AccountsReceivablePage() {
             placeholder="Min amount"
             value={minAmount}
             onChange={(e) => { setMinAmount(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <label className="flex items-center gap-2 text-slate-muted text-sm">

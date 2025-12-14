@@ -92,8 +92,9 @@ function StatCard({
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrLifecyclePage() {
-  const [company, setCompany] = useState('');
   const [onboardingLimit, setOnboardingLimit] = useState(20);
   const [onboardingOffset, setOnboardingOffset] = useState(0);
   const [separationLimit, setSeparationLimit] = useState(20);
@@ -111,17 +112,17 @@ export default function HrLifecyclePage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { data: onboardings, isLoading: onboardingsLoading } = useHrEmployeeOnboardings({
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: onboardingLimit,
     offset: onboardingOffset,
   });
   const { data: separations, isLoading: separationsLoading } = useHrEmployeeSeparations({
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: separationLimit,
     offset: separationOffset,
   });
-  const { data: promotions, isLoading: promotionsLoading } = useHrEmployeePromotions({ company: company || undefined });
-  const { data: transfers, isLoading: transfersLoading } = useHrEmployeeTransfers({ company: company || undefined });
+  const { data: promotions, isLoading: promotionsLoading } = useHrEmployeePromotions({ company: SINGLE_COMPANY || undefined });
+  const { data: transfers, isLoading: transfersLoading } = useHrEmployeeTransfers({ company: SINGLE_COMPANY || undefined });
   const lifecycleMutations = useHrLifecycleMutations();
 
   const onboardingList = extractList(onboardings);
@@ -160,26 +161,6 @@ export default function HrLifecyclePage() {
         <StatCard label="Transfers" value={transferList.total} icon={ArrowRightLeft} tone="text-violet-400" />
       </div>
 
-      {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <p className="text-xs text-slate-muted mb-3">Filter Records</p>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Company</FormLabel>
-            <input
-              type="text"
-              placeholder="All companies"
-              value={company}
-              onChange={(e) => {
-                setCompany(e.target.value);
-                setOnboardingOffset(0);
-                setSeparationOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            />
-          </div>
-        </div>
-      </div>
 
       {/* Update Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

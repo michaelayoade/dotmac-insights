@@ -39,6 +39,8 @@ class DocumentType(str, Enum):
     QUOTATION = "quotation"
     DELIVERY_NOTE = "delivery_note"
     GOODS_RECEIPT = "goods_receipt"
+    EXPENSE_CLAIM = "expense_claim"
+    CASH_ADVANCE = "cash_advance"
 
 
 class ResetFrequency(str, Enum):
@@ -511,6 +513,24 @@ class DebitNote(Base):
     outstanding_amount: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), default=Decimal("0"),
         comment="Amount not yet applied"
+    )
+
+    # --- FX Fields ---
+    base_currency: Mapped[str] = mapped_column(String(3), default="NGN")
+    conversion_rate: Mapped[Decimal] = mapped_column(
+        Numeric(18, 10), default=Decimal("1"),
+        comment="Exchange rate to base currency"
+    )
+    base_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 2), default=Decimal("0"),
+        comment="Total amount in base currency"
+    )
+
+    # --- Workflow ---
+    workflow_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    docstatus: Mapped[int] = mapped_column(Integer, default=0, comment="0=Draft,1=Submitted,2=Cancelled")
+    fiscal_period_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("fiscal_periods.id"), nullable=True
     )
 
     # --- Dates ---

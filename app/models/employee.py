@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.expense import Expense
     from app.models.hr import Department, Designation
+    from app.models.expense_management import ExpenseClaim, CashAdvance, CorporateCard
 
 
 class EmploymentStatus(enum.Enum):

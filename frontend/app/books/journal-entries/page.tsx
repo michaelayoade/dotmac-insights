@@ -156,7 +156,7 @@ export default function JournalEntriesPage() {
             <select
               value={voucherType}
               onChange={(e) => { setVoucherType(e.target.value); setOffset(0); }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             >
               <option value="">All Types</option>
               <option value="Journal Entry">Journal Entry</option>
@@ -173,7 +173,7 @@ export default function JournalEntriesPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => { setStartDate(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
               />
             </div>
           </div>
@@ -185,7 +185,7 @@ export default function JournalEntriesPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => { setEndDate(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
               />
             </div>
           </div>

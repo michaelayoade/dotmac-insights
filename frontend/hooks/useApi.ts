@@ -36,6 +36,10 @@ import {
   HrTrainingEventPayload,
   HrTrainingResultPayload,
   HrJobOpeningPayload,
+  AccountingGeneralLedgerResponse,
+  AccountingBankTransactionListResponse,
+  AccountingBankTransactionDetail,
+  PurchasingSupplierDetail,
 } from '@/lib/api';
 
 // Generic fetcher for SWR
@@ -1467,17 +1471,42 @@ export function useAccountingGeneralLedger(
   },
   config?: SWRConfiguration
 ) {
-  return useSWR(
+  return useSWR<AccountingGeneralLedgerResponse>(
     ['accounting-general-ledger', params],
     () => api.getAccountingGeneralLedger(params),
     config
   );
 }
 
-export function useAccountingCashFlow(startDate?: string, endDate?: string, config?: SWRConfiguration) {
+export function useAccountingCashFlow(
+  params?: { start_date?: string; end_date?: string; fiscal_year?: string; currency?: string },
+  config?: SWRConfiguration
+) {
   return useSWR(
-    ['accounting-cash-flow', startDate, endDate],
-    () => api.getAccountingCashFlow({ start_date: startDate, end_date: endDate }),
+    ['accounting-cash-flow', params],
+    () => api.getAccountingCashFlow(params),
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useAccountingEquityStatement(
+  params?: { start_date?: string; end_date?: string; fiscal_year?: string; currency?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-equity-statement', params],
+    () => api.getAccountingEquityStatement(params),
+    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useAccountingFinancialRatios(
+  params?: { as_of_date?: string; fiscal_year?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['accounting-financial-ratios', params],
+    () => api.getAccountingFinancialRatios(params),
     { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
   );
 }
@@ -1643,15 +1672,197 @@ export function useAccountingBankTransactions(
   },
   config?: SWRConfiguration
 ) {
-  return useSWR(['accounting-bank-transactions', params], () => api.getAccountingBankTransactions(params), config);
+  return useSWR<AccountingBankTransactionListResponse>(
+    ['accounting-bank-transactions', params],
+    () => api.getAccountingBankTransactions(params),
+    config
+  );
 }
 
 export function useAccountingBankTransactionDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(
+  return useSWR<AccountingBankTransactionDetail>(
     id ? ['accounting-bank-transaction-detail', id] : null,
     () => (id ? api.getAccountingBankTransactionDetail(id) : null),
     config
   );
+}
+
+export function useBankTransactionSuggestions(
+  id: number | string | null,
+  params?: { party_type?: string; limit?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    id ? ['bank-transaction-suggestions', id, params] : null,
+    () => (id ? api.getBankTransactionSuggestions(id, params) : null),
+    config
+  );
+}
+
+export function useBankTransactionMutations() {
+  const { mutate } = useSWRConfig();
+
+  return {
+    createTransaction: async (payload: Parameters<typeof api.createBankTransaction>[0]) => {
+      const res = await api.createBankTransaction(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'accounting-bank-transactions');
+      return res;
+    },
+
+    importTransactions: async (formData: FormData) => {
+      const res = await api.importBankTransactions(formData);
+      await mutate((key) => Array.isArray(key) && key[0] === 'accounting-bank-transactions');
+      return res;
+    },
+
+    reconcile: async (id: number | string, payload: Parameters<typeof api.reconcileBankTransaction>[1]) => {
+      const res = await api.reconcileBankTransaction(id, payload);
+      await Promise.all([
+        mutate((key) => Array.isArray(key) && key[0] === 'accounting-bank-transactions'),
+        mutate(['accounting-bank-transaction-detail', id]),
+        mutate((key) => Array.isArray(key) && key[0] === 'bank-transaction-suggestions'),
+      ]);
+      return res;
+    },
+  };
+}
+
+// Nigerian Tax Module Hooks
+export function useTaxDashboard(config?: SWRConfiguration) {
+  return useSWR(['tax-dashboard'], () => api.getTaxDashboard(), {
+    refreshInterval: 60000,
+    ...config,
+  });
+}
+
+export function useTaxSettings(config?: SWRConfiguration) {
+  return useSWR(['tax-settings'], () => api.getTaxSettings(), config);
+}
+
+export function useVATTransactions(
+  params?: { period?: string; type?: string; page?: number; page_size?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['vat-transactions', params], () => api.getVATTransactions(params), config);
+}
+
+export function useVATSummary(period: string | null, config?: SWRConfiguration) {
+  return useSWR(period ? ['vat-summary', period] : null, () => api.getVATSummary(period!), config);
+}
+
+export function useVATFilingPrep(period: string | null, config?: SWRConfiguration) {
+  return useSWR(period ? ['vat-filing-prep', period] : null, () => api.getVATFilingPrep(period!), config);
+}
+
+export function useWHTTransactions(
+  params?: { period?: string; supplier_id?: string; page?: number; page_size?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['wht-transactions', params], () => api.getWHTTransactions(params), config);
+}
+
+export function useWHTSupplierSummary(supplierId: string | number | null, config?: SWRConfiguration) {
+  return useSWR(
+    supplierId ? ['wht-supplier-summary', supplierId] : null,
+    () => api.getWHTSupplierSummary(supplierId!),
+    config
+  );
+}
+
+export function useWHTRemittanceDue(config?: SWRConfiguration) {
+  return useSWR(['wht-remittance-due'], () => api.getWHTRemittanceDue(), config);
+}
+
+export function usePAYECalculations(
+  params?: { period?: string; employee_id?: string; page?: number; page_size?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['paye-calculations', params], () => api.getPAYECalculations(params), config);
+}
+
+export function usePAYESummary(period: string | null, config?: SWRConfiguration) {
+  return useSWR(period ? ['paye-summary', period] : null, () => api.getPAYESummary(period!), config);
+}
+
+export function useCITAssessments(
+  params?: { year?: number; page?: number; page_size?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['cit-assessments', params], () => api.getCITAssessments(params), config);
+}
+
+export function useCITComputation(year: number | null, config?: SWRConfiguration) {
+  return useSWR(year ? ['cit-computation', year] : null, () => api.getCITComputation(year!), config);
+}
+
+export function useFilingCalendar(
+  params?: { year?: number; tax_type?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(['filing-calendar', params], () => api.getFilingCalendar(params), config);
+}
+
+export function useUpcomingFilings(params?: { days?: number }, config?: SWRConfiguration) {
+  return useSWR(['upcoming-filings', params], () => api.getUpcomingFilings(params), config);
+}
+
+export function useOverdueFilings(config?: SWRConfiguration) {
+  return useSWR(['overdue-filings'], () => api.getOverdueFilings(), config);
+}
+
+export function useTaxMutations() {
+  const { mutate } = useSWRConfig();
+
+  return {
+    updateSettings: async (payload: Parameters<typeof api.updateTaxSettings>[0]) => {
+      const res = await api.updateTaxSettings(payload);
+      await mutate(['tax-settings']);
+      return res;
+    },
+    recordVATOutput: async (payload: Parameters<typeof api.recordVATOutput>[0]) => {
+      const res = await api.recordVATOutput(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'vat-transactions');
+      await mutate(['tax-dashboard']);
+      return res;
+    },
+    recordVATInput: async (payload: Parameters<typeof api.recordVATInput>[0]) => {
+      const res = await api.recordVATInput(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'vat-transactions');
+      await mutate(['tax-dashboard']);
+      return res;
+    },
+    deductWHT: async (payload: Parameters<typeof api.deductWHT>[0]) => {
+      const res = await api.deductWHT(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'wht-transactions');
+      await mutate(['tax-dashboard']);
+      return res;
+    },
+    calculatePAYE: async (payload: Parameters<typeof api.calculatePAYE>[0]) => {
+      const res = await api.calculatePAYE(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'paye-calculations');
+      await mutate(['tax-dashboard']);
+      return res;
+    },
+    createCITAssessment: async (payload: Parameters<typeof api.createCITAssessment>[0]) => {
+      const res = await api.createCITAssessment(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'cit-assessments');
+      await mutate(['tax-dashboard']);
+      return res;
+    },
+    generateWHTCertificate: async (payload: Parameters<typeof api.generateWHTCertificate>[0]) => {
+      const res = await api.generateWHTCertificate(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'wht-transactions');
+      return res;
+    },
+    createEInvoice: async (payload: Parameters<typeof api.createEInvoice>[0]) => {
+      const res = await api.createEInvoice(payload);
+      return res;
+    },
+    validateEInvoice: async (id: number | string) => {
+      const res = await api.validateEInvoice(id);
+      return res;
+    },
+  };
 }
 
 // Purchasing Domain Hooks
@@ -1813,7 +2024,7 @@ export function usePurchasingSupplierGroups(config?: SWRConfiguration) {
 }
 
 export function usePurchasingSupplierDetail(id: number | null, config?: SWRConfiguration) {
-  return useSWR(
+  return useSWR<PurchasingSupplierDetail>(
     id ? ['purchasing-supplier-detail', id] : null,
     () => (id ? api.getPurchasingSupplierDetail(id) : null),
     config
@@ -2083,6 +2294,11 @@ export function useExchangeRateMutations() {
 export function useJournalEntryAdminMutations() {
   const { mutate } = useSWRConfig();
   return {
+    create: async (payload: any) => {
+      const res = await api.createJournalEntry(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'accounting-journal-entries');
+      return res;
+    },
     submit: async (id: number | string) => {
       await api.submitJournalEntry(id);
       await mutate((key) => Array.isArray(key) && key[0] === 'accounting-journal-entries');
@@ -2889,6 +3105,16 @@ export function useHrSalarySlipMutations() {
       await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
       await mutate(['hr-salary-slip-detail', id]);
     },
+    payoutPayrollEntry: async (entryId: number | string, payload: import('@/lib/api').HrPayrollPayoutRequest) => {
+      const res = await api.initiateHrPayrollPayouts(entryId, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
+      return res;
+    },
+    handoffPayrollEntry: async (entryId: number | string, payload: import('@/lib/api').HrPayrollPayoutRequest) => {
+      const res = await api.handoffHrPayrollToBooks(entryId, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
+      return res;
+    },
     exportRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string }) => {
       return api.exportHrSalarySlipRegister(params);
     },
@@ -3349,6 +3575,188 @@ export function useSupportSettingsMutations() {
       const res = await api.seedSupportDefaults();
       await mutate((key) => Array.isArray(key) && (key[0] === 'support-settings' || key[0] === 'support-queues'));
       return res;
+    },
+  };
+}
+
+// ==========================================
+// Payment Gateway Integration Hooks
+// ==========================================
+
+export function useGatewayPayments(
+  params?: { status?: string; provider?: string; customer_id?: number; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['gateway-payments', params?.status, params?.provider, params?.customer_id, params?.limit, params?.offset],
+    () => api.getGatewayPayments(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useGatewayPayment(reference: string | null, config?: SWRConfiguration) {
+  return useSWR(
+    reference ? ['gateway-payment', reference] : null,
+    () => (reference ? api.getGatewayPayment(reference) : null),
+    config
+  );
+}
+
+export function useGatewayTransfers(
+  params?: { status?: string; transfer_type?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['gateway-transfers', params?.status, params?.transfer_type, params?.limit, params?.offset],
+    () => api.getGatewayTransfers(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useGatewayTransfer(reference: string | null, config?: SWRConfiguration) {
+  return useSWR(
+    reference ? ['gateway-transfer', reference] : null,
+    () => (reference ? api.getGatewayTransfer(reference) : null),
+    config
+  );
+}
+
+export function useBanks(params?: { country?: string; provider?: string }, config?: SWRConfiguration) {
+  return useSWR(
+    ['banks', params?.country, params?.provider],
+    () => api.getBanks(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useOpenBankingConnections(
+  params?: { customer_id?: number; provider?: string; status?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['open-banking-connections', params?.customer_id, params?.provider, params?.status],
+    () => api.getOpenBankingConnections(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useOpenBankingConnection(id: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['open-banking-connection', id] : null,
+    () => (id ? api.getOpenBankingConnection(id) : null),
+    config
+  );
+}
+
+export function useOpenBankingTransactions(
+  id: number | null,
+  params?: { start_date?: string; end_date?: string; limit?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    id ? ['open-banking-transactions', id, params?.start_date, params?.end_date, params?.limit] : null,
+    () => (id ? api.getOpenBankingTransactions(id, params) : null),
+    config
+  );
+}
+
+export function useWebhookEvents(
+  params?: { provider?: string; event_type?: string; status?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['webhook-events', params?.provider, params?.event_type, params?.status, params?.limit, params?.offset],
+    () => api.getWebhookEvents(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useGatewayMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    initializePayment: async (body: Parameters<typeof api.initializePayment>[0]) => {
+      const res = await api.initializePayment(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'gateway-payments');
+      return res;
+    },
+    verifyPayment: async (reference: string) => {
+      const res = await api.verifyPayment(reference);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'gateway-payments' || key[0] === 'gateway-payment'));
+      return res;
+    },
+    refundPayment: async (reference: string, amount?: number) => {
+      const res = await api.refundPayment(reference, amount);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'gateway-payments' || key[0] === 'gateway-payment'));
+      return res;
+    },
+    initiateTransfer: async (body: Parameters<typeof api.initiateTransfer>[0]) => {
+      const res = await api.initiateTransfer(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'gateway-transfers');
+      return res;
+    },
+    verifyTransfer: async (reference: string) => {
+      const res = await api.verifyTransfer(reference);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'gateway-transfers' || key[0] === 'gateway-transfer'));
+      return res;
+    },
+    payPayrollTransfers: async (payload: { transfer_ids: number[]; provider?: string }) => {
+      const res = await api.payPayrollTransfers(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'gateway-transfers');
+      return res;
+    },
+    resolveAccount: async (body: Parameters<typeof api.resolveAccount>[0], provider?: string) => {
+      return api.resolveAccount(body, provider);
+    },
+    unlinkOpenBankingAccount: async (id: number) => {
+      const res = await api.unlinkOpenBankingAccount(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'open-banking-connections');
+      return res;
+    },
+  };
+}
+
+// Admin Settings
+export function useSettingsGroups(config?: SWRConfiguration) {
+  return useSWR('settings-groups', () => api.getSettingsGroups(), config);
+}
+
+export function useSettings(group: string | null, config?: SWRConfiguration) {
+  return useSWR(
+    group ? ['settings', group] : null,
+    () => (group ? api.getSettings(group) : null),
+    config
+  );
+}
+
+export function useSettingsSchema(group: string | null, config?: SWRConfiguration) {
+  return useSWR(
+    group ? ['settings-schema', group] : null,
+    () => (group ? api.getSettingsSchema(group) : null),
+    config
+  );
+}
+
+export function useSettingsAuditLog(
+  params?: { group?: string; skip?: number; limit?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['settings-audit', params], () => api.getSettingsAuditLog(params), config);
+}
+
+export function useSettingsMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    update: async (group: string, data: Record<string, unknown>) => {
+      const res = await api.updateSettings(group, data);
+      await mutate(['settings', group]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'settings-audit');
+      return res;
+    },
+    test: async (group: string, data: Record<string, unknown>) => {
+      return api.testSettings(group, data);
+    },
+    getTestStatus: async (jobId: string) => {
+      return api.getSettingsTestStatus(jobId);
     },
   };
 }

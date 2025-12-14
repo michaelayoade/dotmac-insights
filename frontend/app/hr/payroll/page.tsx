@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -27,6 +27,7 @@ import {
   useHrSalarySlipMutations,
   useHrAnalyticsOverview,
 } from '@/hooks/useApi';
+import type { HrPayrollPayoutRequest } from '@/lib/api';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
   Banknote,
@@ -153,15 +154,15 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrPayrollPage() {
-  const [company, setCompany] = useState('');
   const [assignmentLimit, setAssignmentLimit] = useState(20);
   const [assignmentOffset, setAssignmentOffset] = useState(0);
   const [slipLimit, setSlipLimit] = useState(20);
   const [slipOffset, setSlipOffset] = useState(0);
   const [generateForm, setGenerateForm] = useState({
     entryId: '',
-    company: '',
     start_date: '',
     end_date: '',
     department: '',
@@ -181,23 +182,98 @@ export default function HrPayrollPage() {
   const [exportFilters, setExportFilters] = useState({ company: '', start_date: '', end_date: '', status: '', payroll_entry: '' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [payoutForm, setPayoutForm] = useState<{ entryId: string; provider: string; currency: string }>({
+    entryId: '',
+    provider: '',
+    currency: 'NGN',
+  });
+  const [payoutRows, setPayoutRows] = useState<
+    Record<
+      string,
+      { slipId: number; accountNumber: string; bankCode: string; accountName: string }
+    >
+  >({});
+  const [payoutStatus, setPayoutStatus] = useState<{ state: 'idle' | 'submitting' | 'success' | 'error'; message?: string }>({
+    state: 'idle',
+  });
+  const company = SINGLE_COMPANY;
 
-  const { data: salaryComponents, isLoading: componentsLoading } = useHrSalaryComponents({ company: company || undefined });
-  const { data: salaryStructures, isLoading: structuresLoading } = useHrSalaryStructures({ company: company || undefined });
+  const { data: salaryComponents, isLoading: componentsLoading } = useHrSalaryComponents({ company: SINGLE_COMPANY || undefined });
+  const { data: salaryStructures, isLoading: structuresLoading } = useHrSalaryStructures({ company: SINGLE_COMPANY || undefined });
   const { data: assignments, isLoading: assignmentsLoading } = useHrSalaryStructureAssignments({
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: assignmentLimit,
     offset: assignmentOffset,
   });
-  const { data: payrollEntries, isLoading: payrollEntriesLoading } = useHrPayrollEntries({ company: company || undefined });
+  const { data: payrollEntries, isLoading: payrollEntriesLoading } = useHrPayrollEntries({ company: SINGLE_COMPANY || undefined });
   const { data: salarySlips, isLoading: salarySlipsLoading } = useHrSalarySlips({
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: slipLimit,
     offset: slipOffset,
+    payroll_entry: payoutForm.entryId ? `PAYROLL-${payoutForm.entryId}` : undefined,
   });
   const { data: analyticsOverview } = useHrAnalyticsOverview();
   const payrollEntryMutations = useHrPayrollEntryMutations();
   const salarySlipMutations = useHrSalarySlipMutations();
+
+  // Prefill payout rows when slips change for selected entry
+  useEffect(() => {
+    if (!salarySlips?.data) return;
+    const next: Record<string, { slipId: number; accountNumber: string; bankCode: string; accountName: string }> = {};
+    salarySlips.data.forEach((slip: any) => {
+      next[String(slip.id)] = {
+        slipId: slip.id,
+        accountNumber: slip.bank_account_no || '',
+        bankCode: '',
+        accountName: slip.employee_name || slip.employee || '',
+      };
+    });
+    setPayoutRows(next);
+  }, [salarySlips?.data]);
+
+  const handlePayoutChange = (slipId: number, field: 'accountNumber' | 'bankCode' | 'accountName', value: string) => {
+    setPayoutRows(prev => ({
+      ...prev,
+      [String(slipId)]: {
+        ...(prev[String(slipId)] || { slipId, accountNumber: '', bankCode: '', accountName: '' }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const submitPayouts = async () => {
+    if (!payoutForm.entryId) {
+      setPayoutStatus({ state: 'error', message: 'Select a payroll entry first.' });
+      return;
+    }
+    const payouts = Object.values(payoutRows)
+      .filter(p => p.accountNumber && p.bankCode)
+      .map(p => ({
+        salary_slip_id: p.slipId,
+        account_number: p.accountNumber,
+        bank_code: p.bankCode,
+        account_name: p.accountName || undefined,
+      }));
+
+    if (!payouts.length) {
+      setPayoutStatus({ state: 'error', message: 'Add at least one payout with account and bank code.' });
+      return;
+    }
+
+    const payload: HrPayrollPayoutRequest = {
+      payouts,
+      provider: payoutForm.provider || undefined,
+      currency: payoutForm.currency || 'NGN',
+    };
+
+    try {
+      setPayoutStatus({ state: 'submitting' });
+      await salarySlipMutations.handoffPayrollEntry(Number(payoutForm.entryId), payload);
+      setPayoutStatus({ state: 'success', message: `Sent ${payouts.length} slips to Books for payment.` });
+    } catch (e: any) {
+      setPayoutStatus({ state: 'error', message: e?.message || 'Failed to initiate payouts' });
+    }
+  };
 
   const componentList = extractList(salaryComponents);
   const structureList = extractList(salaryStructures);
@@ -254,13 +330,13 @@ export default function HrPayrollPage() {
 
   const handleGenerateSlips = async () => {
     setActionError(null);
-    if (!generateForm.entryId || !generateForm.start_date || !generateForm.end_date || !(generateForm.company || company)) {
-      setActionError('Payroll entry, company, and period are required.');
+    if (!generateForm.entryId || !generateForm.start_date || !generateForm.end_date) {
+      setActionError('Payroll entry and period are required.');
       return;
     }
     try {
       await payrollEntryMutations.generateSlips(generateForm.entryId, {
-        company: generateForm.company || company,
+        company,
         department: generateForm.department || null,
         branch: generateForm.branch || null,
         designation: generateForm.designation || null,
@@ -270,7 +346,6 @@ export default function HrPayrollPage() {
       });
       setGenerateForm({
         entryId: '',
-        company: '',
         start_date: '',
         end_date: '',
         department: '',
@@ -497,21 +572,6 @@ export default function HrPayrollPage() {
         </ChartCard>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center bg-slate-card border border-slate-border rounded-xl p-4">
-        <input
-          type="text"
-          placeholder="Filter by company"
-          value={company}
-          onChange={(e) => {
-            setCompany(e.target.value);
-            setAssignmentOffset(0);
-            setSlipOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-        />
-      </div>
-
       {/* Quick Actions */}
       <CollapsibleSection title="Payroll Actions" icon={ClipboardList} defaultOpen={false}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
@@ -526,13 +586,7 @@ export default function HrPayrollPage() {
                 onChange={(e) => setGenerateForm({ ...generateForm, entryId: e.target.value })}
                 className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
               />
-              <input
-                type="text"
-                placeholder="Company"
-                value={generateForm.company}
-                onChange={(e) => setGenerateForm({ ...generateForm, company: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
-              />
+              <div />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -824,6 +878,132 @@ export default function HrPayrollPage() {
           loading={payrollEntriesLoading}
           emptyMessage="No payroll entries"
         />
+      </div>
+
+      {/* Payroll Payouts */}
+      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Banknote className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-white font-semibold">Send Payroll to Books for Payment</h3>
+          </div>
+          <p className="text-slate-muted text-sm">
+            Select a payroll entry, review bank details, and hand off salary slips to the Books payment queue. Accounting will pay via Paystack/Flutterwave.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <label className="flex flex-col gap-1 text-sm text-slate-muted">
+            Payroll entry
+            <select
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              value={payoutForm.entryId}
+              onChange={(e) => setPayoutForm(prev => ({ ...prev, entryId: e.target.value }))}
+            >
+              <option value="">Select entry</option>
+              {(payrollEntries?.data || payrollEntries?.items || []).map((entry: any) => (
+                <option key={entry.id} value={entry.id}>
+                  #{entry.id} • {formatDate(entry.start_date)} – {formatDate(entry.end_date)} • {entry.company || 'Company'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-muted">
+            Provider
+            <select
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              value={payoutForm.provider}
+              onChange={(e) => setPayoutForm(prev => ({ ...prev, provider: e.target.value }))}
+            >
+              <option value="">Default</option>
+              <option value="paystack">Paystack</option>
+              <option value="flutterwave">Flutterwave</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-muted">
+            Currency
+            <input
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              value={payoutForm.currency}
+              onChange={(e) => setPayoutForm(prev => ({ ...prev, currency: e.target.value }))}
+            />
+          </label>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-slate-border">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-elevated/60 text-slate-muted">
+              <tr>
+                <th className="text-left px-3 py-2">Employee</th>
+                <th className="text-left px-3 py-2">Net Pay</th>
+                <th className="text-left px-3 py-2">Account Number</th>
+                <th className="text-left px-3 py-2">Bank Code</th>
+                <th className="text-left px-3 py-2">Account Name</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(salarySlipList.items || []).map((slip: any) => {
+                const row = payoutRows[String(slip.id)] || { accountNumber: '', bankCode: '', accountName: '' };
+                return (
+                  <tr key={slip.id} className="border-t border-slate-border/60">
+                    <td className="px-3 py-2 text-white">
+                      <div className="font-medium">{slip.employee_name || slip.employee}</div>
+                      <div className="text-xs text-slate-muted">{formatDate(slip.start_date)} – {formatDate(slip.end_date)}</div>
+                    </td>
+                    <td className="px-3 py-2 text-emerald-400 font-mono">{formatCurrency(slip.net_pay ?? 0, slip.currency || 'NGN')}</td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        value={row.accountNumber}
+                        onChange={(e) => handlePayoutChange(slip.id, 'accountNumber', e.target.value)}
+                        placeholder="0123456789"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        value={row.bankCode}
+                        onChange={(e) => handlePayoutChange(slip.id, 'bankCode', e.target.value)}
+                        placeholder="058"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        value={row.accountName}
+                        onChange={(e) => handlePayoutChange(slip.id, 'accountName', e.target.value)}
+                        placeholder="Account name"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+              {!salarySlipList.items?.length && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-4 text-slate-muted">
+                    Select a payroll entry to load slips.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm">
+            {payoutStatus.state === 'error' && <span className="text-rose-400">{payoutStatus.message}</span>}
+            {payoutStatus.state === 'success' && <span className="text-emerald-400">{payoutStatus.message}</span>}
+            {payoutStatus.state === 'submitting' && <span className="text-slate-muted">Submitting payouts…</span>}
+          </div>
+          <button
+            onClick={submitPayouts}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
+            disabled={payoutStatus.state === 'submitting'}
+          >
+            <ArrowRight className="w-4 h-4" />
+            Send to Books
+          </button>
+        </div>
       </div>
 
       {/* Salary Slips */}

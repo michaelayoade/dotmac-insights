@@ -157,13 +157,13 @@ export default function SuppliersPage() {
             placeholder="Search suppliers..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <select
           value={status}
           onChange={(e) => { setStatus(e.target.value); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>

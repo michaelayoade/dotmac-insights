@@ -66,6 +66,60 @@ from app.models.auth import (
     TokenDenylist,
 )
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
+from app.models.gateway_transaction import (
+    GatewayTransaction,
+    GatewayProvider,
+    GatewayTransactionType,
+    GatewayTransactionStatus,
+)
+from app.models.virtual_account import VirtualAccount, VirtualAccountStatus
+from app.models.transfer import Transfer, TransferStatus, TransferType
+from app.models.payment_subscription import (
+    PaymentSubscription,
+    PaymentSubscriptionStatus,
+    PaymentSubscriptionInterval,
+)
+from app.models.hr_payroll import SalarySlip, PayrollEntry
+from app.models.open_banking import (
+    OpenBankingConnection,
+    OpenBankingProvider,
+    ConnectionStatus,
+)
+from app.models.webhook_event import WebhookEvent
+from app.models.tax_ng import (
+    NigerianTaxType,
+    TaxJurisdiction,
+    WHTPaymentType,
+    CITCompanySize,
+    VATTransactionType,
+    EInvoiceStatus,
+    PAYEFilingFrequency,
+    TaxSettings,
+    NigerianTaxRate,
+    VATTransaction,
+    WHTTransaction,
+    WHTCertificate,
+    PAYECalculation,
+    CITAssessment,
+    EInvoice,
+    EInvoiceLine,
+)
+from app.models.accounting_ext import FiscalPeriod
+from app.models.settings import SettingGroup, SettingsAuditLog
+from app.models.expense_management import (
+    ExpenseCategory,
+    ExpensePolicy,
+    ExpenseClaim,
+    ExpenseClaimLine,
+    CashAdvance,
+    PerDiemRate,
+    MileageRate,
+    CorporateCard,
+    CorporateCardTransaction,
+    CorporateCardStatement,
+    ExpenseClaimStatus,
+    FundingMethod,
+)
 
 __all__ = [
     "Customer",
@@ -137,4 +191,54 @@ __all__ = [
     # Sync infrastructure
     "SyncCursor",
     "FailedSyncRecord",
+    # Payment integration models
+    "GatewayTransaction",
+    "GatewayProvider",
+    "GatewayTransactionType",
+    "GatewayTransactionStatus",
+    "VirtualAccount",
+    "VirtualAccountStatus",
+    "Transfer",
+    "TransferStatus",
+    "TransferType",
+    "PaymentSubscription",
+    "PaymentSubscriptionStatus",
+    "PaymentSubscriptionInterval",
+    "OpenBankingConnection",
+    "OpenBankingProvider",
+    "ConnectionStatus",
+    "WebhookEvent",
+    # Nigerian tax models
+    "NigerianTaxType",
+    "TaxJurisdiction",
+    "WHTPaymentType",
+    "CITCompanySize",
+    "VATTransactionType",
+    "EInvoiceStatus",
+    "PAYEFilingFrequency",
+    "TaxSettings",
+    "NigerianTaxRate",
+    "VATTransaction",
+    "WHTTransaction",
+    "WHTCertificate",
+    "PAYECalculation",
+    "CITAssessment",
+    "EInvoice",
+    "EInvoiceLine",
+    # Settings models
+    "SettingGroup",
+    "SettingsAuditLog",
+    # Expense management models
+    "ExpenseCategory",
+    "ExpensePolicy",
+    "ExpenseClaim",
+    "ExpenseClaimLine",
+    "CashAdvance",
+    "PerDiemRate",
+    "MileageRate",
+    "CorporateCard",
+    "CorporateCardTransaction",
+    "CorporateCardStatement",
+    "ExpenseClaimStatus",
+    "FundingMethod",
 ]

@@ -494,11 +494,20 @@ class AccountingControl(Base):
     require_attachment_expense: Mapped[bool] = mapped_column(default=True)
     require_attachment_payment: Mapped[bool] = mapped_column(default=False)
     require_attachment_invoice: Mapped[bool] = mapped_column(default=False)
+    require_attachment_supplier_payment: Mapped[bool] = mapped_column(default=False)
+    require_attachment_purchase_invoice: Mapped[bool] = mapped_column(default=False)
+    require_attachment_credit_note: Mapped[bool] = mapped_column(default=False)
+    require_attachment_debit_note: Mapped[bool] = mapped_column(default=False)
+    require_attachment_bank_transaction: Mapped[bool] = mapped_column(default=False)
 
     # Approval settings
     require_approval_journal_entry: Mapped[bool] = mapped_column(default=False)
     require_approval_expense: Mapped[bool] = mapped_column(default=True)
     require_approval_payment: Mapped[bool] = mapped_column(default=False)
+    require_approval_supplier_payment: Mapped[bool] = mapped_column(default=False)
+    require_approval_purchase_invoice: Mapped[bool] = mapped_column(default=False)
+    require_approval_credit_note: Mapped[bool] = mapped_column(default=False)
+    require_approval_debit_note: Mapped[bool] = mapped_column(default=False)
 
     # Period settings
     auto_create_fiscal_periods: Mapped[bool] = mapped_column(default=True)

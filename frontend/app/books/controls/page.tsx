@@ -134,12 +134,12 @@ export default function BooksControlsPage() {
                 value={periodForm.fiscal_year}
                 onChange={(e) => setPeriodForm((prev) => ({ ...prev, fiscal_year: e.target.value }))}
                 placeholder="Fiscal year (e.g. 2025)"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
               />
               <select
                 value={periodForm.frequency}
                 onChange={(e) => setPeriodForm((prev) => ({ ...prev, frequency: e.target.value }))}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
               >
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
@@ -185,20 +185,20 @@ export default function BooksControlsPage() {
               onChange={(e) => setRevalForm((p) => ({ ...p, start_date: e.target.value }))}
               placeholder="Start date"
               type="date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
             <input
               value={revalForm.end_date}
               onChange={(e) => setRevalForm((p) => ({ ...p, end_date: e.target.value }))}
               placeholder="End date"
               type="date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
             <input
               value={revalForm.currency}
               onChange={(e) => setRevalForm((p) => ({ ...p, currency: e.target.value }))}
               placeholder="Currency"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
           </div>
           <div className="flex gap-2 mt-3">
@@ -255,19 +255,19 @@ export default function BooksControlsPage() {
               <input
                 value={newRate.pair}
                 onChange={(e) => setNewRate((p) => ({ ...p, pair: e.target.value }))}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
                 placeholder="Pair (e.g. USD/NGN)"
               />
               <input
                 value={newRate.rate}
                 onChange={(e) => setNewRate((p) => ({ ...p, rate: e.target.value }))}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
                 placeholder="Rate"
               />
               <input
                 value={newRate.date}
                 onChange={(e) => setNewRate((p) => ({ ...p, date: e.target.value }))}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="input-field"
                 placeholder="Date (optional)"
               />
             </div>
@@ -315,7 +315,7 @@ export default function BooksControlsPage() {
                 value={newWorkflowName}
                 onChange={(e) => setNewWorkflowName(e.target.value)}
                 placeholder="Workflow name"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 flex-1"
+                className="input-field flex-1"
               />
               <button
                 onClick={() => {

@@ -186,13 +186,13 @@ export default function AccountsPayablePage() {
             placeholder="Search by supplier name..."
             value={supplierSearch}
             onChange={(e) => { setSupplierSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <select
           value={currency}
           onChange={(e) => { setCurrency(e.target.value); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         >
           <option value="NGN">NGN</option>
           <option value="USD">USD</option>

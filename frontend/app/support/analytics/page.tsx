@@ -2,6 +2,23 @@
 
 import { useState, useMemo } from 'react';
 import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
+import {
   BarChart3,
   Activity,
   TrendingUp,
@@ -19,7 +36,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import {
-  useSupportOverview,
+  useSupportDashboard,
   useSupportAnalyticsVolumeTrend,
   useSupportAnalyticsResolutionTime,
   useSupportAnalyticsByCategory,
@@ -30,6 +47,13 @@ import {
   useSupportRoutingQueueHealth,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+
+// Chart styling constants
+const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899'];
+const TOOLTIP_STYLE = {
+  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' },
+  labelStyle: { color: '#f8fafc' },
+};
 
 // =============================================================================
 // UTILITY COMPONENTS
@@ -78,41 +102,17 @@ function MetricCard({
   );
 }
 
-function MiniBarChart({
-  data,
-  valueKey,
-  labelKey,
-  color = 'bg-teal-electric',
-  showLabels = true,
-}: {
-  data: any[];
-  valueKey: string;
-  labelKey: string;
-  color?: string;
-  showLabels?: boolean;
-}) {
-  const maxValue = Math.max(...data.map((d) => d[valueKey] || 0), 1);
-
+function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
   return (
-    <div className="flex items-end gap-1 h-24">
-      {data.map((item, idx) => {
-        const val = item[valueKey] || 0;
-        const height = (val / maxValue) * 100;
-        return (
-          <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-            <div
-              className={cn('w-full rounded-t transition-all', color)}
-              style={{ height: `${Math.max(height, 4)}%` }}
-              title={`${item[labelKey]}: ${val}`}
-            />
-            {showLabels && (
-              <span className="text-[9px] text-slate-muted truncate w-full text-center">
-                {String(item[labelKey]).slice(-5)}
-              </span>
-            )}
-          </div>
-        );
-      })}
+    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        {Icon && <Icon className="w-4 h-4 text-teal-electric" />}
+        <div>
+          <h3 className="text-white font-semibold">{title}</h3>
+          {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -176,7 +176,7 @@ export default function SupportAnalyticsPage() {
   const [days, setDays] = useState(30);
 
   // Fetch all analytics data
-  const { data: overview, isLoading: overviewLoading } = useSupportOverview({ limit_overdue: 10 });
+  const { data: dashboard, isLoading: dashboardLoading } = useSupportDashboard();
   const { data: volumeTrend } = useSupportAnalyticsVolumeTrend({ months });
   const { data: resolutionTrend } = useSupportAnalyticsResolutionTime({ months });
   const { data: categoryBreakdown } = useSupportAnalyticsByCategory({ days });
@@ -185,8 +185,6 @@ export default function SupportAnalyticsPage() {
   const { data: agentInsights } = useSupportInsightsAgentPerformance({ days });
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days });
   const { data: queueHealth } = useSupportRoutingQueueHealth();
-
-  const summary = overview?.summary;
 
   // Calculate trends
   const latestSla = slaPerformance?.[slaPerformance.length - 1];
@@ -258,40 +256,42 @@ export default function SupportAnalyticsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <MetricCard
           title="Total Tickets"
-          value={summary?.total ?? 0}
+          value={dashboard?.tickets?.total ?? 0}
           icon={Activity}
           colorClass="text-blue-400"
-          loading={overviewLoading}
+          loading={dashboardLoading}
           trend={volumeTrendPct ? { value: volumeTrendPct, positive: volumeTrendPct < 0 } : undefined}
         />
         <MetricCard
           title="Open"
-          value={(summary?.open ?? 0) + (summary?.replied ?? 0)}
-          subtitle={`${summary?.in_progress ?? 0} in progress`}
+          value={dashboard?.tickets?.open ?? 0}
+          subtitle={`${dashboard?.tickets?.on_hold ?? 0} on hold`}
           icon={AlertTriangle}
           colorClass="text-amber-400"
-          loading={overviewLoading}
+          loading={dashboardLoading}
         />
         <MetricCard
           title="Resolved"
-          value={summary?.resolved ?? 0}
+          value={dashboard?.tickets?.resolved ?? 0}
           icon={CheckCircle2}
           colorClass="text-emerald-400"
-          loading={overviewLoading}
+          loading={dashboardLoading}
         />
         <MetricCard
           title="Overdue"
-          value={slaBreach?.currently_overdue ?? 0}
+          value={dashboard?.metrics?.overdue_tickets ?? slaBreach?.currently_overdue ?? 0}
           subtitle={`${slaBreach?.total_breaches ?? 0} breached (${days}d)`}
           icon={XCircle}
           colorClass="text-rose-400"
+          loading={dashboardLoading}
         />
         <MetricCard
           title="Unassigned"
-          value={queueHealth?.unassigned_tickets ?? 0}
+          value={dashboard?.metrics?.unassigned_tickets ?? queueHealth?.unassigned_tickets ?? 0}
           subtitle={`${queueHealth?.total_agents ?? 0} agents`}
           icon={Users}
           colorClass="text-violet-400"
+          loading={dashboardLoading}
         />
       </div>
 
@@ -303,7 +303,7 @@ export default function SupportAnalyticsPage() {
             <Target className="w-4 h-4 text-teal-electric" />
             <h3 className="text-white font-semibold">SLA Attainment</h3>
           </div>
-          <SlaGauge attainment={summary?.sla_attainment_pct ?? 0} />
+          <SlaGauge attainment={dashboard?.sla?.attainment_rate ?? 0} />
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
             <div>
               <p className="text-xs text-slate-muted">Met</p>
@@ -322,35 +322,56 @@ export default function SupportAnalyticsPage() {
           )}
         </div>
 
-        {/* SLA Trend Chart */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-white font-semibold">SLA Trend</h3>
-          </div>
+        {/* SLA Trend Chart - Recharts */}
+        <ChartCard title="SLA Trend" subtitle="Monthly attainment rate" icon={TrendingUp}>
           {slaPerformance?.length ? (
             <>
-              <MiniBarChart data={slaPerformance} valueKey="attainment_rate" labelKey="period" color="bg-emerald-500" />
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-muted">
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={slaPerformance}>
+                  <defs>
+                    <linearGradient id="slaGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `${value.toFixed(1)}%`} />
+                  <Line
+                    type="monotone"
+                    dataKey="attainment_rate"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ fill: '#10b981', r: 4 }}
+                    name="Attainment"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-muted">
                 <span>Target: 90%</span>
-                <span>Latest: {latestSla?.attainment_rate?.toFixed(1)}%</span>
+                <span className="text-emerald-400 font-semibold">Latest: {latestSla?.attainment_rate?.toFixed(1)}%</span>
               </div>
             </>
           ) : (
-            <p className="text-slate-muted text-sm text-center py-8">No SLA data</p>
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No SLA data</div>
           )}
-        </div>
+        </ChartCard>
 
-        {/* Resolution Time */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Avg Resolution Time</h3>
-          </div>
+        {/* Resolution Time - Recharts */}
+        <ChartCard title="Avg Resolution Time" subtitle="Hours to resolve" icon={Clock}>
           {resolutionTrend?.length ? (
             <>
-              <MiniBarChart data={resolutionTrend} valueKey="avg_resolution_hours" labelKey="period" color="bg-violet-500" />
-              <div className="mt-3 text-center">
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={resolutionTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `${value.toFixed(1)}h`} />
+                  <Bar dataKey="avg_resolution_hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Avg Hours" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-2 text-center">
                 <span className="text-2xl font-bold text-white">
                   {resolutionTrend[resolutionTrend.length - 1]?.avg_resolution_hours?.toFixed(1) ?? 0}h
                 </span>
@@ -358,69 +379,105 @@ export default function SupportAnalyticsPage() {
               </div>
             </>
           ) : (
-            <p className="text-slate-muted text-sm text-center py-8">No resolution data</p>
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No resolution data</div>
           )}
-        </div>
+        </ChartCard>
       </div>
 
-      {/* Volume Trend */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-400" />
-            <h3 className="text-white font-semibold">Ticket Volume Trend</h3>
-          </div>
-          <span className="text-xs text-slate-muted">{months} months</span>
-        </div>
+      {/* Volume Trend - Recharts */}
+      <ChartCard title="Ticket Volume Trend" subtitle={`${months} months of ticket data`} icon={Activity}>
         {volumeTrend?.length ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {volumeTrend.map((v) => (
-                <div key={v.period} className="bg-slate-elevated rounded-lg p-3 text-center">
-                  <p className="text-xs text-slate-muted mb-1">{v.period}</p>
-                  <p className="text-lg font-bold text-white">{v.total}</p>
-                  <div className="flex items-center justify-center gap-2 mt-1 text-xs">
-                    <span className="text-emerald-400">{v.resolved} res</span>
-                    <span className="text-slate-muted">|</span>
-                    <span className="text-blue-400">{v.resolution_rate}%</span>
-                  </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={volumeTrend}>
+                <defs>
+                  <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="resolvedGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 11 }} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Legend
+                  formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
+                  iconType="circle"
+                  iconSize={8}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  fill="url(#volumeGradient)"
+                  name="Total Tickets"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="resolved"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  fill="url(#resolvedGradient)"
+                  name="Resolved"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+              {volumeTrend.slice(-6).map((v) => (
+                <div key={v.period} className="bg-slate-elevated rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-slate-muted">{v.period}</p>
+                  <p className="text-sm font-bold text-white">{v.total}</p>
+                  <p className="text-[10px] text-emerald-400">{v.resolution_rate}% res</p>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <p className="text-slate-muted text-sm text-center py-8">No volume data</p>
+          <div className="h-[240px] flex items-center justify-center text-slate-muted text-sm">No volume data</div>
         )}
-      </div>
+      </ChartCard>
 
       {/* Category & Agent Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* By Category */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">By Ticket Type ({days}d)</h3>
-          </div>
+        {/* By Category - Recharts */}
+        <ChartCard title={`By Ticket Type (${days}d)`} subtitle="Volume and resolution rate" icon={Zap}>
           {categoryBreakdown?.by_ticket_type?.length ? (
-            <div className="space-y-3">
-              {categoryBreakdown.by_ticket_type.slice(0, 8).map((cat) => (
-                <div key={cat.type} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white truncate">{cat.type || 'Uncategorized'}</span>
-                    <span className="text-slate-muted font-mono">{cat.count}</span>
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={categoryBreakdown.by_ticket_type.slice(0, 6)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                  <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="type"
+                    stroke="#64748b"
+                    tick={{ fontSize: 10 }}
+                    width={80}
+                    tickFormatter={(value) => (value || 'Other').substring(0, 12)}
+                  />
+                  <Tooltip {...TOOLTIP_STYLE} />
+                  <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Total" />
+                  <Bar dataKey="resolved" fill="#10b981" radius={[0, 4, 4, 0]} name="Resolved" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {categoryBreakdown.by_ticket_type.slice(0, 4).map((cat) => (
+                  <div key={cat.type} className="flex items-center justify-between text-xs bg-slate-elevated rounded px-2 py-1">
+                    <span className="text-slate-muted truncate">{cat.type || 'Other'}</span>
+                    <span className="text-emerald-400 font-mono">{cat.resolution_rate}%</span>
                   </div>
-                  <ProgressBar value={cat.resolved} max={cat.count} color="bg-emerald-500" />
-                  <div className="flex justify-between text-xs text-slate-muted">
-                    <span>{cat.resolved} resolved</span>
-                    <span>{cat.resolution_rate}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           ) : (
-            <p className="text-slate-muted text-sm text-center py-8">No category data</p>
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">No category data</div>
           )}
-        </div>
+        </ChartCard>
 
         {/* Agent Performance */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">

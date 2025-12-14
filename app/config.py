@@ -1,10 +1,16 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, List
+import os
+
+
+def _default_database_url() -> str:
+    # Prefer explicit test DB, then DATABASE_URL, then local sqlite
+    return os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL") or "sqlite:///./dotmac.db"
 
 
 class Settings(BaseSettings):
-    # Database (uses psycopg3 driver)
-    database_url: str = "postgresql+psycopg://user:password@localhost:5432/dotmac_insights"
+    # Database (uses psycopg3 driver unless overridden)
+    database_url: str = _default_database_url()
 
     # CORS Configuration
     cors_origins: str = ""  # Comma-separated list of allowed origins, empty = no CORS
@@ -58,6 +64,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: Optional[str] = None
 
+    # OpenBao (secrets management)
+    openbao_url: Optional[str] = None  # e.g., http://localhost:8200
+    openbao_token: Optional[str] = None
+
     # Analytics
     analytics_statement_timeout_ms: Optional[int] = 15000  # per-request DB timeout
 
@@ -81,6 +91,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Override with explicit test database if provided, regardless of DATABASE_URL
+test_db_override = os.getenv("TEST_DATABASE_URL")
+if test_db_override:
+    settings.database_url = test_db_override
+
+# When running tests, fall back to a local SQLite DB unless explicitly overridden
+if os.getenv("PYTEST_CURRENT_TEST"):
+    settings.database_url = os.getenv("TEST_DATABASE_URL", "sqlite:///./test.db")
 
 # Validate JWT auth in production
 if settings.is_production and not settings.jwks_url:

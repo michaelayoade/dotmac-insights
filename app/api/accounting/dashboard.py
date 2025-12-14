@@ -21,7 +21,7 @@ from app.models.accounting import (
 )
 from app.models.invoice import Invoice, InvoiceStatus
 
-from .helpers import parse_date
+from .helpers import parse_date, get_effective_root_type
 
 router = APIRouter()
 
@@ -66,21 +66,21 @@ def get_accounting_dashboard(
     # Get accounts with their types
     accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
 
-    # Calculate totals by root type
+    # Calculate totals by effective root type (handles ERPNext misclassifications)
     total_assets = sum(
         balance_map.get(acc_id, 0)
         for acc_id, acc in accounts.items()
-        if acc.root_type == AccountType.ASSET
+        if get_effective_root_type(acc) == AccountType.ASSET
     )
     total_liabilities = sum(
         -balance_map.get(acc_id, 0)
         for acc_id, acc in accounts.items()
-        if acc.root_type == AccountType.LIABILITY
+        if get_effective_root_type(acc) == AccountType.LIABILITY
     )
     total_equity = sum(
         -balance_map.get(acc_id, 0)
         for acc_id, acc in accounts.items()
-        if acc.root_type == AccountType.EQUITY
+        if get_effective_root_type(acc) == AccountType.EQUITY
     )
 
     # Period income/expenses (within date range)
@@ -102,12 +102,12 @@ def get_accounting_dashboard(
     total_income = sum(
         period_map.get(acc_id, {}).get("credit", 0) - period_map.get(acc_id, {}).get("debit", 0)
         for acc_id, acc in accounts.items()
-        if acc.root_type == AccountType.INCOME
+        if get_effective_root_type(acc) == AccountType.INCOME
     )
     total_expenses = sum(
         period_map.get(acc_id, {}).get("debit", 0) - period_map.get(acc_id, {}).get("credit", 0)
         for acc_id, acc in accounts.items()
-        if acc.root_type == AccountType.EXPENSE
+        if get_effective_root_type(acc) == AccountType.EXPENSE
     )
 
     # AR/AP summaries

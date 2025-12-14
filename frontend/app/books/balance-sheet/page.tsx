@@ -4,7 +4,23 @@ import { useState } from 'react';
 import { useAccountingBalanceSheet } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, FileSpreadsheet, Building2, CreditCard, PiggyBank, Calendar, Loader2, Download, BarChart2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  FileSpreadsheet,
+  Building2,
+  CreditCard,
+  PiggyBank,
+  Calendar,
+  Loader2,
+  Download,
+  BarChart2,
+  ChevronDown,
+  ChevronRight,
+  Briefcase,
+  Landmark,
+  Coins,
+  TrendingUp,
+} from 'lucide-react';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -22,66 +38,171 @@ interface AccountLineProps {
   indent?: number;
   bold?: boolean;
   className?: string;
+  pct?: number;
 }
 
-function AccountLine({ name, amount, indent = 0, bold, className }: AccountLineProps) {
+function AccountLine({ name, amount, indent = 0, bold, className, pct }: AccountLineProps) {
   return (
-    <div className={cn(
-      'flex justify-between items-center py-2 border-b border-slate-border/50',
-      bold && 'font-semibold',
-      className
-    )} style={{ paddingLeft: `${indent * 1.5}rem` }}>
+    <div
+      className={cn(
+        'flex justify-between items-center py-2 border-b border-slate-border/50',
+        bold && 'font-semibold',
+        className
+      )}
+      style={{ paddingLeft: `${indent * 1.5}rem` }}
+    >
       <span className="text-white">{name}</span>
-      <span className={cn(
-        'font-mono',
-        amount >= 0 ? 'text-white' : 'text-red-400'
-      )}>
-        {formatCurrency(amount)}
-      </span>
+      <div className="flex items-center gap-4">
+        {pct !== undefined && (
+          <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
+        )}
+        <span className={cn('font-mono w-32 text-right', amount >= 0 ? 'text-white' : 'text-red-400')}>
+          {formatCurrency(amount)}
+        </span>
+      </div>
     </div>
   );
 }
 
-interface SectionProps {
+interface CollapsibleSectionProps {
   title: string;
   icon: React.ElementType;
-  items: Array<{ name: string; amount: number; children?: Array<{ name: string; amount: number }> }>;
+  items: Array<{ account: string; balance: number; account_type?: string; pct_of_total?: number }>;
   total: number;
   colorClass: string;
+  defaultOpen?: boolean;
+  showPct?: boolean;
 }
 
-function Section({ title, icon: Icon, items, total, colorClass }: SectionProps) {
+function CollapsibleSection({
+  title,
+  icon: Icon,
+  items,
+  total,
+  colorClass,
+  defaultOpen = true,
+  showPct,
+}: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
   return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className={cn('w-5 h-5', colorClass)} />
-        <h2 className={cn('text-lg font-semibold', colorClass)}>{title}</h2>
-      </div>
-      <div className="space-y-1">
-        {items.map((item, index) => (
-          <div key={index}>
+    <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={cn('w-5 h-5', colorClass)} />
+          <h3 className={cn('text-lg font-semibold', colorClass)}>{title}</h3>
+          <span className="text-slate-muted text-sm">({items.length} accounts)</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(total)}</span>
+          {isOpen ? (
+            <ChevronDown className="w-5 h-5 text-slate-muted" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-slate-muted" />
+          )}
+        </div>
+      </button>
+      {isOpen && items.length > 0 && (
+        <div className="px-4 pb-4 space-y-1">
+          {items.map((item, index) => (
             <AccountLine
-              name={item.name}
-              amount={item.amount}
-              bold={item.children && item.children.length > 0}
+              key={index}
+              name={item.account}
+              amount={item.balance}
+              pct={showPct ? item.pct_of_total : undefined}
             />
-            {item.children?.map((child, childIndex) => (
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface EquitySectionProps {
+  title: string;
+  data: {
+    share_capital?: { accounts: any[]; total: number };
+    share_premium?: { accounts: any[]; total: number };
+    reserves?: { accounts: any[]; total: number };
+    other_comprehensive_income?: { accounts: any[]; total: number };
+    retained_earnings?: { accounts: any[]; total: number; current_period_profit?: number };
+    treasury_shares?: { accounts: any[]; total: number };
+    total?: number;
+  };
+  colorClass: string;
+  showPct?: boolean;
+  totalAssets?: number;
+}
+
+function EquitySection({ title, data, colorClass, showPct, totalAssets }: EquitySectionProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const components = [
+    { label: 'Share Capital', data: data.share_capital, icon: Coins },
+    { label: 'Share Premium', data: data.share_premium, icon: TrendingUp },
+    { label: 'Reserves', data: data.reserves, icon: Briefcase },
+    { label: 'Other Comprehensive Income', data: data.other_comprehensive_income, icon: BarChart2 },
+    { label: 'Retained Earnings', data: data.retained_earnings, icon: PiggyBank },
+    { label: 'Treasury Shares', data: data.treasury_shares, icon: Landmark },
+  ].filter((c) => c.data && (c.data.total !== 0 || c.data.accounts?.length > 0));
+
+  return (
+    <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <PiggyBank className={cn('w-5 h-5', colorClass)} />
+          <h3 className={cn('text-lg font-semibold', colorClass)}>{title}</h3>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(data.total || 0)}</span>
+          {isOpen ? (
+            <ChevronDown className="w-5 h-5 text-slate-muted" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-slate-muted" />
+          )}
+        </div>
+      </button>
+      {isOpen && (
+        <div className="px-4 pb-4 space-y-4">
+          {components.map((component, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="flex items-center gap-2 text-slate-muted text-sm">
+                <component.icon className="w-4 h-4" />
+                <span>{component.label}</span>
+              </div>
+              {component.data?.accounts?.map((acc: any, i: number) => (
+                <AccountLine
+                  key={i}
+                  name={acc.account || acc.name}
+                  amount={acc.balance || acc.amount || 0}
+                  indent={1}
+                  pct={showPct && totalAssets ? ((acc.balance || 0) / totalAssets) * 100 : undefined}
+                />
+              ))}
+              {component.label === 'Retained Earnings' && data.retained_earnings?.current_period_profit !== undefined && (
+                <AccountLine
+                  name="Current Period Profit"
+                  amount={data.retained_earnings.current_period_profit}
+                  indent={1}
+                  className="text-teal-400"
+                />
+              )}
               <AccountLine
-                key={childIndex}
-                name={child.name}
-                amount={child.amount}
-                indent={1}
+                name={`Total ${component.label}`}
+                amount={component.data?.total || 0}
+                bold
+                className="border-t border-slate-border"
               />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className={cn('flex justify-between items-center pt-4 mt-4 border-t-2 border-slate-border')}>
-        <span className={cn('font-bold', colorClass)}>Total {title}</span>
-        <span className={cn('font-mono font-bold text-lg', colorClass)}>
-          {formatCurrency(total)}
-        </span>
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -114,49 +235,38 @@ export default function BalanceSheetPage() {
     );
   }
 
-  const assets = data?.assets || { current_assets: [], fixed_assets: [], other_assets: [], total: 0 };
-  const liabilities = data?.liabilities || { current_liabilities: [], long_term_liabilities: [], total: 0 };
-  const equity = data?.equity || { items: [], retained_earnings: 0, total: 0 };
+  // Extract data with IFRS structure support
+  const totalAssets = data?.total_assets || data?.assets?.total || 0;
+  const totalLiabilities = data?.total_liabilities || data?.liabilities?.total || 0;
+  const totalEquity = data?.total_equity || data?.equity?.total || 0;
+  const workingCapital = data?.working_capital || 0;
+  const currency = data?.currency || 'NGN';
 
-  const mapSection = (label: string, rows: Array<{ account: string; balance: number }>) => ({
-    name: label,
-    amount: rows.reduce((sum, row) => sum + (row.balance || 0), 0),
-    children: rows.map((row) => ({ name: row.account, amount: row.balance })),
-  });
+  // Current/Non-Current classification
+  const currentAssets = data?.assets_classified?.current_assets || { accounts: [], total: 0 };
+  const nonCurrentAssets = data?.assets_classified?.non_current_assets || { accounts: [], total: 0 };
+  const currentLiabilities = data?.liabilities_classified?.current_liabilities || { accounts: [], total: 0 };
+  const nonCurrentLiabilities = data?.liabilities_classified?.non_current_liabilities || { accounts: [], total: 0 };
 
-  const assetItems = [
-    mapSection('Current Assets', assets.current_assets || []),
-    mapSection('Fixed Assets', assets.fixed_assets || []),
-    mapSection('Other Assets', assets.other_assets || []),
-  ].filter((item) => item.children?.length);
+  // Equity breakdown
+  const equityClassified = data?.equity_classified || {};
 
-  const liabilityItems = [
-    mapSection('Current Liabilities', liabilities.current_liabilities || []),
-    mapSection('Long-term Liabilities', liabilities.long_term_liabilities || []),
-  ].filter((item) => item.children?.length);
-
-  const equityItems = [
-    ...(equity.items || []).map((row) => ({ name: row.account, amount: row.balance, children: [] as any[] })),
-    { name: 'Retained Earnings', amount: equity.retained_earnings || 0, children: [] as any[] },
-  ];
+  // Fallback to traditional structure if classified data not available
+  const assetsAccounts = data?.assets?.accounts || [];
+  const liabilitiesAccounts = data?.liabilities?.accounts || [];
+  const hasClassifiedData = currentAssets.accounts?.length > 0 || nonCurrentAssets.accounts?.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* Header with date */}
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Balance Sheet</h2>
+          <h2 className="text-lg font-semibold text-white">Statement of Financial Position</h2>
           {data?.as_of_date && (
-            <span className="text-slate-muted text-sm">
-              as of {typeof data.as_of_date === 'string'
-                ? data.as_of_date
-                : (() => {
-                  const asOf: any = data.as_of_date;
-                  return asOf?.end_date || asOf?.start_date || '-';
-                })()}
-            </span>
+            <span className="text-slate-muted text-sm">as of {data.as_of_date}</span>
           )}
+          {currency && <span className="text-slate-muted text-xs ml-2">({currency})</span>}
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -165,7 +275,7 @@ export default function BalanceSheetPage() {
               type="date"
               value={asOfDate}
               onChange={(e) => setAsOfDate(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
           </div>
           <label className="flex items-center gap-2 text-slate-muted text-sm">
@@ -178,7 +288,10 @@ export default function BalanceSheetPage() {
           </label>
           {asOfDate && (
             <button
-              onClick={() => { setAsOfDate(''); setCommonSize(false); }}
+              onClick={() => {
+                setAsOfDate('');
+                setCommonSize(false);
+              }}
               className="text-slate-muted text-sm hover:text-white transition-colors"
             >
               Clear
@@ -204,87 +317,180 @@ export default function BalanceSheetPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Building2 className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Assets</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(assets.total)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatCurrency(totalAssets, currency)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <CreditCard className="w-5 h-5 text-red-400" />
             <p className="text-red-400 text-sm">Total Liabilities</p>
           </div>
-          <p className="text-2xl font-bold text-red-400">{formatCurrency(liabilities.total)}</p>
+          <p className="text-2xl font-bold text-red-400">{formatCurrency(totalLiabilities, currency)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <PiggyBank className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Equity</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(equity.total)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatCurrency(totalEquity, currency)}</p>
+        </div>
+        <div className={cn(
+          'border rounded-xl p-5',
+          workingCapital >= 0 ? 'bg-teal-500/10 border-teal-500/30' : 'bg-orange-500/10 border-orange-500/30'
+        )}>
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className={cn('w-5 h-5', workingCapital >= 0 ? 'text-teal-400' : 'text-orange-400')} />
+            <p className={cn('text-sm', workingCapital >= 0 ? 'text-teal-400' : 'text-orange-400')}>Working Capital</p>
+          </div>
+          <p className={cn('text-2xl font-bold', workingCapital >= 0 ? 'text-teal-400' : 'text-orange-400')}>
+            {formatCurrency(workingCapital, currency)}
+          </p>
         </div>
       </div>
 
       {/* Assets Section */}
-      <Section
-        title="Assets"
-        icon={Building2}
-        items={assetItems}
-        total={assets.total}
-        colorClass="text-blue-400"
-      />
+      <div className="space-y-4">
+        <h3 className="text-white font-semibold flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-blue-400" />
+          Assets
+        </h3>
+
+        {hasClassifiedData ? (
+          <>
+            <CollapsibleSection
+              title="Current Assets"
+              icon={Briefcase}
+              items={currentAssets.accounts || []}
+              total={currentAssets.total || 0}
+              colorClass="text-blue-400"
+              showPct={commonSize}
+            />
+            <CollapsibleSection
+              title="Non-Current Assets"
+              icon={Landmark}
+              items={nonCurrentAssets.accounts || []}
+              total={nonCurrentAssets.total || 0}
+              colorClass="text-blue-300"
+              showPct={commonSize}
+            />
+          </>
+        ) : (
+          <CollapsibleSection
+            title="All Assets"
+            icon={Building2}
+            items={assetsAccounts}
+            total={totalAssets}
+            colorClass="text-blue-400"
+            showPct={commonSize}
+          />
+        )}
+      </div>
 
       {/* Liabilities Section */}
-      <Section
-        title="Liabilities"
-        icon={CreditCard}
-        items={liabilityItems}
-        total={liabilities.total}
-        colorClass="text-red-400"
-      />
+      <div className="space-y-4">
+        <h3 className="text-white font-semibold flex items-center gap-2">
+          <CreditCard className="w-5 h-5 text-red-400" />
+          Liabilities
+        </h3>
 
-      {/* Equity Section */}
-      <Section
-        title="Equity"
-        icon={PiggyBank}
-        items={equityItems}
-        total={equity.total}
-        colorClass="text-green-400"
-      />
+        {hasClassifiedData ? (
+          <>
+            <CollapsibleSection
+              title="Current Liabilities"
+              icon={CreditCard}
+              items={currentLiabilities.accounts || []}
+              total={currentLiabilities.total || 0}
+              colorClass="text-red-400"
+              showPct={commonSize}
+            />
+            <CollapsibleSection
+              title="Non-Current Liabilities"
+              icon={Landmark}
+              items={nonCurrentLiabilities.accounts || []}
+              total={nonCurrentLiabilities.total || 0}
+              colorClass="text-red-300"
+              showPct={commonSize}
+            />
+          </>
+        ) : (
+          <CollapsibleSection
+            title="All Liabilities"
+            icon={CreditCard}
+            items={liabilitiesAccounts}
+            total={totalLiabilities}
+            colorClass="text-red-400"
+            showPct={commonSize}
+          />
+        )}
+      </div>
+
+      {/* Equity Section with IFRS breakdown */}
+      <div className="space-y-4">
+        <h3 className="text-white font-semibold flex items-center gap-2">
+          <PiggyBank className="w-5 h-5 text-green-400" />
+          Equity
+        </h3>
+
+        {equityClassified.total !== undefined ? (
+          <EquitySection
+            title="Shareholders' Equity"
+            data={equityClassified}
+            colorClass="text-green-400"
+            showPct={commonSize}
+            totalAssets={totalAssets}
+          />
+        ) : (
+          <CollapsibleSection
+            title="Equity"
+            icon={PiggyBank}
+            items={data?.equity?.accounts || []}
+            total={totalEquity}
+            colorClass="text-green-400"
+            showPct={commonSize}
+          />
+        )}
+      </div>
 
       {/* Accounting Equation */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">Accounting Equation</h3>
-        <div className="flex items-center justify-center gap-4 text-lg">
+        <h3 className="text-white font-semibold mb-4">Accounting Equation (IAS 1)</h3>
+        <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Assets</p>
-            <p className="font-mono font-bold text-blue-400">{formatCurrency(assets.total)}</p>
+            <p className="font-mono font-bold text-blue-400">{formatCurrency(totalAssets, currency)}</p>
           </div>
-          <span className="text-slate-muted">=</span>
+          <span className="text-slate-muted text-2xl">=</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Liabilities</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(liabilities.total)}</p>
+            <p className="font-mono font-bold text-red-400">{formatCurrency(totalLiabilities, currency)}</p>
           </div>
-          <span className="text-slate-muted">+</span>
+          <span className="text-slate-muted text-2xl">+</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Equity</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(equity.total)}</p>
+            <p className="font-mono font-bold text-green-400">{formatCurrency(totalEquity, currency)}</p>
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-slate-border text-center">
           <p className="text-slate-muted text-sm">
-            Difference: {' '}
-            <span className={cn(
-              'font-mono font-semibold',
-              Math.abs(assets.total - (liabilities.total + equity.total)) < 1
-                ? 'text-green-400'
-                : 'text-red-400'
-            )}>
-              {formatCurrency(assets.total - (liabilities.total + equity.total))}
+            Difference:{' '}
+            <span
+              className={cn(
+                'font-mono font-semibold',
+                data?.is_balanced ? 'text-green-400' : 'text-red-400'
+              )}
+            >
+              {formatCurrency(data?.difference || 0, currency)}
             </span>
+            {data?.is_balanced && (
+              <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
+                Balanced
+              </span>
+            )}
           </p>
         </div>
       </div>

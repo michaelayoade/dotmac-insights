@@ -144,6 +144,49 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
   return response.json();
 }
 
+/**
+ * Fetch API with FormData support for file uploads.
+ * Does not set Content-Type header - browser sets it with boundary for multipart/form-data.
+ */
+async function fetchApiFormData<T>(endpoint: string, formData: FormData): Promise<T> {
+  const url = `${API_BASE}/api${endpoint}`;
+  const accessToken = getAccessToken();
+
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: accessToken ? 'omit' : 'include',
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      // Note: Do NOT set Content-Type for FormData - browser sets it with boundary
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    const errorMessage = error.detail || `HTTP ${response.status}`;
+
+    if (response.status === 401) {
+      clearAuthToken();
+      if (authEventHandler) {
+        authEventHandler('unauthorized', errorMessage);
+      }
+      throw new ApiError(response.status, 'Authentication required. Please sign in.');
+    }
+
+    if (response.status === 403) {
+      if (authEventHandler) {
+        authEventHandler('forbidden', errorMessage);
+      }
+      throw new ApiError(response.status, 'Access denied. You do not have permission to access this resource.');
+    }
+
+    throw new ApiError(response.status, errorMessage);
+  }
+
+  return response.json();
+}
+
 // API Types
 export interface OverviewData {
   customers: {
@@ -1476,6 +1519,69 @@ export const api = {
   getSupportCannedCategories: () =>
     fetchApi<string[]>('/support/canned-responses/categories'),
 
+  // Expense Management
+  getExpenseCategories: (params?: { include_inactive?: boolean }) =>
+    fetchApi<import('./expenses.types').ExpenseCategory[]>('/expenses/categories/', { params }),
+  getExpenseClaims: (params?: { status?: string; limit?: number; offset?: number }) =>
+    fetchApi<import('./expenses.types').ExpenseClaim[]>('/expenses/claims/', { params }),
+  getExpenseClaimDetail: (id: number) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}`),
+  createExpenseClaim: (payload: import('./expenses.types').ExpenseClaimCreatePayload) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>('/expenses/claims/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  submitExpenseClaim: (id: number, company_code?: string) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}/submit`, {
+      method: 'POST',
+      params: company_code ? { company_code } : undefined,
+    }),
+  approveExpenseClaim: (id: number) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}/approve`, { method: 'POST' }),
+  rejectExpenseClaim: (id: number, reason: string) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}/reject`, {
+      method: 'POST',
+      params: { reason },
+    }),
+  postExpenseClaim: (id: number) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}/post`, { method: 'POST' }),
+  reverseExpenseClaim: (id: number, reason: string) =>
+    fetchApi<import('./expenses.types').ExpenseClaim>(`/expenses/claims/${id}/reverse`, {
+      method: 'POST',
+      params: { reason },
+    }),
+  getCashAdvances: (params?: { status?: string; limit?: number; offset?: number }) =>
+    fetchApi<import('./expenses.types').CashAdvance[]>('/expenses/cash-advances/', { params }),
+  getCashAdvanceDetail: (id: number) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}`),
+  createCashAdvance: (payload: import('./expenses.types').CashAdvanceCreatePayload) =>
+    fetchApi<import('./expenses.types').CashAdvance>('/expenses/cash-advances/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  submitCashAdvance: (id: number, company_code?: string) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}/submit`, {
+      method: 'POST',
+      params: company_code ? { company_code } : undefined,
+    }),
+  approveCashAdvance: (id: number) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}/approve`, { method: 'POST' }),
+  rejectCashAdvance: (id: number, reason: string) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}/reject`, {
+      method: 'POST',
+      params: { reason },
+    }),
+  disburseCashAdvance: (id: number, payload: import('./expenses.types').CashAdvanceDisbursePayload) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}/disburse`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  settleCashAdvance: (id: number, payload: import('./expenses.types').CashAdvanceSettlePayload) =>
+    fetchApi<import('./expenses.types').CashAdvance>(`/expenses/cash-advances/${id}/settle`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   getSupportCsatSurveys: (params?: { active_only?: boolean }) =>
     fetchApi<SupportCsatSurvey[]>('/support/csat/surveys', { params }),
   getSupportCsatSummary: (params?: { days?: number }) =>
@@ -2582,8 +2688,14 @@ export const api = {
   }) =>
     fetchApi<AccountingGeneralLedgerResponse>('/v1/accounting/general-ledger', { params }),
 
-  getAccountingCashFlow: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
+  getAccountingCashFlow: (params?: { start_date?: string; end_date?: string; currency?: string; fiscal_year?: string }) =>
     fetchApi<AccountingCashFlow>('/v1/accounting/cash-flow', { params }),
+
+  getAccountingEquityStatement: (params?: { start_date?: string; end_date?: string; fiscal_year?: string; currency?: string }) =>
+    fetchApi<AccountingEquityStatement>('/v1/accounting/equity-statement', { params }),
+
+  getAccountingFinancialRatios: (params?: { as_of_date?: string; fiscal_year?: string }) =>
+    fetchApi<AccountingFinancialRatios>('/v1/accounting/financial-ratios', { params }),
 
   getAccountingPayables: (params?: {
     supplier_id?: number;
@@ -2680,6 +2792,142 @@ export const api = {
 
   getAccountingBankTransactionDetail: (id: number | string) =>
     fetchApi<AccountingBankTransactionDetail>(`/v1/accounting/bank-transactions/${id}`),
+
+  createBankTransaction: (payload: BankTransactionCreatePayload) =>
+    fetchApi<BankTransactionCreateResponse>('/v1/accounting/bank-transactions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  importBankTransactions: (formData: FormData) =>
+    fetchApiFormData<BankTransactionImportResponse>('/v1/accounting/bank-transactions/import', formData),
+
+  getBankTransactionSuggestions: (id: number | string, params?: { party_type?: string; limit?: number }) =>
+    fetchApi<BankTransactionSuggestionsResponse>(`/v1/accounting/bank-transactions/${id}/suggestions`, { params }),
+
+  reconcileBankTransaction: (id: number | string, payload: ReconcilePayload) =>
+    fetchApi<ReconcileResponse>(`/v1/accounting/bank-transactions/${id}/allocate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Nigerian Tax Module
+  getTaxDashboard: () =>
+    fetchApi<TaxDashboard>('/tax/dashboard'),
+
+  getTaxSettings: () =>
+    fetchApi<TaxSettings>('/tax/settings'),
+
+  updateTaxSettings: (payload: Partial<TaxSettings>) =>
+    fetchApi<TaxSettings>('/tax/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  // VAT
+  getVATTransactions: (params?: { period?: string; type?: string; page?: number; page_size?: number }) =>
+    fetchApi<VATTransactionsResponse>('/tax/vat/transactions', { params }),
+
+  recordVATOutput: (payload: VATOutputPayload) =>
+    fetchApi<VATTransaction>('/tax/vat/record-output', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  recordVATInput: (payload: VATInputPayload) =>
+    fetchApi<VATTransaction>('/tax/vat/record-input', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getVATSummary: (period: string) =>
+    fetchApi<VATSummary>(`/tax/vat/summary/${period}`),
+
+  getVATFilingPrep: (period: string) =>
+    fetchApi<VATFilingPrep>(`/tax/vat/filing-prep/${period}`),
+
+  // WHT
+  getWHTTransactions: (params?: { period?: string; supplier_id?: string; page?: number; page_size?: number }) =>
+    fetchApi<WHTTransactionsResponse>('/tax/wht/transactions', { params }),
+
+  deductWHT: (payload: WHTDeductPayload) =>
+    fetchApi<WHTTransaction>('/tax/wht/deduct', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getWHTSupplierSummary: (supplierId: string | number) =>
+    fetchApi<WHTSupplierSummary>(`/tax/wht/supplier/${supplierId}/summary`),
+
+  getWHTRemittanceDue: () =>
+    fetchApi<WHTRemittanceDue>('/tax/wht/remittance-due'),
+
+  // PAYE
+  getPAYECalculations: (params?: { period?: string; employee_id?: string; page?: number; page_size?: number }) =>
+    fetchApi<PAYECalculationsResponse>('/tax/paye/calculations', { params }),
+
+  calculatePAYE: (payload: PAYECalculatePayload) =>
+    fetchApi<PAYECalculation>('/tax/paye/calculate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getPAYESummary: (period: string) =>
+    fetchApi<PAYESummary>(`/tax/paye/summary/${period}`),
+
+  // CIT
+  getCITAssessments: (params?: { year?: number; page?: number; page_size?: number }) =>
+    fetchApi<CITAssessmentsResponse>('/tax/cit/assessments', { params }),
+
+  createCITAssessment: (payload: CITAssessmentPayload) =>
+    fetchApi<CITAssessment>('/tax/cit/create-assessment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getCITComputation: (year: number) =>
+    fetchApi<CITComputation>(`/tax/cit/${year}/computation`),
+
+  getCITRateCalculator: (params: { turnover: number; profit: number }) =>
+    fetchApi<CITRateResult>('/tax/cit/rate-calculator', { params }),
+
+  // Filing Calendar
+  getFilingCalendar: (params?: { year?: number; tax_type?: string }) =>
+    fetchApi<FilingCalendar>('/tax/filing/calendar', { params }),
+
+  getUpcomingFilings: (params?: { days?: number }) =>
+    fetchApi<FilingDeadline[]>('/tax/filing/upcoming', { params }),
+
+  getOverdueFilings: () =>
+    fetchApi<FilingDeadline[]>('/tax/filing/overdue'),
+
+  // WHT Certificates
+  generateWHTCertificate: (payload: WHTCertificatePayload) =>
+    fetchApi<WHTCertificate>('/tax/certificates/wht/generate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getWHTCertificate: (id: number | string) =>
+    fetchApi<WHTCertificate>(`/tax/certificates/wht/${id}`),
+
+  // E-Invoice
+  getEInvoices: (params?: { status?: string; page?: number; page_size?: number }) =>
+    fetchApi<EInvoicesResponse>('/tax/einvoice', { params }),
+
+  createEInvoice: (payload: EInvoicePayload) =>
+    fetchApi<EInvoice>('/tax/einvoice/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  validateEInvoice: (id: number | string) =>
+    fetchApi<EInvoiceValidation>(`/tax/einvoice/${id}/validate`, {
+      method: 'POST',
+    }),
+
+  getEInvoiceUBL: (id: number | string) =>
+    fetchApi<EInvoiceUBL>(`/tax/einvoice/${id}/ubl`),
 
   // Purchasing Domain
   getPurchasingDashboard: (params?: { start_date?: string; end_date?: string; currency?: string }) =>
@@ -3385,6 +3633,18 @@ export const api = {
     return response.blob();
   },
 
+  initiateHrPayrollPayouts: (entryId: number | string, body: HrPayrollPayoutRequest) =>
+    fetchApi<{ count: number; transfers: any[] }>(`/hr/payroll-entries/${entryId}/payouts`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  handoffHrPayrollToBooks: (entryId: number | string, body: HrPayrollPayoutRequest) =>
+    fetchApi<{ count: number; drafts: any[] }>(`/hr/payroll-entries/${entryId}/handoff`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getHrTrainingPrograms: (params?: { search?: string; limit?: number; offset?: number }) =>
     fetchApi<HrListResponse<HrTrainingProgram>>('/hr/training-programs', { params }),
 
@@ -3724,6 +3984,122 @@ export const api = {
 
   getEscalationPolicies: (params?: { company?: string; is_active?: boolean }) =>
     fetchApi<EscalationPolicyResponse[]>('/support/settings/escalation-policies', { params }),
+
+  // ==========================================
+  // Payment Gateway Integration API
+  // ==========================================
+
+  // Gateway Payments
+  getGatewayPayments: (params?: { status?: string; provider?: string; customer_id?: number; limit?: number; offset?: number }) =>
+    fetchApi<GatewayPaymentListResponse>('/integrations/payments/', { params }),
+
+  getGatewayPayment: (reference: string) =>
+    fetchApi<GatewayPayment>(`/integrations/payments/${reference}`),
+
+  initializePayment: (body: InitializePaymentRequest) =>
+    fetchApi<InitializePaymentResponse>('/integrations/payments/initialize', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  verifyPayment: (reference: string) =>
+    fetchApi<VerifyPaymentResponse>(`/integrations/payments/verify/${reference}`),
+
+  refundPayment: (reference: string, amount?: number) =>
+    fetchApi<{ status: string; message: string; refund: Record<string, unknown> }>(`/integrations/payments/${reference}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(amount ? { amount } : {}),
+    }),
+
+  // Gateway Transfers
+  getGatewayTransfers: (params?: { status?: string; transfer_type?: string; limit?: number; offset?: number }) =>
+    fetchApi<GatewayTransferListResponse>('/integrations/transfers/', { params }),
+
+  getGatewayTransfer: (reference: string) =>
+    fetchApi<GatewayTransfer>(`/integrations/transfers/${reference}`),
+
+  initiateTransfer: (body: InitiateTransferRequest) =>
+    fetchApi<TransferResponse>('/integrations/transfers/initiate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  verifyTransfer: (reference: string) =>
+    fetchApi<TransferResponse>(`/integrations/transfers/verify/${reference}`),
+
+  payPayrollTransfers: (payload: { transfer_ids: number[]; provider?: string }) =>
+    fetchApi<{ count: number; results: any[] }>('/integrations/transfers/payroll/payout', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Banks
+  getBanks: (params?: { country?: string; provider?: string }) =>
+    fetchApi<BankInfo[]>('/integrations/banks/', { params }),
+
+  searchBanks: (q: string, params?: { country?: string; provider?: string }) =>
+    fetchApi<{ results: BankInfo[]; count: number }>('/integrations/banks/search', { params: { q, ...params } }),
+
+  resolveAccount: (body: ResolveAccountRequest, provider?: string) =>
+    fetchApi<ResolveAccountResponse>('/integrations/banks/resolve', {
+      method: 'POST',
+      params: provider ? { provider } : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  // Open Banking
+  getOpenBankingConnections: (params?: { customer_id?: number; provider?: string; status?: string }) =>
+    fetchApi<OpenBankingConnection[]>('/integrations/openbanking/accounts', { params }),
+
+  getOpenBankingConnection: (id: number) =>
+    fetchApi<OpenBankingConnection>(`/integrations/openbanking/accounts/${id}`),
+
+  getOpenBankingBalance: (id: number) =>
+    fetchApi<{ account_id: number; balance: number; currency: string; updated_at: string }>(`/integrations/openbanking/accounts/${id}/balance`),
+
+  getOpenBankingTransactions: (id: number, params?: { start_date?: string; end_date?: string; limit?: number }) =>
+    fetchApi<OpenBankingTransaction[]>(`/integrations/openbanking/accounts/${id}/transactions`, { params }),
+
+  getOpenBankingIdentity: (id: number) =>
+    fetchApi<{ bvn?: string; full_name: string; email?: string; phone?: string; date_of_birth?: string }>(`/integrations/openbanking/accounts/${id}/identity`),
+
+  unlinkOpenBankingAccount: (id: number) =>
+    fetchApi<{ status: string; message: string }>(`/integrations/openbanking/accounts/${id}`, { method: 'DELETE' }),
+
+  // Webhook Events
+  getWebhookEvents: (params?: { provider?: string; event_type?: string; status?: string; limit?: number; offset?: number }) =>
+    fetchApi<WebhookEventListResponse>('/integrations/webhooks/events', { params }),
+
+  getWebhookEvent: (id: number) =>
+    fetchApi<WebhookEvent & { payload: Record<string, unknown> }>(`/integrations/webhooks/events/${id}`),
+
+  // Admin Settings
+  getSettingsGroups: () =>
+    fetchApi<SettingsGroupMeta[]>('/admin/settings'),
+
+  getSettings: (group: string) =>
+    fetchApi<SettingsResponse>(`/admin/settings/${group}`),
+
+  getSettingsSchema: (group: string) =>
+    fetchApi<SettingsSchemaResponse>(`/admin/settings/${group}/schema`),
+
+  updateSettings: (group: string, data: Record<string, unknown>) =>
+    fetchApi<SettingsResponse>(`/admin/settings/${group}`, {
+      method: 'PUT',
+      body: JSON.stringify({ data }),
+    }),
+
+  testSettings: (group: string, data: Record<string, unknown>) =>
+    fetchApi<SettingsTestResponse>(`/admin/settings/${group}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ data }),
+    }),
+
+  getSettingsTestStatus: (jobId: string) =>
+    fetchApi<SettingsTestResponse>(`/admin/settings/test/${jobId}`),
+
+  getSettingsAuditLog: (params?: { group?: string; skip?: number; limit?: number }) =>
+    fetchApi<SettingsAuditEntry[]>('/admin/settings/audit', { params }),
 };
 
 // Additional types
@@ -4338,6 +4714,106 @@ export interface FinancePaymentListResponse {
   page_size: number;
 }
 
+// Accounting core types
+export interface AccountingAccount {
+  id?: number | string;
+  account: string;
+  account_name?: string | null;
+  parent_account?: string | null;
+  is_group?: boolean;
+  balance?: number | null;
+  currency?: string | null;
+  company?: string | null;
+}
+
+export interface AccountingJournalEntryLine {
+  account: string;
+  debit: number;
+  credit: number;
+  cost_center?: string | null;
+  description?: string | null;
+}
+
+export interface AccountingJournalEntry {
+  id?: number | string;
+  name?: string | null;
+  posting_date: string;
+  reference?: string | null;
+  remarks?: string | null;
+  currency?: string | null;
+  accounts: AccountingJournalEntryLine[];
+  status?: string | null;
+}
+
+export interface AccountingGeneralLedgerEntry {
+  id: number | string;
+  posting_date: string | null;
+  account: string;
+  account_name?: string | null;
+  party_type?: string | null;
+  party?: string | null;
+  voucher_no?: string | null;
+  voucher_type?: string | null;
+  cost_center?: string | null;
+  fiscal_year?: string | null;
+  remarks?: string | null;
+  debit?: number | null;
+  credit?: number | null;
+  balance?: number | null;
+}
+
+export interface AccountingGeneralLedgerResponse {
+  entries: AccountingGeneralLedgerEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary?: {
+    total_debit?: number;
+    total_credit?: number;
+    opening_balance?: number;
+    closing_balance?: number;
+  };
+}
+
+export interface AccountingBankTransactionPayment {
+  id?: number | string;
+  payment_document?: string | null;
+  payment_entry?: string | null;
+  allocated_amount?: number | null;
+}
+
+export interface AccountingBankTransactionDetail {
+  id: number | string;
+  erpnext_id?: string | null;
+  transaction_date?: string | null;
+  account?: string | null;
+  company?: string | null;
+  transaction_type?: string | null;
+  status?: string | null;
+  reference_number?: string | null;
+  reference?: string | null;
+  transaction_id?: string | null;
+  amount?: number | null;
+  deposit?: number | null;
+  withdrawal?: number | null;
+  allocated_amount?: number | null;
+  unallocated_amount?: number | null;
+  currency?: string | null;
+  party_type?: string | null;
+  party?: string | null;
+  bank_party_name?: string | null;
+  bank_party_account_number?: string | null;
+  description?: string | null;
+  payments?: AccountingBankTransactionPayment[];
+}
+
+export interface AccountingBankTransactionListResponse {
+  transactions: AccountingBankTransactionDetail[];
+  total: number;
+  limit?: number;
+  offset?: number;
+}
+
 export interface FinancePaymentPayload {
   customer_id: number | null;
   invoice_id?: number | null;
@@ -4687,6 +5163,118 @@ export interface AccountingAccountTreeNode {
   children: AccountingAccountTreeNode[];
 }
 
+// =============================================================================
+// IFRS Compliance Types
+// =============================================================================
+
+/** Validation issue from backend validation */
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  field?: string | null;
+  expected?: number | string | null;
+  actual?: number | string | null;
+}
+
+/** Validation result included in all IFRS-compliant statement responses */
+export interface ValidationResult {
+  is_valid: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+}
+
+/** FX metadata for financial statements */
+export interface FXMetadata {
+  functional_currency: string;
+  presentation_currency: string;
+  is_same_currency: boolean;
+  average_rate?: number;
+  closing_rate?: number;
+}
+
+/** Comparative period information */
+export interface ComparativePeriod {
+  start_date?: string;
+  end_date?: string;
+  as_of_date?: string;
+}
+
+/** Earnings per share data (IAS 33) */
+export interface EarningsPerShare {
+  basic_eps?: number;
+  diluted_eps?: number;
+  weighted_average_shares_basic?: number;
+  weighted_average_shares_diluted?: number;
+  dilutive_instruments?: Array<{
+    instrument_type: string;
+    shares_equivalent: number;
+    dilutive_effect: number;
+  }>;
+  note?: string;
+}
+
+/** Tax reconciliation (IAS 12) */
+export interface TaxReconciliation {
+  profit_before_tax: number;
+  statutory_rate: number;
+  tax_at_statutory_rate: number;
+  reconciling_items: Array<{
+    description: string;
+    amount: number;
+    rate_effect?: number;
+  }>;
+  effective_tax_expense: number;
+  effective_tax_rate: number;
+}
+
+/** OCI component (IAS 1) */
+export interface OCIComponent {
+  description: string;
+  amount: number;
+  may_be_reclassified: boolean;
+  reclassification_adjustment?: number;
+}
+
+/** Other Comprehensive Income breakdown (IAS 1) */
+export interface OtherComprehensiveIncome {
+  items_may_be_reclassified: OCIComponent[];
+  items_not_reclassified: OCIComponent[];
+  total_may_be_reclassified: number;
+  total_not_reclassified: number;
+  total_oci: number;
+}
+
+/** Non-cash transaction types (IAS 7) */
+export type NonCashTransactionType =
+  | 'lease_inception'
+  | 'debt_conversion'
+  | 'asset_exchange'
+  | 'barter'
+  | 'share_based_payment'
+  | 'other';
+
+/** Non-cash transaction (IAS 7) */
+export interface NonCashTransaction {
+  transaction_type: NonCashTransactionType;
+  description: string;
+  amount: number;
+  debit_account?: string;
+  credit_account?: string;
+}
+
+/** Cash flow classification policy (IAS 7) */
+export interface CashFlowClassificationPolicy {
+  interest_paid: 'operating' | 'investing' | 'financing';
+  interest_received: 'operating' | 'investing' | 'financing';
+  dividends_paid: 'operating' | 'investing' | 'financing';
+  dividends_received: 'operating' | 'investing' | 'financing';
+  taxes_paid: 'operating' | 'investing' | 'financing';
+}
+
+// =============================================================================
+// Accounting Reports
+// =============================================================================
+
 export interface AccountingTrialBalance {
   total_debit: number;
   total_credit: number;
@@ -4701,6 +5289,9 @@ export interface AccountingTrialBalance {
     balance: number;
   }>;
   as_of_date?: string;
+  // IFRS compliance fields
+  validation?: ValidationResult;
+  fx_metadata?: FXMetadata;
 }
 
 export interface AccountingBalanceSheet {
@@ -4720,26 +5311,117 @@ export interface AccountingBalanceSheet {
     retained_earnings: number;
     total: number;
   };
+  // IFRS classified structure (IAS 1)
+  assets_classified?: {
+    current_assets: { accounts: Array<{ account: string; balance: number; pct_of_total?: number }>; total: number };
+    non_current_assets: { accounts: Array<{ account: string; balance: number; pct_of_total?: number }>; total: number };
+    // IFRS 16 - Right-of-use assets
+    right_of_use_assets?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    // IAS 12 - Deferred tax assets
+    deferred_tax_assets?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    total: number;
+  };
+  liabilities_classified?: {
+    current_liabilities: { accounts: Array<{ account: string; balance: number; pct_of_total?: number }>; total: number };
+    non_current_liabilities: { accounts: Array<{ account: string; balance: number; pct_of_total?: number }>; total: number };
+    // IFRS 16 - Lease liabilities
+    lease_liabilities?: { current: number; non_current: number; total: number };
+    // IAS 12 - Deferred tax liabilities
+    deferred_tax_liabilities?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    // IAS 37 - Provisions
+    provisions?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    total: number;
+  };
+  equity_classified?: {
+    share_capital?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    share_premium?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    reserves?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    other_comprehensive_income?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    retained_earnings?: { accounts: Array<{ account: string; balance: number }>; from_equity_accounts?: number; current_period_profit?: number; total: number };
+    treasury_shares?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    share_based_payments?: { accounts: Array<{ account: string; balance: number }>; total: number };
+    total: number;
+  };
+  total_assets?: number;
+  total_current_assets?: number;
+  total_non_current_assets?: number;
+  total_liabilities?: number;
+  total_current_liabilities?: number;
+  total_non_current_liabilities?: number;
+  total_equity?: number;
   total_liabilities_equity: number;
+  working_capital?: number;
+  retained_earnings?: number;
+  difference?: number;
   is_balanced: boolean;
   as_of_date?: string;
+  currency?: string;
+  // IFRS compliance fields
+  prior_period?: {
+    as_of_date: string;
+    total_assets: number;
+    total_liabilities: number;
+    total_equity: number;
+  };
+  variance?: {
+    total_assets: { variance: number; variance_pct: number };
+    total_liabilities: { variance: number; variance_pct: number };
+    total_equity: { variance: number; variance_pct: number };
+  };
+  validation?: ValidationResult;
+  fx_metadata?: FXMetadata;
+  reclassified_accounts?: Array<{
+    account: string;
+    original_root_type: string;
+    effective_root_type: string;
+    account_type: string;
+  }>;
 }
 
 export interface AccountingIncomeStatement {
   revenue: {
-    items: Array<{ account: string; amount: number }>;
+    items: Array<{ account: string; amount: number; prior_amount?: number; variance?: number; variance_pct?: number }>;
     total: number;
+    accounts?: Array<{ account: string; amount: number }>;
   };
   cost_of_goods_sold: {
-    items: Array<{ account: string; amount: number }>;
+    items: Array<{ account: string; amount: number; prior_amount?: number; variance?: number; variance_pct?: number }>;
     total: number;
+    accounts?: Array<{ account: string; amount: number }>;
   };
   gross_profit: number;
+  gross_margin?: number;
   operating_expenses: {
-    items: Array<{ account: string; amount: number }>;
+    items: Array<{ account: string; amount: number; prior_amount?: number; variance?: number; variance_pct?: number }>;
+    total: number;
+    accounts?: Array<{ account: string; amount: number }>;
+  };
+  depreciation_amortization?: number;
+  operating_income: number;
+  operating_margin?: number;
+  ebit?: number;
+  ebitda?: number;
+  ebitda_margin?: number;
+  // Finance income/costs (IAS 1)
+  finance_income?: {
+    accounts: Array<{ account: string; amount: number }>;
     total: number;
   };
-  operating_income: number;
+  finance_costs?: {
+    accounts: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  net_finance_income?: number;
+  profit_before_tax?: number;
+  ebt?: number;
+  // Tax expense (IAS 12)
+  tax_expense?: {
+    accounts: Array<{ account: string; amount: number }>;
+    total: number;
+  };
+  effective_tax_rate?: number;
+  tax_reconciliation?: TaxReconciliation;
+  profit_after_tax?: number;
   other_income: {
     items: Array<{ account: string; amount: number }>;
     total: number;
@@ -4749,55 +5431,269 @@ export interface AccountingIncomeStatement {
     total: number;
   };
   net_income: number;
-  period?: { start: string; end: string };
-}
-
-export interface AccountingGeneralLedgerEntry {
-  id: number;
-  posting_date: string;
-  account: string;
-  account_name?: string;
-  debit: number;
-  credit: number;
-  balance: number;
-  voucher_type?: string | null;
-  voucher_no?: string | null;
-  party_type?: string | null;
-  party?: string | null;
-  remarks?: string | null;
-  cost_center?: string | null;
-}
-
-export interface AccountingGeneralLedgerResponse {
-  entries: AccountingGeneralLedgerEntry[];
-  total: number;
-  limit: number;
-  offset: number;
-  summary?: {
-    total_debit: number;
-    total_credit: number;
-    opening_balance?: number;
-    closing_balance?: number;
+  net_margin?: number;
+  // Other Comprehensive Income (IAS 1)
+  other_comprehensive_income?: OtherComprehensiveIncome;
+  total_comprehensive_income?: number;
+  // Earnings Per Share (IAS 33)
+  earnings_per_share?: EarningsPerShare;
+  // Period and classification
+  period?: { start: string; end: string; start_date?: string; end_date?: string; fiscal_year?: string };
+  classification_basis?: 'by_nature' | 'by_function';
+  basis?: 'accrual' | 'cash';
+  currency?: string;
+  // Prior period comparatives
+  prior_period?: {
+    start_date: string;
+    end_date: string;
+    revenue: number;
+    gross_profit: number;
+    operating_income: number;
+    net_income: number;
   };
+  variance?: {
+    revenue: { variance: number; variance_pct: number };
+    gross_profit: { variance: number; variance_pct: number };
+    operating_income: { variance: number; variance_pct: number };
+    net_income: { variance: number; variance_pct: number };
+  };
+  // YTD support
+  ytd_period?: { start_date: string; end_date: string };
+  ytd_revenue?: number;
+  ytd_gross_profit?: number;
+  ytd_operating_income?: number;
+  ytd_net_income?: number;
+  // IFRS compliance fields
+  validation?: ValidationResult;
+  fx_metadata?: FXMetadata;
 }
 
 export interface AccountingCashFlow {
+  period?: { start_date: string; end_date: string; fiscal_year?: string };
+  currency?: string;
+  method?: 'indirect' | 'direct';
   operating_activities: {
-    items: Array<{ description: string; amount: number }>;
+    net_income?: number;
+    adjustments?: {
+      depreciation_amortization?: number;
+      impairment?: number;
+      provisions?: number;
+      unrealized_fx?: number;
+      other?: number;
+    };
+    working_capital_changes?: {
+      accounts_receivable?: number;
+      inventory?: number;
+      prepaid_expenses?: number;
+      accounts_payable?: number;
+      accrued_liabilities?: number;
+      other?: number;
+      total?: number;
+    };
+    items?: Array<{ description: string; amount: number }>;
     net: number;
   };
   investing_activities: {
-    items: Array<{ description: string; amount: number }>;
+    fixed_asset_purchases?: number;
+    fixed_asset_sales?: number;
+    investments?: number;
+    acquisition_of_subsidiaries?: number;
+    disposal_of_subsidiaries?: number;
+    items?: Array<{ description: string; amount: number }>;
     net: number;
   };
   financing_activities: {
-    items: Array<{ description: string; amount: number }>;
+    debt_proceeds?: number;
+    debt_repayments?: number;
+    equity_proceeds?: number;
+    dividends_paid?: number;
+    lease_payments?: number;
+    treasury_share_transactions?: number;
+    items?: Array<{ description: string; amount: number }>;
     net: number;
   };
+  // IAS 7 Required Supplementary Disclosures
+  supplementary_disclosures?: {
+    interest_paid: number;
+    interest_received: number;
+    dividends_paid: number;
+    dividends_received: number;
+    income_taxes_paid: number;
+    classification_policy?: CashFlowClassificationPolicy;
+  };
+  // Structured non-cash transactions (IAS 7)
+  non_cash_transactions?: {
+    note: string;
+    examples: string[];
+    items?: NonCashTransaction[];
+  };
+  // FX effect on cash (IAS 7)
+  fx_effect_on_cash?: number;
+  // Reconciliation
+  total_cash_flow?: number;
   net_change_in_cash: number;
   opening_cash: number;
   closing_cash: number;
-  period?: { start: string; end: string };
+  reconciliation_difference?: number;
+  is_reconciled?: boolean;
+  bank_summary?: {
+    deposits: number;
+    withdrawals: number;
+  };
+  // Profit to CFO reconciliation (indirect method)
+  cfo_reconciliation?: {
+    net_income: number;
+    add_depreciation_amortization: number;
+    add_working_capital_changes: number;
+    add_other_adjustments: number;
+    equals_cash_from_operations: number;
+    is_reconciled: boolean;
+  };
+  // Prior period comparatives
+  prior_period?: {
+    start_date: string;
+    end_date: string;
+    operating_activities_net: number;
+    investing_activities_net: number;
+    financing_activities_net: number;
+    net_change_in_cash: number;
+  };
+  variance?: {
+    operating: { variance: number; variance_pct: number };
+    investing: { variance: number; variance_pct: number };
+    financing: { variance: number; variance_pct: number };
+    net_change: { variance: number; variance_pct: number };
+  };
+  // IFRS compliance fields
+  validation?: ValidationResult;
+  fx_metadata?: FXMetadata;
+}
+
+// Statement of Changes in Equity (IAS 1)
+export interface AccountingEquityStatement {
+  period: { start_date: string; end_date: string; fiscal_year?: string };
+  currency: string;
+  components: Array<{
+    component: string;
+    opening_balance: number;
+    profit_loss: number;
+    other_comprehensive_income: number;
+    dividends: number;
+    share_transactions: number;
+    share_based_payments: number;  // IFRS 2
+    fx_translation_reserve: number;  // FX translation
+    transfers: number;
+    other_movements: number;
+    closing_balance: number;
+    accounts?: Record<string, number>;
+  }>;
+  // OCI breakdown by component
+  oci_breakdown?: {
+    items_may_be_reclassified: Array<{
+      component: string;
+      description: string;
+      amount: number;
+      reclassification_adjustment?: number;
+    }>;
+    items_not_reclassified: Array<{
+      component: string;
+      description: string;
+      amount: number;
+    }>;
+    total_may_be_reclassified: number;
+    total_not_reclassified: number;
+    total_oci: number;
+  };
+  summary: {
+    total_opening_equity: number;
+    total_comprehensive_income: number;
+    profit_for_period: number;
+    other_comprehensive_income: number;
+    transactions_with_owners: {
+      dividends_paid: number;
+      share_issues: number;
+      treasury_share_transactions: number;
+      share_based_payments: number;  // IFRS 2
+    };
+    total_closing_equity: number;
+    change_in_equity: number;
+  };
+  reconciliation: {
+    opening_equity: number;
+    add_profit_for_period: number;
+    add_other_comprehensive_income: number;
+    less_dividends: number;
+    add_share_issues: number;
+    add_share_based_payments: number;  // IFRS 2
+    less_treasury_shares: number;
+    other_movements: number;
+    closing_equity: number;
+    is_reconciled: boolean;
+  };
+  // Prior period comparatives
+  prior_period?: {
+    start_date: string;
+    end_date: string;
+    total_opening_equity: number;
+    total_closing_equity: number;
+    profit_for_period: number;
+    total_comprehensive_income: number;
+  };
+  variance?: {
+    opening_equity: { variance: number; variance_pct: number };
+    closing_equity: { variance: number; variance_pct: number };
+    comprehensive_income: { variance: number; variance_pct: number };
+  };
+  // IFRS compliance fields
+  validation?: ValidationResult;
+  fx_metadata?: FXMetadata;
+}
+
+// Financial Ratios (Comprehensive)
+export interface AccountingFinancialRatios {
+  as_of_date: string;
+  period: { start_date: string; end_date: string; days: number };
+  liquidity_ratios: {
+    current_ratio: { value: number; interpretation: string; status: string; benchmark: string };
+    quick_ratio: { value: number; interpretation: string; status: string; benchmark: string };
+    cash_ratio: { value: number; interpretation: string; status: string; benchmark: string };
+    working_capital: { value: number; interpretation: string; status: string };
+  };
+  solvency_ratios: {
+    debt_to_equity: { value: number; interpretation: string; status: string; benchmark: string };
+    debt_to_assets: { value: number; interpretation: string; status: string; benchmark: string };
+    equity_ratio: { value: number; interpretation: string; status: string; benchmark: string };
+  };
+  efficiency_ratios: {
+    receivables_turnover: { value: number; days: number; interpretation: string; status: string; benchmark: string };
+    payables_turnover: { value: number; days: number; interpretation: string; status: string; benchmark: string };
+    inventory_turnover: { value: number; days: number; interpretation: string; status: string; benchmark: string };
+    asset_turnover: { value: number; interpretation: string; status: string; benchmark: string };
+    cash_conversion_cycle: { value: number; interpretation: string; status: string; benchmark: string };
+  };
+  profitability_ratios: {
+    gross_margin: { value: number; interpretation: string; status: string; benchmark: string };
+    operating_margin: { value: number; interpretation: string; status: string; benchmark: string };
+    net_margin: { value: number; interpretation: string; status: string; benchmark: string };
+    return_on_assets: { value: number; interpretation: string; status: string; benchmark: string };
+    return_on_equity: { value: number; interpretation: string; status: string; benchmark: string };
+  };
+  components: {
+    current_assets: number;
+    current_liabilities: number;
+    total_assets: number;
+    total_liabilities: number;
+    shareholders_equity: number;
+    revenue: number;
+    cogs: number;
+    gross_profit: number;
+    operating_income: number;
+    net_income: number;
+    cash: number;
+    receivables: number;
+    inventory: number;
+    payables: number;
+  };
 }
 
 export interface AccountingPayable {
@@ -5073,6 +5969,73 @@ export interface AccountingBankTransactionPayment {
 
 export interface AccountingBankTransactionDetail extends AccountingBankTransaction {
   payments?: AccountingBankTransactionPayment[];
+}
+
+// Bank Transaction Create/Import/Reconcile Types
+export interface BankTransactionCreatePayload {
+  account: string;
+  transaction_date: string;
+  amount: number;
+  transaction_type: 'deposit' | 'withdrawal';
+  description?: string;
+  reference_number?: string;
+  party_type?: 'Customer' | 'Supplier' | null;
+  party?: string;
+  currency?: string;
+}
+
+export interface BankTransactionCreateResponse {
+  id: number;
+  erpnext_id?: string;
+  status: string;
+  message?: string;
+}
+
+export interface BankTransactionImportResponse {
+  imported_count: number;
+  skipped_count: number;
+  errors: Array<{ row: number; error: string }>;
+  transaction_ids: number[];
+}
+
+export interface ReconciliationSuggestion {
+  document_type: string;
+  document_id: number | string;
+  document_name: string;
+  party: string;
+  party_name: string;
+  outstanding_amount: number;
+  due_date: string;
+  posting_date: string;
+  match_score: number;
+  match_reasons: string[];
+}
+
+export interface BankTransactionSuggestionsResponse {
+  transaction_amount: number;
+  unallocated_amount: number;
+  suggestions: ReconciliationSuggestion[];
+}
+
+export interface ReconcilePayload {
+  allocations: Array<{
+    document_type: string;
+    document_id: number | string;
+    allocated_amount: number;
+  }>;
+  create_payment_entry?: boolean;
+}
+
+export interface ReconcileResponse {
+  success: boolean;
+  allocated_amount: number;
+  remaining_unallocated: number;
+  payment_entry_id?: string;
+  allocations: Array<{
+    document_type: string;
+    document_id: string;
+    allocated_amount: number;
+  }>;
 }
 
 export interface AccountingFiscalYear {
@@ -6032,6 +6995,19 @@ export interface HrSalarySlip extends HrSalarySlipPayload {
   id?: number;
 }
 
+export interface HrPayrollPayoutItem {
+  salary_slip_id: number;
+  account_number: string;
+  bank_code: string;
+  account_name?: string | null;
+}
+
+export interface HrPayrollPayoutRequest {
+  payouts: HrPayrollPayoutItem[];
+  provider?: string | null;
+  currency?: string | null;
+}
+
 export interface HrTrainingProgramPayload {
   program_name: string;
   description?: string | null;
@@ -6950,4 +7926,607 @@ export interface EscalationLevelResponse {
   reassign_ticket: boolean;
   change_priority: boolean;
   new_priority: string | null;
+}
+
+// =============================================================================
+// Nigerian Tax Module Types
+// =============================================================================
+
+export type NigerianTaxType = 'VAT' | 'WHT' | 'PAYE' | 'CIT' | 'STAMP_DUTY' | 'CAPITAL_GAINS';
+export type TaxJurisdiction = 'FEDERAL' | 'STATE' | 'LOCAL';
+export type WHTPaymentType = 'DIVIDEND' | 'INTEREST' | 'RENT' | 'ROYALTY' | 'PROFESSIONAL' | 'CONTRACT' | 'DIRECTOR_FEE' | 'COMMISSION' | 'OTHER';
+export type CITCompanySize = 'SMALL' | 'MEDIUM' | 'LARGE';
+export type VATTransactionType = 'OUTPUT' | 'INPUT';
+export type EInvoiceStatus = 'DRAFT' | 'VALIDATED' | 'SUBMITTED' | 'ACCEPTED' | 'REJECTED';
+export type PAYEFilingFrequency = 'MONTHLY' | 'QUARTERLY';
+
+export interface TaxSettings {
+  id: number;
+  company: string;
+  tin: string | null;
+  vat_registration_number: string | null;
+  is_vat_registered: boolean;
+  vat_filing_frequency: 'MONTHLY';
+  wht_auto_deduct: boolean;
+  paye_filing_frequency: PAYEFilingFrequency;
+  cit_company_size: CITCompanySize;
+  fiscal_year_start_month: number;
+  einvoice_enabled: boolean;
+  firs_api_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaxDashboard {
+  period: string;
+  vat_summary: {
+    output_vat: number;
+    input_vat: number;
+    net_vat: number;
+    transactions_count: number;
+  };
+  wht_summary: {
+    total_deducted: number;
+    pending_remittance: number;
+    transactions_count: number;
+  };
+  paye_summary: {
+    total_paye: number;
+    employees_count: number;
+    avg_tax_rate: number;
+  };
+  cit_summary: {
+    estimated_liability: number;
+    year: number;
+    company_size: CITCompanySize;
+  };
+  upcoming_deadlines: FilingDeadline[];
+  overdue_filings: FilingDeadline[];
+}
+
+export interface VATTransaction {
+  id: number;
+  company: string;
+  transaction_type: VATTransactionType;
+  invoice_id: string | null;
+  party_name: string;
+  party_tin: string | null;
+  transaction_date: string;
+  gross_amount: number;
+  vat_amount: number;
+  net_amount: number;
+  vat_rate: number;
+  description: string | null;
+  period: string;
+  is_exempt: boolean;
+  exemption_reason: string | null;
+  created_at: string;
+}
+
+export interface VATTransactionsResponse {
+  transactions: VATTransaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface VATOutputPayload {
+  invoice_id?: string;
+  party_name: string;
+  party_tin?: string;
+  transaction_date: string;
+  gross_amount: number;
+  description?: string;
+  is_exempt?: boolean;
+  exemption_reason?: string;
+}
+
+export interface VATInputPayload {
+  invoice_id?: string;
+  party_name: string;
+  party_tin?: string;
+  transaction_date: string;
+  gross_amount: number;
+  vat_amount: number;
+  description?: string;
+}
+
+export interface VATSummary {
+  period: string;
+  output_vat: number;
+  input_vat: number;
+  net_vat: number;
+  output_count: number;
+  input_count: number;
+  exempt_amount: number;
+}
+
+export interface VATFilingPrep {
+  period: string;
+  filing_deadline: string;
+  summary: VATSummary;
+  output_transactions: VATTransaction[];
+  input_transactions: VATTransaction[];
+  is_complete: boolean;
+  missing_tins: string[];
+}
+
+export interface WHTTransaction {
+  id: number;
+  company: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  supplier_tin: string | null;
+  payment_type: WHTPaymentType;
+  gross_amount: number;
+  wht_rate: number;
+  wht_amount: number;
+  net_payment: number;
+  transaction_date: string;
+  invoice_reference: string | null;
+  period: string;
+  is_remitted: boolean;
+  remittance_date: string | null;
+  certificate_id: number | null;
+  has_tin: boolean;
+  penalty_rate: number;
+  created_at: string;
+}
+
+export interface WHTTransactionsResponse {
+  transactions: WHTTransaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface WHTDeductPayload {
+  supplier_id?: string;
+  supplier_name: string;
+  supplier_tin?: string;
+  payment_type: WHTPaymentType;
+  gross_amount: number;
+  transaction_date: string;
+  invoice_reference?: string;
+}
+
+export interface WHTSupplierSummary {
+  supplier_id: string;
+  supplier_name: string;
+  supplier_tin: string | null;
+  total_deducted: number;
+  total_transactions: number;
+  certificates_issued: number;
+  pending_certificates: number;
+}
+
+export interface WHTRemittanceDue {
+  period: string;
+  deadline: string;
+  total_deducted: number;
+  transaction_count: number;
+  is_overdue: boolean;
+  days_until_due: number;
+}
+
+export interface WHTCertificate {
+  id: number;
+  company: string;
+  certificate_number: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  supplier_tin: string | null;
+  period_start: string;
+  period_end: string;
+  total_gross: number;
+  total_wht: number;
+  transaction_count: number;
+  issued_date: string;
+  created_at: string;
+}
+
+export interface WHTCertificatePayload {
+  supplier_id?: string;
+  supplier_name: string;
+  period_start: string;
+  period_end: string;
+  transaction_ids?: number[];
+}
+
+export interface PAYECalculation {
+  id: number;
+  company: string;
+  employee_id: string;
+  employee_name: string;
+  period: string;
+  gross_income: number;
+  pension_contribution: number;
+  nhf_contribution: number;
+  nhis_contribution: number;
+  voluntary_contribution: number;
+  consolidated_relief: number;
+  taxable_income: number;
+  paye_amount: number;
+  effective_rate: number;
+  tax_bands: Array<{ band: string; rate: number; amount: number; tax: number }>;
+  created_at: string;
+}
+
+export interface PAYECalculationsResponse {
+  calculations: PAYECalculation[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PAYECalculatePayload {
+  employee_id: string;
+  employee_name: string;
+  gross_income: number;
+  pension_contribution?: number;
+  nhf_contribution?: number;
+  nhis_contribution?: number;
+  voluntary_contribution?: number;
+  period?: string;
+}
+
+export interface PAYESummary {
+  period: string;
+  total_paye: number;
+  total_gross_income: number;
+  employees_count: number;
+  avg_tax_rate: number;
+  total_relief: number;
+}
+
+export interface CITAssessment {
+  id: number;
+  company: string;
+  assessment_year: number;
+  company_size: CITCompanySize;
+  turnover: number;
+  assessable_profit: number;
+  cit_rate: number;
+  cit_amount: number;
+  education_tax_rate: number;
+  education_tax_amount: number;
+  total_tax: number;
+  minimum_tax: number;
+  tax_payable: number;
+  created_at: string;
+}
+
+export interface CITAssessmentsResponse {
+  assessments: CITAssessment[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface CITAssessmentPayload {
+  assessment_year: number;
+  turnover: number;
+  assessable_profit: number;
+}
+
+export interface CITComputation {
+  year: number;
+  company_size: CITCompanySize;
+  turnover: number;
+  assessable_profit: number;
+  cit_rate: number;
+  cit_amount: number;
+  education_tax_rate: number;
+  education_tax_amount: number;
+  total_tax: number;
+  minimum_tax: number;
+  tax_payable: number;
+  due_date: string;
+  quarterly_installments: Array<{ quarter: number; amount: number; due_date: string }>;
+}
+
+export interface CITRateResult {
+  company_size: CITCompanySize;
+  turnover: number;
+  cit_rate: number;
+  education_tax_rate: number;
+  effective_rate: number;
+  minimum_tax_rate: number;
+}
+
+export interface FilingDeadline {
+  id: number;
+  tax_type: NigerianTaxType;
+  period: string;
+  deadline: string;
+  description: string;
+  is_filed: boolean;
+  filed_date: string | null;
+  is_overdue: boolean;
+  days_until_due: number;
+  penalty_rate: number | null;
+}
+
+export interface FilingCalendar {
+  year: number;
+  deadlines: FilingDeadline[];
+  upcoming: FilingDeadline[];
+  overdue: FilingDeadline[];
+}
+
+export interface EInvoice {
+  id: number;
+  company: string;
+  invoice_id: string;
+  invoice_number: string;
+  customer_name: string;
+  customer_tin: string | null;
+  invoice_date: string;
+  due_date: string | null;
+  subtotal: number;
+  vat_amount: number;
+  total: number;
+  currency: string;
+  status: EInvoiceStatus;
+  ubl_xml: string | null;
+  firs_reference: string | null;
+  validation_errors: string[] | null;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export interface EInvoicesResponse {
+  einvoices: EInvoice[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface EInvoicePayload {
+  invoice_id: string;
+  customer_name: string;
+  customer_tin?: string;
+  invoice_date: string;
+  due_date?: string;
+  lines: Array<{
+    description: string;
+    quantity: number;
+    unit_price: number;
+    vat_rate?: number;
+  }>;
+}
+
+export interface EInvoiceValidation {
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface EInvoiceUBL {
+  invoice_id: number;
+  ubl_xml: string;
+}
+
+// ==========================================
+// Payment Gateway Integration Types
+// ==========================================
+
+export interface GatewayPayment {
+  id: number;
+  reference: string;
+  provider: string;
+  provider_reference?: string;
+  amount: number;
+  currency: string;
+  status: string;
+  customer_email?: string;
+  fees?: number;
+  paid_at?: string;
+  created_at: string;
+  extra_data?: Record<string, unknown>;
+}
+
+export interface GatewayPaymentListResponse {
+  items: GatewayPayment[];
+  limit: number;
+  offset: number;
+}
+
+export interface InitializePaymentRequest {
+  amount: number;
+  email: string;
+  currency?: string;
+  callback_url?: string;
+  reference?: string;
+  channels?: string[];
+  invoice_id?: number;
+  customer_id?: number;
+  metadata?: Record<string, unknown>;
+  provider?: string;
+}
+
+export interface InitializePaymentResponse {
+  authorization_url: string;
+  access_code: string;
+  reference: string;
+  provider: string;
+}
+
+export interface VerifyPaymentResponse {
+  reference: string;
+  provider_reference: string;
+  status: string;
+  amount: number;
+  currency: string;
+  paid_at?: string;
+  channel?: string;
+  fees: number;
+  customer_email?: string;
+}
+
+export interface GatewayTransfer {
+  id: number;
+  reference: string;
+  provider: string;
+  provider_reference?: string;
+  transfer_type: string;
+  amount: number;
+  currency: string;
+  status: string;
+  recipient_account: string;
+  recipient_bank_code: string;
+  recipient_name: string;
+  reason?: string;
+  fee?: number;
+  failure_reason?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+export interface GatewayTransferListResponse {
+  items: GatewayTransfer[];
+  limit: number;
+  offset: number;
+}
+
+export interface TransferRecipient {
+  account_number: string;
+  bank_code: string;
+  account_name?: string;
+}
+
+export interface InitiateTransferRequest {
+  amount: number;
+  recipient: TransferRecipient;
+  currency?: string;
+  reference?: string;
+  reason?: string;
+  narration?: string;
+  transfer_type?: string;
+  metadata?: Record<string, unknown>;
+  provider?: string;
+}
+
+export interface TransferResponse {
+  reference: string;
+  provider_reference: string;
+  status: string;
+  amount: number;
+  currency: string;
+  recipient_code: string;
+  fee: number;
+}
+
+export interface BankInfo {
+  code: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  country: string;
+  currency: string;
+}
+
+export interface ResolveAccountRequest {
+  account_number: string;
+  bank_code: string;
+}
+
+export interface ResolveAccountResponse {
+  account_number: string;
+  account_name: string;
+  bank_code: string;
+  bank_name?: string;
+}
+
+export interface OpenBankingConnection {
+  id: number;
+  provider: string;
+  provider_account_id: string;
+  account_number: string;
+  bank_name: string;
+  account_name: string;
+  account_type: string;
+  currency: string;
+  balance?: number;
+  status: string;
+}
+
+export interface OpenBankingTransaction {
+  transaction_id: string;
+  date: string;
+  narration: string;
+  type: string;
+  amount: number;
+  balance?: number;
+  category?: string;
+}
+
+export interface WebhookEvent {
+  id: number;
+  provider: string;
+  event_type: string;
+  idempotency_key: string;
+  status: string;
+  error_message?: string;
+  created_at: string;
+  processed_at?: string;
+}
+
+export interface WebhookEventListResponse {
+  items: WebhookEvent[];
+  limit: number;
+  offset: number;
+}
+
+// Settings Types
+export interface SettingsGroupMeta {
+  group: string;
+  label: string;
+  description: string;
+}
+
+export interface SettingsResponse {
+  group: string;
+  schema_version: number;
+  data: Record<string, unknown>;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+export interface SettingsSchemaResponse {
+  group: string;
+  schema: {
+    type: string;
+    properties: Record<string, {
+      type: string;
+      description?: string;
+      default?: unknown;
+      enum?: string[];
+      'x-secret'?: boolean;
+      format?: string;
+      minimum?: number;
+      maximum?: number;
+      pattern?: string;
+    }>;
+    required?: string[];
+  };
+  secret_fields: string[];
+}
+
+export interface SettingsTestResponse {
+  job_id: string;
+  status: 'pending' | 'running' | 'success' | 'failed';
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface SettingsAuditEntry {
+  id: number;
+  group_name: string;
+  action: string;
+  old_value_redacted?: string;
+  new_value_redacted?: string;
+  user_email: string;
+  ip_address?: string;
+  created_at: string;
 }

@@ -54,7 +54,7 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-// Warm HR color palette
+// Warm People color palette
 const HR_COLORS = {
   primary: '#f59e0b', // Amber
   secondary: '#8b5cf6', // Violet
@@ -349,11 +349,11 @@ export default function HrOverviewPage() {
         />
       </div>
 
-      {/* HR Workflow */}
+      {/* People Workflow */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-white font-semibold">HR Workflow</h3>
+            <h3 className="text-white font-semibold">People Workflow</h3>
             <p className="text-slate-muted text-sm">Employee lifecycle management</p>
           </div>
         </div>

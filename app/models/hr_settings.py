@@ -76,6 +76,26 @@ class AttendanceMarkingMode(str, Enum):
     HYBRID = "HYBRID"  # Multiple methods allowed
 
 
+class EmploymentType(str, Enum):
+    """
+    Standard employment types for Nigerian organizations.
+
+    Tax implications:
+    - All types on payroll are subject to PAYE
+    - Independent contractors (not on payroll) use WHT instead
+    - Statutory deductions (Pension, NHF, NHIS) may vary by type
+    """
+    PERMANENT = "PERMANENT"  # Full-time permanent staff
+    CONTRACT = "CONTRACT"  # Fixed-term contract employees
+    PART_TIME = "PART_TIME"  # Part-time employees
+    INTERN = "INTERN"  # Interns/Industrial trainees (SIWES)
+    NYSC = "NYSC"  # National Youth Service Corps members
+    PROBATION = "PROBATION"  # Probationary employees
+    CASUAL = "CASUAL"  # Casual/daily workers
+    CONSULTANT = "CONSULTANT"  # In-house consultants (on payroll)
+    EXPATRIATE = "EXPATRIATE"  # Foreign/expatriate staff
+
+
 class AppraisalFrequency(str, Enum):
     """How often performance appraisals occur"""
     ANNUAL = "ANNUAL"
@@ -420,3 +440,209 @@ class DocumentChecklistTemplate(Base):
     __table_args__ = (
         UniqueConstraint("company", "name", "template_type", name="uq_checklist_template_company_name_type"),
     )
+
+
+# =============================================================================
+# EMPLOYMENT TYPE DEDUCTION CONFIGURATION
+# =============================================================================
+
+class EmploymentTypeDeductionConfig(Base):
+    """
+    Configures which statutory deductions apply to each employment type.
+
+    Nigerian statutory deductions:
+    - PAYE: Income tax (applies to all on payroll)
+    - Pension: 8% employee + 10% employer (PenCom)
+    - NHF: 2.5% National Housing Fund
+    - NHIS: 5% employee + 10% employer health insurance
+    - NSITF: 1% employer social insurance
+    - ITF: 1% employer training levy
+
+    Some employment types may be exempt from certain deductions:
+    - NYSC: Exempt from pension (federal allowance)
+    - Interns: Often exempt from pension, NHF
+    - Casual workers: May be exempt from pension (< 3 months)
+    - Contract staff: Company policy varies
+    """
+    __tablename__ = "employment_type_deduction_configs"
+
+    id = Column(Integer, primary_key=True)
+    company = Column(String(255), nullable=True, index=True)
+
+    # Employment type this config applies to
+    employment_type = Column(
+        SAEnum(EmploymentType, name="employmenttype"),
+        nullable=False, index=True
+    )
+
+    # Display name for UI
+    display_name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Statutory deduction eligibility
+    paye_applicable = Column(Boolean, nullable=False, default=True)  # Income tax - almost always applies
+    pension_applicable = Column(Boolean, nullable=False, default=True)  # PenCom pension
+    nhf_applicable = Column(Boolean, nullable=False, default=True)  # National Housing Fund
+    nhis_applicable = Column(Boolean, nullable=False, default=True)  # Health insurance
+    nsitf_applicable = Column(Boolean, nullable=False, default=True)  # NSITF (employer)
+    itf_applicable = Column(Boolean, nullable=False, default=True)  # ITF (employer)
+
+    # Minimum service period for pension (months) - PenCom requires 3+ months
+    pension_min_service_months = Column(Integer, nullable=False, default=0)
+
+    # Whether this type counts towards headcount for ITF calculation
+    # ITF applies to companies with 5+ employees OR turnover > N50M
+    counts_for_itf_headcount = Column(Boolean, nullable=False, default=True)
+
+    # Is this employee type eligible for gratuity?
+    gratuity_eligible = Column(Boolean, nullable=False, default=True)
+    gratuity_min_service_years = Column(Integer, nullable=False, default=5)
+
+    # Is this a "on-payroll" type (vs vendor/contractor paid via AP)?
+    is_payroll_employee = Column(Boolean, nullable=False, default=True)
+
+    # Status
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("company", "employment_type", name="uq_employment_type_config_company_type"),
+    )
+
+
+# Default configurations for Nigerian employment types
+DEFAULT_EMPLOYMENT_TYPE_CONFIGS = [
+    {
+        "employment_type": EmploymentType.PERMANENT,
+        "display_name": "Permanent Staff",
+        "description": "Full-time permanent employees",
+        "paye_applicable": True,
+        "pension_applicable": True,
+        "nhf_applicable": True,
+        "nhis_applicable": True,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 0,
+        "gratuity_eligible": True,
+        "gratuity_min_service_years": 5,
+    },
+    {
+        "employment_type": EmploymentType.CONTRACT,
+        "display_name": "Contract Staff",
+        "description": "Fixed-term contract employees",
+        "paye_applicable": True,
+        "pension_applicable": True,  # PenCom applies if > 3 months
+        "nhf_applicable": False,  # Often excluded
+        "nhis_applicable": True,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 3,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.PART_TIME,
+        "display_name": "Part-Time Staff",
+        "description": "Part-time employees",
+        "paye_applicable": True,
+        "pension_applicable": True,
+        "nhf_applicable": False,
+        "nhis_applicable": True,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 3,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.INTERN,
+        "display_name": "Intern / SIWES",
+        "description": "Industrial training students",
+        "paye_applicable": True,  # If paid above threshold
+        "pension_applicable": False,  # Not eligible
+        "nhf_applicable": False,
+        "nhis_applicable": False,
+        "nsitf_applicable": False,
+        "itf_applicable": False,
+        "pension_min_service_months": 0,
+        "counts_for_itf_headcount": False,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.NYSC,
+        "display_name": "NYSC Corps Member",
+        "description": "National Youth Service Corps members",
+        "paye_applicable": False,  # Federal allowance exempt
+        "pension_applicable": False,
+        "nhf_applicable": False,
+        "nhis_applicable": False,
+        "nsitf_applicable": False,
+        "itf_applicable": False,
+        "pension_min_service_months": 0,
+        "counts_for_itf_headcount": False,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.PROBATION,
+        "display_name": "Probationary Staff",
+        "description": "Employees on probation period",
+        "paye_applicable": True,
+        "pension_applicable": True,
+        "nhf_applicable": True,
+        "nhis_applicable": True,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 0,
+        "gratuity_eligible": True,  # Probation counts towards service
+        "gratuity_min_service_years": 5,
+    },
+    {
+        "employment_type": EmploymentType.CASUAL,
+        "display_name": "Casual Worker",
+        "description": "Daily/casual workers",
+        "paye_applicable": True,  # If paid above threshold
+        "pension_applicable": False,  # < 3 months typically
+        "nhf_applicable": False,
+        "nhis_applicable": False,
+        "nsitf_applicable": False,
+        "itf_applicable": False,
+        "pension_min_service_months": 3,
+        "counts_for_itf_headcount": False,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.CONSULTANT,
+        "display_name": "In-house Consultant",
+        "description": "Consultants on company payroll",
+        "paye_applicable": True,
+        "pension_applicable": False,  # Usually excluded
+        "nhf_applicable": False,
+        "nhis_applicable": False,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 0,
+        "gratuity_eligible": False,
+        "gratuity_min_service_years": 0,
+    },
+    {
+        "employment_type": EmploymentType.EXPATRIATE,
+        "display_name": "Expatriate Staff",
+        "description": "Foreign/expatriate employees",
+        "paye_applicable": True,
+        "pension_applicable": True,  # Can opt for home country pension
+        "nhf_applicable": False,  # Not applicable
+        "nhis_applicable": True,
+        "nsitf_applicable": True,
+        "itf_applicable": True,
+        "pension_min_service_months": 0,
+        "gratuity_eligible": True,
+        "gratuity_min_service_years": 5,
+    },
+]

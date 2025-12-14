@@ -171,13 +171,13 @@ export default function ChartOfAccountsPage() {
             placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <select
           value={accountType}
           onChange={(e) => setAccountType(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         >
           <option value="">All Types</option>
           <option value="asset">Assets</option>

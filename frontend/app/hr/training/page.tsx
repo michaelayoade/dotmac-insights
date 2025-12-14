@@ -84,9 +84,10 @@ function StatCard({
   );
 }
 
+const SINGLE_COMPANY = '';
+
 export default function HrTrainingPage() {
   const [status, setStatus] = useState('scheduled');
-  const [company, setCompany] = useState('');
   const [eventLimit, setEventLimit] = useState(20);
   const [eventOffset, setEventOffset] = useState(0);
   const [resultLimit, setResultLimit] = useState(20);
@@ -105,7 +106,7 @@ export default function HrTrainingPage() {
   const { data: programs, isLoading: programsLoading } = useHrTrainingPrograms();
   const { data: events, isLoading: eventsLoading } = useHrTrainingEvents({
     status: status || undefined,
-    company: company || undefined,
+    company: SINGLE_COMPANY || undefined,
     limit: eventLimit,
     offset: eventOffset,
   });
@@ -168,7 +169,7 @@ export default function HrTrainingPage() {
         training_event: selectedEvent?.training_event_name || resultForm.trainingEventId,
         result: resultForm.result || undefined,
         score: resultForm.score ? Number(resultForm.score) : undefined,
-        company: selectedEmployee?.company || company || undefined,
+        company: selectedEmployee?.company || SINGLE_COMPANY || undefined,
       });
       setResultForm({
         employeeId: '',
@@ -199,19 +200,6 @@ export default function HrTrainingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <p className="text-xs text-slate-muted mb-3">Filter Events</p>
         <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Company</FormLabel>
-            <input
-              type="text"
-              placeholder="All companies"
-              value={company}
-              onChange={(e) => {
-                setCompany(e.target.value);
-                setEventOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            />
-          </div>
           <div>
             <FormLabel>Status</FormLabel>
             <select

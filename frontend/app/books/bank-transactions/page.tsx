@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAccountingBankTransactions } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { AlertTriangle, Landmark } from 'lucide-react';
+import { AlertTriangle, Landmark, Plus, Upload } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 function formatDate(date: string | null | undefined) {
@@ -76,9 +77,27 @@ export default function BankTransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Landmark className="w-5 h-5 text-teal-electric" />
-        <h1 className="text-xl font-semibold text-white">Bank Transactions</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Landmark className="w-5 h-5 text-teal-electric" />
+          <h1 className="text-xl font-semibold text-white">Bank Transactions</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/books/bank-transactions/new"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-muted transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Transaction
+          </Link>
+          <Link
+            href="/books/bank-transactions/import"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            Import
+          </Link>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4 items-center">
@@ -88,7 +107,7 @@ export default function BankTransactionsPage() {
             placeholder="Search reference/description..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <input
@@ -96,12 +115,12 @@ export default function BankTransactionsPage() {
           placeholder="Account"
           value={account}
           onChange={(e) => { setAccount(e.target.value); setPage(1); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         />
         <select
           value={status}
           onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="input-field"
         >
           <option value="">All Status</option>
           <option value="posted">Posted</option>

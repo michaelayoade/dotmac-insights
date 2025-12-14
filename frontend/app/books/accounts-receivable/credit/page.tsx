@@ -48,7 +48,7 @@ export default function CreditManagementPage() {
             value={customerId}
             onChange={(e) => setCustomerId(e.target.value)}
             placeholder="Enter customer id"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -59,7 +59,7 @@ export default function CreditManagementPage() {
               value={newLimit}
               onChange={(e) => setNewLimit(e.target.value)}
               placeholder="Amount"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="input-field"
             />
             <button
               onClick={onUpdateLimit}
@@ -75,7 +75,7 @@ export default function CreditManagementPage() {
             value={holdReason}
             onChange={(e) => setHoldReason(e.target.value)}
             placeholder="Reason for hold (optional)"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="input-field"
           />
           <div className="flex gap-2">
             <button
