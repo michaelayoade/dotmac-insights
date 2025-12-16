@@ -4,6 +4,8 @@ from app.models.pop import Pop
 from app.models.subscription import Subscription
 from app.models.invoice import Invoice
 from app.models.payment import Payment
+from app.models.payment_allocation import PaymentAllocation, AllocationType, DiscountType
+from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
 from app.models.conversation import Conversation, Message
 from app.models.sync_log import SyncLog
 from app.models.employee import Employee
@@ -26,6 +28,14 @@ from app.models.accounting import (
     Account,
     BankTransaction,
 )
+from app.models.bank_transaction_split import BankTransactionSplit
+from app.models.document_lines import (
+    InvoiceLine,
+    BillLine,
+    CreditNoteLine,
+    DebitNoteLine,
+)
+from app.models.books_settings import DebitNote, DebitNoteStatus
 from app.models.customer_note import CustomerNote
 from app.models.administrator import Administrator
 from app.models.network_monitor import NetworkMonitor
@@ -106,6 +116,31 @@ from app.models.tax_ng import (
 )
 from app.models.accounting_ext import FiscalPeriod
 from app.models.settings import SettingGroup, SettingsAuditLog
+from app.models.inventory import (
+    Warehouse,
+    StockEntry,
+    StockEntryDetail,
+    StockEntryType,
+    StockLedgerEntry,
+    LandedCostVoucher,
+    LandedCostItem,
+    LandedCostTax,
+    # Phase 3: Stock Receipt/Issue
+    StockReceipt,
+    StockReceiptItem,
+    StockReceiptStatus,
+    StockIssue,
+    StockIssueItem,
+    StockIssueStatus,
+    # Phase 4: Transfers
+    TransferRequest,
+    TransferRequestItem,
+    TransferStatus,
+    # Phase 4: Batch/Serial
+    Batch,
+    SerialNumber,
+    SerialStatus,
+)
 from app.models.expense_management import (
     ExpenseCategory,
     ExpensePolicy,
@@ -120,6 +155,14 @@ from app.models.expense_management import (
     ExpenseClaimStatus,
     FundingMethod,
 )
+from app.models.asset import (
+    Asset,
+    AssetStatus,
+    AssetCategory,
+    AssetCategoryFinanceBook,
+    AssetFinanceBook,
+    AssetDepreciationSchedule,
+)
 
 __all__ = [
     "Customer",
@@ -128,6 +171,11 @@ __all__ = [
     "Subscription",
     "Invoice",
     "Payment",
+    "PaymentAllocation",
+    "AllocationType",
+    "DiscountType",
+    "SupplierPayment",
+    "SupplierPaymentStatus",
     "Conversation",
     "Message",
     "SyncLog",
@@ -152,6 +200,12 @@ __all__ = [
     "GLEntry",
     "Account",
     "BankTransaction",
+    "InvoiceLine",
+    "BillLine",
+    "CreditNoteLine",
+    "DebitNoteLine",
+    "DebitNote",
+    "DebitNoteStatus",
     "CustomerNote",
     "Administrator",
     "NetworkMonitor",
@@ -241,4 +295,35 @@ __all__ = [
     "CorporateCardStatement",
     "ExpenseClaimStatus",
     "FundingMethod",
+    # Inventory models
+    "Warehouse",
+    "StockEntry",
+    "StockEntryDetail",
+    "StockEntryType",
+    "StockLedgerEntry",
+    "LandedCostVoucher",
+    "LandedCostItem",
+    "LandedCostTax",
+    # Stock Receipt/Issue
+    "StockReceipt",
+    "StockReceiptItem",
+    "StockReceiptStatus",
+    "StockIssue",
+    "StockIssueItem",
+    "StockIssueStatus",
+    # Transfers
+    "TransferRequest",
+    "TransferRequestItem",
+    "TransferStatus",
+    # Batch/Serial
+    "Batch",
+    "SerialNumber",
+    "SerialStatus",
+    # Asset management
+    "Asset",
+    "AssetStatus",
+    "AssetCategory",
+    "AssetCategoryFinanceBook",
+    "AssetFinanceBook",
+    "AssetDepreciationSchedule",
 ]

@@ -30,6 +30,7 @@ import {
   useHrAnalyticsLeaveTrend,
   useHrAnalyticsAttendanceTrend,
 } from '@/hooks/useApi';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
   CalendarClock,
@@ -219,17 +220,49 @@ function ActionItem({
 }
 
 export default function HrOverviewPage() {
-  const { data: leaveTypes } = useHrLeaveTypes({ limit: 50 });
-  const { data: holidayLists } = useHrHolidayLists({ limit: 1 });
-  const { data: leaveApplications } = useHrLeaveApplications({ status: 'open', limit: 10 });
-  const { data: shiftAssignments } = useHrShiftAssignments({ limit: 10 });
-  const { data: jobOpenings } = useHrJobOpenings({ status: 'open', limit: 10 });
-  const { data: payrollEntries } = useHrPayrollEntries({ limit: 10 });
-  const { data: trainingEvents } = useHrTrainingEvents({ status: 'scheduled', limit: 10 });
-  const { data: onboardings } = useHrEmployeeOnboardings({ limit: 10 });
-  const { data: analyticsOverview } = useHrAnalyticsOverview();
-  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
-  const { data: attendanceTrend } = useHrAnalyticsAttendanceTrend({ days: 14 });
+  const { data: leaveTypes, error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes } = useHrLeaveTypes({ limit: 50 });
+  const { data: holidayLists, error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday } = useHrHolidayLists({ limit: 1 });
+  const { data: leaveApplications, error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps } = useHrLeaveApplications({ status: 'open', limit: 10 });
+  const { data: shiftAssignments, error: shiftError, isLoading: shiftLoading, mutate: refetchShift } = useHrShiftAssignments({ limit: 10 });
+  const { data: jobOpenings, error: jobsError, isLoading: jobsLoading, mutate: refetchJobs } = useHrJobOpenings({ status: 'open', limit: 10 });
+  const { data: payrollEntries, error: payrollError, isLoading: payrollLoading, mutate: refetchPayroll } = useHrPayrollEntries({ limit: 10 });
+  const { data: trainingEvents, error: trainingError, isLoading: trainingLoading, mutate: refetchTraining } = useHrTrainingEvents({ status: 'scheduled', limit: 10 });
+  const { data: onboardings, error: onboardingError, isLoading: onboardingLoading, mutate: refetchOnboarding } = useHrEmployeeOnboardings({ limit: 10 });
+  const { data: analyticsOverview, error: analyticsError, isLoading: analyticsLoading, mutate: refetchAnalytics } = useHrAnalyticsOverview();
+  const { data: leaveTrend, error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
+  const { data: attendanceTrend, error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance } = useHrAnalyticsAttendanceTrend({ days: 14 });
+
+  const swrStates = [
+    { error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes },
+    { error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday },
+    { error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps },
+    { error: shiftError, isLoading: shiftLoading, mutate: refetchShift },
+    { error: jobsError, isLoading: jobsLoading, mutate: refetchJobs },
+    { error: payrollError, isLoading: payrollLoading, mutate: refetchPayroll },
+    { error: trainingError, isLoading: trainingLoading, mutate: refetchTraining },
+    { error: onboardingError, isLoading: onboardingLoading, mutate: refetchOnboarding },
+    { error: analyticsError, isLoading: analyticsLoading, mutate: refetchAnalytics },
+    { error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend },
+    { error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+
+  if (isDataLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load HR overview data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   const leaveAppList = extractList(leaveApplications);
   const leaveTypeList = extractList(leaveTypes);

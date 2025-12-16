@@ -16,7 +16,6 @@ import {
   PurchasingBillPayload,
   PurchasingOrderPayload,
   PurchasingDebitNotePayload,
-  PurchasingExpensePayload,
   SupportTeamPayload,
   SupportTeamMemberPayload,
   SupportTicketCommentPayload,
@@ -88,8 +87,8 @@ export function useSupportMetrics(days = 30, config?: SWRConfiguration) {
 
 export function useSupportTicketDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['support-ticket-detail', id] : null,
-    () => (id ? api.getSupportTicketDetail(id) : null),
+    id ? ['support-ticket-detail', id] as const : null,
+    ([, ticketId]) => api.getSupportTicketDetail(ticketId),
     config
   );
 }
@@ -427,7 +426,11 @@ export function useProjects(
 }
 
 export function useProjectDetail(id: number | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['project-detail', id] : null, () => (id ? api.getProjectDetail(id) : null), config);
+  return useSWR(
+    id ? ['project-detail', id] as const : null,
+    ([, projectId]) => api.getProjectDetail(projectId),
+    config
+  );
 }
 
 export function useProjectMutations() {
@@ -509,8 +512,8 @@ export function useCustomers(
 
 export function useCustomer(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['customer', id] : null,
-    () => (id ? api.getCustomer(id) : null),
+    id ? ['customer', id] as const : null,
+    ([, customerId]) => api.getCustomer(customerId),
     config
   );
 }
@@ -521,16 +524,16 @@ export function useCustomerUsage(
   config?: SWRConfiguration
 ) {
   return useSWR(
-    id ? ['customer-usage', id, params] : null,
-    () => (id ? api.getCustomerUsage(id, params) : null),
+    id ? ['customer-usage', id, params] as const : null,
+    ([, customerId, usageParams]) => api.getCustomerUsage(customerId, usageParams),
     config
   );
 }
 
 export function useCustomer360(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['customer-360', id] : null,
-    () => (id ? api.getCustomer360(id) : null),
+    id ? ['customer-360', id] as const : null,
+    ([, customerId]) => api.getCustomer360(customerId),
     config
   );
 }
@@ -684,8 +687,8 @@ export function useTableData(
   config?: SWRConfiguration
 ) {
   return useSWR(
-    table ? ['table-data', table, params] : null,
-    () => (table ? api.getTableData(table, params) : null),
+    table ? ['table-data', table, params] as const : null,
+    ([, tableName, tableParams]) => api.getTableData(tableName, tableParams),
     config
   );
 }
@@ -889,8 +892,8 @@ export function useDataExplorer(
   config?: SWRConfiguration
 ) {
   return useSWR(
-    entity ? ['data-explorer', entity, params] : null,
-    () => entity ? api.exploreEntity(entity, params) : null,
+    entity ? ['data-explorer', entity, params] as const : null,
+    ([, entityName, explorerParams]) => api.exploreEntity(entityName, explorerParams),
     config
   );
 }
@@ -1021,48 +1024,48 @@ export function useFinanceForecasts(currency = 'NGN', config?: SWRConfiguration)
 
 export function useFinanceInvoiceDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-invoice-detail', id, currency] : null,
-    () => (id ? api.getFinanceInvoiceDetail(id, currency) : null),
+    id ? ['finance-invoice-detail', id, currency] as const : null,
+    ([, invoiceId, invCurrency]) => api.getFinanceInvoiceDetail(invoiceId, invCurrency),
     config
   );
 }
 
 export function useFinancePaymentDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-payment-detail', id, currency] : null,
-    () => (id ? api.getFinancePaymentDetail(id, currency) : null),
+    id ? ['finance-payment-detail', id, currency] as const : null,
+    ([, paymentId, payCurrency]) => api.getFinancePaymentDetail(paymentId, payCurrency),
     config
   );
 }
 
 export function useFinanceCreditNoteDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-credit-note-detail', id, currency] : null,
-    () => (id ? api.getFinanceCreditNoteDetail(id, currency) : null),
+    id ? ['finance-credit-note-detail', id, currency] as const : null,
+    ([, creditNoteId, creditCurrency]) => api.getFinanceCreditNoteDetail(creditNoteId, creditCurrency),
     config
   );
 }
 
 export function useFinanceOrderDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-order-detail', id, currency] : null,
-    () => (id ? api.getFinanceOrderDetail(id, currency) : null),
+    id ? ['finance-order-detail', id, currency] as const : null,
+    ([, orderId, orderCurrency]) => api.getFinanceOrderDetail(orderId, orderCurrency),
     config
   );
 }
 
 export function useFinanceQuotationDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-quotation-detail', id, currency] : null,
-    () => (id ? api.getFinanceQuotationDetail(id, currency) : null),
+    id ? ['finance-quotation-detail', id, currency] as const : null,
+    ([, quotationId, quotationCurrency]) => api.getFinanceQuotationDetail(quotationId, quotationCurrency),
     config
   );
 }
 
 export function useFinanceCustomerDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['finance-customer-detail', id] : null,
-    () => (id ? api.getFinanceCustomerDetail(id) : null),
+    id ? ['finance-customer-detail', id] as const : null,
+    ([, customerId]) => api.getFinanceCustomerDetail(customerId),
     config
   );
 }
@@ -1319,8 +1322,8 @@ export function useTableDataEnhanced(
   config?: SWRConfiguration
 ) {
   return useSWR(
-    table ? ['table-data-enhanced', table, params] : null,
-    () => (table ? api.getTableDataEnhanced(table, params) : null),
+    table ? ['table-data-enhanced', table, params] as const : null,
+    ([, tableName, tableParams]) => api.getTableDataEnhanced(tableName, tableParams),
     config
   );
 }
@@ -1345,8 +1348,8 @@ export function useAccountingChartOfAccounts(accountType?: string, config?: SWRC
 
 export function useAccountingAccountDetail(id: number | null, params?: { include_ledger?: boolean; start_date?: string; end_date?: string; limit?: number }, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['accounting-account-detail', id, params] : null,
-    () => (id ? api.getAccountingAccountDetail(id, params) : null),
+    id ? ['accounting-account-detail', id, params] as const : null,
+    ([, accountId, detailParams]) => api.getAccountingAccountDetail(accountId, detailParams),
     config
   );
 }
@@ -1592,8 +1595,8 @@ export function useAccountingJournalEntries(
 
 export function useAccountingJournalEntryDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['accounting-journal-entry-detail', id] : null,
-    () => (id ? api.getAccountingJournalEntryDetail(id) : null),
+    id ? ['accounting-journal-entry-detail', id] as const : null,
+    ([, entryId]) => api.getAccountingJournalEntryDetail(entryId),
     config
   );
 }
@@ -1649,8 +1652,8 @@ export function useAccountingPurchaseInvoices(
 
 export function useAccountingPurchaseInvoiceDetail(id: number | null, currency = 'NGN', config?: SWRConfiguration) {
   return useSWR(
-    id ? ['accounting-purchase-invoice-detail', id, currency] : null,
-    () => (id ? api.getAccountingPurchaseInvoiceDetail(id, currency) : null),
+    id ? ['accounting-purchase-invoice-detail', id, currency] as const : null,
+    ([, invoiceId, invoiceCurrency]) => api.getAccountingPurchaseInvoiceDetail(invoiceId, invoiceCurrency),
     config
   );
 }
@@ -1680,9 +1683,10 @@ export function useAccountingBankTransactions(
 }
 
 export function useAccountingBankTransactionDetail(id: number | string | null, config?: SWRConfiguration) {
+  const key = id ? (['accounting-bank-transaction-detail', id] as const) : null;
   return useSWR<AccountingBankTransactionDetail>(
-    id ? ['accounting-bank-transaction-detail', id] : null,
-    () => (id ? api.getAccountingBankTransactionDetail(id) : null),
+    key,
+    key ? ([, transactionId]: [string, string | number]) => api.getAccountingBankTransactionDetail(transactionId) : null,
     config
   );
 }
@@ -1693,8 +1697,8 @@ export function useBankTransactionSuggestions(
   config?: SWRConfiguration
 ) {
   return useSWR(
-    id ? ['bank-transaction-suggestions', id, params] : null,
-    () => (id ? api.getBankTransactionSuggestions(id, params) : null),
+    id ? ['bank-transaction-suggestions', id, params] as const : null,
+    ([, transactionId, suggestionParams]) => api.getBankTransactionSuggestions(transactionId, suggestionParams),
     config
   );
 }
@@ -1908,8 +1912,8 @@ export function usePurchasingBills(
 
 export function usePurchasingBillDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['purchasing-bill-detail', id] : null,
-    () => (id ? api.getPurchasingBillDetail(id) : null),
+    id ? ['purchasing-bill-detail', id] as const : null,
+    ([, billId]) => api.getPurchasingBillDetail(billId),
     config
   );
 }
@@ -1961,8 +1965,8 @@ export function usePurchasingOrders(
 
 export function usePurchasingOrderDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['purchasing-order-detail', id] : null,
-    () => (id ? api.getPurchasingOrderDetail(id) : null),
+    id ? ['purchasing-order-detail', id] as const : null,
+    ([, orderId]) => api.getPurchasingOrderDetail(orderId),
     config
   );
 }
@@ -1991,8 +1995,8 @@ export function usePurchasingDebitNotes(
 
 export function usePurchasingDebitNoteDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['purchasing-debit-note-detail', id] : null,
-    () => (id ? api.getPurchasingDebitNoteDetail(id) : null),
+    id ? ['purchasing-debit-note-detail', id] as const : null,
+    ([, debitNoteId]) => api.getPurchasingDebitNoteDetail(debitNoteId),
     config
   );
 }
@@ -2024,17 +2028,18 @@ export function usePurchasingSupplierGroups(config?: SWRConfiguration) {
 }
 
 export function usePurchasingSupplierDetail(id: number | null, config?: SWRConfiguration) {
+  const key = id ? (['purchasing-supplier-detail', id] as const) : null;
   return useSWR<PurchasingSupplierDetail>(
-    id ? ['purchasing-supplier-detail', id] : null,
-    () => (id ? api.getPurchasingSupplierDetail(id) : null),
+    key,
+    key ? ([, supplierId]: [string, number]) => api.getPurchasingSupplierDetail(supplierId) : null,
     config
   );
 }
 
 export function usePurchasingPaymentDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['purchasing-payment-detail', id] : null,
-    () => (id ? api.getPurchasingPaymentDetail(id) : null),
+    id ? ['purchasing-payment-detail', id] as const : null,
+    ([, paymentId]) => api.getPurchasingPaymentDetail(paymentId),
     config
   );
 }
@@ -2229,8 +2234,8 @@ export function useInventoryValuation(params?: Record<string, any>, config?: SWR
 
 export function useInventoryValuationDetail(itemCode: string | null, params?: Record<string, any>, config?: SWRConfiguration) {
   return useSWR(
-    itemCode ? ['inventory-valuation-detail', itemCode, params] : null,
-    () => (itemCode ? api.getInventoryValuationDetail(itemCode, params) : null),
+    itemCode ? ['inventory-valuation-detail', itemCode, params] as const : null,
+    ([, code, valuationParams]) => api.getInventoryValuationDetail(code, valuationParams),
     config
   );
 }
@@ -2390,31 +2395,10 @@ export function usePurchasingExpenses(
 
 export function usePurchasingExpenseDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['purchasing-expense-detail', id] : null,
-    () => (id ? api.getPurchasingExpenseDetail(id) : null),
+    id ? ['purchasing-expense-detail', id] as const : null,
+    ([, expenseId]) => api.getPurchasingExpenseDetail(expenseId),
     config
   );
-}
-
-export function usePurchasingExpenseMutations() {
-  const { mutate } = useSWRConfig();
-  return {
-    createExpense: async (payload: PurchasingExpensePayload) => {
-      const res = await api.createPurchasingExpense(payload);
-      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-expenses');
-      return res;
-    },
-    updateExpense: async (id: number, payload: PurchasingExpensePayload) => {
-      const res = await api.updatePurchasingExpense(id, payload);
-      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-expenses');
-      await mutate(['purchasing-expense-detail', id]);
-      return res;
-    },
-    deleteExpense: async (id: number, soft = true) => {
-      await api.deletePurchasingExpense(id, soft);
-      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-expenses');
-    },
-  };
 }
 
 export function usePurchasingExpenseTypes(
@@ -2659,6 +2643,13 @@ export function useHrAnalyticsLifecycleEvents(
   return useSWR(['hr-analytics-lifecycle-events', params], () => api.getHrAnalyticsLifecycleEvents(params), config);
 }
 
+export function useEmployees(
+  params?: { search?: string; department?: string; status?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['employees', params], () => api.getEmployees(params), config);
+}
+
 // HR Domain
 export function useHrLeaveTypes(
   params?: { search?: string; is_lwp?: boolean; is_carry_forward?: boolean; limit?: number; offset?: number },
@@ -2668,7 +2659,11 @@ export function useHrLeaveTypes(
 }
 
 export function useHrLeaveTypeDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-leave-type-detail', id] : null, () => (id ? api.getHrLeaveTypeDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-leave-type-detail', id] as const : null,
+    ([, leaveTypeId]) => api.getHrLeaveTypeDetail(leaveTypeId),
+    config
+  );
 }
 
 export function useHrHolidayLists(
@@ -2679,7 +2674,11 @@ export function useHrHolidayLists(
 }
 
 export function useHrHolidayListDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-holiday-list-detail', id] : null, () => (id ? api.getHrHolidayListDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-holiday-list-detail', id] as const : null,
+    ([, holidayListId]) => api.getHrHolidayListDetail(holidayListId),
+    config
+  );
 }
 
 export function useHrLeavePolicies(params?: { search?: string; limit?: number; offset?: number }, config?: SWRConfiguration) {
@@ -2687,7 +2686,11 @@ export function useHrLeavePolicies(params?: { search?: string; limit?: number; o
 }
 
 export function useHrLeavePolicyDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-leave-policy-detail', id] : null, () => (id ? api.getHrLeavePolicyDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-leave-policy-detail', id] as const : null,
+    ([, leavePolicyId]) => api.getHrLeavePolicyDetail(leavePolicyId),
+    config
+  );
 }
 
 export function useHrLeaveAllocations(
@@ -2698,7 +2701,11 @@ export function useHrLeaveAllocations(
 }
 
 export function useHrLeaveAllocationDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-leave-allocation-detail', id] : null, () => (id ? api.getHrLeaveAllocationDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-leave-allocation-detail', id] as const : null,
+    ([, allocationId]) => api.getHrLeaveAllocationDetail(allocationId),
+    config
+  );
 }
 
 export function useHrLeaveApplications(
@@ -2709,7 +2716,11 @@ export function useHrLeaveApplications(
 }
 
 export function useHrLeaveApplicationDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-leave-application-detail', id] : null, () => (id ? api.getHrLeaveApplicationDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-leave-application-detail', id] as const : null,
+    ([, applicationId]) => api.getHrLeaveApplicationDetail(applicationId),
+    config
+  );
 }
 
 export function useHrLeaveApplicationMutations() {
@@ -2771,7 +2782,11 @@ export function useHrShiftTypes(
 }
 
 export function useHrShiftTypeDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-shift-type-detail', id] : null, () => (id ? api.getHrShiftTypeDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-shift-type-detail', id] as const : null,
+    ([, shiftTypeId]) => api.getHrShiftTypeDetail(shiftTypeId),
+    config
+  );
 }
 
 export function useHrShiftAssignments(
@@ -2782,7 +2797,11 @@ export function useHrShiftAssignments(
 }
 
 export function useHrShiftAssignmentDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-shift-assignment-detail', id] : null, () => (id ? api.getHrShiftAssignmentDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-shift-assignment-detail', id] as const : null,
+    ([, assignmentId]) => api.getHrShiftAssignmentDetail(assignmentId),
+    config
+  );
 }
 
 export function useHrAttendances(
@@ -2793,7 +2812,11 @@ export function useHrAttendances(
 }
 
 export function useHrAttendanceDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-attendance-detail', id] : null, () => (id ? api.getHrAttendanceDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-attendance-detail', id] as const : null,
+    ([, attendanceId]) => api.getHrAttendanceDetail(attendanceId),
+    config
+  );
 }
 
 export function useHrAttendanceMutations() {
@@ -2837,7 +2860,11 @@ export function useHrAttendanceRequests(
 }
 
 export function useHrAttendanceRequestDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-attendance-request-detail', id] : null, () => (id ? api.getHrAttendanceRequestDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-attendance-request-detail', id] as const : null,
+    ([, requestId]) => api.getHrAttendanceRequestDetail(requestId),
+    config
+  );
 }
 
 export function useHrAttendanceRequestMutations() {
@@ -2872,7 +2899,11 @@ export function useHrJobOpenings(
 }
 
 export function useHrJobOpeningDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-job-opening-detail', id] : null, () => (id ? api.getHrJobOpeningDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-job-opening-detail', id] as const : null,
+    ([, jobOpeningId]) => api.getHrJobOpeningDetail(jobOpeningId),
+    config
+  );
 }
 
 export function useHrJobOpeningMutations() {
@@ -2904,7 +2935,11 @@ export function useHrJobApplicants(
 }
 
 export function useHrJobApplicantDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-job-applicant-detail', id] : null, () => (id ? api.getHrJobApplicantDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-job-applicant-detail', id] as const : null,
+    ([, applicantId]) => api.getHrJobApplicantDetail(applicantId),
+    config
+  );
 }
 
 export function useHrJobApplicantMutations() {
@@ -2941,7 +2976,11 @@ export function useHrJobOffers(
 }
 
 export function useHrJobOfferDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-job-offer-detail', id] : null, () => (id ? api.getHrJobOfferDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-job-offer-detail', id] as const : null,
+    ([, offerId]) => api.getHrJobOfferDetail(offerId),
+    config
+  );
 }
 
 export function useHrInterviews(
@@ -2952,7 +2991,11 @@ export function useHrInterviews(
 }
 
 export function useHrInterviewDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-interview-detail', id] : null, () => (id ? api.getHrInterviewDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-interview-detail', id] as const : null,
+    ([, interviewId]) => api.getHrInterviewDetail(interviewId),
+    config
+  );
 }
 
 export function useHrInterviewMutations() {
@@ -3022,7 +3065,11 @@ export function useHrSalaryComponents(
 }
 
 export function useHrSalaryComponentDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-salary-component-detail', id] : null, () => (id ? api.getHrSalaryComponentDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-salary-component-detail', id] as const : null,
+    ([, componentId]) => api.getHrSalaryComponentDetail(componentId),
+    config
+  );
 }
 
 export function useHrSalaryStructures(
@@ -3033,7 +3080,11 @@ export function useHrSalaryStructures(
 }
 
 export function useHrSalaryStructureDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-salary-structure-detail', id] : null, () => (id ? api.getHrSalaryStructureDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-salary-structure-detail', id] as const : null,
+    ([, structureId]) => api.getHrSalaryStructureDetail(structureId),
+    config
+  );
 }
 
 export function useHrSalaryStructureAssignments(
@@ -3045,8 +3096,8 @@ export function useHrSalaryStructureAssignments(
 
 export function useHrSalaryStructureAssignmentDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-salary-structure-assignment-detail', id] : null,
-    () => (id ? api.getHrSalaryStructureAssignmentDetail(id) : null),
+    id ? ['hr-salary-structure-assignment-detail', id] as const : null,
+    ([, assignmentId]) => api.getHrSalaryStructureAssignmentDetail(assignmentId),
     config
   );
 }
@@ -3059,7 +3110,11 @@ export function useHrPayrollEntries(
 }
 
 export function useHrPayrollEntryDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-payroll-entry-detail', id] : null, () => (id ? api.getHrPayrollEntryDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-payroll-entry-detail', id] as const : null,
+    ([, payrollEntryId]) => api.getHrPayrollEntryDetail(payrollEntryId),
+    config
+  );
 }
 
 export function useHrPayrollEntryMutations() {
@@ -3089,7 +3144,11 @@ export function useHrSalarySlips(
 }
 
 export function useHrSalarySlipDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-salary-slip-detail', id] : null, () => (id ? api.getHrSalarySlipDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-salary-slip-detail', id] as const : null,
+    ([, salarySlipId]) => api.getHrSalarySlipDetail(salarySlipId),
+    config
+  );
 }
 
 export function useHrSalarySlipMutations() {
@@ -3126,7 +3185,11 @@ export function useHrTrainingPrograms(params?: { search?: string; limit?: number
 }
 
 export function useHrTrainingProgramDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-training-program-detail', id] : null, () => (id ? api.getHrTrainingProgramDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-training-program-detail', id] as const : null,
+    ([, programId]) => api.getHrTrainingProgramDetail(programId),
+    config
+  );
 }
 
 export function useHrTrainingEvents(
@@ -3137,7 +3200,11 @@ export function useHrTrainingEvents(
 }
 
 export function useHrTrainingEventDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-training-event-detail', id] : null, () => (id ? api.getHrTrainingEventDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-training-event-detail', id] as const : null,
+    ([, eventId]) => api.getHrTrainingEventDetail(eventId),
+    config
+  );
 }
 
 export function useHrTrainingEventMutations() {
@@ -3170,7 +3237,11 @@ export function useHrTrainingResults(
 }
 
 export function useHrTrainingResultDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-training-result-detail', id] : null, () => (id ? api.getHrTrainingResultDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-training-result-detail', id] as const : null,
+    ([, resultId]) => api.getHrTrainingResultDetail(resultId),
+    config
+  );
 }
 
 export function useHrTrainingResultMutations() {
@@ -3193,8 +3264,8 @@ export function useHrAppraisalTemplates(
 
 export function useHrAppraisalTemplateDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-appraisal-template-detail', id] : null,
-    () => (id ? api.getHrAppraisalTemplateDetail(id) : null),
+    id ? ['hr-appraisal-template-detail', id] as const : null,
+    ([, templateId]) => api.getHrAppraisalTemplateDetail(templateId),
     config
   );
 }
@@ -3207,7 +3278,11 @@ export function useHrAppraisals(
 }
 
 export function useHrAppraisalDetail(id: number | string | null, config?: SWRConfiguration) {
-  return useSWR(id ? ['hr-appraisal-detail', id] : null, () => (id ? api.getHrAppraisalDetail(id) : null), config);
+  return useSWR(
+    id ? ['hr-appraisal-detail', id] as const : null,
+    ([, appraisalId]) => api.getHrAppraisalDetail(appraisalId),
+    config
+  );
 }
 
 export function useHrAppraisalMutations() {
@@ -3240,8 +3315,8 @@ export function useHrEmployeeOnboardings(
 
 export function useHrEmployeeOnboardingDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-employee-onboarding-detail', id] : null,
-    () => (id ? api.getHrEmployeeOnboardingDetail(id) : null),
+    id ? ['hr-employee-onboarding-detail', id] as const : null,
+    ([, onboardingId]) => api.getHrEmployeeOnboardingDetail(onboardingId),
     config
   );
 }
@@ -3255,8 +3330,8 @@ export function useHrEmployeeSeparations(
 
 export function useHrEmployeeSeparationDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-employee-separation-detail', id] : null,
-    () => (id ? api.getHrEmployeeSeparationDetail(id) : null),
+    id ? ['hr-employee-separation-detail', id] as const : null,
+    ([, separationId]) => api.getHrEmployeeSeparationDetail(separationId),
     config
   );
 }
@@ -3270,8 +3345,8 @@ export function useHrEmployeePromotions(
 
 export function useHrEmployeePromotionDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-employee-promotion-detail', id] : null,
-    () => (id ? api.getHrEmployeePromotionDetail(id) : null),
+    id ? ['hr-employee-promotion-detail', id] as const : null,
+    ([, promotionId]) => api.getHrEmployeePromotionDetail(promotionId),
     config
   );
 }
@@ -3285,8 +3360,8 @@ export function useHrEmployeeTransfers(
 
 export function useHrEmployeeTransferDetail(id: number | string | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['hr-employee-transfer-detail', id] : null,
-    () => (id ? api.getHrEmployeeTransferDetail(id) : null),
+    id ? ['hr-employee-transfer-detail', id] as const : null,
+    ([, transferId]) => api.getHrEmployeeTransferDetail(transferId),
     config
   );
 }
@@ -3596,18 +3671,18 @@ export function useGatewayPayments(
 
 export function useGatewayPayment(reference: string | null, config?: SWRConfiguration) {
   return useSWR(
-    reference ? ['gateway-payment', reference] : null,
-    () => (reference ? api.getGatewayPayment(reference) : null),
+    reference ? ['gateway-payment', reference] as const : null,
+    ([, paymentRef]) => api.getGatewayPayment(paymentRef),
     config
   );
 }
 
 export function useGatewayTransfers(
-  params?: { status?: string; transfer_type?: string; limit?: number; offset?: number },
+  params?: { status?: string; transfer_type?: string; provider?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
 ) {
   return useSWR(
-    ['gateway-transfers', params?.status, params?.transfer_type, params?.limit, params?.offset],
+    ['gateway-transfers', params?.status, params?.transfer_type, params?.provider, params?.limit, params?.offset],
     () => api.getGatewayTransfers(params),
     { revalidateOnFocus: false, ...config }
   );
@@ -3615,8 +3690,8 @@ export function useGatewayTransfers(
 
 export function useGatewayTransfer(reference: string | null, config?: SWRConfiguration) {
   return useSWR(
-    reference ? ['gateway-transfer', reference] : null,
-    () => (reference ? api.getGatewayTransfer(reference) : null),
+    reference ? ['gateway-transfer', reference] as const : null,
+    ([, transferRef]) => api.getGatewayTransfer(transferRef),
     config
   );
 }
@@ -3642,8 +3717,8 @@ export function useOpenBankingConnections(
 
 export function useOpenBankingConnection(id: number | null, config?: SWRConfiguration) {
   return useSWR(
-    id ? ['open-banking-connection', id] : null,
-    () => (id ? api.getOpenBankingConnection(id) : null),
+    id ? ['open-banking-connection', id] as const : null,
+    ([, connectionId]) => api.getOpenBankingConnection(connectionId),
     config
   );
 }
@@ -3653,9 +3728,10 @@ export function useOpenBankingTransactions(
   params?: { start_date?: string; end_date?: string; limit?: number },
   config?: SWRConfiguration
 ) {
+  const key = id ? (['open-banking-transactions', id, params?.start_date, params?.end_date, params?.limit] as const) : null;
   return useSWR(
-    id ? ['open-banking-transactions', id, params?.start_date, params?.end_date, params?.limit] : null,
-    () => (id ? api.getOpenBankingTransactions(id, params) : null),
+    key,
+    key ? ([, connectionId]) => api.getOpenBankingTransactions(connectionId, params) : null,
     config
   );
 }
@@ -3722,16 +3798,16 @@ export function useSettingsGroups(config?: SWRConfiguration) {
 
 export function useSettings(group: string | null, config?: SWRConfiguration) {
   return useSWR(
-    group ? ['settings', group] : null,
-    () => (group ? api.getSettings(group) : null),
+    group ? ['settings', group] as const : null,
+    ([, groupName]) => api.getSettings(groupName),
     config
   );
 }
 
 export function useSettingsSchema(group: string | null, config?: SWRConfiguration) {
   return useSWR(
-    group ? ['settings-schema', group] : null,
-    () => (group ? api.getSettingsSchema(group) : null),
+    group ? ['settings-schema', group] as const : null,
+    ([, groupName]) => api.getSettingsSchema(groupName),
     config
   );
 }
@@ -3757,6 +3833,314 @@ export function useSettingsMutations() {
     },
     getTestStatus: async (jobId: string) => {
       return api.getSettingsTestStatus(jobId);
+    },
+  };
+}
+
+// Inventory Domain Hooks
+export function useInventoryItems(
+  params?: { item_group?: string; warehouse?: string; has_stock?: boolean; search?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-items', params], () => api.getInventoryItems(params), config);
+}
+
+export function useInventoryItemDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['inventory-item-detail', id] as const : null,
+    ([, itemId]) => api.getInventoryItemDetail(itemId),
+    config
+  );
+}
+
+export function useInventoryWarehouses(
+  params?: { include_disabled?: boolean; is_group?: boolean; company?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-warehouses', params], () => api.getInventoryWarehouses(params), config);
+}
+
+export function useInventoryWarehouseDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['inventory-warehouse-detail', id] as const : null,
+    ([, warehouseId]) => api.getInventoryWarehouseDetail(warehouseId),
+    config
+  );
+}
+
+export function useInventoryStockEntries(
+  params?: { stock_entry_type?: string; from_warehouse?: string; to_warehouse?: string; start_date?: string; end_date?: string; docstatus?: number; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-stock-entries', params], () => api.getInventoryStockEntries(params), config);
+}
+
+export function useInventoryStockEntryDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['inventory-stock-entry-detail', id] as const : null,
+    ([, entryId]) => api.getInventoryStockEntryDetail(entryId),
+    config
+  );
+}
+
+export function useInventoryStockLedger(
+  params?: { item_code?: string; warehouse?: string; voucher_type?: string; voucher_no?: string; start_date?: string; end_date?: string; include_cancelled?: boolean; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-stock-ledger', params], () => api.getInventoryStockLedger(params), config);
+}
+
+export function useInventoryStockSummary(
+  params?: { warehouse?: string; item_group?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-stock-summary', params], () => api.getInventoryStockSummary(params), config);
+}
+
+export function useInventoryMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createItem: async (body: InventoryItemPayload) => {
+      const res = await api.createInventoryItem(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-items');
+      return res;
+    },
+    updateItem: async (id: number | string, body: Partial<InventoryItemPayload>) => {
+      const res = await api.updateInventoryItem(id, body);
+      await mutate(['inventory-item-detail', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-items');
+      return res;
+    },
+    deleteItem: async (id: number | string) => {
+      await api.deleteInventoryItem(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-items');
+    },
+    createWarehouse: async (body: InventoryWarehousePayload) => {
+      const res = await api.createInventoryWarehouse(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-warehouses');
+      return res;
+    },
+    updateWarehouse: async (id: number | string, body: Partial<InventoryWarehousePayload>) => {
+      const res = await api.updateInventoryWarehouse(id, body);
+      await mutate(['inventory-warehouse-detail', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-warehouses');
+      return res;
+    },
+    deleteWarehouse: async (id: number | string) => {
+      await api.deleteInventoryWarehouse(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-warehouses');
+    },
+    createStockEntry: async (body: InventoryStockEntryPayload) => {
+      const res = await api.createInventoryStockEntry(body);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'inventory-stock-entries' || key[0] === 'inventory-stock-ledger' || key[0] === 'inventory-items'));
+      return res;
+    },
+    updateStockEntry: async (id: number | string, body: { posting_date?: string; remarks?: string; docstatus?: number }) => {
+      const res = await api.updateInventoryStockEntry(id, body);
+      await mutate(['inventory-stock-entry-detail', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-stock-entries');
+      return res;
+    },
+    deleteStockEntry: async (id: number | string) => {
+      await api.deleteInventoryStockEntry(id);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'inventory-stock-entries' || key[0] === 'inventory-stock-ledger'));
+    },
+    postToGL: async (id: number | string, params?: { inventory_account?: string; expense_account?: string }) => {
+      const res = await api.postStockEntryToGL(id, params);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-stock-entries');
+      return res;
+    },
+  };
+}
+
+// Inventory - Reorder Alerts
+export function useInventoryReorderAlerts(
+  params?: { limit?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-reorder-alerts', params], () => api.getInventoryReorderAlerts(params), config);
+}
+
+// Inventory - Transfer Requests
+export function useInventoryTransfers(
+  params?: { status?: string; from_warehouse?: string; to_warehouse?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-transfers', params], () => api.getInventoryTransfers(params), config);
+}
+
+export function useInventoryTransferMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (body: Parameters<typeof api.createInventoryTransfer>[0]) => {
+      const res = await api.createInventoryTransfer(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-transfers');
+      return res;
+    },
+    submit: async (id: number | string) => {
+      const res = await api.submitInventoryTransfer(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-transfers');
+      return res;
+    },
+    approve: async (id: number | string) => {
+      const res = await api.approveInventoryTransfer(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-transfers');
+      return res;
+    },
+    reject: async (id: number | string, reason: string) => {
+      const res = await api.rejectInventoryTransfer(id, reason);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-transfers');
+      return res;
+    },
+    execute: async (id: number | string) => {
+      const res = await api.executeInventoryTransfer(id);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'inventory-transfers' || key[0] === 'inventory-stock-entries'));
+      return res;
+    },
+  };
+}
+
+// Inventory - Batches
+export function useInventoryBatches(
+  params?: { item_code?: string; include_disabled?: boolean; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-batches', params], () => api.getInventoryBatches(params), config);
+}
+
+export function useInventoryBatchMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (body: Parameters<typeof api.createInventoryBatch>[0]) => {
+      const res = await api.createInventoryBatch(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-batches');
+      return res;
+    },
+  };
+}
+
+// Inventory - Serial Numbers
+export function useInventorySerials(
+  params?: { item_code?: string; warehouse?: string; status?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['inventory-serials', params], () => api.getInventorySerials(params), config);
+}
+
+export function useInventorySerialMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (body: Parameters<typeof api.createInventorySerial>[0]) => {
+      const res = await api.createInventorySerial(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'inventory-serials');
+      return res;
+    },
+  };
+}
+
+// Asset Management Hooks
+export function useAssets(
+  params?: { status?: string; category?: string; location?: string; custodian?: string; department?: string; search?: string; min_value?: number; max_value?: number; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['assets', params], () => api.getAssets(params), config);
+}
+
+export function useAsset(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['asset', id] as const : null,
+    ([, assetId]) => api.getAsset(assetId),
+    config
+  );
+}
+
+export function useAssetsSummary(config?: SWRConfiguration) {
+  return useSWR('assets-summary', () => api.getAssetsSummary(), config);
+}
+
+export function useAssetCategories(
+  params?: { limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['asset-categories', params], () => api.getAssetCategories(params), config);
+}
+
+export function useDepreciationSchedule(
+  params?: { asset_id?: number; finance_book?: string; from_date?: string; to_date?: string; pending_only?: boolean; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['depreciation-schedule', params], () => api.getDepreciationSchedule(params), config);
+}
+
+export function usePendingDepreciation(asOfDate?: string, config?: SWRConfiguration) {
+  return useSWR(['pending-depreciation', asOfDate], () => api.getPendingDepreciation(asOfDate), config);
+}
+
+export function useMaintenanceDue(config?: SWRConfiguration) {
+  return useSWR('maintenance-due', () => api.getMaintenanceDue(), config);
+}
+
+export function useWarrantyExpiring(days?: number, config?: SWRConfiguration) {
+  return useSWR(['warranty-expiring', days], () => api.getWarrantyExpiring(days), config);
+}
+
+export function useInsuranceExpiring(days?: number, config?: SWRConfiguration) {
+  return useSWR(['insurance-expiring', days], () => api.getInsuranceExpiring(days), config);
+}
+
+export function useAssetMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createAsset: async (body: Parameters<typeof api.createAsset>[0]) => {
+      const res = await api.createAsset(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'assets');
+      await mutate('assets-summary');
+      return res;
+    },
+    updateAsset: async (id: number | string, body: Parameters<typeof api.updateAsset>[1]) => {
+      const res = await api.updateAsset(id, body);
+      await mutate(['asset', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'assets');
+      return res;
+    },
+    submitAsset: async (id: number | string) => {
+      const res = await api.submitAsset(id);
+      await mutate(['asset', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'assets');
+      await mutate('assets-summary');
+      return res;
+    },
+    scrapAsset: async (id: number | string, scrapDate?: string) => {
+      const res = await api.scrapAsset(id, scrapDate);
+      await mutate(['asset', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'assets');
+      await mutate('assets-summary');
+      return res;
+    },
+    markForMaintenance: async (id: number | string) => {
+      const res = await api.markForMaintenance(id);
+      await mutate(['asset', id]);
+      await mutate('maintenance-due');
+      await mutate('assets-summary');
+      return res;
+    },
+    completeMaintenance: async (id: number | string) => {
+      const res = await api.completeMaintenance(id);
+      await mutate(['asset', id]);
+      await mutate('maintenance-due');
+      await mutate('assets-summary');
+      return res;
+    },
+  };
+}
+
+export function useAssetCategoryMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (body: Parameters<typeof api.createAssetCategory>[0]) => {
+      const res = await api.createAssetCategory(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'asset-categories');
+      return res;
     },
   };
 }

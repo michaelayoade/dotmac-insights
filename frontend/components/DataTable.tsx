@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
-interface Column<T> {
+interface Column<T = any> {
   key: string;
   header: string;
   render?: (item: T) => React.ReactNode;
@@ -13,7 +13,7 @@ interface Column<T> {
   width?: string;
 }
 
-interface DataTableProps<T> {
+interface DataTableProps<T = any> {
   columns: Column<T>[];
   data: T[];
   keyField: string;
@@ -21,9 +21,12 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
   className?: string;
+  selectable?: boolean;
+  selectedRowIds?: Record<string, boolean> | Set<string>;
+  onSelectChange?: (selected: Record<string, boolean>) => void;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T = any>({
   columns,
   data,
   keyField,
@@ -31,9 +34,17 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyMessage = 'No data available',
   onRowClick,
   className,
+  selectable = false,
+  selectedRowIds,
+  onSelectChange,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const selection =
+    selectedRowIds instanceof Set
+      ? Object.fromEntries(Array.from(selectedRowIds).map((id) => [id, true]))
+      : selectedRowIds || {};
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -46,8 +57,8 @@ export function DataTable<T extends Record<string, unknown>>({
 
   const sortedData = sortKey
     ? [...data].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+      const aVal = (a as Record<string, unknown>)[sortKey];
+      const bVal = (b as Record<string, unknown>)[sortKey];
       if (aVal === bVal) return 0;
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
@@ -56,6 +67,51 @@ export function DataTable<T extends Record<string, unknown>>({
     })
     : data;
 
+  const getRowKey = (item: T, fallback?: string) => {
+    const value = (item as any)[keyField];
+    if (value === undefined || value === null) return fallback || '';
+    return String(value);
+  };
+
+  const allSelected =
+    selectable &&
+    sortedData.length > 0 &&
+    sortedData.every((item, index) => selection[getRowKey(item, `row-${index}`)]);
+
+  const hasSelection = selectable && Object.values(selection).some(Boolean);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = Boolean(hasSelection && !allSelected);
+    }
+  }, [allSelected, hasSelection]);
+
+  const handleToggleRow = (rowKey: string, checked: boolean) => {
+    if (!onSelectChange) return;
+    const next = { ...selection };
+    if (checked) {
+      next[rowKey] = true;
+    } else {
+      delete next[rowKey];
+    }
+    onSelectChange(next);
+  };
+
+  const handleToggleAll = (checked: boolean) => {
+    if (!onSelectChange) return;
+    if (!checked) {
+      onSelectChange({});
+      return;
+    }
+
+    const next: Record<string, boolean> = {};
+    sortedData.forEach((item, index) => {
+      const rowKey = getRowKey(item, `row-${index}`);
+      next[rowKey] = true;
+    });
+    onSelectChange(next);
+  };
+
   if (loading) {
     return (
       <div className={cn('bg-slate-card rounded-xl border border-slate-border overflow-hidden', className)}>
@@ -63,6 +119,11 @@ export function DataTable<T extends Record<string, unknown>>({
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-border bg-slate-elevated/50">
+                {selectable && (
+                  <th className="w-12 px-4 py-3 text-left text-xs font-semibold text-slate-muted uppercase tracking-wide">
+                    <div className="h-4 w-4 rounded border border-slate-border bg-slate-elevated" />
+                  </th>
+                )}
                 {columns.map((col) => (
                   <th
                     key={col.key}
@@ -76,6 +137,11 @@ export function DataTable<T extends Record<string, unknown>>({
             <tbody>
               {[...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-slate-border">
+                  {selectable && (
+                    <td className="px-4 py-3">
+                      <div className="h-4 w-4 rounded border border-slate-border bg-slate-elevated" />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td key={col.key} className="px-4 py-3">
                       <div className="skeleton h-4 w-24 rounded" />
@@ -104,6 +170,17 @@ export function DataTable<T extends Record<string, unknown>>({
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-border bg-slate-elevated/50">
+              {selectable && (
+                <th className="w-12 px-4 py-3">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => handleToggleAll(e.target.checked)}
+                    className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric"
+                  />
+                </th>
+              )}
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -140,7 +217,7 @@ export function DataTable<T extends Record<string, unknown>>({
           <tbody>
             {sortedData.map((item, index) => (
               <tr
-                key={String(item[keyField])}
+                key={getRowKey(item, `row-${index}`)}
                 className={cn(
                   'border-b border-slate-border last:border-0 transition-colors',
                   onRowClick && 'cursor-pointer hover:bg-slate-elevated/50',
@@ -148,6 +225,16 @@ export function DataTable<T extends Record<string, unknown>>({
                 )}
                 onClick={() => onRowClick?.(item)}
               >
+                {selectable && (
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selection[getRowKey(item, `row-${index}`)])}
+                      onChange={(e) => handleToggleRow(getRowKey(item, `row-${index}`), e.target.checked)}
+                      className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric"
+                    />
+                  </td>
+                )}
                 {columns.map((col) => (
                   <td
                     key={col.key}
@@ -157,7 +244,9 @@ export function DataTable<T extends Record<string, unknown>>({
                       col.align === 'right' && 'text-right'
                     )}
                   >
-                    {col.render ? col.render(item) : String(item[col.key] ?? '—')}
+                    {col.render
+                      ? col.render(item)
+                      : String((item as Record<string, unknown>)[col.key as string] ?? '—')}
                   </td>
                 ))}
               </tr>

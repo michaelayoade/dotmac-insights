@@ -342,7 +342,7 @@ async def get_expense_summary(
     start, end = _get_date_range(start_date, end_date, months=12)
 
     # Total expenses from Expense model
-    total_expenses = db.query(func.coalesce(func.sum(Expense.total_amount), 0)).filter(
+    total_expenses = db.query(func.coalesce(func.sum(Expense.total_sanctioned_amount), 0)).filter(
         Expense.posting_date >= start,
         Expense.posting_date <= end,
         Expense.status != ExpenseStatus.CANCELLED,
@@ -361,18 +361,18 @@ async def get_expense_summary(
     # By category
     by_category = db.query(
         Expense.expense_type,
-        func.sum(Expense.total_amount).label("amount"),
+        func.sum(Expense.total_sanctioned_amount).label("amount"),
         func.count(Expense.id).label("count"),
     ).filter(
         Expense.posting_date >= start,
         Expense.posting_date <= end,
         Expense.status != ExpenseStatus.CANCELLED,
-    ).group_by(Expense.expense_type).order_by(func.sum(Expense.total_amount).desc()).all()
+    ).group_by(Expense.expense_type).order_by(func.sum(Expense.total_sanctioned_amount).desc()).all()
 
     categories = [
         {
             "category": row.expense_type or "Uncategorized",
-            "amount": float(row.amount or 0),
+            "total": float(row.amount or 0),
             "count": row.count,
             "percentage": round(float(row.amount / total_expenses * 100), 2) if total_expenses else 0,
         }
@@ -383,7 +383,7 @@ async def get_expense_summary(
         "period": {"start": start.isoformat(), "end": end.isoformat()},
         "total_expenses": float(total_expenses),
         "gl_expenses": float(gl_expenses),
-        "by_category": categories,
+        "categories": categories,
         "expense_count": sum(c["count"] for c in categories),
     }
 
@@ -398,14 +398,13 @@ async def get_expense_trend(
     end_date: Optional[str] = Query(None),
     interval: str = Query(default="month"),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """Monthly expense trend."""
     start, end = _get_date_range(start_date, end_date, months)
 
     results = db.query(
         func.date_trunc(interval, Expense.posting_date).label("period"),
-        func.sum(Expense.total_amount).label("amount"),
-        func.count(Expense.id).label("count"),
+        func.sum(Expense.total_sanctioned_amount).label("amount"),
     ).filter(
         Expense.posting_date >= start,
         Expense.posting_date <= end,
@@ -414,28 +413,13 @@ async def get_expense_trend(
         func.date_trunc(interval, Expense.posting_date)
     ).order_by(text("period")).all()
 
-    trend = [
+    return [
         {
             "period": row.period.isoformat() if row.period else None,
-            "amount": float(row.amount or 0),
-            "count": row.count,
+            "total": float(row.amount or 0),
         }
         for row in results
     ]
-
-    total = sum(t["amount"] for t in trend)
-    avg = total / len(trend) if trend else 0
-
-    return {
-        "interval": interval,
-        "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "trend": trend,
-        "summary": {
-            "total": round(total, 2),
-            "average": round(avg, 2),
-            "periods": len(trend),
-        }
-    }
 
 
 @router.get(
@@ -446,38 +430,32 @@ async def get_expenses_by_category(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """Detailed expense breakdown by category."""
     start, end = _get_date_range(start_date, end_date, months=12)
 
     results = db.query(
         Expense.expense_type,
-        func.sum(Expense.total_amount).label("amount"),
+        func.sum(Expense.total_sanctioned_amount).label("amount"),
         func.count(Expense.id).label("count"),
-        func.avg(Expense.total_amount).label("avg_amount"),
+        func.avg(Expense.total_sanctioned_amount).label("avg_amount"),
     ).filter(
         Expense.posting_date >= start,
         Expense.posting_date <= end,
         Expense.status != ExpenseStatus.CANCELLED,
-    ).group_by(Expense.expense_type).order_by(func.sum(Expense.total_amount).desc()).all()
+    ).group_by(Expense.expense_type).order_by(func.sum(Expense.total_sanctioned_amount).desc()).all()
 
     total = sum(float(r.amount or 0) for r in results)
     categories = [
         {
             "category": row.expense_type or "Uncategorized",
-            "amount": float(row.amount or 0),
-            "count": row.count,
-            "average": float(row.avg_amount or 0),
+            "total": float(row.amount or 0),
             "percentage": round(float(row.amount / total * 100), 2) if total else 0,
         }
         for row in results
     ]
 
-    return {
-        "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "total": round(total, 2),
-        "categories": categories,
-    }
+    return categories
 
 
 @router.get(
@@ -489,7 +467,7 @@ async def get_expenses_by_vendor(
     end_date: Optional[str] = Query(None),
     top: int = Query(default=20, le=100),
     db: Session = Depends(get_db),
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """Top vendors by expense amount."""
     start, end = _get_date_range(start_date, end_date, months=12)
 
@@ -510,20 +488,16 @@ async def get_expenses_by_vendor(
     total = sum(float(r.amount or 0) for r in results)
     vendors = [
         {
-            "vendor_id": row.supplier,
+            "vendor": row.supplier,
             "vendor_name": row.supplier_name or row.supplier,
-            "amount": float(row.amount or 0),
+            "total": float(row.amount or 0),
             "invoice_count": row.invoice_count,
             "percentage": round(float(row.amount / total * 100), 2) if total else 0,
         }
         for row in results
     ]
 
-    return {
-        "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "total": round(total, 2),
-        "vendors": vendors,
-    }
+    return vendors
 
 
 # ============= PROFITABILITY ANALYSIS =============
@@ -800,7 +774,7 @@ async def get_cash_flow_forecast(
     monthly_inflow = float(monthly_inflow) / 6 if monthly_inflow else 0
 
     # Calculate average monthly outflows
-    monthly_outflow = db.query(func.coalesce(func.sum(Expense.total_amount), 0)).filter(
+    monthly_outflow = db.query(func.coalesce(func.sum(Expense.total_sanctioned_amount), 0)).filter(
         Expense.posting_date >= six_months_ago,
         Expense.status != ExpenseStatus.CANCELLED,
     ).scalar() or Decimal("0")
@@ -865,7 +839,7 @@ async def get_cash_runway(
 
     # Average monthly expenses (last 6 months)
     six_months_ago = today - relativedelta(months=6)
-    total_expenses = db.query(func.coalesce(func.sum(Expense.total_amount), 0)).filter(
+    total_expenses = db.query(func.coalesce(func.sum(Expense.total_sanctioned_amount), 0)).filter(
         Expense.posting_date >= six_months_ago,
         Expense.status != ExpenseStatus.CANCELLED,
     ).scalar() or Decimal("0")

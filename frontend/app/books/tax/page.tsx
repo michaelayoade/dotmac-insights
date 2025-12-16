@@ -10,13 +10,13 @@ import {
   Users,
   Building2,
   Calendar,
-  AlertTriangle,
   Clock,
   ChevronRight,
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -28,16 +28,21 @@ function formatDate(date: string | null | undefined) {
 }
 
 export default function TaxDashboardPage() {
-  const { data: dashboard, isLoading, error } = useTaxDashboard();
+  const { data: dashboard, isLoading, error, mutate } = useTaxDashboard();
   const { data: upcoming } = useUpcomingFilings({ days: 30 });
   const { data: overdue } = useOverdueFilings();
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load tax dashboard</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load tax dashboard."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

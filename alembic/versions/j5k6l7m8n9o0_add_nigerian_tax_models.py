@@ -5,7 +5,7 @@ Revises: i4j5k6l7m8n9
 Create Date: 2024-01-15 10:00:00.000000
 
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from datetime import date
@@ -22,10 +22,11 @@ DEFAULT_COMPANY = 'default'
 
 def upgrade() -> None:
     conn = op.get_bind()
-    inspector = sa.inspect(conn)
+    offline = context.is_offline_mode()
+    inspector = sa.inspect(conn) if not offline else None
 
     def table_exists(name: str) -> bool:
-        return inspector.has_table(name)
+        return False if inspector is None else inspector.has_table(name)
 
     def constraint_exists(table: str, constraint: str) -> bool:
         return table_exists(table) and any(c["name"] == constraint for c in inspector.get_unique_constraints(table))

@@ -8,7 +8,7 @@ Create Date: 2025-12-12 14:00:00.000000
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 
@@ -20,9 +20,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    inspector = sa.inspect(bind)
-    existing_tables = set(inspector.get_table_names())
+    if context.is_offline_mode():
+        # In offline/--sql mode we cannot inspect; emit create statements unconditionally
+        existing_tables = set()
+    else:
+        bind = op.get_bind()
+        inspector = sa.inspect(bind)
+        existing_tables = set(inspector.get_table_names())
 
     # ============= INVOICE ITEMS =============
     if 'invoice_items' not in existing_tables:

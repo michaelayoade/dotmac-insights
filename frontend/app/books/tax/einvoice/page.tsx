@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { formatCurrency } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   FileCheck,
   ArrowLeft,
@@ -28,7 +30,7 @@ function useEInvoices(params?: { status?: string; page?: number; page_size?: num
   ).toString() : '';
   return useSWR(
     ['einvoices', queryString],
-    () => api.tax.getEInvoices(params)
+    () => api.getEInvoices(params)
   );
 }
 
@@ -51,9 +53,18 @@ function formatDate(date: string | null | undefined) {
 }
 
 export default function EInvoicePage() {
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [filters, setFilters] = usePersistentState<{
+    page: number;
+    pageSize: number;
+    statusFilter: string;
+    search: string;
+  }>('books.tax.einvoice.filters', {
+    page: 1,
+    pageSize: 20,
+    statusFilter: '',
+    search: '',
+  });
+  const { page, pageSize, statusFilter, search } = filters;
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
 
   const { data, isLoading, error, mutate } = useEInvoices({
@@ -174,12 +185,17 @@ export default function EInvoicePage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load e-invoices</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load e-invoices."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -251,12 +267,14 @@ export default function EInvoicePage() {
           <input
             type="text"
             placeholder="Search invoices..."
+            value={search}
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value, page: 1 }))}
             className="input-field pl-9 max-w-[220px]"
           />
         </div>
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          onChange={(e) => setFilters((prev) => ({ ...prev, statusFilter: e.target.value, page: 1 }))}
           className="input-field max-w-[160px]"
         >
           <option value="">All Statuses</option>
@@ -266,6 +284,14 @@ export default function EInvoicePage() {
           <option value="VALIDATED">Validated</option>
           <option value="REJECTED">Rejected</option>
         </select>
+        {(search || statusFilter) && (
+          <button
+            onClick={() => setFilters((prev) => ({ ...prev, search: '', statusFilter: '', page: 1 }))}
+            className="text-slate-muted text-sm hover:text-white transition-colors"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
       {/* E-Invoices Table */}
@@ -282,7 +308,7 @@ export default function EInvoicePage() {
           total={data.total}
           limit={pageSize}
           offset={(page - 1) * pageSize}
-          onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+          onPageChange={(newOffset) => setFilters((prev) => ({ ...prev, page: Math.floor(newOffset / pageSize) + 1 }))}
         />
       )}
 

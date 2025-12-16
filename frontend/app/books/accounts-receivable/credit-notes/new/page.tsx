@@ -3,14 +3,19 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useFinanceCreditNoteMutations } from '@/hooks/useApi';
+import { useFinanceCreditNoteMutations, useFinanceCustomers } from '@/hooks/useApi';
 import { AlertTriangle, ArrowLeft, Save, Plus, Trash2, Percent, Calendar as CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CustomerSearch } from '@/components/EntitySearch';
 
 export default function NewCreditNotePage() {
   const router = useRouter();
   const { createCreditNote } = useFinanceCreditNoteMutations();
+  const { data: customersData, isLoading: customersLoading } = useFinanceCustomers({ limit: 200, offset: 0 });
+  const customers = useMemo(() => (customersData as any)?.items || (customersData as any)?.customers || [], [customersData]);
+
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<{ id: number; name: string } | null>(null);
   const [form, setForm] = useState({
     customer_name: '',
     customer_id: '',
@@ -20,7 +25,8 @@ export default function NewCreditNotePage() {
     reason: '',
     memo: '',
   });
-  const [lineItems, setLineItems] = useState([
+  type LineItem = { description: string; quantity: number; unit_price: number; tax_rate: number };
+  const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: '', quantity: 1, unit_price: 0, tax_rate: 0 },
   ]);
   const [error, setError] = useState<string | null>(null);
@@ -31,15 +37,13 @@ export default function NewCreditNotePage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleLineChange = (index: number, field: keyof typeof lineItems[number], value: string) => {
+  const handleLineChange = (index: number, field: keyof LineItem, value: string) => {
+    const numericFields: Array<keyof LineItem> = ['quantity', 'unit_price', 'tax_rate'];
     const updated = [...lineItems];
-    const numericFields: Array<keyof typeof lineItems[number]> = ['quantity', 'unit_price', 'tax_rate'];
-    if (numericFields.includes(field)) {
-      updated[index][field] = Number(value) || 0;
-    } else {
-      // @ts-expect-error string field assignment
-      updated[index][field] = value;
-    }
+    updated[index] = {
+      ...updated[index],
+      [field]: numericFields.includes(field) ? (Number(value) || 0) : value,
+    } as LineItem;
     setLineItems(updated);
   };
 
@@ -57,7 +61,7 @@ export default function NewCreditNotePage() {
   }, [lineItems]);
 
   const validate = () => {
-    if (!form.customer_name && !form.customer_id) return 'Customer is required';
+    if (!selectedCustomer && !form.customer_name && !form.customer_id) return 'Customer is required';
     if (!form.issue_date) return 'Issue date is required';
     if (totals.total <= 0) return 'Add at least one line item with amount';
     return null;
@@ -74,8 +78,8 @@ export default function NewCreditNotePage() {
     setSaving(true);
     try {
       await createCreditNote({
-        customer_id: form.customer_id ? Number(form.customer_id) : undefined,
-        customer_name: form.customer_name || undefined,
+        customer_id: selectedCustomer?.id || (form.customer_id ? Number(form.customer_id) : undefined),
+        customer_name: selectedCustomer?.name || form.customer_name || undefined,
         invoice_id: form.invoice_id ? Number(form.invoice_id) : undefined,
         description: form.reason || form.memo || undefined,
         amount: totals.total || 0,
@@ -121,7 +125,14 @@ export default function NewCreditNotePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
           {/* Required fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input label="Customer Name" name="customer_name" value={form.customer_name} onChange={handleChange} required />
+            <CustomerSearch
+              label="Customer"
+              customers={customers}
+              value={selectedCustomer}
+              onSelect={setSelectedCustomer}
+              loading={customersLoading}
+              required
+            />
             <Input
               label="Issue Date"
               name="issue_date"
@@ -153,9 +164,8 @@ export default function NewCreditNotePage() {
           {/* Optional fields */}
           {showMoreOptions && (
             <div className="space-y-4 pt-2 border-t border-slate-border/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Invoice ID" name="invoice_id" value={form.invoice_id} onChange={handleChange} type="number" placeholder="Link to original invoice" />
-                <Input label="Customer ID" name="customer_id" value={form.customer_id} onChange={handleChange} type="number" />
                 <Input label="Currency" name="currency" value={form.currency} onChange={handleChange} />
               </div>
               <div>

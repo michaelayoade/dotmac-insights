@@ -18,7 +18,7 @@ Adds comprehensive settings infrastructure for HR and Support modules:
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
@@ -31,20 +31,64 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ==========================================================================
-    # HR ENUMS
-    # ==========================================================================
-    op.execute("CREATE TYPE leaveaccountingfrequency AS ENUM ('ANNUAL', 'MONTHLY', 'QUARTERLY', 'BIANNUAL')")
-    op.execute("CREATE TYPE proratamethod AS ENUM ('LINEAR', 'CALENDAR_DAYS', 'WORKING_DAYS', 'MONTHLY')")
-    op.execute("CREATE TYPE payrollfrequency AS ENUM ('WEEKLY', 'BIWEEKLY', 'MONTHLY', 'SEMIMONTHLY')")
-    op.execute("CREATE TYPE overtimecalculation AS ENUM ('HOURLY_RATE', 'DAILY_RATE', 'MONTHLY_RATE')")
-    op.execute("CREATE TYPE gratuitycalculation AS ENUM ('LAST_SALARY', 'AVERAGE_SALARY', 'BASIC_SALARY')")
-    op.execute("CREATE TYPE employeeidformat AS ENUM ('NUMERIC', 'ALPHANUMERIC', 'YEAR_BASED', 'DEPARTMENT_BASED')")
-    op.execute("CREATE TYPE attendancemarkingmode AS ENUM ('MANUAL', 'BIOMETRIC', 'GEOLOCATION', 'HYBRID')")
-    op.execute("CREATE TYPE appraisalfrequency AS ENUM ('ANNUAL', 'SEMIANNUAL', 'QUARTERLY', 'MONTHLY')")
+    bind = op.get_bind()
+
+    # Skip if already applied (tables present)
+    if bind and not context.is_offline_mode():
+        inspector = sa.inspect(bind)
+        if inspector.has_table("hr_settings"):
+            return
+
+    def ensure_enum(name: str, values: tuple[str, ...]) -> postgresql.ENUM:
+        """Create enum type if missing, return ENUM bound to existing type."""
+        if bind and not context.is_offline_mode():
+            value_list = ", ".join(f"'{v}'" for v in values)
+            ddl = f"""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN
+                        CREATE TYPE {name} AS ENUM ({value_list});
+                    END IF;
+                END$$;
+            """
+            bind.execute(sa.text(ddl))
+        return postgresql.ENUM(*values, name=name, create_type=False)
+
+    leave_accounting_frequency = ensure_enum(
+        "leaveaccountingfrequency",
+        ("ANNUAL", "MONTHLY", "QUARTERLY", "BIANNUAL"),
+    )
+    pro_rata_method = ensure_enum(
+        "proratamethod",
+        ("LINEAR", "CALENDAR_DAYS", "WORKING_DAYS", "MONTHLY"),
+    )
+    payroll_frequency = ensure_enum(
+        "payrollfrequency",
+        ("WEEKLY", "BIWEEKLY", "MONTHLY", "SEMIMONTHLY"),
+    )
+    overtime_calculation = ensure_enum(
+        "overtimecalculation",
+        ("HOURLY_RATE", "DAILY_RATE", "MONTHLY_RATE"),
+    )
+    gratuity_calculation = ensure_enum(
+        "gratuitycalculation",
+        ("LAST_SALARY", "AVERAGE_SALARY", "BASIC_SALARY"),
+    )
+    employee_id_format = ensure_enum(
+        "employeeidformat",
+        ("NUMERIC", "ALPHANUMERIC", "YEAR_BASED", "DEPARTMENT_BASED"),
+    )
+    attendance_marking_mode = ensure_enum(
+        "attendancemarkingmode",
+        ("MANUAL", "BIOMETRIC", "GEOLOCATION", "HYBRID"),
+    )
+    appraisal_frequency = ensure_enum(
+        "appraisalfrequency",
+        ("ANNUAL", "SEMIANNUAL", "QUARTERLY", "MONTHLY"),
+    )
 
     # ==========================================================================
-    # HR SETTINGS
+    # HR ENUMS
     # ==========================================================================
     op.create_table(
         "hr_settings",
@@ -52,8 +96,8 @@ def upgrade() -> None:
         sa.Column("company", sa.String(255), nullable=True, unique=True, index=True),
 
         # Leave Policy
-        sa.Column("leave_accounting_frequency", postgresql.ENUM("ANNUAL", "MONTHLY", "QUARTERLY", "BIANNUAL", name="leaveaccountingfrequency", create_type=False), nullable=False, server_default="ANNUAL"),
-        sa.Column("pro_rata_method", postgresql.ENUM("LINEAR", "CALENDAR_DAYS", "WORKING_DAYS", "MONTHLY", name="proratamethod", create_type=False), nullable=False, server_default="WORKING_DAYS"),
+        sa.Column("leave_accounting_frequency", leave_accounting_frequency, nullable=False, server_default="ANNUAL"),
+        sa.Column("pro_rata_method", pro_rata_method, nullable=False, server_default="WORKING_DAYS"),
         sa.Column("max_carryforward_days", sa.Integer(), nullable=False, server_default="5"),
         sa.Column("carryforward_expiry_months", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("min_leave_notice_days", sa.Integer(), nullable=False, server_default="1"),
@@ -63,7 +107,7 @@ def upgrade() -> None:
         sa.Column("medical_certificate_required_after_days", sa.Integer(), nullable=False, server_default="2"),
 
         # Attendance
-        sa.Column("attendance_marking_mode", postgresql.ENUM("MANUAL", "BIOMETRIC", "GEOLOCATION", "HYBRID", name="attendancemarkingmode", create_type=False), nullable=False, server_default="MANUAL"),
+        sa.Column("attendance_marking_mode", attendance_marking_mode, nullable=False, server_default="MANUAL"),
         sa.Column("allow_backdated_attendance", sa.Boolean(), nullable=False, server_default=sa.sql.expression.false()),
         sa.Column("backdated_attendance_days", sa.Integer(), nullable=False, server_default="3"),
         sa.Column("auto_mark_absent_enabled", sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
@@ -83,7 +127,7 @@ def upgrade() -> None:
         sa.Column("shift_change_notice_days", sa.Integer(), nullable=False, server_default="3"),
 
         # Payroll
-        sa.Column("payroll_frequency", postgresql.ENUM("WEEKLY", "BIWEEKLY", "MONTHLY", "SEMIMONTHLY", name="payrollfrequency", create_type=False), nullable=False, server_default="MONTHLY"),
+        sa.Column("payroll_frequency", payroll_frequency, nullable=False, server_default="MONTHLY"),
         sa.Column("salary_payment_day", sa.Integer(), nullable=False, server_default="28"),
         sa.Column("payroll_cutoff_day", sa.Integer(), nullable=False, server_default="25"),
         sa.Column("allow_salary_advance", sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
@@ -93,7 +137,7 @@ def upgrade() -> None:
 
         # Overtime
         sa.Column("overtime_enabled", sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
-        sa.Column("overtime_calculation", postgresql.ENUM("HOURLY_RATE", "DAILY_RATE", "MONTHLY_RATE", name="overtimecalculation", create_type=False), nullable=False, server_default="HOURLY_RATE"),
+        sa.Column("overtime_calculation", overtime_calculation, nullable=False, server_default="HOURLY_RATE"),
         sa.Column("overtime_multiplier_weekday", sa.Numeric(4, 2), nullable=False, server_default="1.50"),
         sa.Column("overtime_multiplier_weekend", sa.Numeric(4, 2), nullable=False, server_default="2.00"),
         sa.Column("overtime_multiplier_holiday", sa.Numeric(4, 2), nullable=False, server_default="2.50"),
@@ -132,7 +176,7 @@ def upgrade() -> None:
         sa.Column("offer_negotiation_window_days", sa.Integer(), nullable=False, server_default="3"),
 
         # Appraisal
-        sa.Column("appraisal_frequency", postgresql.ENUM("ANNUAL", "SEMIANNUAL", "QUARTERLY", "MONTHLY", name="appraisalfrequency", create_type=False), nullable=False, server_default="ANNUAL"),
+        sa.Column("appraisal_frequency", appraisal_frequency, nullable=False, server_default="ANNUAL"),
         sa.Column("appraisal_cycle_start_month", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("appraisal_rating_scale", sa.Integer(), nullable=False, server_default="5"),
         sa.Column("require_self_review", sa.Boolean(), nullable=False, server_default=sa.sql.expression.true()),
@@ -151,7 +195,7 @@ def upgrade() -> None:
         sa.Column("max_work_hours_per_day", sa.Integer(), nullable=False, server_default="12"),
 
         # Display
-        sa.Column("employee_id_format", postgresql.ENUM("NUMERIC", "ALPHANUMERIC", "YEAR_BASED", "DEPARTMENT_BASED", name="employeeidformat", create_type=False), nullable=False, server_default="NUMERIC"),
+        sa.Column("employee_id_format", employee_id_format, nullable=False, server_default="NUMERIC"),
         sa.Column("employee_id_prefix", sa.String(10), nullable=False, server_default="EMP"),
         sa.Column("employee_id_min_digits", sa.Integer(), nullable=False, server_default="4"),
 
@@ -277,7 +321,7 @@ def upgrade() -> None:
         sa.Column("working_hours_type", postgresql.ENUM("STANDARD", "EXTENDED", "ROUND_THE_CLOCK", "CUSTOM", name="workinghourstype", create_type=False), nullable=False, server_default="STANDARD"),
         sa.Column("timezone", sa.String(50), nullable=False, server_default="Africa/Lagos"),
         sa.Column("weekly_schedule", postgresql.JSON(), nullable=False, server_default='{"MONDAY": {"start": "09:00", "end": "17:00", "closed": false}, "TUESDAY": {"start": "09:00", "end": "17:00", "closed": false}, "WEDNESDAY": {"start": "09:00", "end": "17:00", "closed": false}, "THURSDAY": {"start": "09:00", "end": "17:00", "closed": false}, "FRIDAY": {"start": "09:00", "end": "17:00", "closed": false}, "SATURDAY": {"start": "00:00", "end": "00:00", "closed": true}, "SUNDAY": {"start": "00:00", "end": "00:00", "closed": true}}'),
-        sa.Column("holiday_calendar_id", sa.Integer(), nullable=True),
+        sa.Column("holiday_calendar_id", sa.Integer(), sa.ForeignKey("holiday_calendars.id"), nullable=True),
 
         # SLA Defaults
         sa.Column("default_sla_policy_id", sa.Integer(), sa.ForeignKey("sla_policies.id"), nullable=True),

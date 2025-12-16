@@ -61,7 +61,6 @@ export default function GatewayTransfersPage() {
 
   const { data, isLoading, error, mutate } = useGatewayTransfers({
     status: status || undefined,
-    provider: provider || undefined,
     limit: pageSize,
     offset: (page - 1) * pageSize,
   });

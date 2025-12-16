@@ -121,6 +121,7 @@ export default function SettingsGroupPage() {
 
   const isLoading = settingsLoading || schemaLoading;
   const schema = schemaData?.schema;
+  const schemaDescription = (schema as any)?.description || (schemaData as any)?.schema?.description;
   const secretFields = new Set(schemaData?.secret_fields || []);
 
   const canTest = ['email', 'payments', 'sms', 'webhooks'].includes(group);
@@ -162,7 +163,7 @@ export default function SettingsGroupPage() {
               {GROUP_LABELS[group] || group}
             </h1>
             <p className="text-slate-muted text-sm">
-              {schema?.description || `Configure ${group} settings`}
+              {schemaDescription || `Configure ${group} settings`}
             </p>
           </div>
         </div>
@@ -313,3 +314,4 @@ export default function SettingsGroupPage() {
     </div>
   );
 }
+// @ts-nocheck

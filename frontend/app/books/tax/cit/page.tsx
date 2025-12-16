@@ -131,6 +131,8 @@ export default function CITPage() {
 
   // Get latest assessment for summary
   const latestAssessment = data?.assessments?.[0];
+  const latestProfitBeforeTax = latestAssessment?.profit_before_tax ?? 0;
+  const latestCitLiability = latestAssessment?.cit_liability ?? 0;
 
   return (
     <div className="space-y-6">
@@ -171,7 +173,7 @@ export default function CITPage() {
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              {latestAssessment.profit_before_tax >= 0 ? (
+              {latestProfitBeforeTax >= 0 ? (
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
               ) : (
                 <TrendingDown className="w-4 h-4 text-red-400" />
@@ -180,9 +182,9 @@ export default function CITPage() {
             </div>
             <p className={cn(
               'text-xl font-semibold font-mono',
-              latestAssessment.profit_before_tax >= 0 ? 'text-emerald-400' : 'text-red-400'
+              latestProfitBeforeTax >= 0 ? 'text-emerald-400' : 'text-red-400'
             )}>
-              {formatCurrency(latestAssessment.profit_before_tax, 'NGN')}
+              {formatCurrency(latestProfitBeforeTax, 'NGN')}
             </p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -195,7 +197,7 @@ export default function CITPage() {
           <div className="bg-slate-card border border-purple-500/30 rounded-xl p-4">
             <p className="text-slate-muted text-sm">CIT Liability</p>
             <p className="text-2xl font-semibold text-purple-400 font-mono mt-1">
-              {formatCurrency(latestAssessment.cit_liability, 'NGN')}
+              {formatCurrency(latestCitLiability, 'NGN')}
             </p>
           </div>
         </div>

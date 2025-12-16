@@ -52,6 +52,10 @@ export default function SupportSlaPage() {
   const policies = useSupportSlaPolicies({ active_only: activeOnly });
   const breaches = useSupportSlaBreachesSummary({ days });
   const slaPerformance = useSupportAnalyticsSlaPerformance({ months: 6 });
+  const breachData = breaches.data || {};
+  const breachTargets = Array.isArray((breachData as any).by_target_type) ? (breachData as any).by_target_type : [];
+  const calendarsData = Array.isArray(calendars.data) ? calendars.data : [];
+  const policiesData = Array.isArray(policies.data) ? policies.data : [];
 
   // Calculate overall attainment from latest month
   const latestPerf = slaPerformance.data?.[slaPerformance.data.length - 1];
@@ -138,31 +142,31 @@ export default function SupportSlaPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-rose-400">{breaches.data.total_breaches ?? 0}</p>
+                  <p className="text-2xl font-bold text-rose-400">{breachData.total_breaches ?? 0}</p>
                   <p className="text-xs text-slate-muted">Total Breaches</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-amber-400">{breaches.data.currently_overdue ?? 0}</p>
+                  <p className="text-2xl font-bold text-amber-400">{breachData.currently_overdue ?? 0}</p>
                   <p className="text-xs text-slate-muted">Currently Overdue</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-violet-400">
-                    {(breaches.data.by_target_type || []).reduce((s: number, t: any) => s + (t.avg_overrun_hours || 0), 0).toFixed(1)}h
+                    {breachTargets.reduce((s: number, t: any) => s + (t.avg_overrun_hours || 0), 0).toFixed(1)}h
                   </p>
                   <p className="text-xs text-slate-muted">Avg Overrun</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-blue-400">
-                    {(breaches.data.by_target_type || []).length}
+                    {breachTargets.length}
                   </p>
                   <p className="text-xs text-slate-muted">Target Types</p>
                 </div>
               </div>
 
-              {(breaches.data.by_target_type || []).length > 0 && (
+              {breachTargets.length > 0 && (
                 <div className="space-y-2 pt-3 border-t border-slate-border">
                   <p className="text-xs text-slate-muted">By Target Type</p>
-                  {(breaches.data.by_target_type || []).map((row: any, idx: number) => (
+                  {breachTargets.map((row: any, idx: number) => (
                     <div key={idx} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-white">{row.target_type || 'Unknown'}</span>
@@ -172,7 +176,7 @@ export default function SupportSlaPage() {
                       </div>
                       <ProgressBar
                         value={row.count}
-                        max={breaches.data.total_breaches || 1}
+                        max={breachData.total_breaches || 1}
                         color="bg-rose-500"
                       />
                     </div>
@@ -217,20 +221,20 @@ export default function SupportSlaPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Calendars */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-400" />
-              <h3 className="text-white font-semibold">Business Calendars</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-400" />
+                <h3 className="text-white font-semibold">Business Calendars</h3>
+              </div>
+              <span className="text-xs text-slate-muted">{calendarsData.length} calendars</span>
             </div>
-            <span className="text-xs text-slate-muted">{calendars.data?.length ?? 0} calendars</span>
-          </div>
           {!calendars.data ? (
             <p className="text-slate-muted text-sm">Loading calendars…</p>
-          ) : calendars.data.length === 0 ? (
+          ) : calendarsData.length === 0 ? (
             <p className="text-slate-muted text-sm">No calendars configured.</p>
           ) : (
             <div className="space-y-3">
-              {calendars.data.map((cal) => (
+              {calendarsData.map((cal) => (
                 <div key={cal.id} className="border border-slate-border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -246,7 +250,7 @@ export default function SupportSlaPage() {
                   </div>
                   <div className="mt-2 flex items-center gap-3 text-xs text-slate-muted">
                     <span className="px-2 py-1 rounded bg-slate-elevated">{cal.timezone}</span>
-                    {cal.holidays?.length > 0 && (
+                    {Array.isArray(cal.holidays) && cal.holidays.length > 0 && (
                       <span>{cal.holidays.length} holidays</span>
                     )}
                   </div>
@@ -263,15 +267,18 @@ export default function SupportSlaPage() {
               <Clock className="w-4 h-4 text-violet-400" />
               <h3 className="text-white font-semibold">SLA Policies</h3>
             </div>
-            <span className="text-xs text-slate-muted">{policies.data?.length ?? 0} policies</span>
+            <span className="text-xs text-slate-muted">{policiesData.length} policies</span>
           </div>
           {!policies.data ? (
             <p className="text-slate-muted text-sm">Loading policies…</p>
-          ) : policies.data.length === 0 ? (
+          ) : policiesData.length === 0 ? (
             <p className="text-slate-muted text-sm">No policies configured.</p>
           ) : (
             <div className="space-y-3">
-              {policies.data.map((policy) => (
+              {policiesData.map((policy) => {
+                const targets = Array.isArray(policy.targets) ? policy.targets : [];
+                const conditions = Array.isArray(policy.conditions) ? policy.conditions : [];
+                return (
                 <div key={policy.id} className="border border-slate-border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -286,14 +293,14 @@ export default function SupportSlaPage() {
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-muted">
-                    {policy.conditions?.length ? (
+                    {conditions.length ? (
                       <span className="px-2 py-1 rounded bg-slate-elevated">
-                        {policy.conditions.length} conditions
+                        {conditions.length} conditions
                       </span>
                     ) : null}
-                    {policy.targets?.length ? (
+                    {targets.length ? (
                       <span className="px-2 py-1 rounded bg-slate-elevated">
-                        {policy.targets.length} targets
+                        {targets.length} targets
                       </span>
                     ) : null}
                     {policy.priority !== undefined && (
@@ -302,21 +309,22 @@ export default function SupportSlaPage() {
                       </span>
                     )}
                   </div>
-                  {policy.targets?.length > 0 && (
+                  {targets.length > 0 && (
                     <div className="mt-3 pt-2 border-t border-slate-border/50 space-y-1">
-                      {policy.targets.slice(0, 3).map((target: any, idx: number) => (
+                      {targets.slice(0, 3).map((target: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
                           <span className="text-slate-muted">{target.target_type || 'Target'}</span>
                           <span className="text-white">{target.target_hours}h</span>
                         </div>
                       ))}
-                      {policy.targets.length > 3 && (
-                        <p className="text-xs text-slate-muted">+{policy.targets.length - 3} more targets</p>
+                      {targets.length > 3 && (
+                        <p className="text-xs text-slate-muted">+{targets.length - 3} more targets</p>
                       )}
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

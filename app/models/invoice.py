@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index, text, Numeric
+from sqlalchemy import String, Text, ForeignKey, Enum, Index, text, Numeric, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.models.document_lines import InvoiceLine
+from app.models.payment_allocation import PaymentAllocation, AllocationType
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.payment import Payment
     from app.models.credit_note import CreditNote
-    from app.models.document_lines import InvoiceLine
-    from app.models.payment_allocation import PaymentAllocation
 
 
 class InvoiceStatus(enum.Enum):
@@ -112,14 +112,17 @@ class Invoice(Base):
     customer: Mapped[Optional[Customer]] = relationship(back_populates="invoices")
     payments: Mapped[List[Payment]] = relationship(back_populates="invoice")
     credit_notes: Mapped[List[CreditNote]] = relationship(back_populates="invoice")
-    lines: Mapped[List["InvoiceLine"]] = relationship(
+    lines: Mapped[List[InvoiceLine]] = relationship(
         back_populates="invoice",
         cascade="all, delete-orphan",
-        order_by="InvoiceLine.idx",
+        order_by=InvoiceLine.idx,
     )
-    allocations: Mapped[List["PaymentAllocation"]] = relationship(
-        primaryjoin="and_(PaymentAllocation.allocation_type=='invoice', PaymentAllocation.document_id==Invoice.id)",
-        foreign_keys="PaymentAllocation.document_id",
+    allocations: Mapped[List[PaymentAllocation]] = relationship(
+        primaryjoin=lambda: and_(
+            PaymentAllocation.allocation_type == AllocationType.INVOICE,
+            PaymentAllocation.document_id == Invoice.id,
+        ),
+        foreign_keys=[PaymentAllocation.document_id],
         viewonly=True,
     )
 

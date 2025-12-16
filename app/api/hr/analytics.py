@@ -6,15 +6,15 @@ Cross-module analytics and dashboard endpoints.
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from typing import Dict, Any, Optional
-from datetime import date
+from sqlalchemy import func, extract
+from typing import Dict, Any, Optional, List
+from datetime import date, datetime, timedelta
 
 from app.database import get_db
 from app.auth import Require
 from app.models.hr_leave import LeaveApplication, LeaveApplicationStatus, LeaveAllocation
 from app.models.hr_attendance import Attendance, AttendanceStatus
-from app.models.hr_payroll import SalarySlip, SalarySlipStatus
+from app.models.hr_payroll import SalarySlip, SalarySlipStatus, SalarySlipEarning, SalarySlipDeduction
 from app.models.hr_recruitment import JobOpening, JobOpeningStatus, JobApplicant, JobApplicantStatus
 from app.models.hr_training import TrainingEvent, TrainingEventStatus
 from app.models.hr_appraisal import Appraisal, AppraisalStatus
@@ -72,6 +72,8 @@ async def hr_dashboard(
         SalarySlip.status,
         func.count(SalarySlip.id),
         func.sum(SalarySlip.net_pay),
+        func.sum(SalarySlip.gross_pay),
+        func.sum(SalarySlip.total_deduction),
     )
     if company:
         payroll_query = payroll_query.filter(SalarySlip.company.ilike(f"%{company}%"))
@@ -86,6 +88,8 @@ async def hr_dashboard(
         payroll_summary[status_val] = {
             "count": int(row[1] or 0),
             "total_net_pay": float(row[2] or 0),
+            "total_gross_pay": float(row[3] or 0),
+            "total_deductions": float(row[4] or 0),
         }
 
     # Training summary
@@ -140,6 +144,186 @@ async def hr_dashboard(
             "separation": separation_summary,
         },
     }
+
+
+@router.get("/overview", dependencies=[Depends(Require("hr:read"))])
+async def hr_overview(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Overview snapshot used by HR analytics dashboard."""
+    dashboard = await hr_dashboard(company=company, from_date=None, to_date=None, db=db)
+    payroll_breakdown = dashboard.get("payroll", {})
+    payroll_30d = {
+        "net_total": sum(val.get("total_net_pay", 0) for val in payroll_breakdown.values()),
+        "gross_total": sum(val.get("total_gross_pay", 0) for val in payroll_breakdown.values()),
+        "slip_count": sum(val.get("count", 0) for val in payroll_breakdown.values()),
+    }
+    return {
+        "leave_by_status": dashboard.get("leave", {}),
+        "attendance_status_30d": dashboard.get("attendance", {}),
+        "payroll_30d": payroll_30d,
+        "recruitment": dashboard.get("recruitment", {}),
+        "training": dashboard.get("training", {}),
+        "appraisal": dashboard.get("appraisal", {}),
+        "lifecycle": dashboard.get("lifecycle", {}),
+    }
+
+
+@router.get("/leave-trend", dependencies=[Depends(Require("hr:read"))])
+async def leave_trend(
+    company: Optional[str] = None,
+    months: int = Query(default=6, ge=1, le=24),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Leave application volume by month."""
+    end_dt = date.today()
+    start_dt = end_dt - timedelta(days=months * 30)
+
+    query = db.query(
+        extract("year", LeaveApplication.from_date).label("year"),
+        extract("month", LeaveApplication.from_date).label("month"),
+        func.count(LeaveApplication.id).label("count"),
+    ).filter(
+        LeaveApplication.from_date >= start_dt,
+        LeaveApplication.from_date <= end_dt,
+    )
+    if company:
+        query = query.filter(LeaveApplication.company.ilike(f"%{company}%"))
+
+    results = query.group_by(
+        extract("year", LeaveApplication.from_date),
+        extract("month", LeaveApplication.from_date),
+    ).order_by(
+        extract("year", LeaveApplication.from_date),
+        extract("month", LeaveApplication.from_date),
+    ).all()
+
+    return [
+        {
+            "year": int(r.year),
+            "month_num": int(r.month),
+            "month": f"{int(r.year)}-{int(r.month):02d}",
+            "count": int(r.count or 0),
+        }
+        for r in results
+    ]
+
+
+@router.get("/attendance-trend", dependencies=[Depends(Require("hr:read"))])
+async def attendance_trend(
+    company: Optional[str] = None,
+    days: int = Query(default=14, ge=1, le=90),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Attendance records by day."""
+    end_dt = date.today()
+    start_dt = end_dt - timedelta(days=days)
+
+    query = db.query(
+        Attendance.attendance_date,
+        func.count(Attendance.id).label("count"),
+    ).filter(
+        Attendance.attendance_date >= start_dt,
+        Attendance.attendance_date <= end_dt,
+    )
+    if company:
+        query = query.filter(Attendance.company.ilike(f"%{company}%"))
+
+    results = query.group_by(Attendance.attendance_date).order_by(Attendance.attendance_date).all()
+
+    return [
+        {
+            "date": r.attendance_date.isoformat() if r.attendance_date else None,
+            "total": int(r.count or 0),
+        }
+        for r in results
+    ]
+
+
+@router.get("/payroll-trend", dependencies=[Depends(Require("hr:read"))])
+async def payroll_trend(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Monthly payroll totals."""
+    query = db.query(
+        extract("year", SalarySlip.posting_date).label("year"),
+        extract("month", SalarySlip.posting_date).label("month"),
+        func.sum(SalarySlip.net_pay).label("net_total"),
+        func.sum(SalarySlip.gross_pay).label("gross_total"),
+        func.count(SalarySlip.id).label("slip_count"),
+    ).filter(
+        SalarySlip.status.in_([SalarySlipStatus.SUBMITTED, SalarySlipStatus.PAID])
+    )
+    if company:
+        query = query.filter(SalarySlip.company.ilike(f"%{company}%"))
+
+    results = query.group_by(
+        extract("year", SalarySlip.posting_date),
+        extract("month", SalarySlip.posting_date),
+    ).order_by(
+        extract("year", SalarySlip.posting_date),
+        extract("month", SalarySlip.posting_date),
+    ).all()
+
+    return [
+        {
+            "year": int(r.year),
+            "month_num": int(r.month),
+            "month": f"{int(r.year)}-{int(r.month):02d}",
+            "net_total": float(r.net_total or 0),
+            "gross_total": float(r.gross_total or 0),
+            "slip_count": int(r.slip_count or 0),
+        }
+        for r in results
+    ]
+
+
+@router.get("/payroll-components", dependencies=[Depends(Require("hr:read"))])
+async def payroll_components(
+    company: Optional[str] = None,
+    component_type: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Aggregate payroll components (earnings and deductions)."""
+    earnings_query = db.query(
+        SalarySlipEarning.salary_component.label("component"),
+        func.sum(SalarySlipEarning.amount).label("amount"),
+        func.count(SalarySlipEarning.id).label("count"),
+    ).join(SalarySlip, SalarySlip.id == SalarySlipEarning.salary_slip_id)
+    if company:
+        earnings_query = earnings_query.filter(SalarySlip.company.ilike(f"%{company}%"))
+    earnings = earnings_query.group_by(SalarySlipEarning.salary_component).all()
+
+    deductions_query = db.query(
+        SalarySlipDeduction.salary_component.label("component"),
+        func.sum(SalarySlipDeduction.amount).label("amount"),
+        func.count(SalarySlipDeduction.id).label("count"),
+    ).join(SalarySlip, SalarySlip.id == SalarySlipDeduction.salary_slip_id)
+    if company:
+        deductions_query = deductions_query.filter(SalarySlip.company.ilike(f"%{company}%"))
+    deductions = deductions_query.group_by(SalarySlipDeduction.salary_component).all()
+
+    rows: List[Dict[str, Any]] = []
+    for row in earnings:
+        rows.append({
+            "salary_component": row.component,
+            "component_type": "earning",
+            "amount": float(row.amount or 0),
+            "count": int(row.count or 0),
+        })
+    for row in deductions:
+        rows.append({
+            "salary_component": row.component,
+            "component_type": "deduction",
+            "amount": float(row.amount or 0),
+            "count": int(row.count or 0),
+        })
+
+    # Respect limit to avoid overly long responses
+    return rows[:limit]
 
 
 @router.get("/leave-balance", dependencies=[Depends(Require("hr:read"))])
@@ -274,12 +458,21 @@ async def payroll_summary_report(
 
     result = query.first()
 
-    return {
+    summary = {
         "total_slips": int(result[0] or 0),
         "total_gross": float(result[1] or 0),
         "total_deductions": float(result[2] or 0),
         "total_net": float(result[3] or 0),
     }
+    summary.update(
+        {
+            "slip_count": summary["total_slips"],
+            "gross_total": summary["total_gross"],
+            "deduction_total": summary["total_deductions"],
+            "net_total": summary["total_net"],
+        }
+    )
+    return summary
 
 
 @router.get("/recruitment-funnel", dependencies=[Depends(Require("hr:read"))])
@@ -319,6 +512,9 @@ async def recruitment_funnel(
         "active_openings": active_openings,
         "total_applicants": total_applicants,
         "applicant_breakdown": applicant_breakdown,
+        "openings": {"total": total_openings, "active": active_openings},
+        "applicants": applicant_breakdown,
+        "offers": {},
         "conversion_rates": {
             "applied_to_replied": (
                 applicant_breakdown.get("replied", 0) / total_applicants * 100
@@ -329,6 +525,32 @@ async def recruitment_funnel(
                 if applicant_breakdown.get("replied", 0) > 0 else 0
             ),
         },
+    }
+
+
+@router.get("/appraisal-status", dependencies=[Depends(Require("hr:read"))])
+async def appraisal_status(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return appraisal status breakdown."""
+    dashboard = await hr_dashboard(company=company, db=db)
+    return {"status_counts": dashboard.get("appraisal", {})}
+
+
+@router.get("/lifecycle-events", dependencies=[Depends(Require("hr:read"))])
+async def lifecycle_events(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return onboarding/separation/promotion/transfer counts."""
+    dashboard = await hr_dashboard(company=company, db=db)
+    lifecycle = dashboard.get("lifecycle", {}) or {}
+    return {
+        "onboarding": lifecycle.get("onboarding", {}),
+        "separation": lifecycle.get("separation", {}),
+        "promotion": {},
+        "transfer": {},
     }
 
 
@@ -359,4 +581,63 @@ async def training_completion_report(
         "total_events": total,
         "status_breakdown": status_breakdown,
         "completion_rate": completed / total * 100 if total > 0 else 0,
+    }
+
+
+# =============================================================================
+# EMPLOYEES LIST (for lookups)
+# =============================================================================
+
+@router.get("/employees", dependencies=[Depends(Require("hr:read"))])
+async def list_employees(
+    search: Optional[str] = None,
+    department: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List employees for lookups and selection fields."""
+    from app.models.employee import Employee, EmploymentStatus
+
+    query = db.query(Employee)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (Employee.name.ilike(search_term)) |
+            (Employee.email.ilike(search_term)) |
+            (Employee.employee_number.ilike(search_term)) |
+            (Employee.department.ilike(search_term))
+        )
+
+    if department:
+        query = query.filter(Employee.department.ilike(f"%{department}%"))
+
+    if status:
+        try:
+            status_enum = EmploymentStatus(status)
+            query = query.filter(Employee.status == status_enum)
+        except ValueError:
+            pass
+
+    total = query.count()
+    employees = query.order_by(Employee.name).offset(offset).limit(limit).all()
+
+    return {
+        "items": [
+            {
+                "id": e.id,
+                "name": e.name,
+                "email": e.email,
+                "employee_number": e.employee_number,
+                "department": e.department,
+                "designation": e.designation,
+                "status": e.status.value if e.status else None,
+            }
+            for e in employees
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
     }

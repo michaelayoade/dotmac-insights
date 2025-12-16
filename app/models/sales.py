@@ -243,6 +243,20 @@ class Item(Base):
     standard_rate: Mapped[Decimal] = mapped_column(default=Decimal("0"))
     valuation_rate: Mapped[Decimal] = mapped_column(default=Decimal("0"))
 
+    # GL Accounts for inventory posting
+    stock_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Inventory asset account
+    expense_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # COGS account
+    income_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Revenue account
+
+    # Reorder settings
+    reorder_level: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    reorder_qty: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+    safety_stock: Mapped[Decimal] = mapped_column(default=Decimal("0"))
+
+    # Batch/Serial tracking
+    has_batch_no: Mapped[bool] = mapped_column(default=False)
+    has_serial_no: Mapped[bool] = mapped_column(default=False)
+
     # Status
     disabled: Mapped[bool] = mapped_column(default=False)
     has_variants: Mapped[bool] = mapped_column(default=False)

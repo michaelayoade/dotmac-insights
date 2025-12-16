@@ -1,21 +1,10 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
-import Layout from '@/components/Layout';
-
 /**
- * Wraps pages in the global shell except routes that already provide their own
- * dedicated layout (e.g., Books and HR). This prevents double-wrapping and
- * lets section layouts control their experience.
+ * App shell wrapper. All modules now use their own ModuleLayout, so this
+ * simply renders children directly. The root page (/) serves as a module
+ * chooser and doesn't need a sidebar.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const rootSegment = (pathname || '').split('/')[1] || '';
-  const hasDedicatedLayout = rootSegment === 'books' || rootSegment === 'hr' || rootSegment === 'support';
-
-  if (hasDedicatedLayout) {
-    return <>{children}</>;
-  }
-
-  return <Layout>{children}</Layout>;
+  return <>{children}</>;
 }

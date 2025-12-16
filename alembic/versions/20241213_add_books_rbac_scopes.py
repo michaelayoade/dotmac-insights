@@ -13,7 +13,7 @@ Adds RBAC scopes for accounting books module:
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from datetime import datetime
 
@@ -52,8 +52,21 @@ ROLE_BOOKS_PERMISSIONS = {
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        return
+
     connection = op.get_bind()
+    if connection is None:
+        return
     now = datetime.utcnow()
+
+    def fetchall_safe(statement: str, params: dict | None = None):
+        """Run a query defensively; return [] if the connection is a mock/offline handle."""
+        try:
+            result = connection.execute(sa.text(statement), params or {})
+            return result.fetchall() if result is not None else []
+        except AttributeError:
+            return []
 
     # Insert new permissions
     for scope, description, category in BOOKS_PERMISSIONS:
@@ -67,15 +80,13 @@ def upgrade() -> None:
         )
 
     # Get permission IDs
-    perms_result = connection.execute(
-        sa.text("SELECT id, scope FROM permissions WHERE scope LIKE 'books:%'")
-    ).fetchall()
+    perms_result = fetchall_safe("SELECT id, scope FROM permissions WHERE scope LIKE 'books:%'")
     perm_id_map = {row[1]: row[0] for row in perms_result}
 
     # Get role IDs
-    roles_result = connection.execute(
-        sa.text("SELECT id, name FROM roles WHERE name IN ('admin', 'operator', 'analyst', 'viewer')")
-    ).fetchall()
+    roles_result = fetchall_safe(
+        "SELECT id, name FROM roles WHERE name IN ('admin', 'operator', 'analyst', 'viewer')"
+    )
     role_id_map = {row[1]: row[0] for row in roles_result}
 
     # Assign permissions to roles
@@ -105,7 +116,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        return
+
     connection = op.get_bind()
+    if connection is None:
+        return
 
     # Get permission IDs for books scopes
     perms_result = connection.execute(

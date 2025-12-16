@@ -101,3 +101,10 @@ async def root():
 async def health_check():
     """Health check endpoint (public)."""
     return {"status": "healthy"}
+
+
+# Convenience health endpoint under /api for environments that prefix requests
+@app.get("/api/health")
+async def api_health_check():
+    """Health check for clients that expect /api/health."""
+    return {"status": "healthy"}

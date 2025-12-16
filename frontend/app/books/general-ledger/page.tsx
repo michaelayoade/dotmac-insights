@@ -6,7 +6,8 @@ import { AccountingGeneralLedgerEntry } from '@/lib/api';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, BookMarked, Calendar, ArrowUpRight, ArrowDownRight, Download, BarChart2 } from 'lucide-react';
+import { BookMarked, Calendar, ArrowUpRight, ArrowDownRight, Download, BarChart2 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -44,7 +45,7 @@ export default function GeneralLedgerPage() {
     setOffset(0);
   };
 
-  const { data, isLoading, error } = useAccountingGeneralLedger({
+  const { data, isLoading, error, mutate } = useAccountingGeneralLedger({
     account: accountCode || undefined,
     start_date: startDate || undefined,
     end_date: endDate || undefined,
@@ -156,12 +157,17 @@ export default function GeneralLedgerPage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load general ledger</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load general ledger."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

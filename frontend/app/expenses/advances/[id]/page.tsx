@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import dayjs from "dayjs";
 import { useCashAdvanceDetail, useCashAdvanceMutations } from "@/hooks/useExpenses";
+import { formatDate } from "@/lib/utils";
 
 export default function CashAdvanceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -73,7 +73,7 @@ export default function CashAdvanceDetailPage() {
             {data.advance_number || `Draft #${data.id}`} <span className="text-sm text-gray-500">({data.status})</span>
           </h2>
           <p className="text-sm text-gray-500">
-            Request Date: {dayjs(data.request_date).format("YYYY-MM-DD")} · Employee: {data.employee_id}
+            Request Date: {formatDate(data.request_date)} · Employee: {data.employee_id}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">{actions}</div>

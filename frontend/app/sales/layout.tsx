@@ -1,80 +1,132 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   FileText,
   CreditCard,
   Receipt,
   TrendingUp,
-  Clock,
   Lightbulb,
+  Users,
+  ShoppingCart,
+  Settings,
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
-const salesTabs = [
-  { key: 'dashboard', label: 'Dashboard', href: '/sales', icon: LayoutDashboard },
-  { key: 'invoices', label: 'Invoices', href: '/sales/invoices', icon: FileText },
-  { key: 'payments', label: 'Payments', href: '/sales/payments', icon: CreditCard },
-  { key: 'credit-notes', label: 'Credit Notes', href: '/sales/credit-notes', icon: Receipt },
-  { key: 'analytics', label: 'Analytics', href: '/sales/analytics', icon: TrendingUp },
-  { key: 'insights', label: 'Insights', href: '/sales/insights', icon: Lightbulb },
+// Sales Flow:
+// 1. QUOTE: Create quotations, manage opportunities
+// 2. ORDER: Convert quotes to orders
+// 3. INVOICE: Bill customers, track AR
+// 4. COLLECT: Receive payments, manage aging
+
+const sections: NavSection[] = [
+  {
+    key: 'overview',
+    label: 'Dashboard',
+    description: 'AR overview & metrics',
+    icon: LayoutDashboard,
+    items: [
+      { name: 'Dashboard', href: '/sales', description: 'Overview & KPIs' },
+      { name: 'Analytics', href: '/sales/analytics', description: 'Sales trends' },
+      { name: 'Insights', href: '/sales/insights', description: 'AI recommendations' },
+    ],
+  },
+  {
+    key: 'orders',
+    label: 'Orders',
+    description: 'Quotations & sales orders',
+    icon: ShoppingCart,
+    items: [
+      { name: 'Quotations', href: '/sales/quotations', description: 'Proposals & quotes' },
+      { name: 'Sales Orders', href: '/sales/orders', description: 'Order management' },
+    ],
+  },
+  {
+    key: 'receivables',
+    label: 'Accounts Receivable',
+    description: 'Invoices & payments',
+    icon: FileText,
+    items: [
+      { name: 'Invoices', href: '/sales/invoices', description: 'Customer billing' },
+      { name: 'Payments', href: '/sales/payments', description: 'Incoming payments' },
+      { name: 'Credit Notes', href: '/sales/credit-notes', description: 'Customer credits' },
+    ],
+  },
+  {
+    key: 'customers',
+    label: 'Customers',
+    description: 'Customer management',
+    icon: Users,
+    items: [
+      { name: 'Customers', href: '/sales/customers', description: 'Customer directory' },
+    ],
+  },
 ];
+
+const quickLinks: QuickLink[] = [
+  { label: 'New Invoice', href: '/sales/invoices/new', icon: FileText, color: 'emerald-400' },
+  { label: 'New Quote', href: '/sales/quotations/new', icon: Receipt, color: 'amber-400' },
+  { label: 'Receive Pay', href: '/sales/payments/new', icon: CreditCard, color: 'teal-400' },
+  { label: 'Analytics', href: '/sales/analytics', icon: TrendingUp, color: 'cyan-400' },
+];
+
+const workflowPhases: WorkflowPhase[] = [
+  { key: 'quote', label: 'Quote', description: 'Create proposals' },
+  { key: 'invoice', label: 'Invoice', description: 'Bill customers' },
+  { key: 'collect', label: 'Collect', description: 'Receive payments' },
+];
+
+const workflowSteps: WorkflowStep[] = [
+  { label: 'Create quotation', color: 'amber' },
+  { label: 'Convert to order', color: 'violet' },
+  { label: 'Generate invoice', color: 'emerald' },
+  { label: 'Collect payment', color: 'teal' },
+];
+
+function getWorkflowPhase(sectionKey: string | null): string {
+  if (!sectionKey) return 'quote';
+  if (sectionKey === 'orders') return 'quote';
+  if (sectionKey === 'receivables') return 'invoice';
+  return 'collect';
+}
 
 export default function SalesLayout({ children }: { children: React.ReactNode }) {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
-  const pathname = usePathname();
 
   if (authLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400" />
       </div>
     );
   }
 
   if (!hasAccess) {
-    return <AccessDenied />;
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-bold text-white">Sales (AR)</h1>
-        <p className="text-slate-muted mt-1">
-          Track invoices, payments, credits, and collections
-        </p>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-border pb-4">
-        {salesTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = pathname === tab.href || (pathname === '/sales' && tab.key === 'dashboard');
-          return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                isActive
-                  ? 'bg-teal-electric/20 text-teal-electric border border-teal-electric/30'
-                  : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Page Content */}
+    <ModuleLayout
+      moduleName="Dotmac"
+      moduleSubtitle="Sales"
+      sidebarTitle="Accounts Receivable"
+      sidebarDescription="Invoicing, payments & collections"
+      baseRoute="/sales"
+      accentColor="emerald"
+      icon={TrendingUp}
+      sections={sections}
+      quickLinks={quickLinks}
+      workflowPhases={workflowPhases}
+      getWorkflowPhase={getWorkflowPhase}
+      workflowSteps={workflowSteps}
+    >
       {children}
-    </div>
+    </ModuleLayout>
   );
 }

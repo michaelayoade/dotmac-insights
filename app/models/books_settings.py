@@ -558,3 +558,7 @@ class DebitNote(Base):
     supplier = relationship("Supplier", foreign_keys=[supplier_id])
     purchase_invoice = relationship("PurchaseInvoice", foreign_keys=[purchase_invoice_id])
     journal_entry = relationship("JournalEntry", foreign_keys=[journal_entry_id])
+    lines: Mapped[List["DebitNoteLine"]] = relationship(
+        back_populates="debit_note",
+        cascade="all, delete-orphan",
+    )

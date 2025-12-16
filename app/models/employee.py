@@ -72,6 +72,9 @@ class Employee(Base):
     )
     managed_projects: Mapped[List[Project]] = relationship(back_populates="project_manager")
     expenses: Mapped[List[Expense]] = relationship(back_populates="employee")
+    expense_claims: Mapped[List["ExpenseClaim"]] = relationship(back_populates="employee")
+    cash_advances: Mapped[List["CashAdvance"]] = relationship(back_populates="employee")
+    corporate_cards: Mapped[List["CorporateCard"]] = relationship(back_populates="employee")
 
     # HR Relationships
     department_rel: Mapped[Optional["Department"]] = relationship(foreign_keys=[department_id])

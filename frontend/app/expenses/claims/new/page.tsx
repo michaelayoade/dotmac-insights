@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import dayjs from "dayjs";
 import { useExpenseCategories, useExpenseMutations } from "@/hooks/useExpenses";
+import { useEmployees } from "@/hooks/useApi";
+import { EmployeeSearch } from "@/components/EntitySearch";
 import type { ExpenseClaimCreatePayload, ExpenseClaimLinePayload } from "@/lib/expenses.types";
 
 type FundingMethod = ExpenseClaimLinePayload["funding_method"];
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 const defaultLine = (): ExpenseClaimLinePayload => ({
   category_id: 0,
-  expense_date: dayjs().format("YYYY-MM-DD"),
+  expense_date: todayISO(),
   description: "",
   claimed_amount: 0,
   currency: "NGN",
@@ -23,13 +26,15 @@ const defaultLine = (): ExpenseClaimLinePayload => ({
 export default function NewExpenseClaimPage() {
   const { data: categories } = useExpenseCategories({ include_inactive: false });
   const { createClaim } = useExpenseMutations();
+  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ limit: 200 });
+  const employees = useMemo(() => employeesData?.items || [], [employeesData]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState<ExpenseClaimCreatePayload>({
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: number; name: string } | null>(null);
+  const [form, setForm] = useState<Omit<ExpenseClaimCreatePayload, 'employee_id'>>({
     title: "",
     description: "",
-    employee_id: 0,
-    claim_date: dayjs().format("YYYY-MM-DD"),
+    claim_date: todayISO(),
     currency: "NGN",
     base_currency: "NGN",
     conversion_rate: 1,
@@ -59,7 +64,7 @@ export default function NewExpenseClaimPage() {
     setError(null);
     setSuccess(null);
     // Basic validation
-    if (!form.title || !form.employee_id || !form.lines.length) {
+    if (!form.title || !selectedEmployee || !form.lines.length) {
       setError("Title, employee, and at least one line are required.");
       return;
     }
@@ -69,7 +74,10 @@ export default function NewExpenseClaimPage() {
     }
     setSubmitting(true);
     try {
-      await createClaim(form);
+      await createClaim({
+        ...form,
+        employee_id: selectedEmployee.id,
+      } as ExpenseClaimCreatePayload);
       setSuccess("Expense claim created.");
     } catch (e: any) {
       setError(e?.message || "Failed to create claim");
@@ -81,60 +89,59 @@ export default function NewExpenseClaimPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">New Expense Claim</h2>
-        <p className="text-sm text-gray-500">Capture claim header and detailed lines.</p>
+        <h2 className="text-xl font-semibold text-white">New Expense Claim</h2>
+        <p className="text-sm text-slate-muted">Capture claim header and detailed lines.</p>
       </div>
 
-      <div className="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-4 rounded-xl border border-slate-border bg-slate-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
-            Title
+            <span className="text-slate-muted">Title</span>
             <input
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
           </label>
+          <EmployeeSearch
+            label="Employee"
+            employees={employees}
+            value={selectedEmployee}
+            onSelect={setSelectedEmployee}
+            loading={employeesLoading}
+            required
+          />
           <label className="flex flex-col gap-1 text-sm">
-            Employee ID
-            <input
-              type="number"
-              className="rounded-lg border px-3 py-2"
-              value={form.employee_id || ""}
-              onChange={(e) => setForm((prev) => ({ ...prev, employee_id: Number(e.target.value) }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Claim Date
+            <span className="text-slate-muted">Claim Date</span>
             <input
               type="date"
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.claim_date}
               onChange={(e) => setForm((prev) => ({ ...prev, claim_date: e.target.value }))}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Currency
+            <span className="text-slate-muted">Currency</span>
             <input
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.currency}
               onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Base Currency
+            <span className="text-slate-muted">Base Currency</span>
             <input
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.base_currency}
               onChange={(e) => setForm((prev) => ({ ...prev, base_currency: e.target.value }))}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Conversion Rate
+            <span className="text-slate-muted">Conversion Rate</span>
             <input
               type="number"
               step="0.0001"
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.conversion_rate}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, conversion_rate: Number(e.target.value) || 1 }))
@@ -142,9 +149,9 @@ export default function NewExpenseClaimPage() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
-            Description
+            <span className="text-slate-muted">Description</span>
             <textarea
-              className="rounded-lg border px-3 py-2"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
               value={form.description || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
             />
@@ -154,10 +161,10 @@ export default function NewExpenseClaimPage() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Line Items</h3>
+          <h3 className="text-lg font-medium text-white">Line Items</h3>
           <button
             onClick={addLine}
-            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700"
+            className="rounded-lg border border-teal-electric/30 bg-teal-electric/10 px-3 py-1 text-sm font-medium text-teal-electric"
           >
             Add line
           </button>
@@ -165,13 +172,13 @@ export default function NewExpenseClaimPage() {
 
         <div className="space-y-4">
           {form.lines.map((line, idx) => (
-            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div key={idx} className="rounded-xl border border-slate-border bg-slate-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-4">
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-3 flex-1">
                   <label className="flex flex-col gap-1 text-sm">
-                    Category
+                    <span className="text-slate-muted">Category</span>
                     <select
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.category_id || 0}
                       onChange={(e) => updateLine(idx, { category_id: Number(e.target.value) })}
                     >
@@ -184,18 +191,18 @@ export default function NewExpenseClaimPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    Expense Date
+                    <span className="text-slate-muted">Expense Date</span>
                     <input
                       type="date"
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.expense_date}
                       onChange={(e) => updateLine(idx, { expense_date: e.target.value })}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    Funding Method
+                    <span className="text-slate-muted">Funding Method</span>
                     <select
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.funding_method}
                       onChange={(e) => updateLine(idx, { funding_method: e.target.value as FundingMethod })}
                     >
@@ -206,35 +213,35 @@ export default function NewExpenseClaimPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                    Description
+                    <span className="text-slate-muted">Description</span>
                     <input
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.description}
                       onChange={(e) => updateLine(idx, { description: e.target.value })}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    Amount
+                    <span className="text-slate-muted">Amount</span>
                     <input
                       type="number"
                       step="0.01"
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.claimed_amount}
                       onChange={(e) => updateLine(idx, { claimed_amount: Number(e.target.value) || 0 })}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    Currency
+                    <span className="text-slate-muted">Currency</span>
                     <input
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.currency || ""}
                       onChange={(e) => updateLine(idx, { currency: e.target.value })}
                     />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
-                    Receipt?
+                    <span className="text-slate-muted">Receipt?</span>
                     <select
-                      className="rounded-lg border px-3 py-2"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                       value={line.has_receipt ? "yes" : "no"}
                       onChange={(e) => updateLine(idx, { has_receipt: e.target.value === "yes" })}
                     >
@@ -244,9 +251,9 @@ export default function NewExpenseClaimPage() {
                   </label>
                   {!line.has_receipt && (
                     <label className="flex flex-col gap-1 text-sm md:col-span-2">
-                      Missing Receipt Reason
+                      <span className="text-slate-muted">Missing Receipt Reason</span>
                       <input
-                        className="rounded-lg border px-3 py-2"
+                        className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
                         value={line.receipt_missing_reason || ""}
                         onChange={(e) => updateLine(idx, { receipt_missing_reason: e.target.value })}
                       />
@@ -254,7 +261,7 @@ export default function NewExpenseClaimPage() {
                   )}
                 </div>
                 <button
-                  className="text-sm text-red-600 underline"
+                  className="text-sm text-red-400 underline"
                   onClick={() => removeLine(idx)}
                   disabled={form.lines.length === 1}
                 >
@@ -270,12 +277,12 @@ export default function NewExpenseClaimPage() {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+          className="rounded-lg bg-teal-electric px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm hover:bg-teal-electric/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Saving..." : "Create Claim"}
         </button>
-        {error && <span className="text-sm text-red-600">{error}</span>}
-        {success && <span className="text-sm text-green-600">{success}</span>}
+        {error && <span className="text-sm text-red-400">{error}</span>}
+        {success && <span className="text-sm text-green-400">{success}</span>}
       </div>
     </div>
   );

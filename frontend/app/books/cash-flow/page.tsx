@@ -4,8 +4,6 @@ import { useState } from 'react';
 import { useAccountingCashFlow } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import {
-  AlertTriangle,
-  Loader2,
   Calendar,
   Wallet,
   TrendingUp,
@@ -21,6 +19,7 @@ import {
   Receipt,
   DollarSign,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -105,22 +104,19 @@ export default function CashFlowPage() {
     fiscal_year: fiscalYear || undefined,
   };
 
-  const { data, isLoading, error } = useAccountingCashFlow(params);
+  const { data, isLoading, error, mutate } = useAccountingCashFlow(params);
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
 
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load cash flow statement</p>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-electric" />
-      </div>
+      <ErrorDisplay
+        message="Failed to load cash flow statement."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

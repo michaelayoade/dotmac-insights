@@ -27,6 +27,7 @@ import {
   ShoppingCart,
   ArrowLeftRight,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -116,15 +117,45 @@ function StatusBadge({ status, count, total }: StatusBadgeProps) {
 
 export default function PurchasingDashboardPage() {
   const currency = 'NGN';
-  const { data: dashboard, isLoading: dashboardLoading } = usePurchasingDashboard({ currency });
-  const { data: suppliers } = usePurchasingSuppliers({ limit: 1, offset: 0 });
-  const { data: bills } = usePurchasingBills({ limit: 1, offset: 0, currency });
-  const { data: aging } = usePurchasingAging({ currency });
-  const { data: bySupplier } = usePurchasingBySupplier({ limit: 5, currency });
-  const { data: recentBills } = usePurchasingBills({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
-  const { data: recentPayments } = usePurchasingPayments({ limit: 5, currency });
-  const { data: recentOrders } = usePurchasingOrders({ limit: 5, currency, sort_by: 'transaction_date', sort_dir: 'desc' });
-  const { data: recentDebitNotes } = usePurchasingDebitNotes({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = usePurchasingDashboard({ currency });
+  const { data: suppliers, isLoading: suppliersLoading, error: suppliersError, mutate: refetchSuppliers } = usePurchasingSuppliers({ limit: 1, offset: 0 });
+  const { data: bills, isLoading: billsLoading, error: billsError, mutate: refetchBills } = usePurchasingBills({ limit: 1, offset: 0, currency });
+  const { data: aging, isLoading: agingLoading, error: agingError, mutate: refetchAging } = usePurchasingAging({ currency });
+  const { data: bySupplier, isLoading: bySupplierLoading, error: bySupplierError, mutate: refetchBySupplier } = usePurchasingBySupplier({ limit: 5, currency });
+  const { data: recentBills, isLoading: recentBillsLoading, error: recentBillsError, mutate: refetchRecentBills } = usePurchasingBills({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
+  const { data: recentPayments, isLoading: recentPaymentsLoading, error: recentPaymentsError, mutate: refetchRecentPayments } = usePurchasingPayments({ limit: 5, currency });
+  const { data: recentOrders, isLoading: recentOrdersLoading, error: recentOrdersError, mutate: refetchRecentOrders } = usePurchasingOrders({ limit: 5, currency, sort_by: 'transaction_date', sort_dir: 'desc' });
+  const { data: recentDebitNotes, isLoading: recentDebitNotesLoading, error: recentDebitNotesError, mutate: refetchRecentDebitNotes } = usePurchasingDebitNotes({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
+
+  const swrStates = [
+    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
+    { error: suppliersError, isLoading: suppliersLoading, mutate: refetchSuppliers },
+    { error: billsError, isLoading: billsLoading, mutate: refetchBills },
+    { error: agingError, isLoading: agingLoading, mutate: refetchAging },
+    { error: bySupplierError, isLoading: bySupplierLoading, mutate: refetchBySupplier },
+    { error: recentBillsError, isLoading: recentBillsLoading, mutate: refetchRecentBills },
+    { error: recentPaymentsError, isLoading: recentPaymentsLoading, mutate: refetchRecentPayments },
+    { error: recentOrdersError, isLoading: recentOrdersLoading, mutate: refetchRecentOrders },
+    { error: recentDebitNotesError, isLoading: recentDebitNotesLoading, mutate: refetchRecentDebitNotes },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+
+  if (isDataLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load purchasing dashboard data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   const loading = dashboardLoading;
 

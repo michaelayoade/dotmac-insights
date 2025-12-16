@@ -1,8 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   FileText,
@@ -10,69 +7,105 @@ import {
   ShoppingCart,
   FileX,
   Users,
-  Receipt,
   Calendar,
   TrendingUp,
+  Settings,
 } from 'lucide-react';
+import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
-const tabs = [
-  { name: 'Dashboard', href: '/purchasing', icon: LayoutDashboard },
-  { name: 'Bills', href: '/purchasing/bills', icon: FileText },
-  { name: 'Payments', href: '/purchasing/payments', icon: CreditCard },
-  { name: 'Purchase Orders', href: '/purchasing/orders', icon: ShoppingCart },
-  { name: 'Debit Notes', href: '/purchasing/debit-notes', icon: FileX },
-  { name: 'Suppliers', href: '/purchasing/suppliers', icon: Users },
-  { name: 'Expenses', href: '/purchasing/expenses', icon: Receipt },
-  { name: 'AP Aging', href: '/purchasing/aging', icon: Calendar },
-  { name: 'Analytics', href: '/purchasing/analytics', icon: TrendingUp },
+// Purchasing Flow:
+// 1. ORDER: Create purchase orders, manage requisitions
+// 2. RECEIVE: Process bills, track deliveries
+// 3. PAY: Make payments, manage AP aging
+// 4. ANALYZE: Vendor analytics, spend analysis
+
+const sections: NavSection[] = [
+  {
+    key: 'overview',
+    label: 'Dashboard',
+    description: 'AP overview & metrics',
+    icon: LayoutDashboard,
+    items: [
+      { name: 'Dashboard', href: '/purchasing', description: 'Overview & KPIs' },
+      { name: 'Analytics', href: '/purchasing/analytics', description: 'Spend analysis' },
+    ],
+  },
+  {
+    key: 'orders',
+    label: 'Procurement',
+    description: 'Orders & requisitions',
+    icon: ShoppingCart,
+    items: [
+      { name: 'Purchase Orders', href: '/purchasing/orders', description: 'Create & track orders' },
+    ],
+  },
+  {
+    key: 'payables',
+    label: 'Accounts Payable',
+    description: 'Bills & payments',
+    icon: FileText,
+    items: [
+      { name: 'Bills', href: '/purchasing/bills', description: 'Supplier invoices' },
+      { name: 'Payments', href: '/purchasing/payments', description: 'Outgoing payments' },
+      { name: 'Debit Notes', href: '/purchasing/debit-notes', description: 'Supplier credits' },
+      { name: 'AP Aging', href: '/purchasing/aging', description: 'Aging analysis' },
+    ],
+  },
+  {
+    key: 'vendors',
+    label: 'Vendors',
+    description: 'Supplier management',
+    icon: Users,
+    items: [
+      { name: 'Suppliers', href: '/purchasing/suppliers', description: 'Vendor directory' },
+    ],
+  },
 ];
 
-export default function PurchasingLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
+const quickLinks: QuickLink[] = [
+  { label: 'New Order', href: '/purchasing/orders/new', icon: ShoppingCart, color: 'violet-400' },
+  { label: 'New Bill', href: '/purchasing/bills/new', icon: FileText, color: 'amber-400' },
+  { label: 'Pay', href: '/purchasing/payments/new', icon: CreditCard, color: 'emerald-400' },
+  { label: 'Aging', href: '/purchasing/aging', icon: Calendar, color: 'rose-400' },
+];
 
+const workflowPhases: WorkflowPhase[] = [
+  { key: 'order', label: 'Order', description: 'Create POs' },
+  { key: 'receive', label: 'Receive', description: 'Process bills' },
+  { key: 'pay', label: 'Pay', description: 'Make payments' },
+];
+
+const workflowSteps: WorkflowStep[] = [
+  { label: 'Create purchase order', color: 'violet' },
+  { label: 'Receive & bill', color: 'amber' },
+  { label: 'Approve payment', color: 'teal' },
+  { label: 'Settle AP', color: 'emerald' },
+];
+
+function getWorkflowPhase(sectionKey: string | null): string {
+  if (!sectionKey) return 'order';
+  if (sectionKey === 'orders') return 'order';
+  if (sectionKey === 'payables') return 'receive';
+  return 'pay';
+}
+
+export default function PurchasingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Purchasing</h1>
-        <p className="text-slate-muted text-sm mt-1">
-          Vendor management, bills, expenses, and accounts payable
-        </p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="border-b border-slate-border overflow-x-auto">
-        <nav className="-mb-px flex space-x-1 min-w-max">
-          {tabs.map((tab) => {
-            const isActive =
-              tab.href === '/purchasing'
-                ? pathname === '/purchasing'
-                : pathname.startsWith(tab.href);
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.name}
-                href={tab.href}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-                  isActive
-                    ? 'border-teal-electric text-teal-electric'
-                    : 'border-transparent text-slate-muted hover:text-white hover:border-slate-border'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.name}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Page Content */}
+    <ModuleLayout
+      moduleName="Dotmac"
+      moduleSubtitle="Purchasing"
+      sidebarTitle="Accounts Payable"
+      sidebarDescription="Vendor management & procurement"
+      baseRoute="/purchasing"
+      accentColor="violet"
+      icon={ShoppingCart}
+      sections={sections}
+      quickLinks={quickLinks}
+      workflowPhases={workflowPhases}
+      getWorkflowPhase={getWorkflowPhase}
+      workflowSteps={workflowSteps}
+    >
       {children}
-    </div>
+    </ModuleLayout>
   );
 }

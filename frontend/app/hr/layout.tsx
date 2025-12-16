@@ -1,35 +1,17 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState, useMemo, useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import { useTheme } from '@dotmac/design-tokens';
-import { useAuth } from '@/lib/auth-context';
 import {
   LayoutDashboard,
   CalendarClock,
   Clock3,
-  Briefcase,
   Wallet2,
-  GraduationCap,
-  Target,
-  GitMerge,
-  Activity,
-  ChevronDown,
-  ChevronRight,
-  Users,
-  UserPlus,
-  ClipboardList,
   TrendingUp,
   Settings,
-  Sun,
-  Moon,
-  User,
-  LogOut,
-  Menu,
-  X,
+  Users,
+  UserPlus,
+  Activity,
 } from 'lucide-react';
+import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
 // HR Information Flow:
 // 1. SETUP: Define policies, structures, components (Foundation)
@@ -38,16 +20,6 @@ import {
 // 4. COMPENSATION: Payroll processing, salary management (Monthly Cycle)
 // 5. DEVELOPMENT: Training, appraisals, career growth (Continuous)
 // 6. ANALYTICS: Reports, insights, compliance (Monitoring)
-
-type SectionKey = 'overview' | 'people' | 'time' | 'compensation' | 'development' | 'config';
-
-type NavSection = {
-  key: SectionKey;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  items: { name: string; href: string; description?: string }[];
-};
 
 const sections: NavSection[] = [
   {
@@ -110,28 +82,28 @@ const sections: NavSection[] = [
   },
 ];
 
-// Workflow phases for contextual guidance
-const workflowPhases = [
+const quickLinks: QuickLink[] = [
+  { label: 'Leave', href: '/hr/leave', icon: CalendarClock, color: 'amber-400' },
+  { label: 'Payroll', href: '/hr/payroll', icon: Wallet2, color: 'violet-400' },
+  { label: 'Recruit', href: '/hr/recruitment', icon: UserPlus, color: 'emerald-400' },
+  { label: 'Reports', href: '/hr/analytics', icon: Activity, color: 'cyan-400' },
+];
+
+const workflowPhases: WorkflowPhase[] = [
   { key: 'setup', label: 'Setup', description: 'Configure people policies' },
   { key: 'operate', label: 'Operate', description: 'Daily people operations' },
   { key: 'analyze', label: 'Analyze', description: 'Review & improve' },
 ];
 
-function isActivePath(pathname: string, href: string) {
-  if (href === '/hr') return pathname === '/hr';
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+const workflowSteps: WorkflowStep[] = [
+  { label: 'Recruit & Hire', color: 'violet' },
+  { label: 'Onboard Employee', color: 'emerald' },
+  { label: 'Manage Time & Leave', color: 'amber' },
+  { label: 'Process Payroll', color: 'cyan' },
+  { label: 'Develop & Review', color: 'rose' },
+];
 
-function getActiveSection(pathname: string): SectionKey | null {
-  for (const section of sections) {
-    if (section.items.some((item) => isActivePath(pathname, item.href))) {
-      return section.key;
-    }
-  }
-  return null;
-}
-
-function getWorkflowPhase(sectionKey: SectionKey | null): string {
+function getWorkflowPhase(sectionKey: string | null): string {
   if (!sectionKey) return 'setup';
   if (sectionKey === 'overview') return 'analyze';
   if (sectionKey === 'people' || sectionKey === 'config') return 'setup';
@@ -139,405 +111,22 @@ function getWorkflowPhase(sectionKey: SectionKey | null): string {
 }
 
 export default function HrLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { isDarkMode, setColorScheme } = useTheme();
-  const { isAuthenticated, logout } = useAuth();
-
-  const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>(() => {
-    const activeSection = getActiveSection(pathname);
-    const initial: Record<SectionKey, boolean> = {
-      overview: true,
-      people: false,
-      time: false,
-      compensation: false,
-      development: false,
-      config: false,
-    };
-    if (activeSection) initial[activeSection] = true;
-    return initial;
-  });
-
-  // Keep the active section open on route change
-  useEffect(() => {
-    const activeSection = getActiveSection(pathname);
-    if (!activeSection) return;
-    setOpenSections((prev) => ({ ...prev, [activeSection]: true }));
-  }, [pathname]);
-
-  const activeSection = useMemo(() => getActiveSection(pathname), [pathname]);
-  const currentPhase = useMemo(() => getWorkflowPhase(activeSection), [activeSection]);
-
-  const activeHref = useMemo(() => {
-    for (const section of sections) {
-      for (const item of section.items) {
-        if (isActivePath(pathname, item.href)) return item.href;
-      }
-    }
-    return '';
-  }, [pathname]);
-
-  const toggleSection = (key: SectionKey) => {
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   return (
-    <div className="space-y-4">
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-card border-b border-slate-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-300 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-slate-deep" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-display font-bold text-white tracking-tight">Dotmac People</span>
-              <span className="text-[10px] text-slate-muted uppercase tracking-widest">People</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
-              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
-              title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen((v) => !v)}
-              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop top bar */}
-      <div className="hidden lg:flex items-center justify-between bg-slate-card border border-slate-border rounded-xl px-4 py-3">
-        <Link href="/hr" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-amber-300 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5 text-slate-deep" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-display font-bold text-white tracking-tight">Dotmac People</span>
-            <span className="text-[10px] text-slate-muted uppercase tracking-widest">People</span>
-          </div>
-        </Link>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
-            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="p-2 text-amber-300">
-              <User className="w-5 h-5" />
-            </div>
-            {isAuthenticated && (
-              <button
-                onClick={logout}
-                className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-elevated rounded-lg transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile overlay */}
-      {mobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/40 backdrop-blur-sm"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Mobile drawer */}
-      <div
-        className={cn(
-          'lg:hidden fixed top-[64px] bottom-0 left-0 z-40 w-72 max-w-[85vw] bg-slate-card border-r border-slate-border transform transition-transform duration-300 overflow-y-auto',
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        <div className="p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href="/hr/leave"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <CalendarClock className="w-4 h-4 text-amber-400 mb-1" />
-              <span className="text-[11px] text-slate-muted">Leave</span>
-            </Link>
-            <Link
-              href="/hr/payroll"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <Wallet2 className="w-4 h-4 text-violet-400 mb-1" />
-              <span className="text-[11px] text-slate-muted">Payroll</span>
-            </Link>
-          </div>
-          <div className="space-y-2">
-            {sections.map((section) => {
-              const Icon = section.icon;
-              const open = openSections[section.key];
-              const isActiveSection = activeSection === section.key;
-
-              return (
-                <div
-                  key={section.key}
-                  className={cn(
-                    'border rounded-lg transition-colors',
-                    isActiveSection ? 'border-amber-500/40 bg-amber-500/5' : 'border-slate-border'
-                  )}
-                >
-                  <button
-                    onClick={() => toggleSection(section.key)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-white hover:bg-slate-elevated/50 rounded-lg transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className={cn('w-4 h-4', isActiveSection ? 'text-amber-400' : 'text-slate-muted')} />
-                      <div className="text-left">
-                        <span className={cn('block', isActiveSection && 'text-amber-300')}>{section.label}</span>
-                        <span className="text-[10px] text-slate-muted">{section.description}</span>
-                      </div>
-                    </div>
-                    {open ? (
-                      <ChevronDown className="w-4 h-4 text-slate-muted" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-muted" />
-                    )}
-                  </button>
-                  {open && (
-                    <div className="pb-2 px-2">
-                      {section.items.map((item) => {
-                        const isActive = activeHref === item.href;
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={cn(
-                              'block px-3 py-2 text-sm rounded-lg transition-colors group',
-                              isActive
-                                ? 'bg-amber-500/20 text-amber-300'
-                                : 'text-slate-muted hover:text-white hover:bg-slate-elevated/50'
-                            )}
-                          >
-                            <span className="block">{item.name}</span>
-                            {item.description && (
-                              <span className={cn(
-                                'text-[10px] block',
-                                isActive ? 'text-amber-400/70' : 'text-slate-muted group-hover:text-slate-muted'
-                              )}>
-                                {item.description}
-                              </span>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="pt-3 border-t border-slate-border space-y-2">
-            <button
-              onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 text-sm text-slate-muted transition-colors"
-            >
-              <span>{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
-              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            {isAuthenticated && (
-              <button
-                onClick={() => { logout(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-elevated text-sm text-slate-muted hover:bg-slate-border/30 transition-colors"
-                title="Sign out"
-              >
-                <span>Sign out</span>
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 pt-[64px] lg:pt-0">
-        {/* Sidebar Navigation */}
-        <aside className="hidden lg:block bg-slate-card border border-slate-border rounded-xl p-4 space-y-4 h-fit">
-        {/* Header */}
-        <div className="pb-3 border-b border-slate-border">
-          <h1 className="text-lg font-semibold text-white">Human Resources</h1>
-          <p className="text-slate-muted text-xs mt-1">People operations & workforce management</p>
-        </div>
-
-        {/* Workflow Phase Indicator */}
-        <div className="bg-slate-elevated rounded-lg p-3">
-          <p className="text-xs text-slate-muted mb-2">Workflow Phase</p>
-          <div className="flex items-center gap-1">
-            {workflowPhases.map((phase, idx) => (
-              <div key={phase.key} className="flex items-center">
-                <div
-                  className={cn(
-                    'px-2 py-1 rounded text-xs font-medium transition-colors',
-                    currentPhase === phase.key
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'text-slate-muted'
-                  )}
-                >
-                  {phase.label}
-                </div>
-                {idx < workflowPhases.length - 1 && (
-                  <ChevronRight className="w-3 h-3 text-slate-muted mx-1" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Navigation Sections */}
-        <div className="space-y-2">
-          {sections.map((section) => {
-            const Icon = section.icon;
-            const open = openSections[section.key];
-            const isActiveSection = activeSection === section.key;
-
-            return (
-              <div
-                key={section.key}
-                className={cn(
-                  'border rounded-lg transition-colors',
-                  isActiveSection ? 'border-amber-500/40 bg-amber-500/5' : 'border-slate-border'
-                )}
-              >
-                <button
-                  onClick={() => toggleSection(section.key)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-white hover:bg-slate-elevated/50 rounded-lg transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Icon className={cn('w-4 h-4', isActiveSection ? 'text-amber-400' : 'text-slate-muted')} />
-                    <div className="text-left">
-                      <span className={cn('block', isActiveSection && 'text-amber-300')}>{section.label}</span>
-                      <span className="text-[10px] text-slate-muted">{section.description}</span>
-                    </div>
-                  </div>
-                  {open ? (
-                    <ChevronDown className="w-4 h-4 text-slate-muted" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-muted" />
-                  )}
-                </button>
-                {open && (
-                  <div className="pb-2 px-2">
-                    {section.items.map((item) => {
-                      const isActive = activeHref === item.href;
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'block px-3 py-2 text-sm rounded-lg transition-colors group',
-                            isActive
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'text-slate-muted hover:text-white hover:bg-slate-elevated/50'
-                          )}
-                        >
-                          <span className="block">{item.name}</span>
-                          {item.description && (
-                            <span className={cn(
-                              'text-[10px] block',
-                              isActive ? 'text-amber-400/70' : 'text-slate-muted group-hover:text-slate-muted'
-                            )}>
-                              {item.description}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Quick Links */}
-        <div className="pt-3 border-t border-slate-border">
-          <p className="text-xs text-slate-muted mb-2 px-1">Quick Links</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href="/hr/leave"
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <CalendarClock className="w-4 h-4 text-amber-400 mb-1" />
-              <span className="text-xs text-slate-muted">Leave</span>
-            </Link>
-            <Link
-              href="/hr/payroll"
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <Wallet2 className="w-4 h-4 text-violet-400 mb-1" />
-              <span className="text-xs text-slate-muted">Payroll</span>
-            </Link>
-            <Link
-              href="/hr/recruitment"
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <UserPlus className="w-4 h-4 text-emerald-400 mb-1" />
-              <span className="text-xs text-slate-muted">Recruit</span>
-            </Link>
-            <Link
-              href="/hr/analytics"
-              className="flex flex-col items-center p-2 rounded-lg bg-slate-elevated hover:bg-slate-border/30 transition-colors text-center"
-            >
-              <Activity className="w-4 h-4 text-cyan-400 mb-1" />
-              <span className="text-xs text-slate-muted">Reports</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* People Workflow Guide */}
-        <div className="pt-3 border-t border-slate-border">
-          <p className="text-xs text-slate-muted mb-2 px-1">People Workflow</p>
-          <div className="space-y-1 text-[10px] text-slate-muted px-1">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center text-[8px] font-bold">1</div>
-              <span>Recruit & Hire</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[8px] font-bold">2</div>
-              <span>Onboard Employee</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[8px] font-bold">3</div>
-              <span>Manage Time & Leave</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[8px] font-bold">4</div>
-              <span>Process Payroll</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-[8px] font-bold">5</div>
-              <span>Develop & Review</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="space-y-6">{children}</div>
-      </div>
-    </div>
+    <ModuleLayout
+      moduleName="Dotmac People"
+      moduleSubtitle="People"
+      sidebarTitle="Human Resources"
+      sidebarDescription="People operations & workforce management"
+      baseRoute="/hr"
+      accentColor="amber"
+      icon={Users}
+      sections={sections}
+      quickLinks={quickLinks}
+      workflowPhases={workflowPhases}
+      getWorkflowPhase={getWorkflowPhase}
+      workflowSteps={workflowSteps}
+    >
+      {children}
+    </ModuleLayout>
   );
 }

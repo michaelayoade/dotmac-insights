@@ -18,8 +18,15 @@ export default function GatewayBanksPage() {
   const [resolveError, setResolveError] = useState('');
 
   const { data, isLoading, error } = useBanks({ country: 'nigeria' });
+  const banks: any[] = Array.isArray((data as any)?.banks)
+    ? (data as any).banks
+    : Array.isArray((data as any)?.results)
+      ? (data as any).results
+      : Array.isArray(data)
+        ? (data as any)
+        : [];
 
-  const filteredBanks = data?.banks?.filter((bank: any) =>
+  const filteredBanks = banks.filter((bank: any) =>
     bank.name.toLowerCase().includes(search.toLowerCase()) ||
     bank.code.includes(search)
   ) || [];
@@ -33,7 +40,7 @@ export default function GatewayBanksPage() {
     setResolveError('');
 
     try {
-      const result = await api.resolveAccount(accountNumber, selectedBank);
+      const result = await api.resolveAccount({ account_number: accountNumber, bank_code: selectedBank });
       setResolveResult(result);
     } catch (err: any) {
       setResolveError(err.message || 'Could not resolve account');
@@ -42,7 +49,7 @@ export default function GatewayBanksPage() {
     }
   };
 
-  const selectedBankInfo = data?.banks?.find((b: any) => b.code === selectedBank);
+  const selectedBankInfo = banks.find((b: any) => b.code === selectedBank);
 
   if (error) {
     return (
@@ -76,14 +83,14 @@ export default function GatewayBanksPage() {
               <label className="block text-sm text-slate-muted mb-1">Bank</label>
               <select
                 value={selectedBank}
-                onChange={(e) => { setSelectedBank(e.target.value); setResolveResult(null); setResolveError(''); }}
-                className="input-field w-full"
-              >
-                <option value="">Select a bank</option>
-                {data?.banks?.map((bank: any) => (
+              onChange={(e) => { setSelectedBank(e.target.value); setResolveResult(null); setResolveError(''); }}
+              className="input-field w-full"
+            >
+              <option value="">Select a bank</option>
+                {banks.map((bank: any) => (
                   <option key={bank.code} value={bank.code}>{bank.name}</option>
                 ))}
-              </select>
+            </select>
             </div>
 
             <div>

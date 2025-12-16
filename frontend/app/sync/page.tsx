@@ -22,6 +22,7 @@ import { formatDate, cn } from '@/lib/utils';
 import { useToast, Modal } from '@dotmac/core';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 type SyncSource = 'splynx' | 'erpnext' | 'chatwoot';
 
@@ -52,8 +53,8 @@ export default function SyncPage() {
   const [syncingSource, setSyncingSource] = useState<SyncSource | 'all' | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; source: SyncSource | null }>({ open: false, source: null });
   const swrGuard = { isPaused: () => authLoading || !canRead };
-  const { data: syncStatus, mutate: refreshStatus } = useSyncStatus(swrGuard);
-  const { data: syncLogs, mutate: refreshLogs, isLoading: logsLoading } = useSyncLogs(50, swrGuard);
+  const { data: syncStatus, mutate: refreshStatus, error: syncStatusError, isLoading: statusLoading } = useSyncStatus(swrGuard);
+  const { data: syncLogs, mutate: refreshLogs, isLoading: logsLoading, error: syncLogsError } = useSyncLogs(50, swrGuard);
   const { toast } = useToast();
 
   const handleSync = async (source: SyncSource | 'all', fullSync: boolean = false) => {
@@ -116,15 +117,28 @@ export default function SyncPage() {
   };
 
   if (authLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (!canRead) {
     return <AccessDenied />;
+  }
+
+  if (statusLoading || logsLoading) {
+    return <LoadingState />;
+  }
+
+  if (syncStatusError || syncLogsError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load sync status."
+        error={(syncStatusError || syncLogsError) as Error}
+        onRetry={() => {
+          refreshStatus();
+          refreshLogs();
+        }}
+      />
+    );
   }
 
   return (

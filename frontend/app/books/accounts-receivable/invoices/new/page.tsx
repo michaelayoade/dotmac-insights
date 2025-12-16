@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useFinanceInvoiceMutations } from '@/hooks/useApi';
+import { useFinanceInvoiceMutations, useFinanceCustomers } from '@/hooks/useApi';
 import { AlertTriangle, ArrowLeft, Save, Plus, Trash2, Percent, Hash, Calendar as CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CustomerSearch } from '@/components/EntitySearch';
 
 export default function NewInvoicePage() {
   const router = useRouter();
   const { createInvoice } = useFinanceInvoiceMutations();
+  const { data: customersData, isLoading: customersLoading } = useFinanceCustomers({ limit: 200, offset: 0 });
+  const customers = useMemo(() => (customersData as any)?.items || (customersData as any)?.customers || [], [customersData]);
+
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<{ id: number; name: string } | null>(null);
   const [form, setForm] = useState({
     customer_name: '',
     customer_id: '',
@@ -73,7 +78,7 @@ export default function NewInvoicePage() {
   }, [lineItems]);
 
   const validate = () => {
-    if (!form.customer_name && !form.customer_id) return 'Customer is required';
+    if (!selectedCustomer && !form.customer_name && !form.customer_id) return 'Customer is required';
     if (!form.invoice_date) return 'Invoice date is required';
     if (!form.due_date) return 'Due date is required';
     if (form.due_date && form.invoice_date && form.due_date < form.invoice_date) return 'Due date must be on/after invoice date';
@@ -92,8 +97,8 @@ export default function NewInvoicePage() {
     setSaving(true);
     try {
       await createInvoice({
-        customer_id: form.customer_id ? Number(form.customer_id) : undefined,
-        customer_name: form.customer_name || undefined,
+        customer_id: selectedCustomer?.id || (form.customer_id ? Number(form.customer_id) : undefined),
+        customer_name: selectedCustomer?.name || form.customer_name || undefined,
         description: form.description || undefined,
         amount: totals.subtotal || 0,
         tax_amount: totals.tax || 0,
@@ -139,7 +144,14 @@ export default function NewInvoicePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
           {/* Required fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input label="Customer Name" name="customer_name" value={form.customer_name} onChange={handleChange} required />
+            <CustomerSearch
+              label="Customer"
+              customers={customers}
+              value={selectedCustomer}
+              onSelect={setSelectedCustomer}
+              loading={customersLoading}
+              required
+            />
             <Input label="Invoice Date" name="invoice_date" value={form.invoice_date} onChange={handleChange} type="date" required />
             <Input
               label="Due Date"
@@ -166,8 +178,7 @@ export default function NewInvoicePage() {
           {/* Optional fields */}
           {showMoreOptions && (
             <div className="space-y-4 pt-2 border-t border-slate-border/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label="Customer ID" name="customer_id" value={form.customer_id} onChange={handleChange} type="number" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Currency" name="currency" value={form.currency} onChange={handleChange} />
                 <Input
                   label="Payment Terms (days)"

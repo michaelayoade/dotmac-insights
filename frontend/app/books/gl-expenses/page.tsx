@@ -1,10 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { usePurchasingExpenses } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { AlertTriangle, Receipt, Calendar, DollarSign, Building2, Filter, Briefcase, Tag, TrendingDown, Search } from 'lucide-react';
+import { AlertTriangle, Receipt, Calendar, DollarSign, Building2, Filter, Briefcase, Tag, TrendingDown, Search, BookOpen } from 'lucide-react';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -31,8 +30,7 @@ function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
-export default function PurchasingExpensesPage() {
-  const router = useRouter();
+export default function GLExpensesPage() {
   const currency = 'NGN';
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -60,11 +58,11 @@ export default function PurchasingExpensesPage() {
   const columns = [
     {
       key: 'expense_number',
-      header: 'Expense #',
+      header: 'Voucher #',
       sortable: true,
       render: (item: any) => (
         <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-teal-electric" />
+          <Receipt className="w-4 h-4 text-teal-400" />
           <span className="font-mono text-white font-medium">
             {item.voucher_no || `#${item.id}`}
           </span>
@@ -84,8 +82,20 @@ export default function PurchasingExpensesPage() {
       ),
     },
     {
-      key: 'supplier',
-      header: 'Payee',
+      key: 'account',
+      header: 'Account',
+      render: (item: any) => (
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-slate-muted" />
+          <span className="text-slate-300 truncate max-w-[180px]">
+            {item.account || '-'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'party',
+      header: 'Party',
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-slate-muted" />
@@ -113,7 +123,7 @@ export default function PurchasingExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1.5">
           <Briefcase className="w-3.5 h-3.5 text-slate-muted" />
-          <span className="text-slate-muted text-sm">
+          <span className="text-slate-muted text-sm truncate max-w-[120px]">
             {item.cost_center || '-'}
           </span>
         </div>
@@ -135,7 +145,7 @@ export default function PurchasingExpensesPage() {
     return (
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load expenses</p>
+        <p className="text-red-400">Failed to load GL expense entries</p>
         <p className="text-slate-muted text-sm mt-1">
           {error instanceof Error ? error.message : 'Unknown error'}
         </p>
@@ -145,33 +155,31 @@ export default function PurchasingExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Expenses</h1>
-          <p className="text-slate-muted text-sm">Capture and track employee expense claims</p>
+      {/* Header */}
+      <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">GL Expense Entries</h1>
+            <p className="text-slate-muted text-sm mt-1">
+              Read-only view of expense-type journal entries from the general ledger
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => router.push('/purchasing/expenses/new')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
-        >
-          <Receipt className="w-4 h-4" />
-          New Expense
-        </button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
-            <Receipt className="w-4 h-4 text-teal-electric" />
-            <p className="text-slate-muted text-sm">Total Expenses</p>
+            <Receipt className="w-4 h-4 text-teal-400" />
+            <p className="text-slate-muted text-sm">Total Entries</p>
           </div>
           <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <TrendingDown className="w-4 h-4 text-red-400" />
-            <p className="text-red-400 text-sm">Total Spent</p>
+            <p className="text-red-400 text-sm">Total Expenses</p>
           </div>
           <p className="text-xl font-bold text-red-400">
             {formatCurrency(summary.total_amount || summary.total_spent || 0)}
@@ -180,10 +188,19 @@ export default function PurchasingExpensesPage() {
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
             <DollarSign className="w-4 h-4 text-blue-400" />
-            <p className="text-blue-400 text-sm">Average Expense</p>
+            <p className="text-blue-400 text-sm">Average Entry</p>
           </div>
           <p className="text-xl font-bold text-blue-400">
             {formatCurrency(avgAmount)}
+          </p>
+        </div>
+        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar className="w-4 h-4 text-slate-muted" />
+            <p className="text-slate-muted text-sm">Period</p>
+          </div>
+          <p className="text-sm font-medium text-white">
+            {startDate && endDate ? `${formatDate(startDate)} - ${formatDate(endDate)}` : 'All time'}
           </p>
         </div>
       </div>
@@ -191,7 +208,7 @@ export default function PurchasingExpensesPage() {
       {/* Filters */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
+          <Filter className="w-4 h-4 text-teal-400" />
           <span className="text-white text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
@@ -199,13 +216,13 @@ export default function PurchasingExpensesPage() {
             <Search className="w-4 h-4 text-slate-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search expenses..."
+              placeholder="Search entries..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="flex-1 min-w-[200px] max-w-md">
@@ -217,7 +234,7 @@ export default function PurchasingExpensesPage() {
                 setCostCenter(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -228,7 +245,7 @@ export default function PurchasingExpensesPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               placeholder="Start date"
             />
             <span className="text-slate-muted">to</span>
@@ -239,7 +256,7 @@ export default function PurchasingExpensesPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               placeholder="End date"
             />
           </div>
@@ -266,8 +283,7 @@ export default function PurchasingExpensesPage() {
         data={expenses}
         keyField="id"
         loading={isLoading}
-        emptyMessage="No expenses found"
-        className="cursor-pointer"
+        emptyMessage="No GL expense entries found"
       />
 
       {/* Pagination */}

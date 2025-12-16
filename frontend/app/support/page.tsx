@@ -42,7 +42,9 @@ import {
   Zap,
   Shield,
   Activity,
+  RefreshCw,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 const CHART_COLORS = ['#14b8a6', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#06b6d4'];
 
@@ -154,14 +156,43 @@ function SlaGauge({ attainment }: { attainment: number }) {
 
 export default function SupportDashboardPage() {
   // Fetch dashboard data
-  const { data: dashboard, isLoading: dashboardLoading } = useSupportDashboard();
-  const { data: volumeTrend } = useSupportAnalyticsVolumeTrend({ months: 6 });
-  const { data: slaPerformance } = useSupportAnalyticsSlaPerformance({ months: 6 });
-  const { data: categoryBreakdown } = useSupportAnalyticsByCategory({ days: 30 });
-  const { data: queueHealth } = useSupportRoutingQueueHealth();
-  const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
-  const { data: teamsData } = useSupportTeams();
-  const { data: agentsData } = useSupportAgents();
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useSupportDashboard();
+  const { data: volumeTrend, error: volumeError, isLoading: volumeLoading, mutate: refetchVolume } = useSupportAnalyticsVolumeTrend({ months: 6 });
+  const { data: slaPerformance, error: slaError, isLoading: slaLoading, mutate: refetchSla } = useSupportAnalyticsSlaPerformance({ months: 6 });
+  const { data: categoryBreakdown, error: categoryError, isLoading: categoryLoading, mutate: refetchCategory } = useSupportAnalyticsByCategory({ days: 30 });
+  const { data: queueHealth, error: queueError, isLoading: queueLoading, mutate: refetchQueue } = useSupportRoutingQueueHealth();
+  const { data: slaBreach, error: breachError, isLoading: breachLoading, mutate: refetchBreach } = useSupportSlaBreachesSummary({ days: 30 });
+  const { data: teamsData, error: teamsError, isLoading: teamsLoading, mutate: refetchTeams } = useSupportTeams();
+  const { data: agentsData, error: agentsError, isLoading: agentsLoading, mutate: refetchAgents } = useSupportAgents();
+
+  const swrStates = [
+    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
+    { error: volumeError, isLoading: volumeLoading, mutate: refetchVolume },
+    { error: slaError, isLoading: slaLoading, mutate: refetchSla },
+    { error: categoryError, isLoading: categoryLoading, mutate: refetchCategory },
+    { error: queueError, isLoading: queueLoading, mutate: refetchQueue },
+    { error: breachError, isLoading: breachLoading, mutate: refetchBreach },
+    { error: teamsError, isLoading: teamsLoading, mutate: refetchTeams },
+    { error: agentsError, isLoading: agentsLoading, mutate: refetchAgents },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+
+  if (isDataLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load support dashboard data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   const teams = teamsData?.teams || [];
   const agents = agentsData?.agents || [];

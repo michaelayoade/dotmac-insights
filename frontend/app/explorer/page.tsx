@@ -24,9 +24,11 @@ import { api, EnhancedTableInfo } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 export default function ExplorerPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('explore:read');
+  const swrGuard = { isPaused: () => authLoading || !hasAccess };
 
   // All hooks must be called before any conditional returns
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export default function ExplorerPage() {
   const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
   const [exporting, setExporting] = useState(false);
 
-  const { data: tablesData, isLoading: tablesLoading, error: tablesError } = useTablesEnhanced();
+  const { data: tablesData, isLoading: tablesLoading, error: tablesError, mutate: retryTables } = useTablesEnhanced(swrGuard);
 
   const queryParams = useMemo(() => {
     const params: Record<string, unknown> = {
@@ -75,7 +77,8 @@ export default function ExplorerPage() {
       start_date?: string;
       end_date?: string;
       search?: string;
-    }
+    },
+    swrGuard
   );
 
   const selectedTableInfo = useMemo(() => {
@@ -157,11 +160,7 @@ export default function ExplorerPage() {
 
   // Auth loading state - after all hooks
   if (authLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
-      </div>
-    );
+    return <LoadingState />;
   }
 
   // Access denied state
@@ -251,7 +250,13 @@ export default function ExplorerPage() {
               <RefreshCw className="w-5 h-5 text-slate-muted animate-spin" />
             </div>
           ) : tablesError ? (
-            <div className="text-coral-alert text-sm p-4">Failed to load tables</div>
+            <div className="p-3">
+              <ErrorDisplay
+                message="Failed to load tables."
+                error={tablesError as Error}
+                onRetry={() => retryTables()}
+              />
+            </div>
           ) : (
             Object.entries(filteredCategories).map(([category, tables]) => (
               <div key={category} className="mb-2">
@@ -458,8 +463,12 @@ export default function ExplorerPage() {
             {/* Data Display */}
             <Card padding="none" className="flex-1 flex flex-col min-h-0 mt-4">
               {tableError ? (
-                <div className="p-8 text-center">
-                  <p className="text-coral-alert">Error loading data: {tableError.message}</p>
+                <div className="p-6">
+                  <ErrorDisplay
+                    message="Failed to load table data."
+                    error={tableError as Error}
+                    onRetry={() => refetchTableData()}
+                  />
                 </div>
               ) : viewMode === 'table' ? (
                 <div className="flex-1 flex flex-col min-h-0">

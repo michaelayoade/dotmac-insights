@@ -9,7 +9,7 @@ particularly the ERPNext invoice soft-match query that was causing timeouts.
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 
@@ -21,6 +21,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        # Skip index creation in offline/--sql mode
+        return
+
     conn = op.get_bind()
 
     # Helper to create index if it doesn't exist
@@ -94,6 +98,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        return
+
     conn = op.get_bind()
 
     def drop_index_if_exists(name, table):

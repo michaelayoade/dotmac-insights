@@ -140,6 +140,7 @@ function StatusBadge({ status }: { status: string }) {
 const SINGLE_COMPANY = '';
 
 export default function HrLeavePage() {
+  const [company, setCompany] = useState<string>(SINGLE_COMPANY);
   const [allocationStatus, setAllocationStatus] = useState('');
   const [applicationStatus, setApplicationStatus] = useState('');
   const [allocLimit, setAllocLimit] = useState(20);
@@ -153,18 +154,18 @@ export default function HrLeavePage() {
     limit: 100,
   });
   const { data: holidayLists, isLoading: holidayListsLoading } = useHrHolidayLists({
-    company: SINGLE_COMPANY || undefined,
+    company: company || SINGLE_COMPANY || undefined,
   });
   const { data: leavePolicies, isLoading: leavePoliciesLoading } = useHrLeavePolicies();
   const { data: leaveAllocations, isLoading: allocLoading } = useHrLeaveAllocations({
     status: allocationStatus || undefined,
-    company: SINGLE_COMPANY || undefined,
+    company: company || SINGLE_COMPANY || undefined,
     limit: allocLimit,
     offset: allocOffset,
   });
   const { data: leaveApplications, isLoading: appLoading } = useHrLeaveApplications({
     status: applicationStatus || undefined,
-    company: SINGLE_COMPANY || undefined,
+    company: company || SINGLE_COMPANY || undefined,
     limit: appLimit,
     offset: appOffset,
   });

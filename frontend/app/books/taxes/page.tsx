@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, FileText, Layers } from 'lucide-react';
 import { useAccountingTaxCategories, useAccountingTaxTemplates, useAccountingTaxPayable, useAccountingTaxReceivable } from '@/hooks/useApi';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function SectionCard({
   title,
@@ -75,8 +76,8 @@ function Table({
 }
 
 export default function AccountingTaxesPage() {
-  const { data: categoriesData, error: categoriesError, isLoading: loadingCategories } = useAccountingTaxCategories();
-  const { data: templatesData, error: templatesError, isLoading: loadingTemplates } = useAccountingTaxTemplates();
+  const { data: categoriesData, error: categoriesError, isLoading: loadingCategories, mutate: refetchCategories } = useAccountingTaxCategories();
+  const { data: templatesData, error: templatesError, isLoading: loadingTemplates, mutate: refetchTemplates } = useAccountingTaxTemplates();
   const { data: payableData } = useAccountingTaxPayable();
   const { data: receivableData } = useAccountingTaxReceivable();
 
@@ -89,6 +90,24 @@ export default function AccountingTaxesPage() {
   const receivableTotal = receivableData?.total ?? 0;
 
   const hasError = categoriesError || templatesError;
+  const isLoading = loadingCategories || loadingTemplates;
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (hasError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load tax reference data."
+        error={(categoriesError || templatesError) as Error}
+        onRetry={() => {
+          refetchCategories();
+          refetchTemplates();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -3,18 +3,25 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useFinancePaymentMutations } from '@/hooks/useApi';
+import { useFinancePaymentMutations, useFinanceCustomers, useFinanceInvoices } from '@/hooks/useApi';
 import { AlertTriangle, ArrowLeft, Save, Calendar as CalendarIcon, CreditCard, Hash, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CustomerSearch, InvoiceSearch } from '@/components/EntitySearch';
 
 export default function NewPaymentPage() {
   const router = useRouter();
   const { createPayment } = useFinancePaymentMutations();
+  const { data: customersData, isLoading: customersLoading } = useFinanceCustomers({ limit: 200, offset: 0 });
+  const customers = useMemo(() => (customersData as any)?.items || (customersData as any)?.customers || [], [customersData]);
+
+  const { data: invoicesData, isLoading: invoicesLoading } = useFinanceInvoices({ page: 1, page_size: 200 });
+  const invoices = useMemo(() => (invoicesData as any)?.items || (invoicesData as any)?.invoices || [], [invoicesData]);
+
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<{ id: number; invoice_number?: string } | null>(null);
+
   const [form, setForm] = useState({
-    customer_name: '',
-    customer_id: '',
-    invoice_id: '',
     amount: '',
     receipt_number: '',
     currency: 'NGN',
@@ -32,7 +39,7 @@ export default function NewPaymentPage() {
   };
 
   const validate = () => {
-    if (!form.customer_name && !form.customer_id) return 'Customer is required';
+    if (!selectedCustomer) return 'Customer is required';
     if (!form.amount || Number(form.amount) <= 0) return 'Amount must be greater than zero';
     if (!form.payment_date) return 'Payment date is required';
     return null;
@@ -51,8 +58,9 @@ export default function NewPaymentPage() {
     setSaving(true);
     try {
       await createPayment({
-        customer_id: form.customer_id ? Number(form.customer_id) : undefined,
-        invoice_id: form.invoice_id ? Number(form.invoice_id) : undefined,
+        customer_id: selectedCustomer?.id,
+        customer_name: selectedCustomer?.name,
+        invoice_id: selectedInvoice?.id,
         receipt_number: form.receipt_number || undefined,
         amount: form.amount ? Number(form.amount) : undefined,
         currency: form.currency || 'NGN',
@@ -61,7 +69,6 @@ export default function NewPaymentPage() {
         payment_date: form.payment_date || undefined,
         transaction_reference: form.transaction_reference || undefined,
         notes: form.notes || undefined,
-        customer_name: form.customer_name || undefined,
       });
       router.push('/books/accounts-receivable/payments');
     } catch (err: any) {
@@ -93,7 +100,14 @@ export default function NewPaymentPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
           {/* Required fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Input label="Customer Name" name="customer_name" value={form.customer_name} onChange={handleChange} required />
+            <CustomerSearch
+              label="Customer"
+              customers={customers}
+              value={selectedCustomer}
+              onSelect={setSelectedCustomer}
+              loading={customersLoading}
+              required
+            />
             <Input
               label="Amount"
               name="amount"
@@ -127,9 +141,14 @@ export default function NewPaymentPage() {
           {/* Optional fields */}
           {showMoreOptions && (
             <div className="space-y-4 pt-2 border-t border-slate-border/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label="Invoice ID" name="invoice_id" value={form.invoice_id} onChange={handleChange} type="number" placeholder="Link to invoice" />
-                <Input label="Customer ID" name="customer_id" value={form.customer_id} onChange={handleChange} type="number" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InvoiceSearch
+                  label="Link to Invoice"
+                  invoices={invoices}
+                  value={selectedInvoice}
+                  onSelect={setSelectedInvoice}
+                  loading={invoicesLoading}
+                />
                 <Input label="Currency" name="currency" value={form.currency} onChange={handleChange} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,8 +184,8 @@ export default function NewPaymentPage() {
               <span className="text-slate-muted">Amount</span>
               <span className="font-mono text-white">{amountDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {form.currency}</span>
             </div>
-            {form.invoice_id && (
-              <p className="text-xs text-slate-muted">Will be applied to Invoice #{form.invoice_id}</p>
+            {selectedInvoice && (
+              <p className="text-xs text-slate-muted">Will be applied to {selectedInvoice.invoice_number || `Invoice #${selectedInvoice.id}`}</p>
             )}
           </div>
         </div>

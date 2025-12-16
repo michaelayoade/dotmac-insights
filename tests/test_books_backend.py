@@ -146,3 +146,83 @@ class TestBooksAppEndpoints:
         assert "tree" in data
         assert isinstance(data["tree"], list)
         assert "accounts" in data # flat list
+
+
+# ---------------------------------------------------------------------------
+# Books frontend page smoke coverage
+# ---------------------------------------------------------------------------
+
+# Minimal availability checks for every Books page data source the frontend calls.
+# These keep us honest that the API surface for app/books/* renders without 404/500s.
+BOOKS_PAGE_ENDPOINTS = [
+    ("/api/v1/accounting/dashboard", dict, ["summary", "period"]),
+    ("/api/v1/accounting/trial-balance", dict, ["total_debit", "total_credit"]),
+    ("/api/v1/accounting/balance-sheet", dict, ["assets", "liabilities", "equity"]),
+    ("/api/v1/accounting/income-statement", dict, None),
+    ("/api/v1/accounting/accounts", dict, ["total", "accounts"]),
+    ("/api/v1/accounting/general-ledger", dict, ["entries"]),
+    ("/api/v1/accounting/accounts-receivable", dict, ["aging"]),
+    ("/api/v1/accounting/accounts-payable", dict, ["aging"]),
+    ("/api/v1/accounting/receivables-outstanding", dict, ["total_outstanding"]),
+    ("/api/v1/accounting/payables-outstanding", dict, ["total_payable"]),
+    ("/api/v1/accounting/bank-accounts", dict, ["accounts"]),
+    ("/api/v1/accounting/bank-transactions", dict, ["data"]),
+    ("/api/v1/accounting/journal-entries", dict, ["entries"]),
+    ("/api/v1/accounting/purchase-invoices", dict, ["invoices"]),
+    ("/api/v1/accounting/suppliers", dict, ["suppliers"]),
+    ("/api/v1/accounting/cash-flow", dict, None),
+    ("/api/v1/accounting/equity-statement", dict, None),
+    ("/api/v1/accounting/fiscal-years", dict, ["fiscal_years"]),
+    ("/api/books/settings", dict, ["settings"]),
+    ("/api/books/settings/number-formats", list, None),
+    ("/api/books/settings/currencies", list, None),
+    ("/api/v1/accounting/tax-categories", dict, ["categories"]),
+    ("/api/v1/accounting/sales-tax-templates", dict, ["templates"]),
+    ("/api/v1/accounting/purchase-tax-templates", dict, ["templates"]),
+    ("/api/v1/accounting/item-tax-templates", dict, ["templates"]),
+    ("/api/v1/accounting/tax-rules", dict, ["rules"]),
+    ("/api/tax/dashboard", dict, None),
+    ("/api/tax/filing/upcoming", dict, None),
+    ("/api/tax/filing/overdue", dict, None),
+    ("/api/accounting/workflows", dict, ["workflows"]),
+    ("/api/accounting/approvals/pending", dict, ["pending"]),
+    ("/api/accounting/controls", dict, None),
+]
+
+
+@pytest.mark.parametrize(
+    "endpoint,expected_type,required_keys",
+    BOOKS_PAGE_ENDPOINTS,
+    ids=[path for path, _, _ in BOOKS_PAGE_ENDPOINTS],
+)
+def test_books_frontend_pages_have_data_sources(client, endpoint, expected_type, required_keys):
+    """Smoke test: every Books page API used by the frontend responds with JSON."""
+    response = client.get(endpoint)
+    assert response.status_code == 200, f"{endpoint} failed: {response.text}"
+
+    payload = response.json()
+    assert isinstance(payload, expected_type), f"{endpoint} returned {type(payload)} instead of {expected_type}"
+
+    # Validate key presence when the shape is important for rendering.
+    if required_keys:
+        for key in required_keys:
+            assert key in payload, f"{endpoint} missing expected key '{key}'"
+
+    # Controls endpoint may legitimately return either a controls object or a message when unconfigured.
+    if endpoint.endswith("/controls"):
+        assert ("controls" in payload) or ("message" in payload), "Controls endpoint should return controls or message"
+
+
+@pytest.mark.parametrize(
+    "detail_endpoint",
+    [
+        "/api/v1/accounting/accounts/999999",
+        "/api/v1/accounting/journal-entries/999999",
+        "/api/v1/accounting/bank-transactions/999999",
+        "/api/v1/accounting/purchase-invoices/999999",
+    ],
+)
+def test_books_detail_endpoints_gracefully_handle_missing_records(client, detail_endpoint):
+    """Detail pages should surface 404s instead of 500s when a record is missing."""
+    response = client.get(detail_endpoint)
+    assert response.status_code == 404, f"{detail_endpoint} should 404 for missing records, got {response.status_code}"

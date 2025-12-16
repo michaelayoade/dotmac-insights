@@ -108,6 +108,10 @@ class Project(Base):
     # Notes
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Soft delete
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -119,6 +123,7 @@ class Project(Base):
     expenses: Mapped[List["Expense"]] = relationship(back_populates="project")
     tickets: Mapped[List["Ticket"]] = relationship(back_populates="project")
     tasks: Mapped[List["Task"]] = relationship(back_populates="project")
+    users: Mapped[List["ProjectUser"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Project {self.project_name} - {self.status.value}>"
@@ -136,3 +141,23 @@ class Project(Base):
         if self.expected_end_date and self.status == ProjectStatus.OPEN:
             return datetime.utcnow() > self.expected_end_date
         return False
+
+
+class ProjectUser(Base):
+    """Project team members (child table from ERPNext)."""
+
+    __tablename__ = "project_users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    user: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    project_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    view_attachments: Mapped[Optional[bool]] = mapped_column(nullable=True)
+    welcome_email_sent: Mapped[Optional[bool]] = mapped_column(nullable=True)
+    idx: Mapped[Optional[int]] = mapped_column(nullable=True)
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Relationship
+    project: Mapped["Project"] = relationship(back_populates="users")

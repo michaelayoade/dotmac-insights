@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   Receipt,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number, currency = 'NGN'): string {
   return new Intl.NumberFormat('en-NG', {
@@ -146,57 +147,59 @@ function AgingChart({ buckets }: { buckets: FinanceAgingAnalytics['buckets'] }) 
 
 export default function SalesDashboardPage() {
   const currency = 'NGN';
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError } = useFinanceDashboard(currency);
-  const { data: aging, isLoading: agingLoading } = useFinanceAging({ currency });
-  const { data: revenueTrend, isLoading: trendLoading } = useFinanceRevenueTrend({ currency, interval: 'month' });
-  const { data: recentInvoices } = useFinanceInvoices({
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useFinanceDashboard(currency);
+  const { data: aging, isLoading: agingLoading, error: agingError, mutate: refetchAging } = useFinanceAging({ currency });
+  const { data: revenueTrend, isLoading: trendLoading, error: trendError, mutate: refetchTrend } = useFinanceRevenueTrend({ currency, interval: 'month' });
+  const { data: recentInvoices, error: invoicesError, mutate: refetchInvoices, isLoading: invoicesLoading } = useFinanceInvoices({
     currency,
     page: 1,
     page_size: 5,
     sort_by: 'invoice_date',
     sort_order: 'desc',
   });
-  const { data: recentPayments } = useFinancePayments({
+  const { data: recentPayments, error: paymentsError, mutate: refetchPayments, isLoading: paymentsLoading } = useFinancePayments({
     currency,
     page: 1,
     page_size: 5,
     sort_by: 'payment_date',
     sort_order: 'desc',
   });
-  const { data: recentCredits } = useFinanceCreditNotes({
+  const { data: recentCredits, error: creditsError, mutate: refetchCredits, isLoading: creditsLoading } = useFinanceCreditNotes({
     currency,
     page: 1,
     page_size: 5,
     sort_by: 'issue_date',
     sort_order: 'desc',
   });
-  const { data: recentBills } = usePurchasingBills({ currency, limit: 5, sort_by: 'posting_date', sort_dir: 'desc' });
-  const { data: recentPurchasePayments } = usePurchasingPayments({ currency, limit: 5 });
+  const { data: recentBills, error: billsError, mutate: refetchBills, isLoading: billsLoading } = usePurchasingBills({ currency, limit: 5, sort_by: 'posting_date', sort_dir: 'desc' });
+  const { data: recentPurchasePayments, error: purchasePaymentsError, mutate: refetchPurchasePayments, isLoading: purchasePaymentsLoading } = usePurchasingPayments({ currency, limit: 5 });
 
-  if (dashboardLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-slate-card rounded-xl border border-slate-border p-6 animate-pulse">
-              <div className="h-4 bg-slate-elevated rounded w-1/2 mb-3" />
-              <div className="h-8 bg-slate-elevated rounded w-3/4" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  const swrStates = [
+    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
+    { error: agingError, isLoading: agingLoading, mutate: refetchAging },
+    { error: trendError, isLoading: trendLoading, mutate: refetchTrend },
+    { error: invoicesError, isLoading: invoicesLoading, mutate: refetchInvoices },
+    { error: paymentsError, isLoading: paymentsLoading, mutate: refetchPayments },
+    { error: creditsError, isLoading: creditsLoading, mutate: refetchCredits },
+    { error: billsError, isLoading: billsLoading, mutate: refetchBills },
+    { error: purchasePaymentsError, isLoading: purchasePaymentsLoading, mutate: refetchPurchasePayments },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+
+  if (isDataLoading) {
+    return <LoadingState />;
   }
 
-  if (dashboardError) {
+  if (firstError) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load finance dashboard</p>
-        <p className="text-slate-muted text-sm mt-1">
-          {dashboardError instanceof Error ? dashboardError.message : 'Unknown error'}
-        </p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load sales dashboard data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
     );
   }
 

@@ -10,7 +10,7 @@ Phase 3 of helpdesk enhancement:
 - Ticket custom fields
 - Ticket enhancements (tags, watchers, merge support)
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
@@ -21,91 +21,115 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind) if (bind and not context.is_offline_mode()) else None
+
+    def has_table(name: str) -> bool:
+        if inspector:
+            try:
+                return inspector.has_table(name)
+            except Exception:
+                pass
+        if bind:
+            try:
+                return bind.execute(sa.text("SELECT to_regclass(:n)"), {"n": name}).scalar() is not None
+            except Exception:
+                return False
+        return False
+
+    if has_table('csat_surveys'):
+        # Migration already applied; skip to avoid duplicate tables/columns.
+        return
+
     # ==========================================================================
     # CSAT SURVEYS
     # ==========================================================================
-    op.create_table(
-        'csat_surveys',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(255), nullable=False, index=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('survey_type', sa.String(20), default='csat', index=True),
-        sa.Column('trigger', sa.String(30), default='ticket_resolved', index=True),
-        sa.Column('questions', sa.JSON(), nullable=True),
-        sa.Column('delay_hours', sa.Integer(), default=0),
-        sa.Column('send_via', sa.String(50), default='email'),
-        sa.Column('conditions', sa.JSON(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('csat_surveys'):
+        op.create_table(
+            'csat_surveys',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(255), nullable=False, index=True),
+            sa.Column('description', sa.Text(), nullable=True),
+            sa.Column('survey_type', sa.String(20), default='csat', index=True),
+            sa.Column('trigger', sa.String(30), default='ticket_resolved', index=True),
+            sa.Column('questions', sa.JSON(), nullable=True),
+            sa.Column('delay_hours', sa.Integer(), default=0),
+            sa.Column('send_via', sa.String(50), default='email'),
+            sa.Column('conditions', sa.JSON(), nullable=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # CSAT RESPONSES
     # ==========================================================================
-    op.create_table(
-        'csat_responses',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('survey_id', sa.Integer(), sa.ForeignKey('csat_surveys.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('ticket_id', sa.Integer(), sa.ForeignKey('tickets.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('customer_id', sa.Integer(), sa.ForeignKey('customers.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('rating', sa.Integer(), nullable=True, index=True),
-        sa.Column('answers', sa.JSON(), nullable=True),
-        sa.Column('feedback_text', sa.Text(), nullable=True),
-        sa.Column('sent_at', sa.DateTime(), nullable=True),
-        sa.Column('responded_at', sa.DateTime(), nullable=True, index=True),
-        sa.Column('response_channel', sa.String(50), nullable=True),
-        sa.Column('response_token', sa.String(100), nullable=True, unique=True, index=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('csat_responses'):
+        op.create_table(
+            'csat_responses',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('survey_id', sa.Integer(), sa.ForeignKey('csat_surveys.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('ticket_id', sa.Integer(), sa.ForeignKey('tickets.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('customer_id', sa.Integer(), sa.ForeignKey('customers.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('rating', sa.Integer(), nullable=True, index=True),
+            sa.Column('answers', sa.JSON(), nullable=True),
+            sa.Column('feedback_text', sa.Text(), nullable=True),
+            sa.Column('sent_at', sa.DateTime(), nullable=True),
+            sa.Column('responded_at', sa.DateTime(), nullable=True, index=True),
+            sa.Column('response_channel', sa.String(50), nullable=True),
+            sa.Column('response_token', sa.String(100), nullable=True, unique=True, index=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # TICKET TAGS
     # ==========================================================================
-    op.create_table(
-        'ticket_tags',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(100), nullable=False, unique=True, index=True),
-        sa.Column('color', sa.String(20), nullable=True),
-        sa.Column('description', sa.String(500), nullable=True),
-        sa.Column('usage_count', sa.Integer(), default=0),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('ticket_tags'):
+        op.create_table(
+            'ticket_tags',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(100), nullable=False, unique=True, index=True),
+            sa.Column('color', sa.String(20), nullable=True),
+            sa.Column('description', sa.String(500), nullable=True),
+            sa.Column('usage_count', sa.Integer(), default=0),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # TICKET CUSTOM FIELDS
     # ==========================================================================
-    op.create_table(
-        'ticket_custom_fields',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(255), nullable=False, index=True),
-        sa.Column('field_key', sa.String(100), nullable=False, unique=True, index=True),
-        sa.Column('description', sa.String(500), nullable=True),
-        sa.Column('field_type', sa.String(50), default='text'),
-        sa.Column('options', sa.JSON(), nullable=True),
-        sa.Column('default_value', sa.String(500), nullable=True),
-        sa.Column('is_required', sa.Boolean(), default=False),
-        sa.Column('min_length', sa.Integer(), nullable=True),
-        sa.Column('max_length', sa.Integer(), nullable=True),
-        sa.Column('regex_pattern', sa.String(500), nullable=True),
-        sa.Column('display_order', sa.Integer(), default=100),
-        sa.Column('show_in_list', sa.Boolean(), default=False),
-        sa.Column('show_in_create', sa.Boolean(), default=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('ticket_custom_fields'):
+        op.create_table(
+            'ticket_custom_fields',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(255), nullable=False, index=True),
+            sa.Column('field_key', sa.String(100), nullable=False, unique=True, index=True),
+            sa.Column('description', sa.String(500), nullable=True),
+            sa.Column('field_type', sa.String(50), default='text'),
+            sa.Column('options', sa.JSON(), nullable=True),
+            sa.Column('default_value', sa.String(500), nullable=True),
+            sa.Column('is_required', sa.Boolean(), default=False),
+            sa.Column('min_length', sa.Integer(), nullable=True),
+            sa.Column('max_length', sa.Integer(), nullable=True),
+            sa.Column('regex_pattern', sa.String(500), nullable=True),
+            sa.Column('display_order', sa.Integer(), default=100),
+            sa.Column('show_in_list', sa.Boolean(), default=False),
+            sa.Column('show_in_create', sa.Boolean(), default=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # ALTER TICKETS TABLE - Add enhancement fields

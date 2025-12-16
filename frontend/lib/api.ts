@@ -1,7 +1,16 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// Use an internal URL for server-side calls (inside the Docker network) and the public
+// NEXT_PUBLIC_API_URL for browser calls. This keeps SSR working while the browser hits
+// the host-exposed API port.
+const API_BASE =
+  typeof window === 'undefined'
+    ? process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || ''
+    : process.env.NEXT_PUBLIC_API_URL || '';
 
 export function buildApiUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>) {
-  const url = new URL(endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`);
+  const base = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
+  const normalizedEndpoint =
+    endpoint.startsWith('http') ? endpoint : `${base}${endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`}`;
+  const url = new URL(normalizedEndpoint);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') return;
@@ -106,17 +115,23 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
 
   const accessToken = getAccessToken();
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    // Don't include credentials for cross-origin requests with Bearer token
-    // CORS with credentials: 'include' requires specific origin header, not wildcard '*'
-    credentials: accessToken ? 'omit' : 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...fetchOptions.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      // Don't include credentials for cross-origin requests with Bearer token
+      // CORS with credentials: 'include' requires specific origin header, not wildcard '*'
+      credentials: accessToken ? 'omit' : 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...fetchOptions.headers,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to reach the API';
+    throw new ApiError(0, `Network error: ${message}`);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -152,15 +167,21 @@ async function fetchApiFormData<T>(endpoint: string, formData: FormData): Promis
   const url = `${API_BASE}/api${endpoint}`;
   const accessToken = getAccessToken();
 
-  const response = await fetch(url, {
-    method: 'POST',
-    credentials: accessToken ? 'omit' : 'include',
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      // Note: Do NOT set Content-Type for FormData - browser sets it with boundary
-    },
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      credentials: accessToken ? 'omit' : 'include',
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        // Note: Do NOT set Content-Type for FormData - browser sets it with boundary
+      },
+      body: formData,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unable to reach the API';
+    throw new ApiError(0, `Network error: ${message}`);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -1373,6 +1394,129 @@ export interface SupportCsatTrend {
   response_count: number;
 }
 
+// Support automation / SLA / routing / KB placeholder types (minimum fields used by UI)
+export interface SupportAutomationRule {
+  id: number;
+  name: string;
+  description?: string | null;
+  trigger: string;
+  is_active: boolean;
+  conditions?: any[];
+  actions?: any[];
+}
+
+export interface SupportAutomationLog {
+  id: number;
+  rule_id?: number | null;
+  ticket_id?: number | null;
+  trigger?: string | null;
+  success?: boolean;
+  run_at?: string | null;
+  message?: string | null;
+  rule_name?: string | null;
+  executed_at?: string | null;
+  ticket_number?: string | null;
+  error_message?: string | null;
+}
+
+export interface SupportAutomationLogList {
+  data: SupportAutomationLog[];
+  total?: number;
+}
+
+export interface SupportAutomationLogSummary {
+  total_executions?: number;
+  successful_executions?: number;
+  success_rate?: number;
+}
+
+export interface SupportCalendar {
+  id: number;
+  name: string;
+  description?: string | null;
+  calendar_type?: string | null;
+  is_active?: boolean;
+  timezone?: string | null;
+  holidays?: Array<{ name?: string; date?: string }>;
+}
+
+export interface SupportSlaPolicy {
+  id: number;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  conditions?: any[];
+  targets?: any[];
+  priority?: string | null;
+}
+
+export interface SupportSlaBreachSummary {
+  total?: number;
+  breached?: number;
+  on_time?: number;
+  currently_overdue?: number;
+  total_breaches?: number;
+  by_target_type?: Record<string, number>;
+}
+
+export interface SupportRoutingRule {
+  id: number;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  strategy?: string | null;
+  team_id?: number | null;
+  priority?: number | null;
+}
+
+export interface SupportQueueHealth {
+  queue: string;
+  pending: number;
+  sla_breaches?: number;
+  currently_overdue?: number;
+  unassigned_tickets?: number;
+  avg_wait_hours?: number;
+  total_agents?: number;
+  total_capacity?: number;
+  total_load?: number;
+  overall_utilization_pct?: number;
+}
+
+export interface SupportAgentWorkload {
+  agent_id: number;
+  agent_name?: string | null;
+  email?: string | null;
+  open_tickets: number;
+  pending?: number;
+  overdue?: number;
+  current_load?: number;
+  capacity?: number;
+  routing_weight?: number;
+  utilization_pct?: number;
+  is_available?: boolean;
+  team_name?: string | null;
+}
+
+export interface SupportKbCategory {
+  id: number;
+  name: string;
+  parent_id?: number | null;
+  status?: string | null;
+  description?: string | null;
+}
+
+export interface SupportKbArticleList {
+  items: Array<{ id: number; title: string; status?: string | null; category_id?: number | null; description?: string | null }>;
+  data?: Array<{ id: number; title: string; status?: string | null; category_id?: number | null; description?: string | null }>;
+  total?: number;
+}
+
+export interface SupportCannedResponseList {
+  items: Array<{ id: number; title: string; category?: string | null; content?: string | null }>;
+  data?: Array<{ id: number; title: string; category?: string | null; content?: string | null }>;
+  total?: number;
+}
+
 export interface InvoiceAging {
   total_outstanding: number;
   aging: {
@@ -1519,9 +1663,39 @@ export const api = {
   getSupportCannedCategories: () =>
     fetchApi<string[]>('/support/canned-responses/categories'),
 
-  // Expense Management
+  // Expense Management - Categories
   getExpenseCategories: (params?: { include_inactive?: boolean }) =>
     fetchApi<import('./expenses.types').ExpenseCategory[]>('/expenses/categories/', { params }),
+  createExpenseCategory: (payload: import('./expenses.types').ExpenseCategoryCreatePayload) =>
+    fetchApi<import('./expenses.types').ExpenseCategory>('/expenses/categories/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateExpenseCategory: (id: number, payload: import('./expenses.types').ExpenseCategoryCreatePayload) =>
+    fetchApi<import('./expenses.types').ExpenseCategory>(`/expenses/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteExpenseCategory: (id: number) =>
+    fetchApi<void>(`/expenses/categories/${id}`, { method: 'DELETE' }),
+
+  // Expense Management - Policies
+  getExpensePolicies: (params?: { include_inactive?: boolean; category_id?: number }) =>
+    fetchApi<import('./expenses.types').ExpensePolicy[]>('/expenses/policies/', { params }),
+  createExpensePolicy: (payload: import('./expenses.types').ExpensePolicyCreatePayload) =>
+    fetchApi<import('./expenses.types').ExpensePolicy>('/expenses/policies/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateExpensePolicy: (id: number, payload: import('./expenses.types').ExpensePolicyCreatePayload) =>
+    fetchApi<import('./expenses.types').ExpensePolicy>(`/expenses/policies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteExpensePolicy: (id: number) =>
+    fetchApi<void>(`/expenses/policies/${id}`, { method: 'DELETE' }),
+
+  // Expense Management - Claims
   getExpenseClaims: (params?: { status?: string; limit?: number; offset?: number }) =>
     fetchApi<import('./expenses.types').ExpenseClaim[]>('/expenses/claims/', { params }),
   getExpenseClaimDetail: (id: number) =>
@@ -1581,6 +1755,177 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  // Corporate Cards
+  getCorporateCards: (params?: { employee_id?: number; status?: string; include_inactive?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<import('./expenses.types').CorporateCard[]>('/expenses/cards/', { params }),
+  getCorporateCardDetail: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCard>(`/expenses/cards/${id}`),
+  createCorporateCard: (payload: import('./expenses.types').CorporateCardCreatePayload) =>
+    fetchApi<import('./expenses.types').CorporateCard>('/expenses/cards/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateCorporateCard: (id: number, payload: import('./expenses.types').CorporateCardUpdatePayload) =>
+    fetchApi<import('./expenses.types').CorporateCard>(`/expenses/cards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  suspendCorporateCard: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCard>(`/expenses/cards/${id}/suspend`, { method: 'POST' }),
+  activateCorporateCard: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCard>(`/expenses/cards/${id}/activate`, { method: 'POST' }),
+  cancelCorporateCard: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCard>(`/expenses/cards/${id}/cancel`, { method: 'POST' }),
+  deleteCorporateCard: (id: number) =>
+    fetchApi<void>(`/expenses/cards/${id}`, { method: 'DELETE' }),
+
+  // Corporate Card Transactions
+  getCorporateCardTransactions: (params?: { card_id?: number; statement_id?: number; status?: string; unmatched_only?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction[]>('/expenses/transactions/', { params }),
+  getCorporateCardTransactionDetail: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}`),
+  createCorporateCardTransaction: (payload: import('./expenses.types').CorporateCardTransactionCreatePayload) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>('/expenses/transactions/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  matchTransaction: (id: number, expenseClaimLineId: number, confidence?: number) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/match`, {
+      method: 'POST',
+      body: JSON.stringify({ expense_claim_line_id: expenseClaimLineId, confidence }),
+    }),
+  unmatchTransaction: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/unmatch`, { method: 'POST' }),
+  disputeTransaction: (id: number, reason: string) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/dispute`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  resolveTransactionDispute: (id: number, resolutionNotes: string, newStatus?: string) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/resolve`, {
+      method: 'POST',
+      params: { resolution_notes: resolutionNotes, new_status: newStatus },
+    }),
+  excludeTransaction: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/exclude`, { method: 'POST' }),
+  markTransactionPersonal: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction>(`/expenses/transactions/${id}/mark-personal`, { method: 'POST' }),
+  deleteTransaction: (id: number) =>
+    fetchApi<void>(`/expenses/transactions/${id}`, { method: 'DELETE' }),
+
+  // Corporate Card Statements
+  getCorporateCardStatements: (params?: { card_id?: number; status?: string; limit?: number; offset?: number }) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement[]>('/expenses/statements/', { params }),
+  getCorporateCardStatementDetail: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>(`/expenses/statements/${id}`),
+  createCorporateCardStatement: (payload: { card_id: number; period_start: string; period_end: string; statement_date?: string; import_source?: string; original_filename?: string }) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>('/expenses/statements/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  importStatement: (payload: import('./expenses.types').StatementImportPayload) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>('/expenses/statements/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  reconcileStatement: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>(`/expenses/statements/${id}/reconcile`, { method: 'POST' }),
+  closeStatement: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>(`/expenses/statements/${id}/close`, { method: 'POST' }),
+  reopenStatement: (id: number) =>
+    fetchApi<import('./expenses.types').CorporateCardStatement>(`/expenses/statements/${id}/reopen`, { method: 'POST' }),
+  getStatementTransactions: (id: number, status?: string) =>
+    fetchApi<import('./expenses.types').CorporateCardTransaction[]>(`/expenses/statements/${id}/transactions`, { params: { status } }),
+  deleteStatement: (id: number) =>
+    fetchApi<void>(`/expenses/statements/${id}`, { method: 'DELETE' }),
+
+  // Corporate Card Analytics
+  getCardAnalyticsOverview: (params?: { months?: number }) =>
+    fetchApi<import('./expenses.types').CardAnalyticsOverview>('/expenses/analytics/overview', { params }),
+  getCardSpendTrend: (params?: { months?: number }) =>
+    fetchApi<import('./expenses.types').SpendTrendItem[]>('/expenses/analytics/spend-trend', { params }),
+  getCardTopMerchants: (params?: { days?: number; limit?: number }) =>
+    fetchApi<{ merchants: import('./expenses.types').TopMerchant[]; total_spend: number; period_days: number }>('/expenses/analytics/top-merchants', { params }),
+  getCardByCategory: (params?: { days?: number }) =>
+    fetchApi<{ categories: import('./expenses.types').CategoryBreakdown[]; total_spend: number; period_days: number }>('/expenses/analytics/by-category', { params }),
+  getCardUtilization: (params?: { days?: number }) =>
+    fetchApi<import('./expenses.types').CardUtilization[]>('/expenses/analytics/card-utilization', { params }),
+  getCardStatusBreakdown: (params?: { days?: number }) =>
+    fetchApi<{ by_status: import('./expenses.types').StatusBreakdownItem[]; totals: { count: number; amount: number }; period_days: number }>('/expenses/analytics/status-breakdown', { params }),
+  getCardTopSpenders: (params?: { days?: number; limit?: number }) =>
+    fetchApi<{ spenders: import('./expenses.types').TopSpender[]; period_days: number }>('/expenses/analytics/top-spenders', { params }),
+  getCardReconciliationTrend: (params?: { months?: number }) =>
+    fetchApi<import('./expenses.types').ReconciliationTrendItem[]>('/expenses/analytics/reconciliation-trend', { params }),
+  getCardStatementSummary: () =>
+    fetchApi<import('./expenses.types').StatementSummary>('/expenses/analytics/statement-summary'),
+
+  // Expense Reports & Exports
+  getExpenseReportStatus: () =>
+    fetchApi<{ formats: Record<string, { available: boolean; requires?: string }> }>('/expenses/reports/status'),
+  getExpenseSummaryReport: (params?: { start_date?: string; end_date?: string }) =>
+    fetchApi<import('./expenses.types').ExpenseSummaryReport>('/expenses/reports/summary', { params }),
+  exportExpenseClaimsReport: (params: {
+    format: 'csv' | 'excel' | 'pdf';
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    employee_id?: number;
+    include_lines?: boolean;
+    filename?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) searchParams.set(key, String(value));
+    });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return fetch(`${API_BASE_URL}/expenses/reports/claims?${searchParams}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then((res) => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    });
+  },
+  exportCashAdvancesReport: (params: {
+    format: 'csv' | 'excel' | 'pdf';
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    employee_id?: number;
+    filename?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) searchParams.set(key, String(value));
+    });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return fetch(`${API_BASE_URL}/expenses/reports/advances?${searchParams}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then((res) => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    });
+  },
+  exportCardTransactionsReport: (params: {
+    format: 'csv' | 'excel';
+    start_date?: string;
+    end_date?: string;
+    card_id?: number;
+    status?: string;
+    filename?: string;
+  }) => {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) searchParams.set(key, String(value));
+    });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return fetch(`${API_BASE_URL}/expenses/reports/transactions?${searchParams}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then((res) => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    });
+  },
 
   getSupportCsatSurveys: (params?: { active_only?: boolean }) =>
     fetchApi<SupportCsatSurvey[]>('/support/csat/surveys', { params }),
@@ -2026,15 +2371,21 @@ export const api = {
     });
 
     const accessToken = getAccessToken();
-    const response = await fetch(
-      `${API_BASE}/api/explore/tables/${table}/export?${searchParams.toString()}`,
-      {
-        credentials: accessToken ? 'omit' : 'include',
-        headers: {
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-      }
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `${API_BASE}/api/explore/tables/${table}/export?${searchParams.toString()}`,
+        {
+          credentials: accessToken ? 'omit' : 'include',
+          headers: {
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to reach the API';
+      throw new ApiError(0, `Export failed: ${message}`);
+    }
 
     if (!response.ok) {
       throw new ApiError(response.status, `Export failed: ${response.statusText}`);
@@ -3152,23 +3503,6 @@ export const api = {
   getPurchasingExpenseDetail: (id: number) =>
     fetchApi<PurchasingExpenseDetail>(`/v1/purchasing/expenses/${id}`),
 
-  createPurchasingExpense: (body: PurchasingExpensePayload) =>
-    fetchApi<PurchasingExpenseDetail>('/v1/purchasing/expenses', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  updatePurchasingExpense: (id: number, body: PurchasingExpensePayload) =>
-    fetchApi<PurchasingExpenseDetail>(`/v1/purchasing/expenses/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
-
-  deletePurchasingExpense: (id: number, soft = true) =>
-    fetchApi<void>(`/v1/purchasing/expenses/${id}?soft=${soft ? 'true' : 'false'}`, {
-      method: 'DELETE',
-    }),
-
   getPurchasingAging: (params?: {
     as_of_date?: string;
     supplier?: string;
@@ -3258,27 +3592,148 @@ export const api = {
     }
   },
 
+  // Inventory Domain
+  getInventoryItems: (params?: { item_group?: string; warehouse?: string; has_stock?: boolean; search?: string; limit?: number; offset?: number }) =>
+    fetchApi<InventoryItemListResponse>('/inventory/items', { params }),
+
+  getInventoryItemDetail: (id: number | string) =>
+    fetchApi<any>(`/inventory/items/${id}`),
+
+  getInventoryWarehouses: (params?: { include_disabled?: boolean; is_group?: boolean; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<InventoryWarehouseListResponse>('/inventory/warehouses', { params }),
+
+  getInventoryWarehouseDetail: (id: number | string) =>
+    fetchApi<any>(`/inventory/warehouses/${id}`),
+
+  getInventoryStockEntries: (params?: { stock_entry_type?: string; from_warehouse?: string; to_warehouse?: string; start_date?: string; end_date?: string; docstatus?: number; limit?: number; offset?: number }) =>
+    fetchApi<InventoryStockEntryListResponse>('/inventory/stock-entries', { params }),
+
+  getInventoryStockEntryDetail: (id: number | string) =>
+    fetchApi<any>(`/inventory/stock-entries/${id}`),
+
+  getInventoryStockLedger: (params?: { item_code?: string; warehouse?: string; voucher_type?: string; voucher_no?: string; start_date?: string; end_date?: string; include_cancelled?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<InventoryStockLedgerListResponse>('/inventory/stock-ledger', { params }),
+
+  getInventoryStockSummary: (params?: { warehouse?: string; item_group?: string }) =>
+    fetchApi<InventoryStockSummaryResponse>('/inventory/summary', { params }),
+
   // Inventory mutations
   createInventoryItem: (body: InventoryItemPayload) =>
-    fetchApi(`/v1/inventory/items`, { method: 'POST', body: JSON.stringify(body) }),
+    fetchApi(`/inventory/items`, { method: 'POST', body: JSON.stringify(body) }),
 
   updateInventoryItem: (id: number | string, body: Partial<InventoryItemPayload>) =>
-    fetchApi(`/v1/inventory/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    fetchApi(`/inventory/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   deleteInventoryItem: (id: number | string) =>
-    fetchApi(`/v1/inventory/items/${id}?soft=true`, { method: 'DELETE' }),
+    fetchApi(`/inventory/items/${id}?soft=true`, { method: 'DELETE' }),
 
   createInventoryWarehouse: (body: InventoryWarehousePayload) =>
-    fetchApi(`/v1/inventory/warehouses`, { method: 'POST', body: JSON.stringify(body) }),
+    fetchApi(`/inventory/warehouses`, { method: 'POST', body: JSON.stringify(body) }),
 
   updateInventoryWarehouse: (id: number | string, body: Partial<InventoryWarehousePayload>) =>
-    fetchApi(`/v1/inventory/warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    fetchApi(`/inventory/warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   deleteInventoryWarehouse: (id: number | string) =>
-    fetchApi(`/v1/inventory/warehouses/${id}?soft=true`, { method: 'DELETE' }),
+    fetchApi(`/inventory/warehouses/${id}?soft=true`, { method: 'DELETE' }),
 
   createInventoryStockEntry: (body: InventoryStockEntryPayload) =>
-    fetchApi(`/v1/inventory/stock-entries`, { method: 'POST', body: JSON.stringify(body) }),
+    fetchApi(`/inventory/stock-entries`, { method: 'POST', body: JSON.stringify(body) }),
+
+  updateInventoryStockEntry: (id: number | string, body: { posting_date?: string; remarks?: string; docstatus?: number }) =>
+    fetchApi(`/inventory/stock-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  deleteInventoryStockEntry: (id: number | string) =>
+    fetchApi(`/inventory/stock-entries/${id}?soft=true`, { method: 'DELETE' }),
+
+  // Inventory - Stock Entry GL Posting
+  postStockEntryToGL: (id: number | string, params?: { inventory_account?: string; expense_account?: string }) =>
+    fetchApi<{ id: number; journal_entry_id?: number; message: string }>(`/inventory/stock-entries/${id}/post`, { method: 'POST', params }),
+
+  // Inventory - Reorder Alerts
+  getInventoryReorderAlerts: (params?: { limit?: number }) =>
+    fetchApi<InventoryReorderAlertsResponse>('/inventory/reorder-alerts', { params }),
+
+  // Inventory - Transfer Requests
+  getInventoryTransfers: (params?: { status?: string; from_warehouse?: string; to_warehouse?: string; limit?: number; offset?: number }) =>
+    fetchApi<InventoryTransferListResponse>('/inventory/transfers', { params }),
+
+  createInventoryTransfer: (body: InventoryTransferPayload) =>
+    fetchApi<{ id: number; status: string; message: string }>('/inventory/transfers', { method: 'POST', body: JSON.stringify(body) }),
+
+  submitInventoryTransfer: (id: number | string) =>
+    fetchApi<{ id: number; status: string; message: string }>(`/inventory/transfers/${id}/submit`, { method: 'POST' }),
+
+  approveInventoryTransfer: (id: number | string) =>
+    fetchApi<{ id: number; status: string; message: string }>(`/inventory/transfers/${id}/approve`, { method: 'POST' }),
+
+  rejectInventoryTransfer: (id: number | string, reason: string) =>
+    fetchApi<{ id: number; status: string; message: string }>(`/inventory/transfers/${id}/reject`, { method: 'POST', params: { reason } }),
+
+  executeInventoryTransfer: (id: number | string) =>
+    fetchApi<{ id: number; status: string; stock_entry_id?: number; message: string }>(`/inventory/transfers/${id}/execute`, { method: 'POST' }),
+
+  // Inventory - Batches
+  getInventoryBatches: (params?: { item_code?: string; include_disabled?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<InventoryBatchListResponse>('/inventory/batches', { params }),
+
+  createInventoryBatch: (body: InventoryBatchPayload) =>
+    fetchApi<{ id: number; batch_id: string; message: string }>('/inventory/batches', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Inventory - Serial Numbers
+  getInventorySerials: (params?: { item_code?: string; warehouse?: string; status?: string; limit?: number; offset?: number }) =>
+    fetchApi<InventorySerialListResponse>('/inventory/serials', { params }),
+
+  createInventorySerial: (body: InventorySerialPayload) =>
+    fetchApi<{ id: number; serial_no: string; message: string }>('/inventory/serials', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Asset Management
+  getAssets: (params?: { status?: string; category?: string; location?: string; custodian?: string; department?: string; search?: string; min_value?: number; max_value?: number; limit?: number; offset?: number }) =>
+    fetchApi<AssetListResponse>('/assets', { params }),
+
+  getAsset: (id: number | string) =>
+    fetchApi<AssetDetail>(`/assets/${id}`),
+
+  createAsset: (body: AssetCreatePayload) =>
+    fetchApi<{ id: number; message: string }>('/assets', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateAsset: (id: number | string, body: AssetUpdatePayload) =>
+    fetchApi<{ id: number; message: string }>(`/assets/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  submitAsset: (id: number | string) =>
+    fetchApi<{ id: number; message: string }>(`/assets/${id}/submit`, { method: 'POST' }),
+
+  scrapAsset: (id: number | string, scrapDate?: string) =>
+    fetchApi<{ id: number; message: string }>(`/assets/${id}/scrap`, { method: 'POST', params: { scrap_date: scrapDate } }),
+
+  getAssetsSummary: () =>
+    fetchApi<AssetSummaryResponse>('/assets/summary'),
+
+  getAssetCategories: (params?: { limit?: number; offset?: number }) =>
+    fetchApi<AssetCategoryListResponse>('/assets/categories/', { params }),
+
+  createAssetCategory: (body: AssetCategoryCreatePayload) =>
+    fetchApi<{ id: number; message: string }>('/assets/categories/', { method: 'POST', body: JSON.stringify(body) }),
+
+  getDepreciationSchedule: (params?: { asset_id?: number; finance_book?: string; from_date?: string; to_date?: string; pending_only?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<DepreciationScheduleListResponse>('/assets/depreciation-schedule', { params }),
+
+  getPendingDepreciation: (asOfDate?: string) =>
+    fetchApi<PendingDepreciationResponse>('/assets/pending-depreciation', { params: { as_of_date: asOfDate } }),
+
+  getMaintenanceDue: () =>
+    fetchApi<MaintenanceDueResponse>('/assets/maintenance/due'),
+
+  markForMaintenance: (id: number | string) =>
+    fetchApi<{ id: number; message: string }>(`/assets/${id}/mark-maintenance`, { method: 'POST' }),
+
+  completeMaintenance: (id: number | string) =>
+    fetchApi<{ id: number; message: string }>(`/assets/${id}/complete-maintenance`, { method: 'POST' }),
+
+  getWarrantyExpiring: (days?: number) =>
+    fetchApi<WarrantyExpiringResponse>('/assets/warranty/expiring', { params: { days } }),
+
+  getInsuranceExpiring: (days?: number) =>
+    fetchApi<InsuranceExpiringResponse>('/assets/insurance/expiring', { params: { days } }),
 
   // HR Domain
   getHrLeaveTypes: (params?: { search?: string; is_lwp?: boolean; is_carry_forward?: boolean; limit?: number; offset?: number }) =>
@@ -3620,12 +4075,18 @@ export const api = {
   exportHrSalarySlipRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string }) => {
     const url = buildApiUrl('/api/hr/salary-slips/register/export', params);
     const token = getAccessToken();
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to reach the API';
+      throw new ApiError(0, `Export failed: ${message}`);
+    }
     if (!response.ok) {
       const errorText = await response.text();
       throw new ApiError(response.status, errorText || `HTTP ${response.status}`);
@@ -3813,6 +4274,9 @@ export const api = {
 
   getHrAnalyticsLifecycleEvents: (params?: { company?: string; start_date?: string; end_date?: string }) =>
     fetchApi<HrLifecycleEventsBreakdown>('/hr/analytics/lifecycle-events', { params }),
+
+  getEmployees: (params?: { search?: string; department?: string; status?: string; limit?: number; offset?: number }) =>
+    fetchApi<{ items: Array<{ id: number; name: string; email?: string; employee_number?: string; department?: string; designation?: string; status?: string }>; total: number; limit: number; offset: number }>('/hr/analytics/employees', { params }),
 
   createHrEmployeeTransfer: (body: HrEmployeeTransferPayload) =>
     fetchApi<HrEmployeeTransfer>('/hr/employee-transfers', { method: 'POST', body: JSON.stringify(body) }),
@@ -4012,7 +4476,7 @@ export const api = {
     }),
 
   // Gateway Transfers
-  getGatewayTransfers: (params?: { status?: string; transfer_type?: string; limit?: number; offset?: number }) =>
+  getGatewayTransfers: (params?: { status?: string; transfer_type?: string; provider?: string; limit?: number; offset?: number }) =>
     fetchApi<GatewayTransferListResponse>('/integrations/transfers/', { params }),
 
   getGatewayTransfer: (reference: string) =>
@@ -4035,21 +4499,21 @@ export const api = {
 
   // Banks
   getBanks: (params?: { country?: string; provider?: string }) =>
-    fetchApi<BankInfo[]>('/integrations/banks/', { params }),
+    fetchApi<BankListResponse>('/integrations/banks/', { params }),
 
   searchBanks: (q: string, params?: { country?: string; provider?: string }) =>
     fetchApi<{ results: BankInfo[]; count: number }>('/integrations/banks/search', { params: { q, ...params } }),
 
-  resolveAccount: (body: ResolveAccountRequest, provider?: string) =>
+  resolveAccount: (body: ResolveAccountRequest | string, provider?: string) =>
     fetchApi<ResolveAccountResponse>('/integrations/banks/resolve', {
       method: 'POST',
       params: provider ? { provider } : undefined,
-      body: JSON.stringify(body),
+      body: JSON.stringify(typeof body === 'string' ? { account_number: body, bank_code: '' } : body),
     }),
 
   // Open Banking
   getOpenBankingConnections: (params?: { customer_id?: number; provider?: string; status?: string }) =>
-    fetchApi<OpenBankingConnection[]>('/integrations/openbanking/accounts', { params }),
+    fetchApi<OpenBankingConnectionResponse>('/integrations/openbanking/accounts', { params }),
 
   getOpenBankingConnection: (id: number) =>
     fetchApi<OpenBankingConnection>(`/integrations/openbanking/accounts/${id}`),
@@ -4058,7 +4522,7 @@ export const api = {
     fetchApi<{ account_id: number; balance: number; currency: string; updated_at: string }>(`/integrations/openbanking/accounts/${id}/balance`),
 
   getOpenBankingTransactions: (id: number, params?: { start_date?: string; end_date?: string; limit?: number }) =>
-    fetchApi<OpenBankingTransaction[]>(`/integrations/openbanking/accounts/${id}/transactions`, { params }),
+    fetchApi<OpenBankingTransactionResponse>(`/integrations/openbanking/accounts/${id}/transactions`, { params }),
 
   getOpenBankingIdentity: (id: number) =>
     fetchApi<{ bvn?: string; full_name: string; email?: string; phone?: string; date_of_birth?: string }>(`/integrations/openbanking/accounts/${id}/identity`),
@@ -4100,6 +4564,36 @@ export const api = {
 
   getSettingsAuditLog: (params?: { group?: string; skip?: number; limit?: number }) =>
     fetchApi<SettingsAuditEntry[]>('/admin/settings/audit', { params }),
+
+  // Document Attachments (Receipts, etc.)
+  getDocumentAttachments: (doctype: string, docId: number) =>
+    fetchApi<DocumentAttachmentList>(`/accounting/documents/${doctype}/${docId}/attachments`),
+  uploadAttachment: async (doctype: string, docId: number, file: File, options?: { attachment_type?: string; description?: string; is_primary?: boolean }) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.attachment_type) formData.append('attachment_type', options.attachment_type);
+    if (options?.description) formData.append('description', options.description);
+    if (options?.is_primary) formData.append('is_primary', 'true');
+    const response = await fetch(`${BASE_URL}/accounting/documents/${doctype}/${docId}/attachments`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
+      throw new Error(error.detail || 'Upload failed');
+    }
+    return response.json() as Promise<DocumentAttachmentUploadResponse>;
+  },
+  getAttachment: (attachmentId: number) =>
+    fetchApi<DocumentAttachment>(`/accounting/attachments/${attachmentId}`),
+  deleteAttachment: (attachmentId: number) =>
+    fetchApi<void>(`/accounting/attachments/${attachmentId}`, { method: 'DELETE' }),
+  updateAttachment: (attachmentId: number, payload: { description?: string; attachment_type?: string; is_primary?: boolean }) =>
+    fetchApi<{ message: string; id: number }>(`/accounting/attachments/${attachmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 };
 
 // Additional types
@@ -4714,10 +5208,10 @@ export interface FinancePaymentListResponse {
   page_size: number;
 }
 
-// Accounting core types
-export interface AccountingAccount {
+// Accounting core types (legacy summary shape)
+export interface AccountingAccountBase {
   id?: number | string;
-  account: string;
+  account?: string;
   account_name?: string | null;
   parent_account?: string | null;
   is_group?: boolean;
@@ -4734,7 +5228,7 @@ export interface AccountingJournalEntryLine {
   description?: string | null;
 }
 
-export interface AccountingJournalEntry {
+export type AccountingJournalEntryPayload = {
   id?: number | string;
   name?: string | null;
   posting_date: string;
@@ -4743,7 +5237,7 @@ export interface AccountingJournalEntry {
   currency?: string | null;
   accounts: AccountingJournalEntryLine[];
   status?: string | null;
-}
+};
 
 export interface AccountingGeneralLedgerEntry {
   id: number | string;
@@ -4775,14 +5269,14 @@ export interface AccountingGeneralLedgerResponse {
   };
 }
 
-export interface AccountingBankTransactionPayment {
+export interface AccountingBankTransactionPaymentLegacy {
   id?: number | string;
   payment_document?: string | null;
   payment_entry?: string | null;
   allocated_amount?: number | null;
 }
 
-export interface AccountingBankTransactionDetail {
+export interface AccountingBankTransactionDetailLegacy {
   id: number | string;
   erpnext_id?: string | null;
   transaction_date?: string | null;
@@ -4804,11 +5298,11 @@ export interface AccountingBankTransactionDetail {
   bank_party_name?: string | null;
   bank_party_account_number?: string | null;
   description?: string | null;
-  payments?: AccountingBankTransactionPayment[];
+  payments?: AccountingBankTransactionPaymentLegacy[];
 }
 
-export interface AccountingBankTransactionListResponse {
-  transactions: AccountingBankTransactionDetail[];
+export interface AccountingBankTransactionListResponseLegacy {
+  transactions: AccountingBankTransactionDetailLegacy[];
   total: number;
   limit?: number;
   offset?: number;
@@ -5299,16 +5793,19 @@ export interface AccountingBalanceSheet {
     current_assets: Array<{ account: string; balance: number }>;
     fixed_assets: Array<{ account: string; balance: number }>;
     other_assets: Array<{ account: string; balance: number }>;
+    accounts?: Array<{ account: string; balance: number; account_type?: string; pct_of_total?: number }>;
     total: number;
   };
   liabilities: {
     current_liabilities: Array<{ account: string; balance: number }>;
     long_term_liabilities: Array<{ account: string; balance: number }>;
+    accounts?: Array<{ account: string; balance: number; account_type?: string; pct_of_total?: number }>;
     total: number;
   };
   equity: {
     items: Array<{ account: string; balance: number }>;
     retained_earnings: number;
+    accounts?: Array<{ account: string; balance: number }>;
     total: number;
   };
   // IFRS classified structure (IAS 1)
@@ -5355,7 +5852,7 @@ export interface AccountingBalanceSheet {
   difference?: number;
   is_balanced: boolean;
   as_of_date?: string;
-  currency?: string;
+  currency?: string | null;
   // IFRS compliance fields
   prior_period?: {
     as_of_date: string;
@@ -5722,6 +6219,9 @@ export interface AccountingPayableResponse {
   };
   suppliers?: AccountingPayable[];
   currency?: string;
+  items?: AccountingPayable[];
+  data?: AccountingPayable[];
+  total?: number;
 }
 
 export interface AccountingReceivable {
@@ -5843,6 +6343,8 @@ export interface AccountingSupplier {
   id: number;
   name: string;
   supplier_name?: string;
+  code?: string | null;
+  supplier_code?: string | null;
   supplier_type?: string | null;
   supplier_group?: string | null;
   country?: string | null;
@@ -5852,9 +6354,26 @@ export interface AccountingSupplier {
   email?: string | null;
   phone?: string | null;
   is_internal?: boolean;
+  is_active?: boolean;
   disabled?: boolean;
   total_outstanding?: number;
   total_invoices?: number;
+  total_purchases?: number;
+  outstanding_balance?: number;
+  balance?: number;
+  status?: string | null;
+  banks?: Array<{
+    bank_name?: string | null;
+    account_number?: string | null;
+    account_name?: string | null;
+    currency?: string | null;
+  }>;
+  items?: Array<{
+    item_code?: string | null;
+    item_name?: string | null;
+    item_group?: string | null;
+    description?: string | null;
+  }>;
 }
 
 export interface AccountingSupplierListResponse {
@@ -5862,6 +6381,13 @@ export interface AccountingSupplierListResponse {
   total: number;
   limit: number;
   offset: number;
+  active?: number;
+  by_status?: Record<string, number>;
+  total_outstanding?: number;
+  outstanding?: number;
+  total_purchases?: number;
+  total_invoices?: number;
+  currency?: string;
 }
 
 export interface AccountingBankAccount {
@@ -6212,6 +6738,13 @@ export interface PurchasingSupplier {
   email: string | null;
   mobile: string | null;
   outstanding: number;
+  status?: string | null;
+  supplier_name?: string | null;
+  code?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  credit_limit?: number | null;
+  notes?: string | null;
 }
 
 export interface PurchasingSupplierListResponse {
@@ -6219,6 +6752,8 @@ export interface PurchasingSupplierListResponse {
   total: number;
   limit: number;
   offset: number;
+  items?: PurchasingSupplier[];
+  data?: PurchasingSupplier[];
 }
 
 export interface PurchasingSupplierDetail extends PurchasingSupplier {
@@ -6412,6 +6947,7 @@ export interface PurchasingDebitNotePayload {
   company?: string | null;
   posting_date?: string | null;
   due_date?: string | null;
+  debit_note_number?: string | null;
   return_against?: string | null;
   grand_total?: number | null;
   outstanding_amount?: number | null;
@@ -6420,6 +6956,12 @@ export interface PurchasingDebitNotePayload {
   currency?: string | null;
   conversion_rate?: number | null;
   status?: string | null;
+  line_items?: Array<{
+    description?: string;
+    quantity?: number;
+    unit_price?: number;
+    tax_rate?: number;
+  }>;
 }
 
 export interface PurchasingOrder {
@@ -6553,6 +7095,489 @@ export interface InventoryStockEntryPayload {
   lines: InventoryStockEntryLine[];
 }
 
+// Inventory list response types
+export interface InventoryItem {
+  id: number;
+  item_code: string;
+  item_name: string;
+  item_group?: string | null;
+  stock_uom?: string | null;
+  is_stock_item?: boolean;
+  valuation_rate?: number;
+  total_stock_qty?: number;
+  stock_by_warehouse?: Record<string, number> | null;
+}
+
+export interface InventoryItemListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: InventoryItem[];
+}
+
+export interface InventoryWarehouse {
+  id: number;
+  erpnext_id?: string | null;
+  warehouse_name: string;
+  parent_warehouse?: string | null;
+  company?: string | null;
+  warehouse_type?: string | null;
+  is_group?: boolean;
+  disabled?: boolean;
+  account?: string | null;
+}
+
+export interface InventoryWarehouseListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  warehouses: InventoryWarehouse[];
+}
+
+export interface InventoryStockEntry {
+  id: number;
+  erpnext_id?: string | null;
+  stock_entry_type: string;
+  purpose?: string | null;
+  posting_date?: string | null;
+  from_warehouse?: string | null;
+  to_warehouse?: string | null;
+  total_amount?: number;
+  docstatus?: number;
+  work_order?: string | null;
+  purchase_order?: string | null;
+  sales_order?: string | null;
+}
+
+export interface InventoryStockEntryListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  entries: InventoryStockEntry[];
+}
+
+export interface InventoryStockLedgerEntry {
+  id: number;
+  erpnext_id?: string | null;
+  item_code: string;
+  warehouse: string;
+  posting_date?: string | null;
+  posting_time?: string | null;
+  actual_qty: number;
+  qty_after_transaction: number;
+  incoming_rate?: number;
+  outgoing_rate?: number;
+  valuation_rate?: number;
+  stock_value?: number;
+  stock_value_difference?: number;
+  voucher_type?: string | null;
+  voucher_no?: string | null;
+  batch_no?: string | null;
+}
+
+export interface InventoryStockLedgerListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  entries: InventoryStockLedgerEntry[];
+}
+
+export interface InventoryStockSummaryItem {
+  item_code: string;
+  item_name?: string | null;
+  item_group?: string | null;
+  stock_uom?: string | null;
+  total_qty: number;
+  total_value: number;
+  valuation_rate?: number;
+  warehouses?: Array<{ warehouse: string; qty: number; value: number }>;
+}
+
+export interface InventoryStockSummaryResponse {
+  total_value: number;
+  total_items: number;
+  total_qty?: number;
+  items: InventoryStockSummaryItem[];
+}
+
+// Inventory - Reorder Alerts
+export interface InventoryReorderAlert {
+  id: number;
+  item_code: string;
+  item_name?: string | null;
+  item_group?: string | null;
+  stock_uom?: string | null;
+  reorder_level: number;
+  reorder_qty: number;
+  safety_stock: number;
+  current_stock: number;
+  shortage: number;
+}
+
+export interface InventoryReorderAlertsResponse {
+  total: number;
+  alerts: InventoryReorderAlert[];
+}
+
+// Inventory - Transfer Requests
+export interface InventoryTransfer {
+  id: number;
+  from_warehouse?: string | null;
+  to_warehouse?: string | null;
+  request_date?: string | null;
+  required_date?: string | null;
+  transfer_date?: string | null;
+  total_qty: number;
+  total_value: number;
+  status: string;
+  remarks?: string | null;
+}
+
+export interface InventoryTransferListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  transfers: InventoryTransfer[];
+}
+
+export interface InventoryTransferItemPayload {
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  uom?: string;
+  valuation_rate?: number;
+  batch_no?: string;
+  serial_no?: string;
+}
+
+export interface InventoryTransferPayload {
+  from_warehouse: string;
+  to_warehouse: string;
+  required_date?: string;
+  remarks?: string;
+  items: InventoryTransferItemPayload[];
+}
+
+// Inventory - Batches
+export interface InventoryBatch {
+  id: number;
+  batch_id: string;
+  item_code?: string | null;
+  item_name?: string | null;
+  manufacturing_date?: string | null;
+  expiry_date?: string | null;
+  batch_qty: number;
+  supplier?: string | null;
+  disabled: boolean;
+}
+
+export interface InventoryBatchListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  batches: InventoryBatch[];
+}
+
+export interface InventoryBatchPayload {
+  batch_id: string;
+  item_code: string;
+  item_name?: string;
+  manufacturing_date?: string;
+  expiry_date?: string;
+  supplier?: string;
+  description?: string;
+}
+
+// Inventory - Serial Numbers
+export interface InventorySerial {
+  id: number;
+  serial_no: string;
+  item_code?: string | null;
+  item_name?: string | null;
+  warehouse?: string | null;
+  batch_no?: string | null;
+  status: string;
+  customer?: string | null;
+  delivery_date?: string | null;
+  warranty_expiry_date?: string | null;
+}
+
+export interface InventorySerialListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  serials: InventorySerial[];
+}
+
+export interface InventorySerialPayload {
+  serial_no: string;
+  item_code: string;
+  item_name?: string;
+  warehouse?: string;
+  batch_no?: string;
+  supplier?: string;
+  purchase_date?: string;
+  warranty_period?: number;
+  description?: string;
+}
+
+// Asset Management Types
+export interface Asset {
+  id: number;
+  erpnext_id?: string | null;
+  asset_name: string;
+  asset_category?: string | null;
+  item_code?: string | null;
+  item_name?: string | null;
+  company?: string | null;
+  location?: string | null;
+  custodian?: string | null;
+  department?: string | null;
+  cost_center?: string | null;
+  purchase_date?: string | null;
+  gross_purchase_amount: number;
+  asset_value: number;
+  opening_accumulated_depreciation: number;
+  status?: string | null;
+  serial_no?: string | null;
+  maintenance_required: boolean;
+  warranty_expiry_date?: string | null;
+  insured_value: number;
+  created_at?: string | null;
+}
+
+export interface AssetListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  assets: Asset[];
+}
+
+export interface AssetFinanceBook {
+  id: number;
+  finance_book?: string | null;
+  depreciation_method?: string | null;
+  total_number_of_depreciations: number;
+  frequency_of_depreciation: number;
+  depreciation_start_date?: string | null;
+  expected_value_after_useful_life: number;
+  value_after_depreciation: number;
+  daily_depreciation_amount: number;
+  rate_of_depreciation: number;
+}
+
+export interface AssetDepreciationScheduleItem {
+  id: number;
+  finance_book?: string | null;
+  schedule_date?: string | null;
+  depreciation_amount: number;
+  accumulated_depreciation_amount: number;
+  journal_entry?: string | null;
+  depreciation_booked: boolean;
+}
+
+export interface AssetDetail extends Asset {
+  available_for_use_date?: string | null;
+  supplier?: string | null;
+  purchase_receipt?: string | null;
+  purchase_invoice?: string | null;
+  asset_quantity: number;
+  docstatus: number;
+  calculate_depreciation: boolean;
+  is_existing_asset: boolean;
+  is_composite_asset: boolean;
+  next_depreciation_date?: string | null;
+  disposal_date?: string | null;
+  journal_entry_for_scrap?: string | null;
+  insurance_start_date?: string | null;
+  insurance_end_date?: string | null;
+  comprehensive_insurance?: string | null;
+  asset_owner?: string | null;
+  description?: string | null;
+  updated_at?: string | null;
+  finance_books: AssetFinanceBook[];
+  depreciation_schedules: AssetDepreciationScheduleItem[];
+}
+
+export interface AssetCreatePayload {
+  asset_name: string;
+  asset_category?: string;
+  item_code?: string;
+  item_name?: string;
+  company?: string;
+  location?: string;
+  custodian?: string;
+  department?: string;
+  cost_center?: string;
+  purchase_date?: string;
+  available_for_use_date?: string;
+  gross_purchase_amount?: number;
+  supplier?: string;
+  asset_quantity?: number;
+  calculate_depreciation?: boolean;
+  description?: string;
+  serial_no?: string;
+  finance_books?: Array<{
+    finance_book?: string;
+    depreciation_method?: string;
+    total_number_of_depreciations?: number;
+    frequency_of_depreciation?: number;
+    depreciation_start_date?: string;
+    expected_value_after_useful_life?: number;
+    rate_of_depreciation?: number;
+  }>;
+}
+
+export interface AssetUpdatePayload {
+  asset_name?: string;
+  asset_category?: string;
+  location?: string;
+  custodian?: string;
+  department?: string;
+  cost_center?: string;
+  maintenance_required?: boolean;
+  description?: string;
+  insured_value?: number;
+  insurance_start_date?: string;
+  insurance_end_date?: string;
+}
+
+export interface AssetSummaryResponse {
+  totals: {
+    count: number;
+    book_value: number;
+    purchase_value: number;
+    accumulated_depreciation: number;
+  };
+  by_status: Array<{
+    status: string;
+    count: number;
+    total_value: number;
+    purchase_value: number;
+  }>;
+  by_category: Array<{
+    category: string;
+    count: number;
+    total_value: number;
+  }>;
+  by_location: Array<{
+    location: string;
+    count: number;
+    total_value: number;
+  }>;
+  maintenance_required: number;
+  warranty_expiring_soon: number;
+}
+
+export interface AssetCategory {
+  id: number;
+  erpnext_id?: string | null;
+  asset_category_name: string;
+  enable_cwip_accounting: boolean;
+  finance_books: Array<{
+    finance_book?: string | null;
+    depreciation_method?: string | null;
+    total_number_of_depreciations: number;
+    frequency_of_depreciation: number;
+    fixed_asset_account?: string | null;
+    accumulated_depreciation_account?: string | null;
+    depreciation_expense_account?: string | null;
+  }>;
+}
+
+export interface AssetCategoryListResponse {
+  total: number;
+  categories: AssetCategory[];
+}
+
+export interface AssetCategoryCreatePayload {
+  asset_category_name: string;
+  enable_cwip_accounting?: boolean;
+}
+
+export interface DepreciationScheduleEntry {
+  id: number;
+  asset_id: number;
+  asset_name?: string | null;
+  finance_book?: string | null;
+  schedule_date?: string | null;
+  depreciation_amount: number;
+  accumulated_depreciation_amount: number;
+  journal_entry?: string | null;
+  depreciation_booked: boolean;
+}
+
+export interface DepreciationScheduleListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  schedules: DepreciationScheduleEntry[];
+}
+
+export interface PendingDepreciationEntry {
+  id: number;
+  asset_id: number;
+  asset_name?: string | null;
+  asset_category?: string | null;
+  finance_book?: string | null;
+  schedule_date?: string | null;
+  depreciation_amount: number;
+}
+
+export interface PendingDepreciationResponse {
+  pending_entries: PendingDepreciationEntry[];
+  total_pending_amount: number;
+  count: number;
+  as_of_date: string;
+}
+
+export interface MaintenanceDueAsset {
+  id: number;
+  asset_name: string;
+  asset_category?: string | null;
+  location?: string | null;
+  custodian?: string | null;
+  serial_no?: string | null;
+  purchase_date?: string | null;
+  asset_value: number;
+}
+
+export interface MaintenanceDueResponse {
+  assets: MaintenanceDueAsset[];
+  count: number;
+}
+
+export interface WarrantyExpiringAsset {
+  id: number;
+  asset_name: string;
+  asset_category?: string | null;
+  serial_no?: string | null;
+  supplier?: string | null;
+  warranty_expiry_date?: string | null;
+  days_remaining?: number | null;
+}
+
+export interface WarrantyExpiringResponse {
+  assets: WarrantyExpiringAsset[];
+  count: number;
+}
+
+export interface InsuranceExpiringAsset {
+  id: number;
+  asset_name: string;
+  asset_category?: string | null;
+  serial_no?: string | null;
+  insured_value: number;
+  insurance_end_date?: string | null;
+  days_remaining?: number | null;
+  comprehensive_insurance?: string | null;
+}
+
+export interface InsuranceExpiringResponse {
+  assets: InsuranceExpiringAsset[];
+  count: number;
+}
+
 // Reports Domain Types
 export interface ReportsRevenueSummary {
   mrr?: number;
@@ -6662,6 +7687,7 @@ export interface HrListResponse<T> {
   total: number;
   limit?: number;
   offset?: number;
+  items?: T[];
 }
 
 export interface HrLeaveType {
@@ -7948,13 +8974,22 @@ export interface TaxSettings {
   is_vat_registered: boolean;
   vat_filing_frequency: 'MONTHLY';
   wht_auto_deduct: boolean;
-  paye_filing_frequency: PAYEFilingFrequency;
+  paye_filing_frequency: PAYEFilingFrequency | string;
   cit_company_size: CITCompanySize;
   fiscal_year_start_month: number;
   einvoice_enabled: boolean;
   firs_api_key: string | null;
   created_at: string;
   updated_at: string;
+  company_tin?: string | null;
+  company_name?: string | null;
+  rc_number?: string | null;
+  tax_office?: string | null;
+  vat_registered?: boolean;
+  default_vat_rate?: number;
+  fiscal_year_end_month?: number;
+  auto_calculate_wht?: boolean;
+  einvoice_api_key?: string | null;
 }
 
 export interface TaxDashboard {
@@ -8183,16 +9218,22 @@ export interface CITAssessment {
   id: number;
   company: string;
   assessment_year: number;
+  year?: number;
   company_size: CITCompanySize;
   turnover: number;
   assessable_profit: number;
+  profit_before_tax?: number;
+  taxable_profit?: number;
   cit_rate: number;
   cit_amount: number;
+  cit_liability?: number;
   education_tax_rate: number;
   education_tax_amount: number;
   total_tax: number;
   minimum_tax: number;
   tax_payable: number;
+  status?: string;
+  created_by?: string | null;
   created_at: string;
 }
 
@@ -8252,6 +9293,7 @@ export interface FilingCalendar {
   deadlines: FilingDeadline[];
   upcoming: FilingDeadline[];
   overdue: FilingDeadline[];
+  filings?: FilingDeadline[];
 }
 
 export interface EInvoice {
@@ -8426,6 +9468,11 @@ export interface BankInfo {
   currency: string;
 }
 
+export interface BankListResponse {
+  banks: BankInfo[];
+  count?: number;
+}
+
 export interface ResolveAccountRequest {
   account_number: string;
   bank_code: string;
@@ -8449,7 +9496,14 @@ export interface OpenBankingConnection {
   currency: string;
   balance?: number;
   status: string;
+  items?: never;
 }
+
+export type OpenBankingConnectionResponse = OpenBankingConnection[] & {
+  items?: OpenBankingConnection[];
+  data?: OpenBankingConnection[];
+  total?: number;
+};
 
 export interface OpenBankingTransaction {
   transaction_id: string;
@@ -8460,6 +9514,12 @@ export interface OpenBankingTransaction {
   balance?: number;
   category?: string;
 }
+
+export type OpenBankingTransactionResponse = OpenBankingTransaction[] & {
+  transactions?: OpenBankingTransaction[];
+  data?: OpenBankingTransaction[];
+  total?: number;
+};
 
 export interface WebhookEvent {
   id: number;
@@ -8497,6 +9557,7 @@ export interface SettingsSchemaResponse {
   group: string;
   schema: {
     type: string;
+    description?: string;
     properties: Record<string, {
       type: string;
       description?: string;
@@ -8529,4 +9590,32 @@ export interface SettingsAuditEntry {
   user_email: string;
   ip_address?: string;
   created_at: string;
+}
+
+// Document Attachment Types
+export interface DocumentAttachment {
+  id: number;
+  doctype: string;
+  document_id: number;
+  file_name: string;
+  file_path: string;
+  file_type?: string;
+  file_size?: number;
+  attachment_type?: string;
+  is_primary: boolean;
+  description?: string;
+  uploaded_at?: string;
+  uploaded_by_id?: number;
+}
+
+export interface DocumentAttachmentList {
+  total: number;
+  attachments: DocumentAttachment[];
+}
+
+export interface DocumentAttachmentUploadResponse {
+  message: string;
+  id: number;
+  file_name: string;
+  file_size: number;
 }

@@ -1,10 +1,97 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ToastProvider } from '@dotmac/core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ToastProvider, useToast } from '@dotmac/core';
 import { ThemeProvider } from '@dotmac/design-tokens';
-import { onAuthError, clearAuthToken } from '@/lib/api';
+import { SWRConfig, type Key } from 'swr';
+import { ApiError, onAuthError, clearAuthToken } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth-context';
+import { useTheme } from '@dotmac/design-tokens';
+import { applyColorScheme, getSavedColorScheme } from '@/lib/theme';
+
+function ThemePersistence({ children }: { children: React.ReactNode }) {
+  const { setColorScheme, config, resolvedColorScheme } = useTheme() as any;
+  const colorScheme = (config as any)?.colorScheme;
+
+  // Hydrate theme from localStorage on mount (avoids losing the user's choice across app sections)
+  useEffect(() => {
+    const saved = getSavedColorScheme();
+    if (saved && saved !== colorScheme) {
+      setColorScheme(saved);
+    }
+    applyColorScheme(saved || colorScheme || 'dark');
+  }, [colorScheme, setColorScheme]);
+
+  // Persist and enforce the class on the document root whenever scheme resolves
+  useEffect(() => {
+    applyColorScheme((colorScheme as any) || (resolvedColorScheme as any) || 'light');
+  }, [colorScheme, resolvedColorScheme]);
+
+  return <>{children}</>;
+}
+
+function SwrErrorBoundary({ children }: { children: React.ReactNode }) {
+  const { toast } = useToast();
+  const lastShownRef = useRef<Record<string, number>>({});
+
+  const formatKey = useCallback((key: Key) => {
+    if (!key) return '';
+    if (typeof key === 'string' || typeof key === 'number') return String(key);
+    if (Array.isArray(key)) {
+      return key
+        .filter(Boolean)
+        .map((part) => {
+          if (typeof part === 'string' || typeof part === 'number') return String(part);
+          if (typeof part === 'object' && part !== null) return 'params';
+          return '';
+        })
+        .filter(Boolean)
+        .join(' / ');
+    }
+    return '';
+  }, []);
+
+  const handleError = useCallback(
+    (error: unknown, key: Key) => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        return; // Auth errors handled globally already
+      }
+
+      const keyLabel = formatKey(key) || 'data';
+      const description =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred while loading data.';
+
+      const now = Date.now();
+      const lastShown = lastShownRef.current[keyLabel] || 0;
+      if (now - lastShown < 8000) {
+        return; // De-dupe repeated errors
+      }
+      lastShownRef.current[keyLabel] = now;
+
+      toast({
+        title: 'Failed to load data',
+        description: `${keyLabel ? `${keyLabel}: ` : ''}${description}`,
+        variant: 'error',
+      });
+    },
+    [formatKey, toast]
+  );
+
+  return (
+    <SWRConfig
+      value={{
+        onError: handleError,
+        shouldRetryOnError: false,
+      }}
+    >
+      {children}
+    </SWRConfig>
+  );
+}
 
 function AuthErrorBanner({ show, message, onDismiss }: { show: boolean; message: string; onDismiss: () => void }) {
   if (!show) return null;
@@ -55,18 +142,28 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setAuthError({ show: false, message: '' });
   };
 
+  // Read any scheme the boot script placed on the root to reduce flicker
+  const initialScheme =
+    typeof document !== 'undefined' && document.documentElement?.dataset?.colorScheme
+      ? (document.documentElement.dataset.colorScheme as 'light' | 'dark' | 'system')
+      : 'dark';
+
   return (
-    <ThemeProvider defaultVariant="admin" defaultColorScheme="dark">
-      <AuthProvider>
-        <ToastProvider>
-          <AuthErrorBanner
-            show={authError.show}
-            message={authError.message}
-            onDismiss={dismissAuthError}
-          />
-          <div className={authError.show ? 'pt-12' : ''}>{children}</div>
-        </ToastProvider>
-      </AuthProvider>
+    <ThemeProvider defaultVariant="admin" defaultColorScheme={initialScheme}>
+      <ThemePersistence>
+        <AuthProvider>
+          <ToastProvider>
+            <SwrErrorBoundary>
+              <AuthErrorBanner
+                show={authError.show}
+                message={authError.message}
+                onDismiss={dismissAuthError}
+              />
+              <div className={authError.show ? 'pt-12' : ''}>{children}</div>
+            </SwrErrorBoundary>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemePersistence>
     </ThemeProvider>
   );
 }

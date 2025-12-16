@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { useWHTTransactions, useWHTRemittanceDue, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { formatCurrency } from '@/lib/utils';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Receipt,
   Plus,
   ArrowLeft,
-  AlertTriangle,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -44,7 +44,7 @@ export default function WHTPage() {
   const [period, setPeriod] = useState('');
   const [showDeductForm, setShowDeductForm] = useState(false);
 
-  const { data, isLoading, error } = useWHTTransactions({
+  const { data, isLoading, error, mutate } = useWHTTransactions({
     period: period || undefined,
     page,
     page_size: pageSize,
@@ -105,12 +105,17 @@ export default function WHTPage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load WHT transactions</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load WHT transactions."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

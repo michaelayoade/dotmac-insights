@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 import enum
 from app.database import Base
+from app.models.document_lines import BillLine
 
 
 # ============= SUPPLIER =============
@@ -282,8 +283,11 @@ class PurchaseInvoice(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships - imported lazily to avoid circular imports
-    # lines: Mapped[List["BillLine"]] = relationship(back_populates="purchase_invoice")
+    # Relationships
+    lines: Mapped[List[BillLine]] = relationship(
+        back_populates="purchase_invoice",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<PurchaseInvoice {self.erpnext_id} - {self.supplier_name}>"
@@ -435,7 +439,7 @@ class BankTransaction(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships - splits for line-level allocation
-    # splits: Mapped[List["BankTransactionSplit"]] = relationship(back_populates="bank_transaction")
+    splits: Mapped[List["BankTransactionSplit"]] = relationship(back_populates="bank_transaction")
 
     def __repr__(self) -> str:
         return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"

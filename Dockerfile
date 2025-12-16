@@ -27,6 +27,8 @@ RUN poetry install --no-root --only main
 
 # Create non-root user
 RUN useradd -m appuser
+# Ensure app directory is writable by the non-root user (Celery beat needs to delete its schedule file)
+RUN chown -R appuser:appuser /app
 
 # Copy application code
 COPY --chown=appuser:appuser . .

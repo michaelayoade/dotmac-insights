@@ -8,7 +8,7 @@ Seeds the reports:read permission for the consolidated reports API.
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from datetime import datetime
 
@@ -22,6 +22,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add reports:read permission and assign to admin, operator, analyst roles."""
+    if context.is_offline_mode():
+        return
+
     connection = op.get_bind()
     now = datetime.utcnow()
 
@@ -84,6 +87,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove reports:read permission and its role mappings."""
+    if context.is_offline_mode():
+        return
+
     connection = op.get_bind()
 
     # Get the permission ID

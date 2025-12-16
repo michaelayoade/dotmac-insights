@@ -216,41 +216,49 @@ export default function OpenBankingConnectionsPage() {
         </select>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data?.items || []}
-        keyField="id"
-        loading={isLoading}
-        emptyMessage="No linked accounts found"
-      />
+      {(() => {
+        const connections = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+        return (
+          <DataTable
+            columns={columns}
+            data={connections}
+            keyField="id"
+            loading={isLoading}
+            emptyMessage="No linked accounts found"
+          />
+        );
+      })()}
 
       {/* Stats Cards */}
-      {data?.items && data.items.length > 0 && (
+      {(() => {
+        const connections = data?.items ?? data?.data ?? (Array.isArray(data) ? data : []);
+        return connections.length ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{data.items.length}</div>
+            <div className="text-2xl font-bold text-white">{connections.length}</div>
             <div className="text-sm text-slate-muted">Total Connections</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
             <div className="text-2xl font-bold text-green-400">
-              {data.items.filter((c: any) => c.status === 'connected').length}
+              {connections.filter((c: any) => c.status === 'connected').length}
             </div>
             <div className="text-sm text-slate-muted">Active</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
             <div className="text-2xl font-bold text-purple-400">
-              {data.items.filter((c: any) => c.provider === 'mono').length}
+              {connections.filter((c: any) => c.provider === 'mono').length}
             </div>
             <div className="text-sm text-slate-muted">Via Mono</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
             <div className="text-2xl font-bold text-teal-electric">
-              {data.items.filter((c: any) => c.provider === 'okra').length}
+              {connections.filter((c: any) => c.provider === 'okra').length}
             </div>
             <div className="text-sm text-slate-muted">Via Okra</div>
           </div>
         </div>
-      )}
+        ) : null;
+      })()}
 
       {/* Unlink Modal */}
       {showUnlinkModal && selectedConnection && (

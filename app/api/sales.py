@@ -926,7 +926,7 @@ async def list_invoices(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List invoices with filtering, search, sort, and pagination (single-currency only)."""
-    query = db.query(Invoice).filter(Invoice.is_deleted == False)
+    query = db.query(Invoice)
 
     if status:
         try:
@@ -1021,7 +1021,7 @@ async def get_invoice(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get detailed invoice information."""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.is_deleted == False).first()
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
 
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -1076,7 +1076,7 @@ async def update_invoice(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update an existing invoice stored locally."""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.is_deleted == False).first()
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 

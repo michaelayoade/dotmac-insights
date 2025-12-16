@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useAccountingReceivables, useAccountingReceivablesEnhanced } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, Users, Calendar, Download } from 'lucide-react';
+import { Users, Calendar, Download } from 'lucide-react';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -62,11 +64,20 @@ function getAgingBadge(daysOverdue: number | undefined | null) {
 }
 
 export default function AccountsReceivablePage() {
-  const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(20);
-  const [customerSearch, setCustomerSearch] = useState<string>('');
-  const [minAmount, setMinAmount] = useState<string>('');
-  const [enhanced, setEnhanced] = useState(false);
+  const [filters, setFilters] = usePersistentState<{
+    offset: number;
+    limit: number;
+    customerSearch: string;
+    minAmount: string;
+    enhanced: boolean;
+  }>('books.ar.filters', {
+    offset: 0,
+    limit: 20,
+    customerSearch: '',
+    minAmount: '',
+    enhanced: false,
+  });
+  const { offset, limit, customerSearch, minAmount, enhanced } = filters;
 
   const params = {
     search: customerSearch || undefined,
@@ -155,12 +166,20 @@ export default function AccountsReceivablePage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load accounts receivable</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load accounts receivable."
+        error={error as Error}
+        onRetry={() => {
+          base.mutate?.();
+          enhancedResult.mutate?.();
+        }}
+      />
     );
   }
 
@@ -199,7 +218,7 @@ export default function AccountsReceivablePage() {
             type="text"
             placeholder="Search by customer name..."
             value={customerSearch}
-            onChange={(e) => { setCustomerSearch(e.target.value); setOffset(0); }}
+            onChange={(e) => { setFilters((prev) => ({ ...prev, customerSearch: e.target.value, offset: 0 })); }}
             className="input-field"
           />
         </div>
@@ -208,17 +227,17 @@ export default function AccountsReceivablePage() {
             type="number"
             placeholder="Min amount"
             value={minAmount}
-            onChange={(e) => { setMinAmount(e.target.value); setOffset(0); }}
+            onChange={(e) => { setFilters((prev) => ({ ...prev, minAmount: e.target.value, offset: 0 })); }}
             className="input-field"
           />
         </div>
         <label className="flex items-center gap-2 text-slate-muted text-sm">
-          <input type="checkbox" checked={enhanced} onChange={(e) => setEnhanced(e.target.checked)} />
+          <input type="checkbox" checked={enhanced} onChange={(e) => setFilters((prev) => ({ ...prev, enhanced: e.target.checked, offset: 0 }))} />
           Enhanced aging
         </label>
         {(customerSearch || minAmount) && (
           <button
-            onClick={() => { setCustomerSearch(''); setMinAmount(''); setOffset(0); }}
+            onClick={() => { setFilters((prev) => ({ ...prev, customerSearch: '', minAmount: '', offset: 0 })); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters
@@ -248,10 +267,9 @@ export default function AccountsReceivablePage() {
           total={data.total || 0}
           limit={limit}
           offset={offset}
-          onPageChange={setOffset}
+          onPageChange={(newOffset) => setFilters((prev) => ({ ...prev, offset: newOffset }))}
           onLimitChange={(newLimit) => {
-            setLimit(newLimit);
-            setOffset(0);
+            setFilters((prev) => ({ ...prev, limit: newLimit, offset: 0 }));
           }}
         />
       )}

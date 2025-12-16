@@ -6,7 +6,6 @@ import { useTaxSettings, useTaxMutations } from '@/hooks/useApi';
 import {
   Settings,
   ArrowLeft,
-  AlertTriangle,
   Save,
   Building2,
   FileText,
@@ -14,6 +13,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 const PAYE_FILING_FREQUENCIES = [
   { value: 'MONTHLY', label: 'Monthly' },
@@ -28,7 +28,7 @@ const CIT_COMPANY_SIZES = [
 ];
 
 export default function TaxSettingsPage() {
-  const { data: settings, isLoading, error } = useTaxSettings();
+  const { data: settings, isLoading, error, mutate } = useTaxSettings();
   const { updateSettings } = useTaxMutations();
 
   const [form, setForm] = useState({
@@ -74,7 +74,11 @@ export default function TaxSettingsPage() {
     setSaving(true);
     setSaved(false);
     try {
-      await updateSettings(form);
+      await updateSettings({
+        ...form,
+        cit_company_size: form.cit_company_size as any,
+        paye_filing_frequency: form.paye_filing_frequency as any,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -82,39 +86,17 @@ export default function TaxSettingsPage() {
     }
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load tax settings</p>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Tax
-          </Link>
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-slate-muted animate-spin" />
-            <h1 className="text-xl font-semibold text-white">Tax Settings</h1>
-          </div>
-        </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 bg-slate-elevated rounded animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
+      <ErrorDisplay
+        message="Failed to load tax settings."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

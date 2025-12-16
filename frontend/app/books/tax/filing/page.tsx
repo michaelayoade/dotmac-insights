@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useFilingCalendar, useUpcomingFilings, useOverdueFilings } from '@/hooks/useApi';
 import { formatCurrency } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Calendar,
   ArrowLeft,
-  AlertTriangle,
   Clock,
   CheckCircle2,
   XCircle,
@@ -45,23 +46,35 @@ const TAX_TYPE_COLORS: Record<string, { bg: string; text: string; icon: string }
 };
 
 export default function FilingCalendarPage() {
-  const [taxTypeFilter, setTaxTypeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [filters, setFilters] = usePersistentState<{
+    taxType: string;
+    status: string;
+    year: number;
+  }>('books.tax.filing.filters', {
+    taxType: '',
+    status: '',
+    year: new Date().getFullYear(),
+  });
+  const { taxType: taxTypeFilter, status: statusFilter, year } = filters;
 
-  const { data: calendar, isLoading, error } = useFilingCalendar({
+  const { data: calendar, isLoading, error, mutate } = useFilingCalendar({
     year,
     tax_type: taxTypeFilter || undefined,
   });
   const { data: upcoming } = useUpcomingFilings({ days: 60 });
   const { data: overdue } = useOverdueFilings();
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load filing calendar</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load filing calendar."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -106,7 +119,7 @@ export default function FilingCalendarPage() {
       {overdue && overdue.length > 0 && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <Clock className="w-5 h-5 text-red-400" />
             <h3 className="text-red-400 font-semibold">Overdue Filings ({overdue.length})</h3>
           </div>
           <div className="space-y-2">

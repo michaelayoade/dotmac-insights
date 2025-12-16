@@ -23,6 +23,8 @@ import {
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return '-';
@@ -133,18 +135,31 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function SupportTicketsPage() {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [priority, setPriority] = useState<string>('');
-  const [status, setStatus] = useState<string>('');
-  const [ticketType, setTicketType] = useState<string>('');
-  const [agent, setAgent] = useState<string>('');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [quickFilter, setQuickFilter] = useState<string>('');
+  const [filters, setFilters] = usePersistentState<{
+    page: number;
+    pageSize: number;
+    priority: string;
+    status: string;
+    ticketType: string;
+    agent: string;
+    startDate: string;
+    endDate: string;
+    quickFilter: string;
+  }>('support.tickets.filters', {
+    page: 1,
+    pageSize: 20,
+    priority: '',
+    status: '',
+    ticketType: '',
+    agent: '',
+    startDate: '',
+    endDate: '',
+    quickFilter: '',
+  });
+  const { page, pageSize, priority, status, ticketType, agent, startDate, endDate, quickFilter } = filters;
   const offset = (page - 1) * pageSize;
 
-  const { data, isLoading, error } = useSupportTickets({
+  const { data, isLoading, error, mutate } = useSupportTickets({
     priority: (priority as any) || undefined,
     status: status || undefined,
     ticket_type: ticketType || undefined,
@@ -163,34 +178,31 @@ export default function SupportTicketsPage() {
 
   const handleQuickFilter = (filter: string) => {
     if (quickFilter === filter) {
-      setQuickFilter('');
-      setStatus('');
-      setPriority('');
+      setFilters((prev) => ({ ...prev, quickFilter: '', status: '', priority: '', page: 1 }));
     } else {
-      setQuickFilter(filter);
+      setFilters((prev) => ({ ...prev, quickFilter: filter, page: 1 }));
       if (filter === 'open') {
-        setStatus('open');
-        setPriority('');
+        setFilters((prev) => ({ ...prev, status: 'open', priority: '' }));
       } else if (filter === 'urgent') {
-        setPriority('urgent');
-        setStatus('');
+        setFilters((prev) => ({ ...prev, priority: 'urgent', status: '' }));
       } else if (filter === 'resolved') {
-        setStatus('resolved');
-        setPriority('');
+        setFilters((prev) => ({ ...prev, status: 'resolved', priority: '' }));
       }
     }
-    setPage(1);
   };
 
   const clearFilters = () => {
-    setPriority('');
-    setStatus('');
-    setTicketType('');
-    setAgent('');
-    setStartDate('');
-    setEndDate('');
-    setQuickFilter('');
-    setPage(1);
+    setFilters({
+      ...filters,
+      priority: '',
+      status: '',
+      ticketType: '',
+      agent: '',
+      startDate: '',
+      endDate: '',
+      quickFilter: '',
+      page: 1,
+    });
   };
 
   const hasActiveFilters = priority || status || ticketType || agent || startDate || endDate;
@@ -267,6 +279,20 @@ export default function SupportTicketsPage() {
       ),
     },
   ];
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load support tickets."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -357,29 +383,25 @@ export default function SupportTicketsPage() {
             <input
               value={agent}
               onChange={(e) => {
-                setAgent(e.target.value);
-                setPage(1);
+                setFilters((prev) => ({ ...prev, agent: e.target.value, page: 1 }));
               }}
               placeholder="Search agent/email..."
               className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <input
-            value={ticketType}
-            onChange={(e) => {
-              setTicketType(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Ticket type..."
+          value={ticketType}
+          onChange={(e) => {
+            setFilters((prev) => ({ ...prev, ticketType: e.target.value, page: 1 }));
+          }}
+          placeholder="Ticket type..."
             className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <select
-            value={priority}
-            onChange={(e) => {
-              setPriority(e.target.value);
-              setQuickFilter('');
-              setPage(1);
-            }}
+          value={priority}
+          onChange={(e) => {
+            setFilters((prev) => ({ ...prev, priority: e.target.value, quickFilter: '', page: 1 }));
+          }}
             className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Priorities</option>
@@ -389,12 +411,10 @@ export default function SupportTicketsPage() {
             <option value="urgent">Urgent</option>
           </select>
           <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setQuickFilter('');
-              setPage(1);
-            }}
+          value={status}
+          onChange={(e) => {
+            setFilters((prev) => ({ ...prev, status: e.target.value, quickFilter: '', page: 1 }));
+          }}
             className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Statuses</option>
@@ -415,8 +435,7 @@ export default function SupportTicketsPage() {
               type="date"
               value={startDate}
               onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
+                setFilters((prev) => ({ ...prev, startDate: e.target.value, page: 1 }));
               }}
               className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
@@ -425,8 +444,7 @@ export default function SupportTicketsPage() {
               type="date"
               value={endDate}
               onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
+                setFilters((prev) => ({ ...prev, endDate: e.target.value, page: 1 }));
               }}
               className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
@@ -483,10 +501,11 @@ export default function SupportTicketsPage() {
           total={total}
           limit={pageSize}
           offset={offset}
-          onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+          onPageChange={(newOffset) =>
+            setFilters((prev) => ({ ...prev, page: Math.floor(newOffset / pageSize) + 1 }))
+          }
           onLimitChange={(newLimit) => {
-            setPageSize(newLimit);
-            setPage(1);
+            setFilters((prev) => ({ ...prev, pageSize: newLimit, page: 1 }));
           }}
         />
       )}

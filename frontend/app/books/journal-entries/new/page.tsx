@@ -5,13 +5,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Calendar as CalendarIcon, Hash, Plus, Trash2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useJournalEntryAdminMutations } from '@/hooks/useApi';
+import { useJournalEntryAdminMutations, useAccountingChartOfAccounts } from '@/hooks/useApi';
+import { AccountSearch } from '@/components/EntitySearch';
 
 type Line = { account: string; description: string; debit: number; credit: number; cost_center: string };
+type SelectedAccount = { name: string; account_number?: string } | null;
 
 export default function NewJournalEntryPage() {
   const router = useRouter();
   const { create, submit, approve } = useJournalEntryAdminMutations();
+  const { data: accountsData, isLoading: accountsLoading } = useAccountingChartOfAccounts();
+  const accounts = useMemo(() => (accountsData as any)?.accounts || accountsData || [], [accountsData]);
+
   const [form, setForm] = useState({
     reference: '',
     posting_date: '',
@@ -22,6 +27,7 @@ export default function NewJournalEntryPage() {
     { account: '', description: '', debit: 0, credit: 0, cost_center: '' },
     { account: '', description: '', debit: 0, credit: 0, cost_center: '' },
   ]);
+  const [selectedAccounts, setSelectedAccounts] = useState<SelectedAccount[]>([null, null]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -35,14 +41,37 @@ export default function NewJournalEntryPage() {
     if (field === 'debit' || field === 'credit') {
       updated[idx][field] = Number(value) || 0;
     } else {
-      // @ts-expect-error string assignment
       updated[idx][field] = value;
     }
     setLines(updated);
   };
 
-  const addLine = () => setLines((prev) => [...prev, { account: '', description: '', debit: 0, credit: 0, cost_center: '' }]);
-  const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
+  const handleAccountSelect = (idx: number, account: SelectedAccount) => {
+    const updatedAccounts = [...selectedAccounts];
+    updatedAccounts[idx] = account;
+    setSelectedAccounts(updatedAccounts);
+
+    // Update line account value
+    const updated = [...lines];
+    if (account) {
+      updated[idx].account = account.account_number
+        ? `${account.account_number} - ${account.name}`
+        : account.name;
+    } else {
+      updated[idx].account = '';
+    }
+    setLines(updated);
+  };
+
+  const addLine = () => {
+    setLines((prev) => [...prev, { account: '', description: '', debit: 0, credit: 0, cost_center: '' }]);
+    setSelectedAccounts((prev) => [...prev, null]);
+  };
+
+  const removeLine = (idx: number) => {
+    setLines((prev) => prev.filter((_, i) => i !== idx));
+    setSelectedAccounts((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const totals = useMemo(() => {
     const debit = lines.reduce((acc, line) => acc + (line.debit || 0), 0);
@@ -144,13 +173,13 @@ export default function NewJournalEntryPage() {
           </div>
           <div className="space-y-3">
             {lines.map((line, idx) => (
-              <div key={idx} className="grid grid-cols-1 md:grid-cols-[1.5fr_2fr_1fr_1fr_1fr_auto] gap-3 items-center bg-slate-elevated border border-slate-border rounded-lg p-3">
-                <Input
+              <div key={idx} className="grid grid-cols-1 md:grid-cols-[1.5fr_2fr_1fr_1fr_1fr_auto] gap-3 items-start bg-slate-elevated border border-slate-border rounded-lg p-3">
+                <AccountSearch
                   label="Account"
-                  name={`account-${idx}`}
-                  value={line.account}
-                  onChange={(e) => handleLineChange(idx, 'account', e.target.value)}
-                  placeholder="4000 - Revenue"
+                  accounts={accounts}
+                  value={selectedAccounts[idx]}
+                  onSelect={(account) => handleAccountSelect(idx, account)}
+                  loading={accountsLoading}
                   required
                 />
                 <Input
@@ -185,7 +214,7 @@ export default function NewJournalEntryPage() {
                   onChange={(e) => handleLineChange(idx, 'cost_center', e.target.value)}
                   placeholder="Optional"
                 />
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-6">
                   <button
                     type="button"
                     onClick={() => removeLine(idx)}

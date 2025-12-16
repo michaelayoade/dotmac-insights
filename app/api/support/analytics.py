@@ -20,6 +20,63 @@ router = APIRouter()
 # ANALYTICS
 # =============================================================================
 
+@router.get("/analytics/overview", dependencies=[Depends(Require("analytics:read"))])
+def get_support_overview(
+    months: int = Query(default=6, le=24),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Lightweight overview used by the support dashboards."""
+    end_dt = datetime.utcnow()
+    start_dt = end_dt - timedelta(days=months * 30)
+
+    total = db.query(func.count(Ticket.id)).scalar() or 0
+    open_count = db.query(func.count(Ticket.id)).filter(
+        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.IN_PROGRESS])
+    ).scalar() or 0
+    resolved = db.query(func.count(Ticket.id)).filter(Ticket.status == TicketStatus.RESOLVED).scalar() or 0
+    closed = db.query(func.count(Ticket.id)).filter(Ticket.status == TicketStatus.CLOSED).scalar() or 0
+
+    # Resolution time (hours)
+    resolution_hours = func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
+    resolution_stats = db.query(
+        func.avg(resolution_hours).label("avg_hours"),
+        func.count(Ticket.id).label("count"),
+    ).filter(
+        Ticket.resolution_date.isnot(None),
+        Ticket.opening_date.isnot(None),
+        Ticket.resolution_date >= start_dt,
+    ).first()
+
+    # SLA attainment
+    sla_met = db.query(func.count(Ticket.id)).filter(
+        Ticket.resolution_by.isnot(None),
+        Ticket.resolution_date.isnot(None),
+        Ticket.resolution_date <= Ticket.resolution_by,
+    ).scalar() or 0
+    sla_total = db.query(func.count(Ticket.id)).filter(
+        Ticket.resolution_by.isnot(None),
+        Ticket.resolution_date.isnot(None),
+    ).scalar() or 0
+
+    return {
+        "ticket_volume": {
+            "total": total,
+            "open": open_count,
+            "resolved": resolved,
+            "closed": closed,
+        },
+        "resolution_time": {
+            "avg_hours": round(float(resolution_stats.avg_hours or 0), 1) if resolution_stats else 0,
+            "sample_size": int(resolution_stats.count or 0) if resolution_stats else 0,
+        },
+        "sla": {
+            "met": sla_met,
+            "total_tracked": sla_total,
+            "attainment_rate": round(sla_met / sla_total * 100, 1) if sla_total > 0 else 0,
+        },
+        "trend_window_months": months,
+    }
+
 @router.get("/analytics/volume-trend", dependencies=[Depends(Require("analytics:read"))])
 def get_volume_trend(
     months: int = Query(default=12, le=24),
@@ -190,6 +247,38 @@ async def get_sla_performance(
         }
         for s in sla_data
     ]
+
+
+@router.get("/metrics", dependencies=[Depends(Require("analytics:read"))])
+def get_support_metrics(
+    days: int = Query(default=30, le=90),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Alias for support metrics expected by the frontend."""
+    start_dt = datetime.utcnow() - timedelta(days=days)
+
+    total = db.query(func.count(Ticket.id)).filter(Ticket.created_at >= start_dt).scalar() or 0
+    resolved = db.query(func.count(Ticket.id)).filter(
+        Ticket.created_at >= start_dt,
+        Ticket.status.in_([TicketStatus.RESOLVED, TicketStatus.CLOSED])
+    ).scalar() or 0
+    avg_resolution_hours = db.query(
+        func.avg(
+            func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
+        )
+    ).filter(
+        Ticket.created_at >= start_dt,
+        Ticket.resolution_date.isnot(None),
+        Ticket.opening_date.isnot(None),
+    ).scalar()
+
+    return {
+        "period_days": days,
+        "total": total,
+        "resolved": resolved,
+        "open": max(total - resolved, 0),
+        "avg_resolution_hours": round(float(avg_resolution_hours or 0), 1),
+    }
 
 
 # =============================================================================

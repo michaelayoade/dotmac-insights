@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import dayjs from "dayjs";
 import { useExpenseClaimDetail, useExpenseMutations } from "@/hooks/useExpenses";
+import { formatDate } from "@/lib/utils";
 
 export default function ExpenseClaimDetailPage() {
   const params = useParams<{ id: string }>();
@@ -62,7 +62,7 @@ export default function ExpenseClaimDetailPage() {
             {data.claim_number || `Draft #${data.id}`} <span className="text-sm text-gray-500">({data.status})</span>
           </h2>
           <p className="text-sm text-gray-500">
-            Date: {dayjs(data.claim_date).format("YYYY-MM-DD")} · Employee: {data.employee_id}
+            Date: {formatDate(data.claim_date)} · Employee: {data.employee_id}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">{actions}</div>
@@ -93,7 +93,7 @@ export default function ExpenseClaimDetailPage() {
             {data.lines.map((line) => (
               <tr key={line.id}>
                 <td className="px-4 py-2 text-sm text-gray-900">{line.description}</td>
-                <td className="px-4 py-2 text-sm text-gray-700">{dayjs(line.expense_date).format("YYYY-MM-DD")}</td>
+                <td className="px-4 py-2 text-sm text-gray-700">{formatDate(line.expense_date)}</td>
                 <td className="px-4 py-2 text-sm text-gray-700">#{line.category_id}</td>
                 <td className="px-4 py-2 text-sm font-medium text-gray-900">
                   {line.claimed_amount.toLocaleString()} {line.currency}

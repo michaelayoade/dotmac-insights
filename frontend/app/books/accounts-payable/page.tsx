@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useAccountingPayables } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, ArrowDownToLine, Calendar, Download } from 'lucide-react';
+import { ArrowDownToLine, Calendar, Download } from 'lucide-react';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -62,12 +64,20 @@ function getAgingBadge(daysOverdue: number | undefined | null) {
 }
 
 export default function AccountsPayablePage() {
-  const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(20);
-  const [supplierSearch, setSupplierSearch] = useState<string>('');
-  const [currency, setCurrency] = useState<string>('NGN');
+  const [filters, setFilters] = usePersistentState<{
+    offset: number;
+    limit: number;
+    supplierSearch: string;
+    currency: string;
+  }>('books.ap.filters', {
+    offset: 0,
+    limit: 20,
+    supplierSearch: '',
+    currency: 'NGN',
+  });
+  const { offset, limit, supplierSearch, currency } = filters;
 
-  const { data, isLoading, error } = useAccountingPayables({
+  const { data, isLoading, error, mutate } = useAccountingPayables({
     currency: currency || undefined,
     limit,
     offset,
@@ -140,12 +150,17 @@ export default function AccountsPayablePage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load accounts payable</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load accounts payable."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -185,13 +200,13 @@ export default function AccountsPayablePage() {
             type="text"
             placeholder="Search by supplier name..."
             value={supplierSearch}
-            onChange={(e) => { setSupplierSearch(e.target.value); setOffset(0); }}
+            onChange={(e) => { setFilters((prev) => ({ ...prev, supplierSearch: e.target.value, offset: 0 })); }}
             className="input-field"
           />
         </div>
         <select
           value={currency}
-          onChange={(e) => { setCurrency(e.target.value); setOffset(0); }}
+          onChange={(e) => { setFilters((prev) => ({ ...prev, currency: e.target.value, offset: 0 })); }}
           className="input-field"
         >
           <option value="NGN">NGN</option>
@@ -199,7 +214,7 @@ export default function AccountsPayablePage() {
         </select>
         {supplierSearch && (
           <button
-            onClick={() => { setSupplierSearch(''); setOffset(0); }}
+            onClick={() => { setFilters((prev) => ({ ...prev, supplierSearch: '', offset: 0 })); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear filters
@@ -229,10 +244,9 @@ export default function AccountsPayablePage() {
           total={totalSuppliers}
           limit={limit}
           offset={offset}
-          onPageChange={setOffset}
+          onPageChange={(newOffset) => setFilters((prev) => ({ ...prev, offset: newOffset }))}
           onLimitChange={(newLimit) => {
-            setLimit(newLimit);
-            setOffset(0);
+            setFilters((prev) => ({ ...prev, limit: newLimit, offset: 0 }));
           }}
         />
       )}

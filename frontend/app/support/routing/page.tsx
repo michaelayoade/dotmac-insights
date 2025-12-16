@@ -20,6 +20,7 @@ export default function SupportRoutingPage() {
   const queue = useSupportRoutingQueueHealth();
   const workload = useSupportRoutingWorkload(teamId ? Number(teamId) : undefined);
   const { data: teamsData } = useSupportTeams();
+  const queueData = (queue.data || {}) as any;
 
   const teams = teamsData?.teams || [];
   const teamMap = new Map(teams.map((t) => [t.id, t.team_name]));
@@ -70,42 +71,42 @@ export default function SupportRoutingPage() {
             <div className="text-center">
               <p className={cn(
                 'text-2xl font-bold',
-                queue.data.unassigned_tickets > 10 ? 'text-rose-400' :
-                queue.data.unassigned_tickets > 5 ? 'text-amber-400' : 'text-white'
+                queueData.unassigned_tickets > 10 ? 'text-rose-400' :
+                queueData.unassigned_tickets > 5 ? 'text-amber-400' : 'text-white'
               )}>
-                {queue.data.unassigned_tickets ?? 0}
+                {queueData.unassigned_tickets ?? 0}
               </p>
               <p className="text-xs text-slate-muted">Unassigned</p>
             </div>
             <div className="text-center">
               <p className={cn(
                 'text-2xl font-bold',
-                (queue.data.avg_wait_hours ?? 0) > 4 ? 'text-rose-400' :
-                (queue.data.avg_wait_hours ?? 0) > 2 ? 'text-amber-400' : 'text-emerald-400'
+                (queueData.avg_wait_hours ?? 0) > 4 ? 'text-rose-400' :
+                (queueData.avg_wait_hours ?? 0) > 2 ? 'text-amber-400' : 'text-emerald-400'
               )}>
-                {(queue.data.avg_wait_hours ?? 0).toFixed(1)}h
+                {(queueData.avg_wait_hours ?? 0).toFixed(1)}h
               </p>
               <p className="text-xs text-slate-muted">Avg Wait</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-blue-400">{queue.data.total_agents ?? 0}</p>
+              <p className="text-2xl font-bold text-blue-400">{queueData.total_agents ?? 0}</p>
               <p className="text-xs text-slate-muted">Agents</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-emerald-400">{queue.data.total_capacity ?? 0}</p>
+              <p className="text-2xl font-bold text-emerald-400">{queueData.total_capacity ?? 0}</p>
               <p className="text-xs text-slate-muted">Capacity</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-violet-400">{queue.data.total_load ?? 0}</p>
+              <p className="text-2xl font-bold text-violet-400">{queueData.total_load ?? 0}</p>
               <p className="text-xs text-slate-muted">Current Load</p>
             </div>
             <div className="text-center">
               <p className={cn(
                 'text-2xl font-bold',
-                (queue.data.overall_utilization_pct ?? 0) > 90 ? 'text-rose-400' :
-                (queue.data.overall_utilization_pct ?? 0) > 70 ? 'text-amber-400' : 'text-teal-electric'
+                (queueData.overall_utilization_pct ?? 0) > 90 ? 'text-rose-400' :
+                (queueData.overall_utilization_pct ?? 0) > 70 ? 'text-amber-400' : 'text-teal-electric'
               )}>
-                {(queue.data.overall_utilization_pct ?? 0).toFixed(0)}%
+                {(queueData.overall_utilization_pct ?? 0).toFixed(0)}%
               </p>
               <p className="text-xs text-slate-muted">Utilization</p>
             </div>
@@ -196,8 +197,8 @@ export default function SupportRoutingPage() {
                     </span>
                   </div>
                   <ProgressBar
-                    value={agent.current_load}
-                    max={agent.capacity}
+                    value={agent.current_load ?? 0}
+                    max={agent.capacity ?? 0}
                     color={(agent.utilization_pct ?? 0) > 90 ? 'bg-rose-500' :
                            (agent.utilization_pct ?? 0) > 70 ? 'bg-amber-500' : 'bg-emerald-500'}
                   />

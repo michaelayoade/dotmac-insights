@@ -806,26 +806,9 @@ class ERPNextSync(BaseSyncClient):
                 for p in self.db.query(Project).filter(Project.erpnext_id.isnot(None)).all()
             }
 
-            # OPTIMIZATION: Batch fetch Expense Claim Detail child records to avoid N+1
-            # This fetches all expense details in one API call instead of N individual calls
+            # Skipping Expense Claim Detail prefetch to avoid 403 permission errors on that doctype.
             expense_details: Dict[str, List[Dict[str, Any]]] = {}
-            try:
-                all_details = await self._fetch_all_doctype(
-                    client,
-                    "Expense Claim Detail",
-                    fields=["parent", "expense_type", "description"],
-                )
-                # Group by parent expense claim
-                for detail in all_details:
-                    parent = detail.get("parent")
-                    if parent:
-                        if parent not in expense_details:
-                            expense_details[parent] = []
-                        expense_details[parent].append(detail)
-                logger.info("expense_details_prefetched", total=len(all_details), unique_claims=len(expense_details))
-            except Exception as e:
-                logger.warning("failed_to_prefetch_expense_details", error=str(e))
-                # Continue without details - N+1 fallback disabled for performance
+            logger.info("expense_details_prefetch_skipped", reason="disabled to avoid permission errors")
 
             # Helper for Decimal conversion
             def to_decimal(val: Any) -> Decimal:
@@ -912,7 +895,7 @@ class ERPNextSync(BaseSyncClient):
                     existing.docstatus = exp_data.get("docstatus", 0)
 
                     # Task
-                    existing.task = exp_data.get("task")
+                    existing.erpnext_task = exp_data.get("task")
 
                     existing.last_synced_at = datetime.utcnow()
 
@@ -977,7 +960,7 @@ class ERPNextSync(BaseSyncClient):
                         docstatus=exp_data.get("docstatus", 0),
 
                         # Task
-                        task=exp_data.get("task"),
+                        erpnext_task=exp_data.get("task"),
                     )
 
                     # Dates

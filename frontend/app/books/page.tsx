@@ -49,6 +49,7 @@ import {
   FileText,
   Plus,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 // Chart color palette matching the teal/finance theme
 const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899'];
@@ -160,19 +161,49 @@ function formatCompactCurrency(value: number): string {
 export default function AccountingDashboardPage() {
   const currency = 'NGN';
   // Fetch data from multiple endpoints
-  const { data: dashboard, isLoading: dashboardLoading } = useAccountingDashboard(currency);
-  const { data: balanceSheet, isLoading: bsLoading } = useAccountingBalanceSheet({ currency });
-  const { data: incomeStatement, isLoading: isLoading } = useAccountingIncomeStatement({ currency });
-  const { data: suppliers } = useAccountingSuppliers({ limit: 1, currency });
-  const { data: bankAccounts } = useAccountingBankAccounts();
-  const { data: ledger } = useAccountingGeneralLedger({ limit: 1, currency });
-  const { data: receivables } = useAccountingReceivables({ currency });
-  const { data: fiscalYears } = useAccountingFiscalYears();
-  const { data: receivablesOutstanding } = useAccountingReceivablesOutstanding({ currency, top: 5 });
-  const { data: payablesOutstanding } = useAccountingPayablesOutstanding({ currency, top: 5 });
-  const { data: cashFlow } = useAccountingCashFlow();
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useAccountingDashboard(currency);
+  const { data: balanceSheet, isLoading: bsLoading, error: bsError, mutate: refetchBalance } = useAccountingBalanceSheet({ currency });
+  const { data: incomeStatement, isLoading: incomeLoading, error: incomeError, mutate: refetchIncome } = useAccountingIncomeStatement({ currency });
+  const { data: suppliers, isLoading: suppliersLoading, error: suppliersError, mutate: refetchSuppliers } = useAccountingSuppliers({ limit: 1, currency });
+  const { data: bankAccounts, isLoading: bankLoading, error: bankError, mutate: refetchBank } = useAccountingBankAccounts();
+  const { data: ledger, isLoading: ledgerLoading, error: ledgerError, mutate: refetchLedger } = useAccountingGeneralLedger({ limit: 1, currency });
+  const { data: receivables, isLoading: receivablesLoading, error: receivablesError, mutate: refetchReceivables } = useAccountingReceivables({ currency });
+  const { data: fiscalYears, isLoading: fiscalLoading, error: fiscalError, mutate: refetchFiscal } = useAccountingFiscalYears();
+  const { data: receivablesOutstanding, isLoading: receivablesOutstandingLoading, error: receivablesOutstandingError, mutate: refetchReceivablesOutstanding } = useAccountingReceivablesOutstanding({ currency, top: 5 });
+  const { data: payablesOutstanding, isLoading: payablesOutstandingLoading, error: payablesOutstandingError, mutate: refetchPayablesOutstanding } = useAccountingPayablesOutstanding({ currency, top: 5 });
+  const { data: cashFlow, isLoading: cashFlowLoading, error: cashFlowError, mutate: refetchCashFlow } = useAccountingCashFlow();
 
-  const loading = bsLoading || isLoading || dashboardLoading;
+  const swrStates = [
+    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
+    { error: bsError, isLoading: bsLoading, mutate: refetchBalance },
+    { error: incomeError, isLoading: incomeLoading, mutate: refetchIncome },
+    { error: suppliersError, isLoading: suppliersLoading, mutate: refetchSuppliers },
+    { error: bankError, isLoading: bankLoading, mutate: refetchBank },
+    { error: ledgerError, isLoading: ledgerLoading, mutate: refetchLedger },
+    { error: receivablesError, isLoading: receivablesLoading, mutate: refetchReceivables },
+    { error: fiscalError, isLoading: fiscalLoading, mutate: refetchFiscal },
+    { error: receivablesOutstandingError, isLoading: receivablesOutstandingLoading, mutate: refetchReceivablesOutstanding },
+    { error: payablesOutstandingError, isLoading: payablesOutstandingLoading, mutate: refetchPayablesOutstanding },
+    { error: cashFlowError, isLoading: cashFlowLoading, mutate: refetchCashFlow },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const loading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load accounting dashboard data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   // Extract key metrics with dashboard as primary source and statements as fallback
   const totalAssets = dashboard?.summary?.total_assets ?? balanceSheet?.assets?.total ?? 0;

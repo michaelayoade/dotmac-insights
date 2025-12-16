@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { usePurchasingDebitNoteMutations } from '@/hooks/useApi';
+import { usePurchasingDebitNoteMutations, useAccountingSuppliers } from '@/hooks/useApi';
 import { AlertTriangle, ArrowLeft, Save, Plus, Trash2, Percent, Calendar as CalendarIcon, Hash, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SupplierSearch } from '@/components/EntitySearch';
 
 export default function NewDebitNotePage() {
   const router = useRouter();
   const { createDebitNote } = usePurchasingDebitNoteMutations();
+  const { data: suppliersData, isLoading: suppliersLoading } = useAccountingSuppliers({ limit: 200, offset: 0 });
+  const suppliers = useMemo(() => (suppliersData as any)?.suppliers || (suppliersData as any)?.items || [], [suppliersData]);
+
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<{ id: number | string; name: string } | null>(null);
   const [form, setForm] = useState({
     supplier: '',
     supplier_name: '',
@@ -21,7 +26,8 @@ export default function NewDebitNotePage() {
     debit_note_number: '',
     memo: '',
   });
-  const [lineItems, setLineItems] = useState([{ description: '', quantity: 1, unit_price: 0, tax_rate: 0 }]);
+  type LineItem = { description: string; quantity: number; unit_price: number; tax_rate: number };
+  const [lineItems, setLineItems] = useState<LineItem[]>([{ description: '', quantity: 1, unit_price: 0, tax_rate: 0 }]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -30,15 +36,13 @@ export default function NewDebitNotePage() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleLineChange = (index: number, field: keyof (typeof lineItems)[number], value: string) => {
+  const handleLineChange = (index: number, field: keyof LineItem, value: string) => {
+    const numericFields: Array<keyof LineItem> = ['quantity', 'unit_price', 'tax_rate'];
     const updated = [...lineItems];
-    const numericFields: Array<keyof (typeof lineItems)[number]> = ['quantity', 'unit_price', 'tax_rate'];
-    if (numericFields.includes(field)) {
-      updated[index][field] = Number(value) || 0;
-    } else {
-      // @ts-expect-error string field assignment
-      updated[index][field] = value;
-    }
+    updated[index] = {
+      ...updated[index],
+      [field]: numericFields.includes(field) ? (Number(value) || 0) : value,
+    } as LineItem;
     setLineItems(updated);
   };
 
@@ -56,7 +60,7 @@ export default function NewDebitNotePage() {
   }, [lineItems]);
 
   const validate = () => {
-    if (!form.supplier && !form.supplier_name) return 'Supplier is required';
+    if (!selectedSupplier && !form.supplier && !form.supplier_name) return 'Supplier is required';
     if (!form.posting_date) return 'Posting date is required';
     if (!form.due_date) return 'Due date is required';
     if (form.due_date && form.posting_date && form.due_date < form.posting_date) return 'Due date must be on/after posting date';
@@ -85,9 +89,11 @@ export default function NewDebitNotePage() {
     setError(null);
     setSaving(true);
     try {
+      const supplierName = selectedSupplier?.name || form.supplier_name || form.supplier;
+      const supplierId = selectedSupplier?.id || form.supplier || form.supplier_name;
       await createDebitNote({
-        supplier: form.supplier || form.supplier_name,
-        supplier_name: form.supplier_name || form.supplier,
+        supplier: String(supplierId),
+        supplier_name: supplierName,
         posting_date: form.posting_date || undefined,
         due_date: form.due_date || undefined,
         grand_total: totals.total || 0,
@@ -104,7 +110,6 @@ export default function NewDebitNotePage() {
           tax_rate: item.tax_rate || 0,
         })) as any,
         debit_note_number: form.debit_note_number || undefined,
-        memo: form.memo || undefined,
       });
       router.push('/books/accounts-payable/debit-notes');
     } catch (err: any) {
@@ -136,7 +141,14 @@ export default function NewDebitNotePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
           {/* Required fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input label="Supplier Name" name="supplier_name" value={form.supplier_name} onChange={handleChange} required />
+            <SupplierSearch
+              label="Supplier"
+              suppliers={suppliers}
+              value={selectedSupplier}
+              onSelect={setSelectedSupplier}
+              loading={suppliersLoading}
+              required
+            />
             <Input label="Posting Date" name="posting_date" value={form.posting_date} onChange={handleChange} type="date" required />
             <Input
               label="Due Date"
@@ -163,8 +175,7 @@ export default function NewDebitNotePage() {
           {/* Optional fields */}
           {showMoreOptions && (
             <div className="space-y-4 pt-2 border-t border-slate-border/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input label="Supplier ID" name="supplier" value={form.supplier} onChange={handleChange} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Currency" name="currency" value={form.currency} onChange={handleChange} />
                 <Input
                   label="Payment Terms (days)"

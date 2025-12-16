@@ -47,6 +47,7 @@ import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
 import { useAuth, Scope } from '@/lib/auth-context';
 import { useTheme } from '@dotmac/design-tokens';
+import { applyColorScheme } from '@/lib/theme';
 
 interface NavItem {
   name: string;
@@ -247,10 +248,15 @@ const SYNC_SOURCE_KEYS = ['splynx', 'erpnext', 'chatwoot'] as const;
 
 function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   const { isDarkMode, setColorScheme } = useTheme();
+  const toggle = () => {
+    const next = isDarkMode ? 'light' : 'dark';
+    setColorScheme(next);
+    applyColorScheme(next);
+  };
 
   return (
     <button
-      onClick={() => setColorScheme(isDarkMode ? 'light' : 'dark')}
+      onClick={toggle}
       className={cn(
         'flex items-center justify-center rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors',
         collapsed ? 'w-10 h-10' : 'w-full px-3 py-2 gap-2'

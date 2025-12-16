@@ -50,9 +50,12 @@ import {
   useVendorSpend,
   useExpenseTrend,
 } from '@/hooks/useApi';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { formatCurrency, formatNumber, formatPercent, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { RefreshCw } from 'lucide-react';
 
 type TimeRange = 6 | 12 | 24;
 type ActiveTab = 'revenue' | 'sales' | 'support' | 'collections' | 'operations';
@@ -64,50 +67,100 @@ function formatDateParam(date: Date | null): string | undefined {
 
 export default function AnalyticsPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+  const swrGuard = { isPaused: () => authLoading || !hasAccess };
 
   // All hooks must be called before any conditional returns
-  const [timeRange, setTimeRange] = useState<TimeRange>(12);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('revenue');
-  const [dateRange, setDateRange] = useState<DateRange>({ startDate: null, endDate: null });
+  const [filters, setFilters] = usePersistentState<{
+    timeRange: TimeRange;
+    activeTab: ActiveTab;
+    startDate: string | null;
+    endDate: string | null;
+  }>('analytics.filters', {
+    timeRange: 12,
+    activeTab: 'revenue',
+    startDate: null,
+    endDate: null,
+  });
+  const timeRange = filters.timeRange;
+  const activeTab = filters.activeTab;
+  const dateRange: DateRange = {
+    startDate: filters.startDate ? new Date(filters.startDate) : null,
+    endDate: filters.endDate ? new Date(filters.endDate) : null,
+  };
 
   // Date params for API calls
   const startDateStr = formatDateParam(dateRange.startDate);
   const endDateStr = formatDateParam(dateRange.endDate);
 
   // Core data
-  const { data: overview } = useOverview();
-  const { data: revenueTrend } = useRevenueTrend(timeRange, startDateStr, endDateStr);
-  const { data: churnTrend } = useChurnTrend(timeRange, startDateStr, endDateStr);
-  const { data: invoiceAging } = useInvoiceAging();
-  const { data: churnRisk } = useChurnRisk(20);
+  const { data: overview, error: overviewError, isLoading: overviewLoading, mutate: refetchOverview } = useOverview(undefined, swrGuard);
+  const { data: revenueTrend, error: revenueTrendError, isLoading: revenueTrendLoading, mutate: refetchRevenueTrend } = useRevenueTrend(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: churnTrend, error: churnTrendError, isLoading: churnTrendLoading, mutate: refetchChurnTrend } = useChurnTrend(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: invoiceAging, error: invoiceAgingError, isLoading: invoiceAgingLoading, mutate: refetchInvoiceAging } = useInvoiceAging(swrGuard);
+  const { data: churnRisk, error: churnRiskError, isLoading: churnRiskLoading, mutate: refetchChurnRisk } = useChurnRisk(20, swrGuard);
 
   // New analytics data
-  const { data: dsoData } = useDSOTrend(timeRange, startDateStr, endDateStr);
-  const { data: pipelineData } = useSalesPipeline();
-  const { data: slaData } = useSLAAttainment(30);
-  const { data: agentData } = useAgentProductivity(30);
-  const { data: agingBySegment } = useAgingBySegment();
-  const { data: revenueByTerritory } = useRevenueByTerritory(timeRange, startDateStr, endDateStr);
-  const { data: quotationTrend } = useQuotationTrend(timeRange, startDateStr, endDateStr);
-  const { data: ticketsByType } = useTicketsByType(30);
-  const { data: networkStatus } = useNetworkDeviceStatus();
-  const { data: ipUtilization } = useIPUtilization();
-  const { data: expensesByCategory } = useExpensesByCategory(timeRange, startDateStr, endDateStr);
-  const { data: vendorSpend } = useVendorSpend(timeRange, 10, startDateStr, endDateStr);
-  const { data: expenseTrend } = useExpenseTrend(timeRange, startDateStr, endDateStr);
+  const { data: dsoData, error: dsoError, isLoading: dsoLoading, mutate: refetchDso } = useDSOTrend(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: pipelineData, error: pipelineError, isLoading: pipelineLoading, mutate: refetchPipeline } = useSalesPipeline(swrGuard);
+  const { data: slaData, error: slaError, isLoading: slaLoading, mutate: refetchSla } = useSLAAttainment(30, swrGuard);
+  const { data: agentData, error: agentError, isLoading: agentLoading, mutate: refetchAgent } = useAgentProductivity(30, swrGuard);
+  const { data: agingBySegment, error: agingError, isLoading: agingLoading, mutate: refetchAging } = useAgingBySegment(swrGuard);
+  const { data: revenueByTerritory, error: territoryError, isLoading: territoryLoading, mutate: refetchTerritory } = useRevenueByTerritory(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: quotationTrend, error: quotationError, isLoading: quotationLoading, mutate: refetchQuotation } = useQuotationTrend(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: ticketsByType, error: ticketsError, isLoading: ticketsLoading, mutate: refetchTickets } = useTicketsByType(30, swrGuard);
+  const { data: networkStatus, error: networkError, isLoading: networkLoading, mutate: refetchNetwork } = useNetworkDeviceStatus(swrGuard);
+  const { data: ipUtilization, error: ipError, isLoading: ipLoading, mutate: refetchIp } = useIPUtilization(swrGuard);
+  const { data: expensesByCategory, error: expensesError, isLoading: expensesLoading, mutate: refetchExpenses } = useExpensesByCategory(timeRange, startDateStr, endDateStr, swrGuard);
+  const { data: vendorSpend, error: vendorError, isLoading: vendorLoading, mutate: refetchVendor } = useVendorSpend(timeRange, 10, startDateStr, endDateStr, swrGuard);
+  const { data: expenseTrend, error: expenseTrendError, isLoading: expenseTrendLoading, mutate: refetchExpenseTrend } = useExpenseTrend(timeRange, startDateStr, endDateStr, swrGuard);
+
+  const swrStates: Array<{ error: Error | undefined; isLoading: boolean; mutate: () => void }> = [
+    { error: overviewError, isLoading: overviewLoading, mutate: refetchOverview },
+    { error: revenueTrendError, isLoading: revenueTrendLoading, mutate: refetchRevenueTrend },
+    { error: churnTrendError, isLoading: churnTrendLoading, mutate: refetchChurnTrend },
+    { error: invoiceAgingError, isLoading: invoiceAgingLoading, mutate: refetchInvoiceAging },
+    { error: churnRiskError, isLoading: churnRiskLoading, mutate: refetchChurnRisk },
+    { error: dsoError, isLoading: dsoLoading, mutate: refetchDso },
+    { error: pipelineError, isLoading: pipelineLoading, mutate: refetchPipeline },
+    { error: slaError, isLoading: slaLoading, mutate: refetchSla },
+    { error: agentError, isLoading: agentLoading, mutate: refetchAgent },
+    { error: agingError, isLoading: agingLoading, mutate: refetchAging },
+    { error: territoryError, isLoading: territoryLoading, mutate: refetchTerritory },
+    { error: quotationError, isLoading: quotationLoading, mutate: refetchQuotation },
+    { error: ticketsError, isLoading: ticketsLoading, mutate: refetchTickets },
+    { error: networkError, isLoading: networkLoading, mutate: refetchNetwork },
+    { error: ipError, isLoading: ipLoading, mutate: refetchIp },
+    { error: expensesError, isLoading: expensesLoading, mutate: refetchExpenses },
+    { error: vendorError, isLoading: vendorLoading, mutate: refetchVendor },
+    { error: expenseTrendError, isLoading: expenseTrendLoading, mutate: refetchExpenseTrend },
+  ];
+
+  const firstError = swrStates.find((state) => state.error)?.error;
+  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const retryAll = () => swrStates.forEach((state) => state.mutate());
 
   // Auth loading state - after all hooks
   if (authLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
-      </div>
-    );
+    return <LoadingState />;
   }
 
   // Access denied state
   if (!hasAccess) {
     return <AccessDenied />;
+  }
+
+  if (isDataLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load analytics data. Please try again."
+        error={firstError}
+        onRetry={retryAll}
+      />
+    );
   }
 
   const currency = overview?.revenue?.currency || 'NGN';
@@ -152,13 +205,18 @@ export default function AnalyticsPage() {
             Business intelligence and performance metrics
           </p>
         </div>
-
         {/* Filters */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Date Range Picker */}
           <DateRangePicker
             value={dateRange}
-            onChange={setDateRange}
+            onChange={(range) =>
+              setFilters((prev) => ({
+                ...prev,
+                startDate: range.startDate ? range.startDate.toISOString() : null,
+                endDate: range.endDate ? range.endDate.toISOString() : null,
+              }))
+            }
           />
 
           {/* Time Range Selector */}
@@ -166,7 +224,7 @@ export default function AnalyticsPage() {
             {([6, 12, 24] as TimeRange[]).map((range) => (
               <button
                 key={range}
-                onClick={() => setTimeRange(range)}
+                onClick={() => setFilters((prev) => ({ ...prev, timeRange: range }))}
                 className={cn(
                   'px-4 py-2 text-sm font-medium rounded-md transition-all',
                   timeRange === range
@@ -178,6 +236,14 @@ export default function AnalyticsPage() {
               </button>
             ))}
           </div>
+
+          <button
+            onClick={retryAll}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh data
+          </button>
         </div>
       </div>
 
@@ -226,7 +292,7 @@ export default function AnalyticsPage() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setFilters((prev) => ({ ...prev, activeTab: tab.id }))}
             className={cn(
               'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all',
               activeTab === tab.id

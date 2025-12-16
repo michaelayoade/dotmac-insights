@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { usePAYECalculations, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { formatCurrency } from '@/lib/utils';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Users,
   Plus,
   ArrowLeft,
-  AlertTriangle,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -41,7 +41,7 @@ export default function PAYEPage() {
   const [period, setPeriod] = useState('');
   const [showCalculator, setShowCalculator] = useState(false);
 
-  const { data, isLoading, error } = usePAYECalculations({
+  const { data, isLoading, error, mutate } = usePAYECalculations({
     period: period || undefined,
     page,
     page_size: pageSize,
@@ -94,12 +94,17 @@ export default function PAYEPage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load PAYE calculations</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load PAYE calculations."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

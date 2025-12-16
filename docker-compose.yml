@@ -110,7 +110,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    command: celery -A app.worker:celery_app beat --loglevel=info
+    # Store Celery beat schedule in /tmp to avoid permission issues on the app directory
+    command: celery -A app.worker:celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     restart: unless-stopped
 
   frontend:
@@ -119,7 +120,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:8000}
-        NEXT_PUBLIC_SERVICE_TOKEN: ${NEXT_PUBLIC_SERVICE_TOKEN}
+        NEXT_PUBLIC_SERVICE_TOKEN: ${NEXT_PUBLIC_SERVICE_TOKEN:-}
     container_name: dotmac_frontend
     ports:
       - "3000:3000"

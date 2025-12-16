@@ -9,7 +9,7 @@ Phase 2 of helpdesk enhancement:
 - Article attachments and feedback
 - Canned responses (macros)
 """
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
@@ -21,114 +21,153 @@ depends_on = None
 
 
 def upgrade() -> None:
+    existing_tables = set()
+    inspector = None
+    if not context.is_offline_mode():
+        bind = op.get_bind()
+        if bind:
+            inspector = sa.inspect(bind)
+            try:
+                existing_tables = set(inspector.get_table_names())
+            except Exception:
+                existing_tables = set()
+
+    def has_table(name: str) -> bool:
+        if name in existing_tables:
+            return True
+        if inspector:
+            try:
+                return inspector.has_table(name)
+            except Exception:
+                pass
+        # Fallback: use to_regclass
+        try:
+            bind = op.get_bind()
+            if bind:
+                for candidate in (name, f"public.{name}"):
+                    res = bind.execute(sa.text("SELECT to_regclass(:n)"), {"n": candidate}).scalar()
+                    if res:
+                        return True
+        except Exception:
+            return False
+        return False
+
+    if has_table('kb_categories'):
+        # Assume this migration already ran; skip to avoid duplicate tables.
+        return
+
     # ==========================================================================
     # KNOWLEDGE BASE CATEGORIES
     # ==========================================================================
-    op.create_table(
-        'kb_categories',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(255), nullable=False, index=True),
-        sa.Column('slug', sa.String(255), nullable=False, unique=True, index=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('icon', sa.String(100), nullable=True),
-        sa.Column('parent_id', sa.Integer(), sa.ForeignKey('kb_categories.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('display_order', sa.Integer(), default=100),
-        sa.Column('visibility', sa.String(20), default='public', index=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('kb_categories'):
+        op.create_table(
+            'kb_categories',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(255), nullable=False, index=True),
+            sa.Column('slug', sa.String(255), nullable=False, unique=True, index=True),
+            sa.Column('description', sa.Text(), nullable=True),
+            sa.Column('icon', sa.String(100), nullable=True),
+            sa.Column('parent_id', sa.Integer(), sa.ForeignKey('kb_categories.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('display_order', sa.Integer(), default=100),
+            sa.Column('visibility', sa.String(20), default='public', index=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # KNOWLEDGE BASE ARTICLES
     # ==========================================================================
-    op.create_table(
-        'kb_articles',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('title', sa.String(500), nullable=False, index=True),
-        sa.Column('slug', sa.String(500), nullable=False, unique=True, index=True),
-        sa.Column('category_id', sa.Integer(), sa.ForeignKey('kb_categories.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('excerpt', sa.String(500), nullable=True),
-        sa.Column('status', sa.String(20), default='draft', index=True),
-        sa.Column('visibility', sa.String(20), default='public', index=True),
-        sa.Column('search_keywords', sa.Text(), nullable=True),
-        sa.Column('view_count', sa.Integer(), default=0),
-        sa.Column('helpful_count', sa.Integer(), default=0),
-        sa.Column('not_helpful_count', sa.Integer(), default=0),
-        sa.Column('version', sa.Integer(), default=1),
-        sa.Column('published_at', sa.DateTime(), nullable=True),
-        sa.Column('team_ids', sa.JSON(), nullable=True),
-        sa.Column('related_article_ids', sa.JSON(), nullable=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('kb_articles'):
+        op.create_table(
+            'kb_articles',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('title', sa.String(500), nullable=False, index=True),
+            sa.Column('slug', sa.String(500), nullable=False, unique=True, index=True),
+            sa.Column('category_id', sa.Integer(), sa.ForeignKey('kb_categories.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('content', sa.Text(), nullable=False),
+            sa.Column('excerpt', sa.String(500), nullable=True),
+            sa.Column('status', sa.String(20), default='draft', index=True),
+            sa.Column('visibility', sa.String(20), default='public', index=True),
+            sa.Column('search_keywords', sa.Text(), nullable=True),
+            sa.Column('view_count', sa.Integer(), default=0),
+            sa.Column('helpful_count', sa.Integer(), default=0),
+            sa.Column('not_helpful_count', sa.Integer(), default=0),
+            sa.Column('version', sa.Integer(), default=1),
+            sa.Column('published_at', sa.DateTime(), nullable=True),
+            sa.Column('team_ids', sa.JSON(), nullable=True),
+            sa.Column('related_article_ids', sa.JSON(), nullable=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
-    # Full-text search index on title, content, keywords
-    op.execute("""
-        CREATE INDEX ix_kb_articles_fulltext ON kb_articles
-        USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(search_keywords, '')))
-    """)
+        op.execute("""
+            CREATE INDEX ix_kb_articles_fulltext ON kb_articles
+            USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(search_keywords, '')))
+        """)
 
     # ==========================================================================
     # KNOWLEDGE BASE ATTACHMENTS
     # ==========================================================================
-    op.create_table(
-        'kb_article_attachments',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('article_id', sa.Integer(), sa.ForeignKey('kb_articles.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('filename', sa.String(500), nullable=False),
-        sa.Column('url', sa.String(2000), nullable=False),
-        sa.Column('mime_type', sa.String(100), nullable=True),
-        sa.Column('size_bytes', sa.Integer(), nullable=True),
-        sa.Column('display_order', sa.Integer(), default=0),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('kb_article_attachments'):
+        op.create_table(
+            'kb_article_attachments',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('article_id', sa.Integer(), sa.ForeignKey('kb_articles.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('filename', sa.String(500), nullable=False),
+            sa.Column('url', sa.String(2000), nullable=False),
+            sa.Column('mime_type', sa.String(100), nullable=True),
+            sa.Column('size_bytes', sa.Integer(), nullable=True),
+            sa.Column('display_order', sa.Integer(), default=0),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # KNOWLEDGE BASE FEEDBACK
     # ==========================================================================
-    op.create_table(
-        'kb_article_feedback',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('article_id', sa.Integer(), sa.ForeignKey('kb_articles.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('is_helpful', sa.Boolean(), nullable=False),
-        sa.Column('feedback_text', sa.Text(), nullable=True),
-        sa.Column('customer_id', sa.Integer(), sa.ForeignKey('customers.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('kb_article_feedback'):
+        op.create_table(
+            'kb_article_feedback',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('article_id', sa.Integer(), sa.ForeignKey('kb_articles.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('is_helpful', sa.Boolean(), nullable=False),
+            sa.Column('feedback_text', sa.Text(), nullable=True),
+            sa.Column('customer_id', sa.Integer(), sa.ForeignKey('customers.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), index=True),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # CANNED RESPONSES
     # ==========================================================================
-    op.create_table(
-        'canned_responses',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(255), nullable=False, index=True),
-        sa.Column('shortcode', sa.String(50), nullable=True, unique=True, index=True),
-        sa.Column('content', sa.Text(), nullable=False),
-        sa.Column('scope', sa.String(20), default='personal', index=True),
-        sa.Column('team_id', sa.Integer(), sa.ForeignKey('teams.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('category', sa.String(100), nullable=True, index=True),
-        sa.Column('usage_count', sa.Integer(), default=0),
-        sa.Column('last_used_at', sa.DateTime(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    if not has_table('canned_responses'):
+        op.create_table(
+            'canned_responses',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('name', sa.String(255), nullable=False, index=True),
+            sa.Column('shortcode', sa.String(50), nullable=True, unique=True, index=True),
+            sa.Column('content', sa.Text(), nullable=False),
+            sa.Column('scope', sa.String(20), default='personal', index=True),
+            sa.Column('team_id', sa.Integer(), sa.ForeignKey('teams.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('agent_id', sa.Integer(), sa.ForeignKey('agents.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('category', sa.String(100), nullable=True, index=True),
+            sa.Column('usage_count', sa.Integer(), default=0),
+            sa.Column('last_used_at', sa.DateTime(), nullable=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+        )
 
     # ==========================================================================
     # SEED DATA: Default KB Categories

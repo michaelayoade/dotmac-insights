@@ -5,11 +5,9 @@ import { useAccountingIncomeStatement } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
 import {
-  AlertTriangle,
   TrendingUp,
   TrendingDown,
   Calendar,
-  Loader2,
   DollarSign,
   Minus,
   Equal,
@@ -22,6 +20,7 @@ import {
   Banknote,
   Receipt,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -167,27 +166,24 @@ export default function IncomeStatementPage() {
     basis: basis || undefined,
   };
 
-  const { data, isLoading, error } = useAccountingIncomeStatement(params);
+  const { data, isLoading, error, mutate } = useAccountingIncomeStatement(params);
 
   const exportStatement = (format: 'csv' | 'pdf') => {
     const url = buildApiUrl('/accounting/income-statement/export', { ...params, format });
     window.open(url, '_blank');
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load income statement</p>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-electric" />
-      </div>
+      <ErrorDisplay
+        message="Failed to load income statement."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

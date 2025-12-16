@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useVATTransactions, useVATSummary, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { formatCurrency } from '@/lib/utils';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Percent,
   Plus,
   ArrowLeft,
-  AlertTriangle,
   TrendingUp,
   TrendingDown,
   ChevronDown,
@@ -32,14 +33,22 @@ function getCurrentPeriod() {
 }
 
 export default function VATPage() {
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [typeFilter, setTypeFilter] = useState('');
-  const [period, setPeriod] = useState(getCurrentPeriod());
+  const [filters, setFilters] = usePersistentState<{
+    page: number;
+    pageSize: number;
+    typeFilter: string;
+    period: string;
+  }>('books.vat.filters', {
+    page: 1,
+    pageSize: 20,
+    typeFilter: '',
+    period: getCurrentPeriod(),
+  });
+  const { page, pageSize, typeFilter, period } = filters;
   const [showOutputForm, setShowOutputForm] = useState(false);
   const [showInputForm, setShowInputForm] = useState(false);
 
-  const { data, isLoading, error } = useVATTransactions({
+  const { data, isLoading, error, mutate } = useVATTransactions({
     period: period || undefined,
     type: typeFilter || undefined,
     page,
@@ -91,12 +100,17 @@ export default function VATPage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load VAT transactions</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load VAT transactions."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -192,12 +206,12 @@ export default function VATPage() {
         <input
           type="month"
           value={period}
-          onChange={(e) => { setPeriod(e.target.value); setPage(1); }}
+          onChange={(e) => { setFilters((prev) => ({ ...prev, period: e.target.value, page: 1 })); }}
           className="input-field max-w-[180px]"
         />
         <select
           value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          onChange={(e) => { setFilters((prev) => ({ ...prev, typeFilter: e.target.value, page: 1 })); }}
           className="input-field max-w-[150px]"
         >
           <option value="">All Types</option>
@@ -220,7 +234,7 @@ export default function VATPage() {
           total={data.total}
           limit={pageSize}
           offset={(page - 1) * pageSize}
-          onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+          onPageChange={(newOffset) => setFilters((prev) => ({ ...prev, page: Math.floor(newOffset / pageSize) + 1 }))}
         />
       )}
     </div>

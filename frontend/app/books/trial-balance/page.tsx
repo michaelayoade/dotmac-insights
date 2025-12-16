@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { useAccountingTrialBalance } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { cn, formatCurrency } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
-import { AlertTriangle, Scale, CheckCircle2, XCircle, Calendar, Download, BarChart2 } from 'lucide-react';
+import { Scale, CheckCircle2, XCircle, Calendar, Download, BarChart2 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 function getAccountTypeColor(type: string) {
   const colors: Record<string, string> = {
@@ -20,11 +21,14 @@ function getAccountTypeColor(type: string) {
 }
 
 export default function TrialBalancePage() {
-  const [asOfDate, setAsOfDate] = useState<string>('');
-  const [drill, setDrill] = useState<boolean>(false);
+  const [filters, setFilters] = usePersistentState<{ asOfDate: string; drill: boolean }>('books.trial-balance.filters', {
+    asOfDate: '',
+    drill: false,
+  });
+  const { asOfDate, drill } = filters;
 
   const params = { end_date: asOfDate || undefined, drill: drill || undefined };
-  const { data, isLoading, error } = useAccountingTrialBalance(params);
+  const { data, isLoading, error, mutate } = useAccountingTrialBalance(params);
 
   const exportBalance = (format: 'csv' | 'pdf') => {
     const url = buildApiUrl('/accounting/trial-balance/export', { ...params, format });
@@ -97,12 +101,17 @@ export default function TrialBalancePage() {
     },
   ];
 
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load trial balance</p>
-      </div>
+      <ErrorDisplay
+        message="Failed to load trial balance."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -173,16 +182,16 @@ export default function TrialBalancePage() {
         <input
           type="date"
           value={asOfDate}
-          onChange={(e) => setAsOfDate(e.target.value)}
+          onChange={(e) => setFilters((prev) => ({ ...prev, asOfDate: e.target.value }))}
           className="input-field"
         />
         <label className="flex items-center gap-2 text-slate-muted text-sm">
-          <input type="checkbox" checked={drill} onChange={(e) => setDrill(e.target.checked)} />
+          <input type="checkbox" checked={drill} onChange={(e) => setFilters((prev) => ({ ...prev, drill: e.target.checked }))} />
           Drill-down balances
         </label>
         {asOfDate && (
           <button
-            onClick={() => { setAsOfDate(''); setDrill(false); }}
+            onClick={() => { setFilters({ asOfDate: '', drill: false }); }}
             className="text-slate-muted text-sm hover:text-white transition-colors"
           >
             Clear

@@ -5,10 +5,8 @@ import { useAccountingEquityStatement } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
 import {
-  AlertTriangle,
   FileSpreadsheet,
   Calendar,
-  Loader2,
   Download,
   BarChart2,
   ChevronDown,
@@ -22,6 +20,7 @@ import {
   XCircle,
   Layers,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -191,27 +190,24 @@ export default function EquityStatementPage() {
     end_date: endDate || undefined,
   };
 
-  const { data, isLoading, error } = useAccountingEquityStatement(params);
+  const { data, isLoading, error, mutate } = useAccountingEquityStatement(params);
 
   const exportStatement = (format: 'csv' | 'pdf') => {
     const url = buildApiUrl('/accounting/equity-statement/export', { ...params, format });
     window.open(url, '_blank');
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load statement of changes in equity</p>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-electric" />
-      </div>
+      <ErrorDisplay
+        message="Failed to load statement of changes in equity."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 

@@ -342,3 +342,406 @@ class LandedCostTax(Base):
 
     def __repr__(self) -> str:
         return f"<LandedCostTax {self.expense_account} amount={self.amount}>"
+
+
+# ============= STOCK RECEIPT (from Purchase Invoice) =============
+class StockReceiptStatus(enum.Enum):
+    DRAFT = "draft"
+    APPROVED = "approved"
+    POSTED = "posted"
+    CANCELLED = "cancelled"
+
+
+class StockReceipt(Base):
+    """Stock receipt linked to purchase invoice for receiving goods."""
+
+    __tablename__ = "stock_receipts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Source document
+    purchase_invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("purchase_invoices.id"), nullable=True, index=True)
+    purchase_order: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # GL posting reference
+    journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+    stock_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stock_entries.id"), nullable=True)
+
+    # Receipt details
+    posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Totals
+    total_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Status
+    status: Mapped[StockReceiptStatus] = mapped_column(Enum(StockReceiptStatus), default=StockReceiptStatus.DRAFT)
+
+    # Approval
+    approved_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Soft delete
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Remarks
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Audit
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    items: Mapped[List["StockReceiptItem"]] = relationship(
+        back_populates="receipt", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockReceipt {self.id} - {self.status.value}>"
+
+
+class StockReceiptItem(Base):
+    """Line items for stock receipt."""
+
+    __tablename__ = "stock_receipt_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    receipt_id: Mapped[int] = mapped_column(ForeignKey("stock_receipts.id"), nullable=False, index=True)
+
+    # Item details
+    item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Quantity
+    qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Pricing
+    rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Batch/Serial
+    batch_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    serial_no: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Relationship
+    receipt: Mapped["StockReceipt"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<StockReceiptItem {self.item_code} qty={self.qty}>"
+
+
+# ============= STOCK ISSUE (for Sales Invoice) =============
+class StockIssueStatus(enum.Enum):
+    DRAFT = "draft"
+    APPROVED = "approved"
+    POSTED = "posted"
+    CANCELLED = "cancelled"
+
+
+class StockIssue(Base):
+    """Stock issue linked to sales invoice for delivering goods."""
+
+    __tablename__ = "stock_issues"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Source document
+    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), nullable=True, index=True)
+    sales_order: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # GL posting reference
+    journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+    stock_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stock_entries.id"), nullable=True)
+
+    # Issue details
+    posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Totals
+    total_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))  # COGS amount
+
+    # Status
+    status: Mapped[StockIssueStatus] = mapped_column(Enum(StockIssueStatus), default=StockIssueStatus.DRAFT)
+
+    # Approval
+    approved_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Soft delete
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Remarks
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Audit
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    items: Mapped[List["StockIssueItem"]] = relationship(
+        back_populates="issue", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockIssue {self.id} - {self.status.value}>"
+
+
+class StockIssueItem(Base):
+    """Line items for stock issue."""
+
+    __tablename__ = "stock_issue_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    issue_id: Mapped[int] = mapped_column(ForeignKey("stock_issues.id"), nullable=False, index=True)
+
+    # Item details
+    item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Quantity
+    qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Valuation (for COGS)
+    valuation_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    cost_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Batch/Serial
+    batch_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    serial_no: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Relationship
+    issue: Mapped["StockIssue"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<StockIssueItem {self.item_code} qty={self.qty}>"
+
+
+# ============= TRANSFER REQUEST =============
+class TransferStatus(enum.Enum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    IN_TRANSIT = "in_transit"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class TransferRequest(Base):
+    """Warehouse transfer request with approval workflow."""
+
+    __tablename__ = "transfer_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Transfer details
+    from_warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    to_warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Dates
+    request_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    required_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    transfer_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Totals
+    total_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_value: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Status and workflow
+    status: Mapped[TransferStatus] = mapped_column(Enum(TransferStatus), default=TransferStatus.DRAFT)
+
+    # Approval
+    approved_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    approved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Execution reference
+    outbound_stock_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stock_entries.id"), nullable=True)
+    inbound_stock_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stock_entries.id"), nullable=True)
+
+    # Soft delete
+    is_deleted: Mapped[bool] = mapped_column(default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Remarks
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Audit
+    requested_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    items: Mapped[List["TransferRequestItem"]] = relationship(
+        back_populates="transfer", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:
+        return f"<TransferRequest {self.id} {self.from_warehouse} → {self.to_warehouse}>"
+
+
+class TransferRequestItem(Base):
+    """Line items for transfer request."""
+
+    __tablename__ = "transfer_request_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    transfer_id: Mapped[int] = mapped_column(ForeignKey("transfer_requests.id"), nullable=False, index=True)
+
+    # Item details
+    item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Quantity
+    qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Valuation
+    valuation_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Batch/Serial
+    batch_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    serial_no: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Row ordering
+    idx: Mapped[int] = mapped_column(default=0)
+
+    # Relationship
+    transfer: Mapped["TransferRequest"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<TransferRequestItem {self.item_code} qty={self.qty}>"
+
+
+# ============= BATCH =============
+class Batch(Base):
+    """Batch tracking for inventory items."""
+
+    __tablename__ = "batches"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    # Batch identification
+    batch_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Dates
+    manufacturing_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    expiry_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+
+    # Quantity tracking
+    batch_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # Source
+    supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    reference_doctype: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    reference_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Status
+    disabled: Mapped[bool] = mapped_column(default=False)
+
+    # Remarks
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Audit
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Batch {self.batch_id} - {self.item_code}>"
+
+
+# ============= SERIAL NUMBER =============
+class SerialStatus(enum.Enum):
+    ACTIVE = "active"
+    DELIVERED = "delivered"
+    RETURNED = "returned"
+    INACTIVE = "inactive"
+
+
+class SerialNumber(Base):
+    """Serial number tracking for inventory items."""
+
+    __tablename__ = "serial_numbers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    # Serial identification
+    serial_no: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Location
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Batch link
+    batch_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # Status
+    status: Mapped[SerialStatus] = mapped_column(Enum(SerialStatus), default=SerialStatus.ACTIVE)
+
+    # Customer assignment (when delivered)
+    customer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    delivery_document_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    delivery_document_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    delivery_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Purchase info
+    purchase_document_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    purchase_document_no: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    purchase_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Warranty
+    warranty_expiry_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    warranty_period: Mapped[Optional[int]] = mapped_column(nullable=True)  # in days
+
+    # AMC (Annual Maintenance Contract)
+    amc_expiry_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Maintenance
+    maintenance_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Remarks
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Audit
+    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<SerialNumber {self.serial_no} - {self.item_code}>"

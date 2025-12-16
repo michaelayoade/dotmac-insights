@@ -11,6 +11,9 @@ from app.models.expense_management import (
     FundingMethod,
     ExpenseClaimStatus,
     CashAdvanceStatus,
+    CorporateCardStatus,
+    CardTransactionStatus,
+    StatementStatus,
 )
 
 
@@ -229,3 +232,189 @@ class CashAdvanceDisburse(BaseModel):
 class CashAdvanceSettle(BaseModel):
     amount: Decimal = Field(ge=0)
     refund_amount: Optional[Decimal] = Field(default=Decimal("0"), ge=0)
+
+
+# ---------------- Corporate Cards ----------------
+
+
+class CorporateCardCreate(BaseModel):
+    card_number_last4: str = Field(min_length=4, max_length=4)
+    card_name: str
+    card_type: Optional[str] = None
+    bank_name: Optional[str] = None
+    card_provider: Optional[str] = None
+    employee_id: int
+    credit_limit: Decimal = Decimal("0")
+    single_transaction_limit: Optional[Decimal] = None
+    daily_limit: Optional[Decimal] = None
+    monthly_limit: Optional[Decimal] = None
+    currency: str = "NGN"
+    issue_date: date
+    expiry_date: Optional[date] = None
+    liability_account: Optional[str] = None
+    bank_account_id: Optional[int] = None
+    company: Optional[str] = None
+
+    @field_validator("credit_limit", "single_transaction_limit", "daily_limit", "monthly_limit")
+    @classmethod
+    def validate_positive_limits(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        if v is not None and v < 0:
+            raise ValueError("Limit values must be non-negative")
+        return v
+
+
+class CorporateCardUpdate(BaseModel):
+    card_name: Optional[str] = None
+    card_type: Optional[str] = None
+    bank_name: Optional[str] = None
+    card_provider: Optional[str] = None
+    credit_limit: Optional[Decimal] = None
+    single_transaction_limit: Optional[Decimal] = None
+    daily_limit: Optional[Decimal] = None
+    monthly_limit: Optional[Decimal] = None
+    expiry_date: Optional[date] = None
+    liability_account: Optional[str] = None
+    bank_account_id: Optional[int] = None
+    status: Optional[CorporateCardStatus] = None
+
+    @field_validator("credit_limit", "single_transaction_limit", "daily_limit", "monthly_limit")
+    @classmethod
+    def validate_positive_limits(cls, v: Optional[Decimal]) -> Optional[Decimal]:
+        if v is not None and v < 0:
+            raise ValueError("Limit values must be non-negative")
+        return v
+
+
+class CorporateCardRead(BaseModel):
+    id: int
+    card_number_last4: str
+    card_name: str
+    card_type: Optional[str] = None
+    bank_name: Optional[str] = None
+    card_provider: Optional[str] = None
+    employee_id: int
+    credit_limit: Decimal
+    single_transaction_limit: Optional[Decimal] = None
+    daily_limit: Optional[Decimal] = None
+    monthly_limit: Optional[Decimal] = None
+    currency: str
+    status: CorporateCardStatus
+    issue_date: date
+    expiry_date: Optional[date] = None
+    liability_account: Optional[str] = None
+    bank_account_id: Optional[int] = None
+    company: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------- Corporate Card Transactions ----------------
+
+
+class CorporateCardTransactionCreate(BaseModel):
+    card_id: int
+    statement_id: Optional[int] = None
+    transaction_date: date
+    posting_date: Optional[date] = None
+    merchant_name: Optional[str] = None
+    merchant_category_code: Optional[str] = None
+    description: Optional[str] = None
+    amount: Decimal
+    currency: str = "NGN"
+    original_amount: Optional[Decimal] = None
+    original_currency: Optional[str] = None
+    conversion_rate: Decimal = Decimal("1")
+    transaction_reference: Optional[str] = None
+    authorization_code: Optional[str] = None
+
+    @field_validator("conversion_rate")
+    @classmethod
+    def validate_conversion_rate(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("conversion_rate must be greater than zero")
+        return v
+
+
+class CorporateCardTransactionUpdate(BaseModel):
+    status: Optional[CardTransactionStatus] = None
+    expense_claim_line_id: Optional[int] = None
+    match_confidence: Optional[Decimal] = None
+    dispute_reason: Optional[str] = None
+    resolution_notes: Optional[str] = None
+
+
+class CorporateCardTransactionRead(BaseModel):
+    id: int
+    card_id: int
+    statement_id: Optional[int] = None
+    transaction_date: date
+    posting_date: Optional[date] = None
+    merchant_name: Optional[str] = None
+    merchant_category_code: Optional[str] = None
+    description: Optional[str] = None
+    amount: Decimal
+    currency: str
+    original_amount: Optional[Decimal] = None
+    original_currency: Optional[str] = None
+    conversion_rate: Decimal
+    transaction_reference: Optional[str] = None
+    authorization_code: Optional[str] = None
+    status: CardTransactionStatus
+    expense_claim_line_id: Optional[int] = None
+    match_confidence: Optional[Decimal] = None
+    disputed_at: Optional[date] = None
+    dispute_reason: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransactionMatchPayload(BaseModel):
+    expense_claim_line_id: int
+    confidence: Optional[Decimal] = None
+
+
+class TransactionDisputePayload(BaseModel):
+    reason: str
+
+
+# ---------------- Corporate Card Statements ----------------
+
+
+class CorporateCardStatementCreate(BaseModel):
+    card_id: int
+    period_start: date
+    period_end: date
+    statement_date: Optional[date] = None
+    import_source: Optional[str] = None
+    original_filename: Optional[str] = None
+
+
+class CorporateCardStatementRead(BaseModel):
+    id: int
+    card_id: int
+    period_start: date
+    period_end: date
+    statement_date: Optional[date] = None
+    import_date: date
+    import_source: Optional[str] = None
+    original_filename: Optional[str] = None
+    status: StatementStatus
+    total_amount: Decimal
+    transaction_count: int
+    matched_amount: Decimal
+    matched_count: int
+    unmatched_count: int
+    reconciled_at: Optional[date] = None
+    reconciled_by_id: Optional[int] = None
+    closed_at: Optional[date] = None
+    closed_by_id: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatementImportPayload(BaseModel):
+    card_id: int
+    period_start: date
+    period_end: date
+    statement_date: Optional[date] = None
+    import_source: str = "manual"
+    original_filename: Optional[str] = None
+    transactions: List[CorporateCardTransactionCreate]

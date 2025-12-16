@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from app.database import Base
+from app.models.supplier_payment import SupplierPayment
 
 if TYPE_CHECKING:
     from app.models.payment import Payment

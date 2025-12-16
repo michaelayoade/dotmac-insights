@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
@@ -19,77 +19,129 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enumerations
-    expense_claim_status = sa.Enum(
-        "draft",
-        "pending_approval",
-        "approved",
-        "rejected",
-        "returned",
-        "recalled",
-        "posted",
-        "paid",
-        "reversed",
-        "cancelled",
-        name="expenseclaimstatus",
-    )
-    funding_method = sa.Enum(
-        "out_of_pocket",
-        "cash_advance",
-        "corporate_card",
-        "per_diem",
-        name="fundingmethod",
-    )
-    cash_advance_status = sa.Enum(
-        "draft",
-        "pending_approval",
-        "approved",
-        "rejected",
-        "disbursed",
-        "partially_settled",
-        "fully_settled",
-        "cancelled",
-        "written_off",
-        name="cashadvancestatus",
-    )
-    line_status = sa.Enum(
-        "pending",
-        "approved",
-        "rejected",
-        "adjusted",
-        name="linestatus",
-    )
-    corporate_card_status = sa.Enum(
-        "active",
-        "suspended",
-        "cancelled",
-        name="corporatecardstatus",
-    )
-    card_transaction_status = sa.Enum(
-        "imported",
-        "matched",
-        "unmatched",
-        "disputed",
-        "excluded",
-        "personal",
-        name="cardtransactionstatus",
-    )
-    statement_status = sa.Enum(
-        "open",
-        "reconciled",
-        "closed",
-        name="statementstatus",
-    )
+    bind = op.get_bind()
 
-    expense_claim_status.create(op.get_bind(), checkfirst=True)
-    funding_method.create(op.get_bind(), checkfirst=True)
-    cash_advance_status.create(op.get_bind(), checkfirst=True)
-    line_status.create(op.get_bind(), checkfirst=True)
-    corporate_card_status.create(op.get_bind(), checkfirst=True)
-    card_transaction_status.create(op.get_bind(), checkfirst=True)
-    statement_status.create(op.get_bind(), checkfirst=True)
+    # If already applied (common when a prior run partially succeeded), skip.
+    if bind and not context.is_offline_mode():
+        inspector = sa.inspect(bind)
+        if inspector.has_table("cash_advances"):
+            return
+
+    # Clean up partially-created enum types from failed runs so we can recreate safely.
+    if bind and not context.is_offline_mode():
+        for enum_name in (
+            "expenseclaimstatus",
+            "fundingmethod",
+            "cashadvancestatus",
+            "linestatus",
+            "corporatecardstatus",
+            "cardtransactionstatus",
+            "statementstatus",
+        ):
+            bind.execute(sa.text(f"DROP TYPE IF EXISTS {enum_name} CASCADE"))
+
+    # Enumerations (skip creation if already present to avoid DuplicateObject errors)
+
+    def ensure_enum(name: str, values: tuple[str, ...]) -> sa.Enum:
+        """Create the enum type if missing, then return a PostgreSQL ENUM bound to the existing type."""
+        if bind and not context.is_offline_mode():
+            # Create type only when missing to avoid DuplicateObject errors on reruns
+            value_list = ", ".join(f"'{v}'" for v in values)
+            # Avoid parameter for type name to prevent indeterminate datatype errors.
+            ddl = f"""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = '{name}') THEN
+                        CREATE TYPE {name} AS ENUM ({value_list});
+                    END IF;
+                END$$;
+            """
+            bind.execute(sa.text(ddl))
+        # Use existing type; do not attempt to recreate during column creation
+        return sa.dialects.postgresql.ENUM(*values, name=name, create_type=False)
+
+    expense_claim_status = ensure_enum(
+        "expenseclaimstatus",
+        (
+            "draft",
+            "pending_approval",
+            "approved",
+            "rejected",
+            "returned",
+            "recalled",
+            "posted",
+            "paid",
+            "reversed",
+            "cancelled",
+        ),
+    )
+    funding_method = ensure_enum(
+        "fundingmethod",
+        (
+            "out_of_pocket",
+            "cash_advance",
+            "corporate_card",
+            "per_diem",
+        ),
+    )
+    cash_advance_status = ensure_enum(
+        "cashadvancestatus",
+        (
+            "draft",
+            "pending_approval",
+            "approved",
+            "rejected",
+            "disbursed",
+            "partially_settled",
+            "fully_settled",
+            "cancelled",
+            "written_off",
+        ),
+    )
+    line_status = ensure_enum(
+        "linestatus",
+        (
+            "pending",
+            "approved",
+            "rejected",
+            "adjusted",
+        ),
+    )
+    corporate_card_status = ensure_enum(
+        "corporatecardstatus",
+        (
+            "active",
+            "suspended",
+            "cancelled",
+        ),
+    )
+    card_transaction_status = ensure_enum(
+        "cardtransactionstatus",
+        (
+            "imported",
+            "matched",
+            "unmatched",
+            "disputed",
+            "excluded",
+            "personal",
+        ),
+    )
+    statement_status = ensure_enum(
+        "statementstatus",
+        (
+            "open",
+            "reconciled",
+            "closed",
+        ),
+    )
 
     # Tables
+    has_tax_codes = False
+    if bind and not context.is_offline_mode():
+        try:
+            has_tax_codes = sa.inspect(bind).has_table("tax_codes")
+        except Exception:
+            has_tax_codes = False
     op.create_table(
         "expense_categories",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -113,7 +165,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("code"),
         sa.ForeignKeyConstraint(["parent_id"], ["expense_categories.id"]),
-        sa.ForeignKeyConstraint(["default_tax_code_id"], ["tax_codes.id"]),
+        *(
+            [sa.ForeignKeyConstraint(["default_tax_code_id"], ["tax_codes.id"])]
+            if has_tax_codes
+            else []
+        ),
     )
     op.create_index("ix_expense_categories_id", "expense_categories", ["id"])
     op.create_index("ix_expense_categories_code", "expense_categories", ["code"])
@@ -412,7 +468,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["expense_claim_id"], ["expense_claims.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["category_id"], ["expense_categories.id"]),
-        sa.ForeignKeyConstraint(["tax_code_id"], ["tax_codes.id"]),
+        *(
+            [sa.ForeignKeyConstraint(["tax_code_id"], ["tax_codes.id"])]
+            if has_tax_codes
+            else []
+        ),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"]),
         sa.ForeignKeyConstraint(["per_diem_rate_id"], ["per_diem_rates.id"]),
     )
@@ -539,61 +599,82 @@ def upgrade() -> None:
 
     # Seed document number formats for expense claim and cash advance if table exists
     try:
-        op.bulk_insert(
-            sa.table(
-                "document_number_formats",
-                sa.column("document_type", sa.String),
-                sa.column("company", sa.String),
-                sa.column("prefix", sa.String),
-                sa.column("format_pattern", sa.String),
-                sa.column("min_digits", sa.Integer),
-                sa.column("starting_number", sa.Integer),
-                sa.column("current_number", sa.Integer),
-                sa.column("reset_frequency", sa.String),
-                sa.column("is_active", sa.Boolean),
-            ),
-            [
-                {
-                    "document_type": "expense_claim",
-                    "company": None,
-                    "prefix": "EXP",
-                    "format_pattern": "{PREFIX}-{YYYY}-{####}",
-                    "min_digits": 4,
-                    "starting_number": 1,
-                    "current_number": 0,
-                    "reset_frequency": "yearly",
-                    "is_active": True,
-                },
-                {
-                    "document_type": "cash_advance",
-                    "company": None,
-                    "prefix": "ADV",
-                    "format_pattern": "{PREFIX}-{YYYY}-{####}",
-                    "min_digits": 4,
-                    "starting_number": 1,
-                    "current_number": 0,
-                    "reset_frequency": "yearly",
-                    "is_active": True,
-                },
-            ],
-        )
+        inspector = sa.inspect(op.get_bind())
+        if inspector.has_table("document_number_formats"):
+            cols = {c["name"]: c for c in inspector.get_columns("document_number_formats")}
+            doc_col = cols.get("document_type")
+            allowed_values = None
+            is_enum = False
+            if doc_col is not None and isinstance(doc_col.get("type"), sa.Enum):
+                enum_type = doc_col["type"]
+                allowed_values = list(enum_type.enums)
+                is_enum = True
+
+            # Only seed if both values are permitted (or column is not an enum).
+            seed_rows = [
+                ("expense_claim", "EXP"),
+                ("cash_advance", "ADV"),
+            ]
+            rows_to_insert = []
+            for doc_type, prefix in seed_rows:
+                if is_enum and allowed_values is not None and doc_type not in allowed_values:
+                    continue
+                rows_to_insert.append(
+                    {
+                        "document_type": doc_type,
+                        "company": None,
+                        "prefix": prefix,
+                        "format_pattern": "{PREFIX}-{YYYY}-{####}",
+                        "min_digits": 4,
+                        "starting_number": 1,
+                        "current_number": 0,
+                        "reset_frequency": "yearly",
+                        "is_active": True,
+                    }
+                )
+
+            if rows_to_insert:
+                doc_type_type = (
+                    doc_col["type"]
+                    if is_enum
+                    else sa.String()
+                )
+                op.bulk_insert(
+                    sa.table(
+                        "document_number_formats",
+                        sa.column("document_type", doc_type_type),
+                        sa.column("company", sa.String),
+                        sa.column("prefix", sa.String),
+                        sa.column("format_pattern", sa.String),
+                        sa.column("min_digits", sa.Integer),
+                        sa.column("starting_number", sa.Integer),
+                        sa.column("current_number", sa.Integer),
+                        sa.column("reset_frequency", sa.String),
+                        sa.column("is_active", sa.Boolean),
+                    ),
+                    rows_to_insert,
+                )
     except Exception:
         # Table may not exist in some environments; ignore seed failure.
         pass
 
     # Seed default approval workflows (single-step) for expense claims and cash advances
     try:
-        # Insert workflows
-        op.bulk_insert(
-            sa.table(
-                "approval_workflows",
-                sa.column("workflow_name", sa.String),
-                sa.column("description", sa.Text),
-                sa.column("doctype", sa.String),
-                sa.column("is_active", sa.Boolean),
-                sa.column("is_mandatory", sa.Boolean),
-            ),
-            [
+        inspector = sa.inspect(op.get_bind())
+        if inspector.has_table("approval_workflows"):
+            cols = {c["name"]: c for c in inspector.get_columns("approval_workflows")}
+            doc_col = cols.get("doctype")
+            allowed_values = None
+            is_enum = False
+            if doc_col is not None and isinstance(doc_col.get("type"), sa.Enum):
+                enum_type = doc_col["type"]
+                allowed_values = list(enum_type.enums)
+                is_enum = True
+
+            def allowed(doc_type: str) -> bool:
+                return not is_enum or (allowed_values is not None and doc_type in allowed_values)
+
+            workflow_rows = [
                 {
                     "workflow_name": "Expense Claim Default",
                     "description": "Single-step approval for expense claims",
@@ -608,48 +689,65 @@ def upgrade() -> None:
                     "is_active": True,
                     "is_mandatory": True,
                 },
-            ],
-        )
+            ]
+            workflow_rows = [r for r in workflow_rows if allowed(r["doctype"])]
 
-        # Fetch inserted workflow ids
-        conn = op.get_bind()
-        wf_rows = conn.execute(sa.text("select id, doctype from approval_workflows where workflow_name in ('Expense Claim Default','Cash Advance Default')")).fetchall()
-        wf_map = {row.doctype: row.id for row in wf_rows}
+            if workflow_rows:
+                op.bulk_insert(
+                    sa.table(
+                        "approval_workflows",
+                        sa.column("workflow_name", sa.String),
+                        sa.column("description", sa.Text),
+                        sa.column("doctype", doc_col["type"] if is_enum else sa.String),
+                        sa.column("is_active", sa.Boolean),
+                        sa.column("is_mandatory", sa.Boolean),
+                    ),
+                    workflow_rows,
+                )
 
-        # Insert steps
-        steps = []
-        if "expense_claim" in wf_map:
-            steps.append(
-                {
-                    "workflow_id": wf_map["expense_claim"],
-                    "step_order": 1,
-                    "step_name": "Manager Approval",
-                    "role_required": "expense_approver",
-                    "approval_mode": "any",
-                }
-            )
-        if "cash_advance" in wf_map:
-            steps.append(
-                {
-                    "workflow_id": wf_map["cash_advance"],
-                    "step_order": 1,
-                    "step_name": "Manager Approval",
-                    "role_required": "expense_approver",
-                    "approval_mode": "any",
-                }
-            )
-        if steps:
-            op.bulk_insert(
-                sa.table(
-                    "approval_steps",
-                    sa.column("workflow_id", sa.Integer),
-                    sa.column("step_order", sa.Integer),
-                    sa.column("step_name", sa.String),
-                    sa.column("role_required", sa.String),
-                    sa.column("approval_mode", sa.String),
-                ),
-                steps,
-            )
+                # Fetch inserted workflow ids
+                conn = op.get_bind()
+                wf_rows = conn.execute(
+                    sa.text(
+                        "select id, doctype::text from approval_workflows where workflow_name in ('Expense Claim Default','Cash Advance Default')"
+                    )
+                ).fetchall()
+                wf_map = {row.doctype: row.id for row in wf_rows}
+
+                # Insert steps
+                steps = []
+                if "expense_claim" in wf_map:
+                    steps.append(
+                        {
+                            "workflow_id": wf_map["expense_claim"],
+                            "step_order": 1,
+                            "step_name": "Manager Approval",
+                            "role_required": "expense_approver",
+                            "approval_mode": "any",
+                        }
+                    )
+                if "cash_advance" in wf_map:
+                    steps.append(
+                        {
+                            "workflow_id": wf_map["cash_advance"],
+                            "step_order": 1,
+                            "step_name": "Manager Approval",
+                            "role_required": "expense_approver",
+                            "approval_mode": "any",
+                        }
+                    )
+                if steps:
+                    op.bulk_insert(
+                        sa.table(
+                            "approval_steps",
+                            sa.column("workflow_id", sa.Integer),
+                            sa.column("step_order", sa.Integer),
+                            sa.column("step_name", sa.String),
+                            sa.column("role_required", sa.String),
+                            sa.column("approval_mode", sa.String),
+                        ),
+                        steps,
+                    )
     except Exception:
         # Approval tables may not exist in some environments; skip seed if so.
         pass

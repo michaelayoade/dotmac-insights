@@ -49,6 +49,7 @@ class Expense(Base):
 
     # Task FK (for expenses linked to tasks)
     task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    erpnext_task: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
 
     # Expense details
     expense_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -92,9 +93,6 @@ class Expense(Base):
     expense_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
     posting_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
 
-    # Task (if linked)
-    task: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -114,3 +112,12 @@ class Expense(Base):
     def outstanding_amount(self) -> Decimal:
         """Calculate outstanding amount to be reimbursed."""
         return self.total_sanctioned_amount - self.total_amount_reimbursed
+
+    @property
+    def task(self) -> Optional[str]:
+        """Backwards-compatible alias for ERPNext task id/name."""
+        return self.erpnext_task
+
+    @task.setter
+    def task(self, value: Optional[str]) -> None:
+        self.erpnext_task = value

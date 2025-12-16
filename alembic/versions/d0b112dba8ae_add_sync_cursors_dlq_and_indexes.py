@@ -7,7 +7,7 @@ Create Date: 2025-12-09 10:58:20.118123
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 
 
@@ -21,8 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Create sync_cursors table if it doesn't exist
     conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    existing_tables = inspector.get_table_names()
+    if context.is_offline_mode():
+        existing_tables = []
+    else:
+        inspector = sa.inspect(conn)
+        existing_tables = inspector.get_table_names()
 
     if 'sync_cursors' not in existing_tables:
         op.create_table(
@@ -79,8 +82,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop tables in reverse order
     conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    existing_tables = inspector.get_table_names()
+    if context.is_offline_mode():
+        existing_tables = ['failed_sync_records', 'sync_cursors']
+    else:
+        inspector = sa.inspect(conn)
+        existing_tables = inspector.get_table_names()
 
     if 'failed_sync_records' in existing_tables:
         op.drop_table('failed_sync_records')

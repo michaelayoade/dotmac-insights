@@ -9,15 +9,16 @@ services:
   api:
     # Override command to use uvicorn with --reload for development
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
     # Mount source code for hot-reload
     volumes:
       - ./app:/app/app:ro
       - ./.env:/app/.env:ro
-    # Disable healthcheck in dev (faster startup)
-    healthcheck:
-      disable: true
 
   celery_worker:
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
     # Mount source code
     volumes:
       - ./app:/app/app:ro
@@ -27,10 +28,20 @@ services:
       disable: true
 
   celery_beat:
-    # Mount source code
-    volumes:
-      - ./app:/app/app:ro
-      - ./.env:/app/.env:ro
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        NEXT_PUBLIC_SERVICE_TOKEN: "5tYE5IkM11HHhQh3C3ql2blUTn2w4QhSc5BO5mYtuiLtLwLQD3Y"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+      INTERNAL_API_URL: "http://api:8000"
+      NEXT_PUBLIC_SERVICE_TOKEN: "5tYE5IkM11HHhQh3C3ql2blUTn2w4QhSc5BO5mYtuiLtLwLQD3Y"
     # Disable healthcheck in dev
     healthcheck:
       disable: true

@@ -8,7 +8,7 @@ Seeds default roles, permissions, and role-permission mappings for RBAC.
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from datetime import datetime
 
@@ -90,6 +90,10 @@ ROLE_PERMISSIONS = {
 
 def upgrade() -> None:
     """Seed default permissions, roles, and role-permission mappings."""
+    if context.is_offline_mode():
+        # Skip data inserts in offline/--sql mode
+        return
+
     connection = op.get_bind()
     now = datetime.utcnow()
 

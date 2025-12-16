@@ -19,7 +19,13 @@ export default function SupportAutomationPage() {
   const summary = useSupportAutomationLogsSummary(undefined, { dedupingInterval: 60000 });
 
   // Get unique triggers from logs
-  const triggers = [...new Set((logs.data?.data || []).map((l) => l.trigger).filter(Boolean))];
+  const triggers: string[] = Array.from(
+    new Set(
+      ((logs.data?.data as Array<{ trigger?: string | null }> | undefined) || [])
+        .map((l) => l.trigger || '')
+        .filter((t) => !!t)
+    )
+  );
 
   return (
     <div className="space-y-6">
@@ -72,7 +78,7 @@ export default function SupportAutomationPage() {
         </div>
         <select
           value={trigger}
-          onChange={(e) => setTrigger(e.target.value)}
+          onChange={(e) => setTrigger(e.target.value || '')}
           className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
         >
           <option value="">All triggers</option>
@@ -89,7 +95,7 @@ export default function SupportAutomationPage() {
             <PlayCircle className="w-4 h-4 text-teal-electric" />
             <h3 className="text-white font-semibold">Automation Rules</h3>
           </div>
-          <span className="text-xs text-slate-muted">{rules.data?.length ?? 0} rules</span>
+          <span className="text-xs text-slate-muted">{Array.isArray(rules.data) ? rules.data.length : 0} rules</span>
         </div>
         {rules.error && (
           <div className="text-red-400 text-sm flex items-center gap-2 mb-3">
@@ -98,7 +104,7 @@ export default function SupportAutomationPage() {
         )}
         {!rules.data ? (
           <p className="text-slate-muted text-sm">Loading rules…</p>
-        ) : rules.data.length === 0 ? (
+        ) : !Array.isArray(rules.data) || rules.data.length === 0 ? (
           <p className="text-slate-muted text-sm">No automation rules configured.</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -118,8 +124,8 @@ export default function SupportAutomationPage() {
                 </div>
                 <div className="mt-3 flex items-center gap-3 text-xs text-slate-muted">
                   <span className="px-2 py-1 rounded bg-slate-elevated">{rule.trigger}</span>
-                  <span>Actions: {(rule.actions || []).length}</span>
-                  <span>Conditions: {(rule.conditions || []).length}</span>
+                  <span>Actions: {Array.isArray(rule.actions) ? rule.actions.length : 0}</span>
+                  <span>Conditions: {Array.isArray(rule.conditions) ? rule.conditions.length : 0}</span>
                 </div>
               </div>
             ))}
@@ -134,11 +140,11 @@ export default function SupportAutomationPage() {
             <Activity className="w-4 h-4 text-cyan-400" />
             <h3 className="text-white font-semibold">Recent Execution Logs</h3>
           </div>
-          <span className="text-xs text-slate-muted">{logs.data?.data?.length ?? 0} logs</span>
+          <span className="text-xs text-slate-muted">{Array.isArray(logs.data?.data) ? logs.data?.data.length : 0} logs</span>
         </div>
         {!logs.data ? (
           <p className="text-slate-muted text-sm">Loading logs…</p>
-        ) : logs.data.data.length === 0 ? (
+        ) : !Array.isArray(logs.data.data) || logs.data.data.length === 0 ? (
           <p className="text-slate-muted text-sm">No execution logs found.</p>
         ) : (
           <div className="space-y-2">

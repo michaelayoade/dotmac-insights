@@ -1,6 +1,8 @@
+'use client';
+
 import React from 'react';
-import dayjs from 'dayjs';
 import { useExpenseClaims } from '@/hooks/useExpenses';
+import { formatDate } from '@/lib/utils';
 
 export default function ExpenseClaimsPage() {
   const { data, error } = useExpenseClaims({ limit: 50 });
@@ -32,7 +34,7 @@ export default function ExpenseClaimsPage() {
                   {claim.claim_number || `Draft #${claim.id}`}<br />
                   <span className="text-xs text-gray-500">{claim.title}</span>
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-700">{dayjs(claim.claim_date).format('YYYY-MM-DD')}</td>
+                <td className="px-4 py-2 text-sm text-gray-700">{formatDate(claim.claim_date)}</td>
                 <td className="px-4 py-2">
                   <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
                     {claim.status}

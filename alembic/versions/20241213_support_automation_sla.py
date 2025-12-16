@@ -16,7 +16,7 @@ This migration creates:
 - routing_round_robin_state: State tracking for round-robin assignment
 """
 from typing import Sequence, Union
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 from datetime import datetime
@@ -29,120 +29,158 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    existing_tables = set()
+    inspector = None
+    bind = None
+    if not context.is_offline_mode():
+        bind = op.get_bind()
+        if bind:
+            inspector = sa.inspect(bind)
+            try:
+                existing_tables = set(inspector.get_table_names())
+            except Exception:
+                existing_tables = set()
+
+    def has_table(name: str) -> bool:
+        if name in existing_tables:
+            return True
+        if inspector:
+            try:
+                return inspector.has_table(name)
+            except Exception:
+                pass
+        if bind:
+            try:
+                for candidate in (name, f"public.{name}"):
+                    res = bind.execute(sa.text("SELECT to_regclass(:n)"), {"n": candidate}).scalar()
+                    if res:
+                        return True
+            except Exception:
+                return False
+        return False
+
+    # If the primary table is already present, assume migration applied.
+    if has_table('automation_rules'):
+        return
+
     # =========================================================================
     # AUTOMATION RULES
     # =========================================================================
-    op.create_table(
-        'automation_rules',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('name', sa.String(255), nullable=False, index=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('trigger', sa.String(50), nullable=False, index=True),
-        sa.Column('conditions', postgresql.JSON(), nullable=True),
-        sa.Column('actions', postgresql.JSON(), nullable=False),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('priority', sa.Integer(), default=100, index=True),
-        sa.Column('stop_processing', sa.Boolean(), default=False),
-        sa.Column('max_executions_per_hour', sa.Integer(), nullable=True),
-        sa.Column('execution_count', sa.Integer(), default=0),
-        sa.Column('last_executed_at', sa.DateTime(), nullable=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-    )
+    if not has_table('automation_rules'):
+        op.create_table(
+            'automation_rules',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('name', sa.String(255), nullable=False, index=True),
+            sa.Column('description', sa.Text(), nullable=True),
+            sa.Column('trigger', sa.String(50), nullable=False, index=True),
+            sa.Column('conditions', postgresql.JSON(), nullable=True),
+            sa.Column('actions', postgresql.JSON(), nullable=False),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('priority', sa.Integer(), default=100, index=True),
+            sa.Column('stop_processing', sa.Boolean(), default=False),
+            sa.Column('max_executions_per_hour', sa.Integer(), nullable=True),
+            sa.Column('execution_count', sa.Integer(), default=0),
+            sa.Column('last_executed_at', sa.DateTime(), nullable=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        )
 
     # =========================================================================
     # AUTOMATION LOGS
     # =========================================================================
-    op.create_table(
-        'automation_logs',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('rule_id', sa.Integer(), sa.ForeignKey('automation_rules.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('ticket_id', sa.Integer(), sa.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('trigger', sa.String(50), nullable=False, index=True),
-        sa.Column('conditions_matched', postgresql.JSON(), nullable=True),
-        sa.Column('actions_executed', postgresql.JSON(), nullable=True),
-        sa.Column('success', sa.Boolean(), default=True, index=True),
-        sa.Column('error_message', sa.Text(), nullable=True),
-        sa.Column('execution_time_ms', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now(), index=True),
-    )
-
-    # Index for recent logs by rule
-    op.create_index('ix_automation_logs_rule_created', 'automation_logs', ['rule_id', 'created_at'])
+    if not has_table('automation_logs'):
+        op.create_table(
+            'automation_logs',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('rule_id', sa.Integer(), sa.ForeignKey('automation_rules.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('ticket_id', sa.Integer(), sa.ForeignKey('tickets.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('trigger', sa.String(50), nullable=False, index=True),
+            sa.Column('conditions_matched', postgresql.JSON(), nullable=True),
+            sa.Column('actions_executed', postgresql.JSON(), nullable=True),
+            sa.Column('success', sa.Boolean(), default=True, index=True),
+            sa.Column('error_message', sa.Text(), nullable=True),
+            sa.Column('execution_time_ms', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now(), index=True),
+        )
+        op.create_index('ix_automation_logs_rule_created', 'automation_logs', ['rule_id', 'created_at'])
 
     # =========================================================================
     # BUSINESS CALENDARS
     # =========================================================================
-    op.create_table(
-        'business_calendars',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('name', sa.String(255), unique=True, nullable=False, index=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('calendar_type', sa.String(20), default='standard'),
-        sa.Column('timezone', sa.String(50), default='UTC'),
-        sa.Column('schedule', postgresql.JSON(), nullable=True),
-        sa.Column('is_default', sa.Boolean(), default=False, index=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-    )
+    if not has_table('business_calendars'):
+        op.create_table(
+            'business_calendars',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('name', sa.String(255), unique=True, nullable=False, index=True),
+            sa.Column('description', sa.Text(), nullable=True),
+            sa.Column('calendar_type', sa.String(20), default='standard'),
+            sa.Column('timezone', sa.String(50), default='UTC'),
+            sa.Column('schedule', postgresql.JSON(), nullable=True),
+            sa.Column('is_default', sa.Boolean(), default=False, index=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        )
 
     # =========================================================================
     # BUSINESS CALENDAR HOLIDAYS
     # =========================================================================
-    op.create_table(
-        'business_calendar_holidays',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('calendar_id', sa.Integer(), sa.ForeignKey('business_calendars.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('holiday_date', sa.Date(), nullable=False, index=True),
-        sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('is_recurring', sa.Boolean(), default=False),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-    )
+    if not has_table('business_calendar_holidays'):
+        op.create_table(
+            'business_calendar_holidays',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('calendar_id', sa.Integer(), sa.ForeignKey('business_calendars.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('holiday_date', sa.Date(), nullable=False, index=True),
+            sa.Column('name', sa.String(255), nullable=False),
+            sa.Column('is_recurring', sa.Boolean(), default=False),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        )
 
-    # Unique constraint for calendar + date
-    op.create_unique_constraint('uq_calendar_holiday_date', 'business_calendar_holidays', ['calendar_id', 'holiday_date'])
+        # Unique constraint for calendar + date
+        op.create_unique_constraint('uq_calendar_holiday_date', 'business_calendar_holidays', ['calendar_id', 'holiday_date'])
 
     # =========================================================================
     # SLA POLICIES
     # =========================================================================
-    op.create_table(
-        'sla_policies',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('name', sa.String(255), unique=True, nullable=False, index=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('calendar_id', sa.Integer(), sa.ForeignKey('business_calendars.id', ondelete='SET NULL'), nullable=True, index=True),
-        sa.Column('conditions', postgresql.JSON(), nullable=True),
-        sa.Column('is_default', sa.Boolean(), default=False, index=True),
-        sa.Column('priority', sa.Integer(), default=100, index=True),
-        sa.Column('is_active', sa.Boolean(), default=True, index=True),
-        sa.Column('created_by_id', sa.Integer(), nullable=True),
-        sa.Column('updated_by_id', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-    )
+    if not has_table('sla_policies'):
+        op.create_table(
+            'sla_policies',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('name', sa.String(255), unique=True, nullable=False, index=True),
+            sa.Column('description', sa.Text(), nullable=True),
+            sa.Column('calendar_id', sa.Integer(), sa.ForeignKey('business_calendars.id', ondelete='SET NULL'), nullable=True, index=True),
+            sa.Column('conditions', postgresql.JSON(), nullable=True),
+            sa.Column('is_default', sa.Boolean(), default=False, index=True),
+            sa.Column('priority', sa.Integer(), default=100, index=True),
+            sa.Column('is_active', sa.Boolean(), default=True, index=True),
+            sa.Column('created_by_id', sa.Integer(), nullable=True),
+            sa.Column('updated_by_id', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        )
 
     # =========================================================================
     # SLA TARGETS
     # =========================================================================
-    op.create_table(
-        'sla_targets',
-        sa.Column('id', sa.Integer(), primary_key=True, index=True),
-        sa.Column('policy_id', sa.Integer(), sa.ForeignKey('sla_policies.id', ondelete='CASCADE'), nullable=False, index=True),
-        sa.Column('target_type', sa.String(30), nullable=False, index=True),
-        sa.Column('priority', sa.String(20), nullable=True, index=True),
-        sa.Column('target_hours', sa.Numeric(10, 2), nullable=False),
-        sa.Column('warning_threshold_pct', sa.Integer(), default=80),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-    )
+    if not has_table('sla_targets'):
+        op.create_table(
+            'sla_targets',
+            sa.Column('id', sa.Integer(), primary_key=True, index=True),
+            sa.Column('policy_id', sa.Integer(), sa.ForeignKey('sla_policies.id', ondelete='CASCADE'), nullable=False, index=True),
+            sa.Column('target_type', sa.String(30), nullable=False, index=True),
+            sa.Column('priority', sa.String(20), nullable=True, index=True),
+            sa.Column('target_hours', sa.Numeric(10, 2), nullable=False),
+            sa.Column('warning_threshold_pct', sa.Integer(), default=80),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        )
 
-    # Unique constraint for policy + type + priority
-    op.create_unique_constraint('uq_sla_target_policy_type_priority', 'sla_targets', ['policy_id', 'target_type', 'priority'])
+        # Unique constraint for policy + type + priority
+        op.create_unique_constraint('uq_sla_target_policy_type_priority', 'sla_targets', ['policy_id', 'target_type', 'priority'])
 
     # =========================================================================
     # SLA BREACH LOGS

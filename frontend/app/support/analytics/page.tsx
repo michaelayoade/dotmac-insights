@@ -185,6 +185,8 @@ export default function SupportAnalyticsPage() {
   const { data: agentInsights } = useSupportInsightsAgentPerformance({ days });
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days });
   const { data: queueHealth } = useSupportRoutingQueueHealth();
+  const qh = (queueHealth || {}) as any;
+  const overdueDetail = (dashboard as any)?.overdue_detail || [];
 
   // Calculate trends
   const latestSla = slaPerformance?.[slaPerformance.length - 1];
@@ -600,28 +602,28 @@ export default function SupportAnalyticsPage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{queueHealth.unassigned_tickets}</p>
+              <p className="text-2xl font-bold text-white">{qh.unassigned_tickets ?? 0}</p>
               <p className="text-xs text-slate-muted">Unassigned</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-amber-400">{queueHealth.avg_wait_hours?.toFixed(1)}h</p>
+              <p className="text-2xl font-bold text-amber-400">{(qh.avg_wait_hours ?? 0).toFixed(1)}h</p>
               <p className="text-xs text-slate-muted">Avg Wait</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-blue-400">{queueHealth.total_agents}</p>
+              <p className="text-2xl font-bold text-blue-400">{qh.total_agents ?? 0}</p>
               <p className="text-xs text-slate-muted">Agents</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-emerald-400">{queueHealth.total_capacity}</p>
+              <p className="text-2xl font-bold text-emerald-400">{qh.total_capacity ?? 0}</p>
               <p className="text-xs text-slate-muted">Capacity</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-violet-400">{queueHealth.total_load}</p>
+              <p className="text-2xl font-bold text-violet-400">{qh.total_load ?? 0}</p>
               <p className="text-xs text-slate-muted">Current Load</p>
             </div>
             <div className="text-center">
-              <p className={cn('text-2xl font-bold', queueHealth.overall_utilization_pct > 80 ? 'text-rose-400' : 'text-teal-electric')}>
-                {queueHealth.overall_utilization_pct}%
+              <p className={cn('text-2xl font-bold', (qh.overall_utilization_pct ?? 0) > 80 ? 'text-rose-400' : 'text-teal-electric')}>
+                {(qh.overall_utilization_pct ?? 0)}%
               </p>
               <p className="text-xs text-slate-muted">Utilization</p>
             </div>
@@ -630,12 +632,12 @@ export default function SupportAnalyticsPage() {
       )}
 
       {/* Overdue Detail */}
-      {overview?.overdue_detail?.length ? (
+      {overdueDetail.length ? (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-4 h-4 text-rose-400" />
             <h3 className="text-white font-semibold">Overdue Tickets</h3>
-            <span className="text-xs text-slate-muted ml-auto">{overview.overdue_detail.length} tickets</span>
+            <span className="text-xs text-slate-muted ml-auto">{overdueDetail.length} tickets</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -648,7 +650,7 @@ export default function SupportAnalyticsPage() {
                 </tr>
               </thead>
               <tbody>
-                {overview.overdue_detail.slice(0, 10).map((ticket: any) => (
+                {overdueDetail.slice(0, 10).map((ticket: any) => (
                   <tr key={ticket.id} className="border-t border-slate-border/40">
                     <td className="py-2 text-white font-mono">{ticket.ticket_number || `#${ticket.id}`}</td>
                     <td className="py-2">

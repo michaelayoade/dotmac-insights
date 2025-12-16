@@ -7,7 +7,7 @@ Create Date: 2025-02-22
 
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op, context
 import sqlalchemy as sa
 from sqlalchemy import text
 
@@ -20,6 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Backfill customer_id on finance tables and enforce NOT NULL when possible."""
+    if context.is_offline_mode():
+        # Skip data backfill in offline/--sql mode
+        return
+
     conn = op.get_bind()
 
     # 1) Backfill invoices by parsing the customer hint embedded in invoice_number.

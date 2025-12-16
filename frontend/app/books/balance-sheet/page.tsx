@@ -5,13 +5,11 @@ import { useAccountingBalanceSheet } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
 import {
-  AlertTriangle,
   FileSpreadsheet,
   Building2,
   CreditCard,
   PiggyBank,
   Calendar,
-  Loader2,
   Download,
   BarChart2,
   ChevronDown,
@@ -21,6 +19,7 @@ import {
   Coins,
   TrendingUp,
 } from 'lucide-react';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -211,27 +210,24 @@ export default function BalanceSheetPage() {
   const [asOfDate, setAsOfDate] = useState<string>('');
   const [commonSize, setCommonSize] = useState<boolean>(false);
   const params = { as_of_date: asOfDate || undefined, common_size: commonSize || undefined };
-  const { data, isLoading, error } = useAccountingBalanceSheet(params);
+  const { data, isLoading, error, mutate } = useAccountingBalanceSheet(params);
 
   const exportSheet = (format: 'csv' | 'pdf') => {
     const url = buildApiUrl('/accounting/balance-sheet/export', { ...params, format });
     window.open(url, '_blank');
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load balance sheet</p>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-electric" />
-      </div>
+      <ErrorDisplay
+        message="Failed to load balance sheet."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -249,7 +245,7 @@ export default function BalanceSheetPage() {
   const nonCurrentLiabilities = data?.liabilities_classified?.non_current_liabilities || { accounts: [], total: 0 };
 
   // Equity breakdown
-  const equityClassified = data?.equity_classified || {};
+  const equityClassified = data?.equity_classified as { total?: number; accounts?: any[] } | undefined;
 
   // Fallback to traditional structure if classified data not available
   const assetsAccounts = data?.assets?.accounts || [];
@@ -436,7 +432,7 @@ export default function BalanceSheetPage() {
           Equity
         </h3>
 
-        {equityClassified.total !== undefined ? (
+        {equityClassified?.total !== undefined ? (
           <EquitySection
             title="Shareholders' Equity"
             data={equityClassified}
