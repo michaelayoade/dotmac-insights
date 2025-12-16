@@ -143,7 +143,7 @@ export default function ApprovalsPage() {
     try {
       const promises: Promise<unknown>[] = [];
 
-      for (const key of selectedItems) {
+      for (const key of Array.from(selectedItems)) {
         const [type, idStr] = key.split('-');
         const id = parseInt(idStr);
 
@@ -171,7 +171,7 @@ export default function ApprovalsPage() {
     try {
       const promises: Promise<unknown>[] = [];
 
-      for (const key of selectedItems) {
+      for (const key of Array.from(selectedItems)) {
         const [type, idStr] = key.split('-');
         const id = parseInt(idStr);
 

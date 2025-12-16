@@ -1,7 +1,7 @@
 """Support automation, SLA policies, and routing infrastructure.
 
 Revision ID: 20241213_support_automation_sla
-Revises:
+Revises: 20240914_ticket_deps_expense
 Create Date: 2024-12-13
 
 This migration creates:
@@ -23,7 +23,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision: str = '20241213_support_automation_sla'
-down_revision: Union[str, None] = None
+down_revision: Union[str, None] = '20240914_ticket_deps_expense'
 branch_labels: Union[str, Sequence[str], None] = ('support_automation',)
 depends_on: Union[str, Sequence[str], None] = None
 

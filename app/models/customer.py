@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from app.models.ticket import Ticket
     from app.models.project import Project
     from app.models.customer_usage import CustomerUsage
+    from app.models.unified_contact import UnifiedContact
 
 
 class CustomerStatus(enum.Enum):
@@ -129,8 +130,17 @@ class Customer(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Link to unified contact (for migration to UnifiedContact model)
+    # Once fully migrated, Customer data will be derived from UnifiedContact
+    unified_contact_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_contacts.id"),
+        nullable=True,
+        index=True
+    )
+
     # Relationships
     pop: Mapped[Optional[Pop]] = relationship(back_populates="customers")
+    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
     subscriptions: Mapped[List[Subscription]] = relationship(back_populates="customer")
     invoices: Mapped[List[Invoice]] = relationship(back_populates="customer")
     payments: Mapped[List[Payment]] = relationship(back_populates="customer")

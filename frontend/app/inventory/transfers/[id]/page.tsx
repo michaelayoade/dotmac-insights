@@ -47,7 +47,7 @@ export default function TransferDetailPage() {
   const transferId = Number(params.id);
 
   const { data, isLoading, error, mutate } = useInventoryTransfers({ limit: 1000 });
-  const { submitTransfer, approveTransfer, rejectTransfer, executeTransfer } = useInventoryTransferMutations();
+  const { submit, approve, reject, execute } = useInventoryTransferMutations();
 
   const transfer = data?.transfers?.find(t => t.id === transferId);
 
@@ -55,16 +55,16 @@ export default function TransferDetailPage() {
     try {
       switch (action) {
         case "submit":
-          await submitTransfer(transferId);
+          await submit(transferId);
           break;
         case "approve":
-          await approveTransfer(transferId);
+          await approve(transferId);
           break;
         case "reject":
-          await rejectTransfer(transferId, "Rejected via UI");
+          await reject(transferId, "Rejected via UI");
           break;
         case "execute":
-          await executeTransfer(transferId);
+          await execute(transferId);
           break;
       }
       mutate();
@@ -254,7 +254,7 @@ export default function TransferDetailPage() {
                           {(item.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 text-right font-mono text-white">
-                          {(item.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {((item.qty ?? 0) * (item.valuation_rate ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
                     ))}
@@ -300,31 +300,23 @@ export default function TransferDetailPage() {
           </div>
 
           {/* Approval Info */}
-          {transfer.approved_by_id && (
+          {transfer.approval_status === "approved" && (
             <div className="bg-slate-card border border-slate-border rounded-xl p-6">
               <h3 className="text-sm font-medium text-slate-muted mb-4">Approval Info</h3>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-slate-muted" />
-                  <span className="text-white">Approved by #{transfer.approved_by_id}</span>
+                  <span className="text-white">Approved</span>
                 </div>
-                {transfer.approved_at && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-slate-muted" />
-                    <span className="text-slate-muted">
-                      {new Date(transfer.approved_at).toLocaleString()}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
           {/* Rejection Info */}
-          {transfer.rejection_reason && (
+          {transfer.approval_status === "rejected" && transfer.remarks && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
               <h3 className="text-sm font-medium text-red-400 mb-2">Rejection Reason</h3>
-              <p className="text-white text-sm">{transfer.rejection_reason}</p>
+              <p className="text-white text-sm">{transfer.remarks}</p>
             </div>
           )}
 
@@ -335,21 +327,21 @@ export default function TransferDetailPage() {
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-slate-muted mt-2" />
                 <div>
-                  <p className="text-white text-sm">Created</p>
+                  <p className="text-white text-sm">Requested</p>
                   <p className="text-xs text-slate-muted">
-                    {transfer.created_at
-                      ? new Date(transfer.created_at).toLocaleString()
+                    {transfer.request_date
+                      ? new Date(transfer.request_date).toLocaleString()
                       : "-"}
                   </p>
                 </div>
               </div>
-              {transfer.updated_at && transfer.updated_at !== transfer.created_at && (
+              {transfer.transfer_date && transfer.transfer_date !== transfer.request_date && (
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-amber-500 mt-2" />
                   <div>
-                    <p className="text-white text-sm">Last Updated</p>
+                    <p className="text-white text-sm">Transferred</p>
                     <p className="text-xs text-slate-muted">
-                      {new Date(transfer.updated_at).toLocaleString()}
+                      {new Date(transfer.transfer_date).toLocaleString()}
                     </p>
                   </div>
                 </div>

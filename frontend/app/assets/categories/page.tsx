@@ -23,9 +23,9 @@ export default function AssetCategoriesPage() {
   });
 
   const { data, isLoading, mutate } = useAssetCategories();
-  const { createCategory } = useAssetCategoryMutations();
+  const { create: createCategory } = useAssetCategoryMutations();
 
-  const categories = data?.items ?? [];
+  const categories = data?.categories ?? [];
 
   const toggleExpand = (id: number) => {
     setExpandedCategories((prev) => {

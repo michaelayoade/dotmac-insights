@@ -404,6 +404,79 @@ class NotificationService:
                 "alert-triangle",
                 "high",
             ),
+            # Performance management templates
+            NotificationEventType.PERF_PERIOD_STARTED: (
+                "Performance Evaluation Started",
+                f"The {payload.get('period_name', 'evaluation period')} has begun. Your scorecard is being prepared.",
+                "calendar",
+                "normal",
+            ),
+            NotificationEventType.PERF_SCORECARD_GENERATED: (
+                "Performance Scorecard Ready",
+                f"Your performance scorecard for {payload.get('period_name', 'this period')} has been generated and is ready for tracking.",
+                "clipboard-list",
+                "normal",
+            ),
+            NotificationEventType.PERF_SCORECARD_COMPUTED: (
+                "Performance Metrics Calculated",
+                f"Your performance metrics for {payload.get('period_name', 'this period')} have been calculated. Score: {payload.get('score', 'N/A')}",
+                "calculator",
+                "normal",
+            ),
+            NotificationEventType.PERF_REVIEW_REQUESTED: (
+                "Performance Review Pending",
+                f"{payload.get('employee_name', 'An employee')}'s scorecard is awaiting your review for {payload.get('period_name', 'this period')}.",
+                "user-check",
+                "high",
+            ),
+            NotificationEventType.PERF_SCORECARD_APPROVED: (
+                "Scorecard Approved",
+                f"Your performance scorecard for {payload.get('period_name', 'this period')} has been approved by {payload.get('reviewer_name', 'your manager')}.",
+                "check-circle",
+                "normal",
+            ),
+            NotificationEventType.PERF_SCORECARD_REJECTED: (
+                "Scorecard Needs Revision",
+                f"Your scorecard for {payload.get('period_name', 'this period')} requires revision. Reason: {payload.get('reason', 'Please review comments.')}",
+                "alert-circle",
+                "high",
+            ),
+            NotificationEventType.PERF_SCORECARD_FINALIZED: (
+                "Performance Rating Finalized",
+                f"Your final performance rating for {payload.get('period_name', 'this period')} is: {payload.get('rating', 'N/A')} ({payload.get('score', 'N/A')} points)",
+                "award",
+                "high",
+            ),
+            NotificationEventType.PERF_SCORE_OVERRIDDEN: (
+                "Score Adjusted",
+                f"A score on your {payload.get('period_name', '')} scorecard was adjusted from {payload.get('old_score', 'N/A')} to {payload.get('new_score', 'N/A')}. Reason: {payload.get('reason', 'N/A')}",
+                "edit",
+                "normal",
+            ),
+            NotificationEventType.PERF_REVIEW_REMINDER: (
+                "Review Reminder",
+                f"You have {payload.get('pending_count', 0)} performance reviews pending. Deadline: {payload.get('deadline', 'N/A')}",
+                "clock",
+                "high",
+            ),
+            NotificationEventType.PERF_PERIOD_CLOSING: (
+                "Evaluation Period Ending",
+                f"The {payload.get('period_name', 'evaluation period')} ends on {payload.get('end_date', 'N/A')}. Please complete all pending reviews.",
+                "alert-triangle",
+                "high",
+            ),
+            NotificationEventType.PERF_WEEKLY_SUMMARY: (
+                "Weekly Performance Summary",
+                f"Your team performance summary: {payload.get('computed_count', 0)} scorecards computed, {payload.get('pending_review', 0)} pending review.",
+                "bar-chart-2",
+                "normal",
+            ),
+            NotificationEventType.PERF_RATING_PUBLISHED: (
+                "Performance Rating Published",
+                f"Your performance rating for {payload.get('period_name', 'this period')} has been published. View your detailed scorecard.",
+                "eye",
+                "normal",
+            ),
         }
 
         return templates.get(
@@ -447,6 +520,9 @@ class NotificationService:
             "expense": f"/accounting/expenses/{entity_id}",
             "customer": f"/customers/{entity_id}",
             "approval": f"/accounting/approvals/{entity_id}",
+            "scorecard": f"/performance/scorecards/{entity_id}",
+            "evaluation_period": f"/performance/periods/{entity_id}",
+            "performance_review": f"/performance/reviews/{entity_id}",
         }
         return url_map.get(entity_type)
 
@@ -460,6 +536,10 @@ class NotificationService:
             NotificationEventType.APPROVAL_REQUESTED,
             NotificationEventType.INVOICE_OVERDUE,
             NotificationEventType.APPROVAL_REJECTED,
+            NotificationEventType.PERF_REVIEW_REQUESTED,
+            NotificationEventType.PERF_SCORECARD_FINALIZED,
+            NotificationEventType.PERF_PERIOD_CLOSING,
+            NotificationEventType.PERF_REVIEW_REMINDER,
         }
 
         if event_type in urgent_events:

@@ -275,11 +275,12 @@ export default function ProjectsAnalyticsPage() {
   const avgCompletion = dashboard?.metrics?.avg_completion_percent || 0;
   const dueThisWeek = dashboard?.metrics?.due_this_week || 0;
 
-  // Financial metrics
-  const totalEstimated = dashboard?.financials?.total_estimated || 0;
-  const totalActual = dashboard?.financials?.total_actual_cost || 0;
-  const totalBilled = dashboard?.financials?.total_billed || 0;
-  const variance = dashboard?.financials?.variance || 0;
+  // Financial metrics (dashboard financials shape varies per API response)
+  const financials: any = dashboard?.financials || {};
+  const totalEstimated = financials.total_estimated ?? 0;
+  const totalActual = financials.total_actual_cost ?? 0;
+  const totalBilled = financials.total_billed ?? 0;
+  const variance = financials.variance ?? 0;
 
   // Performance metrics
   const budgetAdherence = performance?.budget?.adherence_rate || 0;
@@ -465,7 +466,7 @@ export default function ProjectsAnalyticsPage() {
                 <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Bar dataKey="count" name="Tasks" radius={[4, 4, 0, 0]}>
-                  {taskStatusData.map((entry, index) => (
+                  {taskStatusData.map((entry: { fill: string }, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Bar>

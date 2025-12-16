@@ -33,7 +33,7 @@ export default function DepreciationSchedulePage() {
 
   const { data, isLoading, mutate } = useDepreciationSchedule(params);
 
-  const entries = data?.items ?? [];
+  const entries = data?.schedules ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 

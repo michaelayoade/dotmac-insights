@@ -17,16 +17,16 @@ export default function PendingDepreciationPage() {
   const today = new Date().toISOString().split("T")[0];
   const [asOfDate, setAsOfDate] = useState(today);
 
-  const { data: entries, isLoading, mutate } = usePendingDepreciation(asOfDate);
+  const { data, isLoading, mutate } = usePendingDepreciation(asOfDate);
 
-  const pendingEntries = entries ?? [];
-  const totalPending = pendingEntries.reduce((sum, e) => sum + (e.depreciation_amount || 0), 0);
+  const pendingEntries = data?.pending_entries ?? [];
+  const totalPending = data?.total_pending_amount ?? 0;
 
   // Group by asset
   const byAsset = pendingEntries.reduce((acc, entry) => {
     const key = entry.asset_id;
     if (!acc[key]) {
-      acc[key] = { asset_name: entry.asset_name, asset_id: entry.asset_id, entries: [] };
+      acc[key] = { asset_name: entry.asset_name ?? 'Unknown Asset', asset_id: entry.asset_id, entries: [] };
     }
     acc[key].entries.push(entry);
     return acc;

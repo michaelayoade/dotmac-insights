@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import {
   api,
@@ -429,6 +430,35 @@ export function useProjectDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
     id ? ['project-detail', id] as const : null,
     ([, projectId]) => api.getProjectDetail(projectId),
+    config
+  );
+}
+
+export function useProjectTasks(
+  projectId: number | null,
+  params?: {
+    status?: string;
+    priority?: string;
+    assigned_to?: string;
+    task_type?: string;
+    search?: string;
+    overdue_only?: boolean;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    projectId ? ['project-tasks', projectId, params] as const : null,
+    ([, pid, p]) => api.getProjectTasks({ project_id: pid, ...p }),
+    config
+  );
+}
+
+export function useTaskDetail(id: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['task-detail', id] as const : null,
+    ([, taskId]) => api.getTaskDetail(taskId),
     config
   );
 }
@@ -4141,6 +4171,607 @@ export function useAssetCategoryMutations() {
       const res = await api.createAssetCategory(body);
       await mutate((key) => Array.isArray(key) && key[0] === 'asset-categories');
       return res;
+    },
+  };
+}
+
+// ============= CRM HOOKS =============
+
+// Leads
+export function useLeads(
+  params?: Parameters<typeof api.getLeads>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['leads', params], () => api.getLeads(params), config);
+}
+
+export function useLead(id: number | string | undefined, config?: SWRConfiguration) {
+  return useSWR(id ? ['lead', id] : null, () => api.getLead(id!), config);
+}
+
+export function useLeadsSummary(config?: SWRConfiguration) {
+  return useSWR('leads-summary', () => api.getLeadsSummary(), config);
+}
+
+export function useLeadMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createLead: async (body: Parameters<typeof api.createLead>[0]) => {
+      const res = await api.createLead(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'leads');
+      await mutate('leads-summary');
+      return res;
+    },
+    updateLead: async (id: number | string, body: Parameters<typeof api.updateLead>[1]) => {
+      const res = await api.updateLead(id, body);
+      await mutate(['lead', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'leads');
+      return res;
+    },
+    qualifyLead: async (id: number | string) => {
+      const res = await api.qualifyLead(id);
+      await mutate(['lead', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'leads');
+      await mutate('leads-summary');
+      return res;
+    },
+    disqualifyLead: async (id: number | string, reason?: string) => {
+      const res = await api.disqualifyLead(id, reason);
+      await mutate(['lead', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'leads');
+      await mutate('leads-summary');
+      return res;
+    },
+    convertLead: async (id: number | string, body: Parameters<typeof api.convertLead>[1]) => {
+      const res = await api.convertLead(id, body);
+      await mutate(['lead', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'leads');
+      await mutate('leads-summary');
+      await mutate((key) => Array.isArray(key) && key[0] === 'customers');
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      // Invalidate pipeline caches when conversion creates an opportunity
+      await mutate('pipeline-summary');
+      await mutate('pipeline-view');
+      await mutate((key) => Array.isArray(key) && key[0] === 'kanban-view');
+      return res;
+    },
+  };
+}
+
+// Opportunities
+export function useOpportunities(
+  params?: Parameters<typeof api.getOpportunities>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['opportunities', params], () => api.getOpportunities(params), config);
+}
+
+export function useOpportunity(id: number | string | undefined, config?: SWRConfiguration) {
+  return useSWR(id ? ['opportunity', id] : null, () => api.getOpportunity(id!), config);
+}
+
+export function usePipelineSummary(config?: SWRConfiguration) {
+  return useSWR('pipeline-summary', () => api.getPipelineSummary(), config);
+}
+
+export function useOpportunityMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createOpportunity: async (body: Parameters<typeof api.createOpportunity>[0]) => {
+      const res = await api.createOpportunity(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      await mutate('pipeline-summary');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+    updateOpportunity: async (id: number | string, body: Parameters<typeof api.updateOpportunity>[1]) => {
+      const res = await api.updateOpportunity(id, body);
+      await mutate(['opportunity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+    moveStage: async (id: number | string, stageId: number) => {
+      const res = await api.moveOpportunityStage(id, stageId);
+      await mutate(['opportunity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      await mutate('pipeline-summary');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+    markWon: async (id: number | string, actualCloseDate?: string) => {
+      const res = await api.markOpportunityWon(id, actualCloseDate);
+      await mutate(['opportunity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      await mutate('pipeline-summary');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+    markLost: async (id: number | string, lostReason?: string, competitor?: string) => {
+      const res = await api.markOpportunityLost(id, lostReason, competitor);
+      await mutate(['opportunity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'opportunities');
+      await mutate('pipeline-summary');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+  };
+}
+
+// Pipeline
+export function usePipelineStages(includeInactive?: boolean, config?: SWRConfiguration) {
+  return useSWR(['pipeline-stages', includeInactive], () => api.getPipelineStages(includeInactive), config);
+}
+
+export function usePipelineView(config?: SWRConfiguration) {
+  return useSWR('pipeline-view', () => api.getPipelineView(), config);
+}
+
+export function useKanbanView(ownerId?: number, config?: SWRConfiguration) {
+  return useSWR(['kanban-view', ownerId], () => api.getKanbanView(ownerId), config);
+}
+
+export function usePipelineStageMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createStage: async (body: Parameters<typeof api.createPipelineStage>[0]) => {
+      const res = await api.createPipelineStage(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'pipeline-stages');
+      await mutate('pipeline-view');
+      return res;
+    },
+    updateStage: async (id: number | string, body: Parameters<typeof api.updatePipelineStage>[1]) => {
+      const res = await api.updatePipelineStage(id, body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'pipeline-stages');
+      await mutate('pipeline-view');
+      return res;
+    },
+    reorderStages: async (stageIds: number[]) => {
+      const res = await api.reorderPipelineStages(stageIds);
+      await mutate((key) => Array.isArray(key) && key[0] === 'pipeline-stages');
+      await mutate('pipeline-view');
+      await mutate('kanban-view');
+      return res;
+    },
+    deleteStage: async (id: number | string) => {
+      const res = await api.deletePipelineStage(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'pipeline-stages');
+      await mutate('pipeline-view');
+      return res;
+    },
+  };
+}
+
+// Activities
+export function useActivities(
+  params?: Parameters<typeof api.getActivities>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['activities', params], () => api.getActivities(params), config);
+}
+
+export function useActivity(id: number | string | undefined, config?: SWRConfiguration) {
+  return useSWR(id ? ['activity', id] : null, () => api.getActivity(id!), config);
+}
+
+export function useActivityTimeline(
+  params?: Parameters<typeof api.getActivityTimeline>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['activity-timeline', params], () => api.getActivityTimeline(params), config);
+}
+
+export function useUpcomingActivities(limit?: number, config?: SWRConfiguration) {
+  return useSWR(['upcoming-activities', limit], () => api.getUpcomingActivities(limit), config);
+}
+
+export function useOverdueActivities(config?: SWRConfiguration) {
+  return useSWR('overdue-activities', () => api.getOverdueActivities(), config);
+}
+
+export function useActivityMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createActivity: async (body: Parameters<typeof api.createActivity>[0]) => {
+      const res = await api.createActivity(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      await mutate((key) => Array.isArray(key) && key[0] === 'upcoming-activities');
+      return res;
+    },
+    updateActivity: async (id: number | string, body: Parameters<typeof api.updateActivity>[1]) => {
+      const res = await api.updateActivity(id, body);
+      await mutate(['activity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      return res;
+    },
+    completeActivity: async (id: number | string, notes?: string) => {
+      const res = await api.completeActivity(id, notes);
+      await mutate(['activity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      await mutate((key) => Array.isArray(key) && key[0] === 'upcoming-activities');
+      await mutate('overdue-activities');
+      return res;
+    },
+    cancelActivity: async (id: number | string) => {
+      const res = await api.cancelActivity(id);
+      await mutate(['activity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      await mutate((key) => Array.isArray(key) && key[0] === 'upcoming-activities');
+      return res;
+    },
+    rescheduleActivity: async (id: number | string, scheduledAt: string) => {
+      const res = await api.rescheduleActivity(id, scheduledAt);
+      await mutate(['activity', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      await mutate((key) => Array.isArray(key) && key[0] === 'upcoming-activities');
+      await mutate('overdue-activities');
+      return res;
+    },
+    deleteActivity: async (id: number | string) => {
+      const res = await api.deleteActivity(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'activities');
+      await mutate((key) => Array.isArray(key) && key[0] === 'activity-timeline');
+      return res;
+    },
+  };
+}
+
+// Contacts
+export function useContacts(
+  params?: Parameters<typeof api.getContacts>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['contacts', params], () => api.getContacts(params), config);
+}
+
+export function useContact(id: number | string | undefined, config?: SWRConfiguration) {
+  return useSWR(id ? ['contact', id] : null, () => api.getContact(id!), config);
+}
+
+export function useCustomerContacts(customerId: number | undefined, config?: SWRConfiguration) {
+  return useSWR(
+    customerId ? ['customer-contacts', customerId] : null,
+    () => api.getCustomerContacts(customerId!),
+    config
+  );
+}
+
+export function useLeadContacts(leadId: number | undefined, config?: SWRConfiguration) {
+  return useSWR(
+    leadId ? ['lead-contacts', leadId] : null,
+    () => api.getLeadContacts(leadId!),
+    config
+  );
+}
+
+export function useContactMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createContact: async (body: Parameters<typeof api.createContact>[0]) => {
+      const res = await api.createContact(body);
+      await mutate((key) => Array.isArray(key) && key[0] === 'contacts');
+      if (body.customer_id) await mutate(['customer-contacts', body.customer_id]);
+      if (body.lead_id) await mutate(['lead-contacts', body.lead_id]);
+      return res;
+    },
+    updateContact: async (id: number | string, body: Parameters<typeof api.updateContact>[1]) => {
+      const res = await api.updateContact(id, body);
+      await mutate(['contact', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'customer-contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'lead-contacts');
+      return res;
+    },
+    setPrimaryContact: async (id: number | string) => {
+      const res = await api.setPrimaryContact(id);
+      await mutate(['contact', id]);
+      await mutate((key) => Array.isArray(key) && key[0] === 'contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'customer-contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'lead-contacts');
+      return res;
+    },
+    deleteContact: async (id: number | string) => {
+      const res = await api.deleteContact(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'customer-contacts');
+      await mutate((key) => Array.isArray(key) && key[0] === 'lead-contacts');
+      return res;
+    },
+  };
+}
+
+// Lead Sources & Campaigns
+export function useLeadSources(config?: SWRConfiguration) {
+  return useSWR('lead-sources', () => api.getLeadSources(), config);
+}
+
+export function useCampaigns(
+  params?: Parameters<typeof api.getCampaigns>[0],
+  config?: SWRConfiguration
+) {
+  return useSWR(['campaigns', params], () => api.getCampaigns(params), config);
+}
+
+// =============================================================================
+// UNIFIED CONTACTS API HOOKS
+// =============================================================================
+
+export interface UnifiedContactsParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  contact_type?: 'lead' | 'prospect' | 'customer' | 'churned' | 'person';
+  category?: 'residential' | 'business' | 'enterprise' | 'government' | 'non_profit';
+  status?: 'active' | 'inactive' | 'suspended' | 'do_not_contact';
+  qualification?: 'unqualified' | 'cold' | 'warm' | 'hot' | 'qualified';
+  owner_id?: number;
+  territory?: string;
+  city?: string;
+  state?: string;
+  source?: string;
+  is_organization?: boolean;
+  has_outstanding?: boolean;
+  tag?: string;
+  sort_by?: 'name' | 'created_at' | 'last_contact_date' | 'mrr' | 'lead_score';
+  sort_order?: 'asc' | 'desc';
+}
+
+export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRConfiguration) {
+  return useSWR(
+    ['unified-contacts', params],
+    async () => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      const response = await fetch(`/api/contacts?${queryParams.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch contacts');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContact(id: number | string | undefined, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['unified-contact', id] : null,
+    async () => {
+      const response = await fetch(`/api/contacts/${id}`);
+      if (!response.ok) throw new Error('Failed to fetch contact');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContactLeads(params?: UnifiedContactsParams, config?: SWRConfiguration) {
+  return useSWR(
+    ['unified-contacts-leads', params],
+    async () => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      const response = await fetch(`/api/contacts/leads?${queryParams.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch leads');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContactCustomers(params?: UnifiedContactsParams, config?: SWRConfiguration) {
+  return useSWR(
+    ['unified-contacts-customers', params],
+    async () => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      const response = await fetch(`/api/contacts/customers?${queryParams.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch customers');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContactsDashboard(periodDays = 30, config?: SWRConfiguration) {
+  return useSWR(
+    ['unified-contacts-dashboard', periodDays],
+    async () => {
+      const response = await fetch(`/api/contacts/analytics/dashboard?period_days=${periodDays}`);
+      if (!response.ok) throw new Error('Failed to fetch contacts dashboard');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContactsFunnel(periodDays = 30, ownerId?: number, config?: SWRConfiguration) {
+  return useSWR(
+    ['unified-contacts-funnel', periodDays, ownerId],
+    async () => {
+      const params = new URLSearchParams({ period_days: String(periodDays) });
+      if (ownerId) params.append('owner_id', String(ownerId));
+      const response = await fetch(`/api/contacts/analytics/funnel?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch funnel');
+      return response.json();
+    },
+    config
+  );
+}
+
+export function useUnifiedContactMutations() {
+  const { mutate } = useSWRConfig();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const run = async <T>(fn: () => Promise<T>): Promise<T> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      return await fn();
+    } catch (err: any) {
+      const e = err instanceof Error ? err : new Error(err?.message || 'Request failed');
+      setError(e);
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    isLoading,
+    error,
+    createContact: async (body: Record<string, unknown>) => {
+      return run(async () => {
+        const response = await fetch('/api/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error('Failed to create contact');
+        const result = await response.json();
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    updateContact: async (id: number | string, body: Record<string, unknown>) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error('Failed to update contact');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    deleteContact: async (id: number | string, hard = false) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}?hard=${hard}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) throw new Error('Failed to delete contact');
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return response.json();
+      });
+    },
+
+    qualifyLead: async (id: number | string, qualification: string, leadScore?: number) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/qualify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qualification, lead_score: leadScore }),
+        });
+        if (!response.ok) throw new Error('Failed to qualify lead');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    convertToCustomer: async (id: number | string, body?: Record<string, unknown>) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/convert-to-customer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body || {}),
+        });
+        if (!response.ok) throw new Error('Failed to convert to customer');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    markChurned: async (id: number | string, reason: string, notes?: string) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/mark-churned`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, notes }),
+        });
+        if (!response.ok) throw new Error('Failed to mark churned');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    assignOwner: async (id: number | string, ownerId: number, notes?: string) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ owner_id: ownerId, notes }),
+        });
+        if (!response.ok) throw new Error('Failed to assign owner');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
+        return result;
+      });
+    },
+
+    addTags: async (id: number | string, tags: string[]) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/tags/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tags),
+        });
+        if (!response.ok) throw new Error('Failed to add tags');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        return result;
+      });
+    },
+
+    removeTags: async (id: number | string, tags: string[]) => {
+      return run(async () => {
+        const response = await fetch(`/api/contacts/${id}/tags/remove`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tags),
+        });
+        if (!response.ok) throw new Error('Failed to remove tags');
+        const result = await response.json();
+        await mutate(['unified-contact', id]);
+        return result;
+      });
     },
   };
 }

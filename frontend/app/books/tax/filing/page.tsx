@@ -1,9 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useFilingCalendar, useUpcomingFilings, useOverdueFilings } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
@@ -12,8 +10,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  ChevronRight,
   Filter,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -56,6 +54,8 @@ export default function FilingCalendarPage() {
     year: new Date().getFullYear(),
   });
   const { taxType: taxTypeFilter, status: statusFilter, year } = filters;
+  const updateFilters = (next: Partial<typeof filters>) =>
+    setFilters((prev) => ({ ...prev, ...next }));
 
   const { data: calendar, isLoading, error, mutate } = useFilingCalendar({
     year,
@@ -187,7 +187,7 @@ export default function FilingCalendarPage() {
         </div>
         <select
           value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
+          onChange={(e) => updateFilters({ year: Number(e.target.value) })}
           className="input-field max-w-[120px]"
         >
           {[...Array(3)].map((_, i) => {
@@ -197,7 +197,7 @@ export default function FilingCalendarPage() {
         </select>
         <select
           value={taxTypeFilter}
-          onChange={(e) => setTaxTypeFilter(e.target.value)}
+          onChange={(e) => updateFilters({ taxType: e.target.value })}
           className="input-field max-w-[140px]"
         >
           <option value="">All Tax Types</option>
@@ -208,7 +208,7 @@ export default function FilingCalendarPage() {
         </select>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => updateFilters({ status: e.target.value })}
           className="input-field max-w-[140px]"
         >
           <option value="">All Statuses</option>
@@ -233,89 +233,107 @@ export default function FilingCalendarPage() {
           ))}
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(filingsByMonth)
+        (() => {
+          const sortedFilings = Object.entries(filingsByMonth)
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([month, filings]) => {
-              const filteredFilings = filterFilings(filings);
-              if (filteredFilings.length === 0) return null;
+            .map(([month, filings]) => [month, filterFilings(filings)] as const)
+            .filter(([, filtered]) => filtered.length > 0);
 
-              const monthDate = new Date(month + '-01');
-              const monthName = monthDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-
-              return (
-                <div key={month} className="bg-slate-card border border-slate-border rounded-xl p-4">
-                  <h3 className="text-white font-semibold mb-4">{monthName}</h3>
-                  <div className="space-y-3">
-                    {filteredFilings.map((filing: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          'flex items-center justify-between p-4 rounded-lg border',
-                          filing.status === 'FILED'
-                            ? 'bg-emerald-500/5 border-emerald-500/30'
-                            : filing.days_until_due < 0
-                            ? 'bg-red-500/5 border-red-500/30'
-                            : filing.days_until_due <= 7
-                            ? 'bg-amber-500/5 border-amber-500/30'
-                            : 'bg-slate-elevated border-slate-border/50'
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={cn(
-                            'w-12 h-12 rounded-lg flex items-center justify-center shrink-0',
-                            TAX_TYPE_COLORS[filing.tax_type]?.icon || 'bg-slate-border/30'
-                          )}>
-                            {filing.status === 'FILED' ? (
-                              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                            ) : filing.days_until_due < 0 ? (
-                              <XCircle className="w-6 h-6 text-red-400" />
-                            ) : (
-                              <Clock className={cn('w-6 h-6', TAX_TYPE_COLORS[filing.tax_type]?.text || 'text-slate-muted')} />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className={cn(
-                                'px-2 py-0.5 rounded text-xs font-medium',
-                                TAX_TYPE_COLORS[filing.tax_type]?.bg || 'bg-slate-border/30',
-                                TAX_TYPE_COLORS[filing.tax_type]?.text || 'text-slate-muted'
-                              )}>
-                                {filing.tax_type}
-                              </span>
-                              <span className="text-white font-medium">{filing.period}</span>
-                            </div>
-                            <p className="text-slate-muted text-sm mt-1">{filing.description}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-white text-sm font-medium">{formatDateLong(filing.deadline)}</p>
-                          <p className={cn(
-                            'text-sm',
-                            filing.status === 'FILED'
-                              ? 'text-emerald-400'
-                              : filing.days_until_due < 0
-                              ? 'text-red-400'
-                              : filing.days_until_due <= 7
-                              ? 'text-amber-400'
-                              : 'text-slate-muted'
-                          )}>
-                            {filing.status === 'FILED'
-                              ? 'Filed'
-                              : filing.days_until_due < 0
-                              ? `${Math.abs(filing.days_until_due)} days overdue`
-                              : filing.days_until_due === 0
-                              ? 'Due today'
-                              : `${filing.days_until_due} days remaining`}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+          if (sortedFilings.length === 0) {
+            return (
+              <div className="bg-slate-card border border-slate-border rounded-xl p-6 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-slate-elevated flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-amber-400" />
                 </div>
-              );
-            })}
-        </div>
+                <div>
+                  <p className="text-white font-semibold">No filings match these filters</p>
+                  <p className="text-slate-muted text-sm">Adjust the year, tax type, or status to see the calendar.</p>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-6">
+              {sortedFilings.map(([month, filteredFilings]) => {
+                const monthDate = new Date(month + '-01');
+                const monthName = monthDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+                return (
+                  <div key={month} className="bg-slate-card border border-slate-border rounded-xl p-4">
+                    <h3 className="text-white font-semibold mb-4">{monthName}</h3>
+                    <div className="space-y-3">
+                      {filteredFilings.map((filing: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className={cn(
+                            'flex items-center justify-between p-4 rounded-lg border',
+                            filing.status === 'FILED'
+                              ? 'bg-emerald-500/5 border-emerald-500/30'
+                              : filing.days_until_due < 0
+                              ? 'bg-red-500/5 border-red-500/30'
+                              : filing.days_until_due <= 7
+                              ? 'bg-amber-500/5 border-amber-500/30'
+                              : 'bg-slate-elevated border-slate-border/50'
+                          )}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={cn(
+                              'w-12 h-12 rounded-lg flex items-center justify-center shrink-0',
+                              TAX_TYPE_COLORS[filing.tax_type]?.icon || 'bg-slate-border/30'
+                            )}>
+                              {filing.status === 'FILED' ? (
+                                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                              ) : filing.days_until_due < 0 ? (
+                                <XCircle className="w-6 h-6 text-red-400" />
+                              ) : (
+                                <Clock className={cn('w-6 h-6', TAX_TYPE_COLORS[filing.tax_type]?.text || 'text-slate-muted')} />
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={cn(
+                                  'px-2 py-0.5 rounded text-xs font-medium',
+                                  TAX_TYPE_COLORS[filing.tax_type]?.bg || 'bg-slate-border/30',
+                                  TAX_TYPE_COLORS[filing.tax_type]?.text || 'text-slate-muted'
+                                )}>
+                                  {filing.tax_type}
+                                </span>
+                                <span className="text-white font-medium">{filing.period}</span>
+                              </div>
+                              <p className="text-slate-muted text-sm mt-1">{filing.description}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-white text-sm font-medium">{formatDateLong(filing.deadline)}</p>
+                            <p className={cn(
+                              'text-sm',
+                              filing.status === 'FILED'
+                                ? 'text-emerald-400'
+                                : filing.days_until_due < 0
+                                ? 'text-red-400'
+                                : filing.days_until_due <= 7
+                                ? 'text-amber-400'
+                                : 'text-slate-muted'
+                            )}>
+                              {filing.status === 'FILED'
+                                ? 'Filed'
+                                : filing.days_until_due < 0
+                                ? `${Math.abs(filing.days_until_due)} days overdue`
+                                : filing.days_until_due === 0
+                                ? 'Due today'
+                                : `${filing.days_until_due} days remaining`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()
       )}
 
       {/* Filing Schedule Reference */}

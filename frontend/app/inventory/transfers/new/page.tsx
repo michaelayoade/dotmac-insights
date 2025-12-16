@@ -31,7 +31,7 @@ export default function NewTransferPage() {
   const router = useRouter();
   const { data: warehousesData, isLoading: warehousesLoading } = useInventoryWarehouses({ limit: 200 });
   const { data: itemsData, isLoading: itemsLoading } = useInventoryItems({ limit: 500 });
-  const { createTransfer } = useInventoryTransferMutations();
+  const { create: createTransfer } = useInventoryTransferMutations();
 
   const [fromWarehouse, setFromWarehouse] = useState("");
   const [toWarehouse, setToWarehouse] = useState("");
@@ -67,7 +67,7 @@ export default function NewTransferPage() {
         valuation_rate: selected?.valuation_rate || 0,
       };
     } else {
-      (updated[index] as Record<string, unknown>)[field] = value;
+      updated[index] = { ...updated[index], [field]: value };
     }
     setItems(updated);
   };

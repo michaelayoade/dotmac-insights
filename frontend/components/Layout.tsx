@@ -42,6 +42,7 @@ import {
   Bell,
   Settings,
   ChevronDown,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
@@ -682,8 +683,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-slate-card border-b border-slate-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-electric to-teal-glow flex items-center justify-center">
-              <Activity className="w-5 h-5 text-slate-deep" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
+              <Zap className="w-5 h-5 text-slate-deep" />
             </div>
             <span className="font-display font-bold text-white">Dotmac</span>
           </div>
@@ -774,13 +775,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           'flex items-center h-16 border-b border-slate-border px-4',
           collapsed ? 'justify-center' : 'gap-3'
         )}>
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-electric to-teal-glow flex items-center justify-center shrink-0 glow-teal">
-            <Activity className="w-5 h-5 text-slate-deep" />
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center shrink-0 glow-teal">
+            <Zap className="w-5 h-5 text-slate-deep" />
           </div>
           {!collapsed && (
             <div className="flex flex-col">
               <span className="font-display font-bold text-white tracking-tight">Dotmac</span>
-              <span className="text-[10px] text-slate-muted uppercase tracking-widest">Insights</span>
+              <span className="text-[10px] text-slate-muted uppercase tracking-widest">BOS</span>
             </div>
           )}
         </div>

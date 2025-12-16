@@ -7,16 +7,15 @@ import {
   RefreshCw,
   AlertTriangle,
   Calendar,
-  MapPin,
 } from "lucide-react";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { useWarrantyExpiring } from "@/hooks/useApi";
 
 export default function WarrantyExpiringPage() {
   const [days, setDays] = useState(30);
-  const { data: assets, isLoading, mutate } = useWarrantyExpiring(days);
+  const { data, isLoading, mutate } = useWarrantyExpiring(days);
 
-  const expiringAssets = assets ?? [];
+  const expiringAssets = data?.assets ?? [];
 
   return (
     <div className="space-y-6">
@@ -95,10 +94,10 @@ export default function WarrantyExpiringPage() {
                 <tr className="border-b border-slate-border bg-slate-elevated/50">
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Asset</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Category</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Location</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Supplier</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Expiry Date</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Days Left</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Value</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Serial No</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border">
@@ -115,11 +114,8 @@ export default function WarrantyExpiringPage() {
                     <td className="px-4 py-3 text-sm text-slate-muted">
                       {asset.asset_category || "-"}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 text-sm text-slate-muted">
-                        <MapPin className="w-3 h-3" />
-                        {asset.location || "-"}
-                      </div>
+                    <td className="px-4 py-3 text-sm text-slate-muted">
+                      {asset.supplier || "-"}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 text-sm text-slate-muted">
@@ -131,18 +127,18 @@ export default function WarrantyExpiringPage() {
                       <span
                         className={cn(
                           "px-2 py-1 text-xs font-medium rounded-full",
-                          asset.days_until_expiry <= 7
+                          (asset.days_remaining ?? 0) <= 7
                             ? "bg-coral-alert/20 text-coral-alert"
-                            : asset.days_until_expiry <= 14
+                            : (asset.days_remaining ?? 0) <= 14
                             ? "bg-amber-500/20 text-amber-400"
                             : "bg-slate-500/20 text-slate-400"
                         )}
                       >
-                        {asset.days_until_expiry} days
+                        {asset.days_remaining ?? 0} days
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-white">
-                      {formatCurrency(asset.asset_value ?? 0)}
+                    <td className="px-4 py-3 text-right text-sm text-slate-muted">
+                      {asset.serial_no || "-"}
                     </td>
                   </tr>
                 ))}

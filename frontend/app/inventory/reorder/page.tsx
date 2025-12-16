@@ -46,7 +46,7 @@ export default function ReorderPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {alerts.filter(a => (a.current_qty ?? 0) <= (a.safety_stock ?? 0)).length}
+                {alerts.filter(a => (a.current_stock ?? 0) <= (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Critical (below safety stock)</p>
             </div>
@@ -59,7 +59,7 @@ export default function ReorderPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {alerts.filter(a => (a.current_qty ?? 0) > (a.safety_stock ?? 0)).length}
+                {alerts.filter(a => (a.current_stock ?? 0) > (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Low (below reorder level)</p>
             </div>
@@ -119,13 +119,13 @@ export default function ReorderPage() {
               <tbody className="divide-y divide-slate-border/50">
                 {alerts.map((alert, idx) => {
                   const stockLevel = getStockLevel(
-                    alert.current_qty ?? 0,
+                    alert.current_stock ?? 0,
                     alert.reorder_level ?? 0,
                     alert.safety_stock ?? 0
                   );
                   const StatusIcon = stockLevel.icon;
                   return (
-                    <tr key={`${alert.item_code}-${alert.warehouse}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
+                    <tr key={`${alert.item_code}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
                       <td className="py-3">
                         <div>
                           <span className="text-amber-400 font-mono">{alert.item_code}</span>
@@ -137,11 +137,11 @@ export default function ReorderPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-2 text-slate-muted">
                           <Warehouse className="w-3 h-3" />
-                          {alert.warehouse || "All"}
+                          {alert.item_group || "All"}
                         </div>
                       </td>
                       <td className="py-3 text-right font-mono text-white">
-                        {(alert.current_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {(alert.current_stock ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-right font-mono text-slate-muted">
                         {(alert.reorder_level ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}

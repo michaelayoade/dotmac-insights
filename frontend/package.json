@@ -12,6 +12,7 @@
     "@dotmac/core": "file:./deps/dotmac-core-1.0.0.tgz",
     "@dotmac/design-tokens": "file:./deps/dotmac-design-tokens-1.0.0.tgz",
     "clsx": "^2.1.0",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.303.0",
     "next": "14.0.4",
     "react": "^18.2.0",

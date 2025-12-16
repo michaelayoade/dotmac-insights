@@ -70,7 +70,7 @@ export default function AssetsListPage() {
   const { data, isLoading, mutate } = useAssets(params);
   const { submitAsset, scrapAsset } = useAssetMutations();
 
-  const assets = data?.items ?? [];
+  const assets = data?.assets ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 
@@ -238,7 +238,7 @@ export default function AssetsListPage() {
                     <td className="px-4 py-3">
                       <span className={cn(
                         "px-2 py-1 text-xs font-medium rounded-full capitalize",
-                        STATUS_COLORS[asset.status] ?? "bg-slate-500/20 text-slate-400"
+                        STATUS_COLORS[asset.status ?? 'draft'] ?? "bg-slate-500/20 text-slate-400"
                       )}>
                         {asset.status?.replace(/_/g, " ")}
                       </span>
@@ -261,7 +261,7 @@ export default function AssetsListPage() {
                             <CheckCircle className="w-4 h-4" />
                           </button>
                         )}
-                        {["submitted", "partially_depreciated", "in_maintenance"].includes(asset.status) && (
+                        {asset.status && ["submitted", "partially_depreciated", "in_maintenance"].includes(asset.status) && (
                           <button
                             onClick={() => handleScrap(asset.id)}
                             className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-elevated rounded-lg transition-colors"

@@ -191,20 +191,6 @@ export default function AccountingDashboardPage() {
   const loading = swrStates.some((state) => state.isLoading);
   const retryAll = () => swrStates.forEach((state) => state.mutate?.());
 
-  if (loading) {
-    return <LoadingState />;
-  }
-
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load accounting dashboard data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   // Extract key metrics with dashboard as primary source and statements as fallback
   const totalAssets = dashboard?.summary?.total_assets ?? balanceSheet?.assets?.total ?? 0;
   const totalLiabilities = dashboard?.summary?.total_liabilities ?? balanceSheet?.liabilities?.total ?? 0;
@@ -246,10 +232,10 @@ export default function AccountingDashboardPage() {
   const fiscalYearCount = fiscalYears?.total || 0;
   const arOutstanding = receivablesOutstanding?.total || 0;
   const apOutstanding = payablesOutstanding?.total || 0;
-  const topCustomers = receivablesOutstanding?.top || [];
-  const topSuppliers = payablesOutstanding?.top || [];
+  const topCustomers = receivablesOutstanding?.top;
+  const topSuppliers = payablesOutstanding?.top;
 
-  // Chart data: Balance sheet composition
+  // Chart data: Balance sheet composition - useMemo MUST be called unconditionally (before any returns)
   const balanceSheetData = useMemo(() => {
     return [
       { name: 'Assets', value: totalAssets, color: '#3b82f6' },
@@ -285,17 +271,17 @@ export default function AccountingDashboardPage() {
 
   // Chart data: Top customers/suppliers for horizontal bar
   const topPartiesData = useMemo(() => {
-    const customers = topCustomers.slice(0, 5).map((c: any) => ({
+    const customers = (topCustomers ?? []).slice(0, 5).map((c: any) => ({
       name: (c.name || 'Customer').substring(0, 15),
       amount: c.amount || 0,
       type: 'AR',
     }));
-    const suppliers = topSuppliers.slice(0, 5).map((s: any) => ({
+    const suppliersArr = (topSuppliers ?? []).slice(0, 5).map((s: any) => ({
       name: (s.name || 'Supplier').substring(0, 15),
       amount: s.amount || 0,
       type: 'AP',
     }));
-    return [...customers, ...suppliers];
+    return [...customers, ...suppliersArr];
   }, [topCustomers, topSuppliers]);
 
   // Cash flow data
@@ -307,6 +293,21 @@ export default function AccountingDashboardPage() {
       { name: 'Financing', value: cashFlow.financing_activities?.net || 0, fill: '#8b5cf6' },
     ];
   }, [cashFlow]);
+
+  // Early returns AFTER all hooks have been called
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load accounting dashboard data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -592,7 +593,7 @@ export default function AccountingDashboardPage() {
             </div>
             <span className="text-slate-muted text-xs">AR detail</span>
           </div>
-          {topCustomers.length ? (
+          {topCustomers?.length ? (
             <div className="space-y-2">
               {topCustomers.map((c: any) => (
                 <div key={c.id || c.name} className="flex items-center justify-between text-sm">
@@ -613,7 +614,7 @@ export default function AccountingDashboardPage() {
             </div>
             <span className="text-slate-muted text-xs">AP detail</span>
           </div>
-          {topSuppliers.length ? (
+          {topSuppliers?.length ? (
             <div className="space-y-2">
               {topSuppliers.map((s: any) => (
                 <div key={s.id || s.name} className="flex items-center justify-between text-sm">

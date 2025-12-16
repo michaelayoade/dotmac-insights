@@ -25,6 +25,11 @@ from app.api import expenses
 from app.api.tax import router as tax_router
 from app.api.integrations import router as integrations_router
 from app.assets import router as assets_router
+from app.api.crm import router as crm_router
+from app.api.field_service import router as field_service_router
+from app.api.inbox import router as inbox_router
+from app.api.contacts import router as contacts_router
+from app.api.performance import router as performance_router
 
 api_router = APIRouter()
 
@@ -48,6 +53,10 @@ api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(network.router, prefix="/network", tags=["network"])
 api_router.include_router(inventory.router, tags=["inventory"])
 api_router.include_router(assets_router, tags=["assets"])
+api_router.include_router(crm_router, tags=["crm"])  # CRM: leads, opportunities, activities
+api_router.include_router(inbox_router, tags=["inbox"])  # Omnichannel inbox
+api_router.include_router(contacts_router)  # Unified contacts (replaces CRM contacts)
+api_router.include_router(performance_router)  # Performance management module
 
 # Legacy routers (to be deprecated)
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
@@ -59,6 +68,9 @@ api_router.include_router(hr.router, prefix="/hr", tags=["hr"])
 
 # Projects router
 api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
+
+# Field Service router
+api_router.include_router(field_service_router)  # Already has /field-service prefix
 
 # Payment & Banking integrations
 api_router.include_router(integrations_router)  # Already has /integrations prefix

@@ -276,7 +276,7 @@ export default function ProjectDetailPage() {
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold text-white">{data.project_name}</h1>
               <StatusBadge status={data.status} />
-              <PriorityBadge priority={data.priority} />
+              <PriorityBadge priority={data.priority || 'medium'} />
             </div>
             <div className="flex items-center gap-4 text-sm text-slate-muted">
               {data.erpnext_id && (
@@ -338,7 +338,7 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-1">Project Manager</p>
-              <p className="text-white font-semibold">{data.project_manager?.employee_name || data.project_manager || '-'}</p>
+              <p className="text-white font-semibold">{data.project_manager || '-'}</p>
             </div>
           </div>
         </div>
@@ -370,7 +370,7 @@ export default function ProjectDetailPage() {
           value={formatCurrency(data.gross_margin)}
           subtitle={data.per_gross_margin ? `${data.per_gross_margin}%` : undefined}
           icon={BarChart3}
-          colorClass={data.gross_margin > 0 ? 'text-green-400' : 'text-red-400'}
+          colorClass={(data.gross_margin ?? 0) > 0 ? 'text-green-400' : 'text-red-400'}
         />
       </div>
 
@@ -632,10 +632,10 @@ export default function ProjectDetailPage() {
           </div>
 
           {/* Budget Variance */}
-          {data.estimated_costing > 0 && (
+          {(data.estimated_costing ?? 0) > 0 && (
             <div className={cn(
               'rounded-xl p-4 border',
-              (data.total_costing_amount || 0) <= data.estimated_costing
+              (data.total_costing_amount || 0) <= (data.estimated_costing ?? 0)
                 ? 'bg-green-500/10 border-green-500/30'
                 : 'bg-red-500/10 border-red-500/30'
             )}>
@@ -643,20 +643,20 @@ export default function ProjectDetailPage() {
                 <div>
                   <p className={cn(
                     'font-semibold',
-                    (data.total_costing_amount || 0) <= data.estimated_costing ? 'text-green-400' : 'text-red-400'
+                    (data.total_costing_amount || 0) <= (data.estimated_costing ?? 0) ? 'text-green-400' : 'text-red-400'
                   )}>
-                    {(data.total_costing_amount || 0) <= data.estimated_costing ? 'Under Budget' : 'Over Budget'}
+                    {(data.total_costing_amount || 0) <= (data.estimated_costing ?? 0) ? 'Under Budget' : 'Over Budget'}
                   </p>
                   <p className="text-slate-muted text-sm">
-                    {formatCurrency(Math.abs((data.estimated_costing || 0) - (data.total_costing_amount || 0)))}
-                    {' '}{(data.total_costing_amount || 0) <= data.estimated_costing ? 'remaining' : 'overrun'}
+                    {formatCurrency(Math.abs((data.estimated_costing ?? 0) - (data.total_costing_amount || 0)))}
+                    {' '}{(data.total_costing_amount || 0) <= (data.estimated_costing ?? 0) ? 'remaining' : 'overrun'}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-slate-muted text-sm">Budget Utilization</p>
                   <p className="text-2xl font-bold text-white">
-                    {data.estimated_costing > 0
-                      ? Math.round(((data.total_costing_amount || 0) / data.estimated_costing) * 100)
+                    {(data.estimated_costing ?? 0) > 0
+                      ? Math.round(((data.total_costing_amount || 0) / (data.estimated_costing ?? 1)) * 100)
                       : 0}%
                   </p>
                 </div>

@@ -36,8 +36,8 @@ export default function SupportTeamsPage() {
   const { createTeam, updateTeam, deleteTeam, addMember, deleteMember } = useSupportTeamMutations();
   const { data: agentsData } = useSupportAgents();
 
-  const agents = agentsData?.agents || [];
-  const teams = data?.teams || [];
+  const agents = agentsData?.agents ?? [];
+  const teams = data?.teams;
 
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -48,11 +48,12 @@ export default function SupportTeamsPage() {
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const totalMembers = teams.reduce((sum, t) => sum + ((t.members || []).length), 0);
-    const roundRobinCount = teams.filter((t) => t.assignment_rule === 'round_robin').length;
-    const loadBalancedCount = teams.filter((t) => t.assignment_rule === 'load_balanced').length;
+    const teamsList = teams ?? [];
+    const totalMembers = teamsList.reduce((sum, t) => sum + ((t.members || []).length), 0);
+    const roundRobinCount = teamsList.filter((t) => t.assignment_rule === 'round_robin').length;
+    const loadBalancedCount = teamsList.filter((t) => t.assignment_rule === 'load_balanced').length;
     return {
-      totalTeams: teams.length,
+      totalTeams: teamsList.length,
       totalMembers,
       roundRobin: roundRobinCount,
       loadBalanced: loadBalancedCount,
@@ -61,8 +62,9 @@ export default function SupportTeamsPage() {
 
   // Filter teams
   const filteredTeams = useMemo(() => {
-    if (!search) return teams;
-    return teams.filter((team) =>
+    const teamsList = teams ?? [];
+    if (!search) return teamsList;
+    return teamsList.filter((team) =>
       team.team_name?.toLowerCase().includes(search.toLowerCase()) ||
       team.description?.toLowerCase().includes(search.toLowerCase())
     );
@@ -92,7 +94,7 @@ export default function SupportTeamsPage() {
 
   // Get agents not already in a team
   const getAvailableAgents = (teamId: number) => {
-    const team = teams.find((t) => t.id === teamId);
+    const team = (teams ?? []).find((t) => t.id === teamId);
     const memberAgentIds = (team?.members || []).map((m: any) => m.agent_id);
     return agents.filter((a) => a.is_active && !memberAgentIds.includes(a.id));
   };

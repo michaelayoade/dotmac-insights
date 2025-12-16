@@ -5,8 +5,8 @@ import { Providers } from '@/components/Providers';
 import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
-  title: 'Dotmac Insights',
-  description: 'Business intelligence dashboard for Dotmac Technologies',
+  title: 'Dotmac BOS',
+  description: 'Business Operating System - Everything you need to run your business',
 };
 
 export default function RootLayout({

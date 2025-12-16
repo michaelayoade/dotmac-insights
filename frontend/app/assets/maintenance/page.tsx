@@ -13,10 +13,10 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useMaintenanceDue, useAssetMutations } from "@/hooks/useApi";
 
 export default function MaintenanceDuePage() {
-  const { data: assets, isLoading, mutate } = useMaintenanceDue();
+  const { data, isLoading, mutate } = useMaintenanceDue();
   const { completeMaintenance } = useAssetMutations();
 
-  const maintenanceAssets = assets ?? [];
+  const maintenanceAssets = data?.assets ?? [];
 
   const handleComplete = async (assetId: number) => {
     try {
@@ -115,8 +115,8 @@ export default function MaintenanceDuePage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-500/20 text-amber-400 capitalize">
-                        {asset.status?.replace(/_/g, " ")}
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-500/20 text-amber-400">
+                        Maintenance Due
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-white">
@@ -124,15 +124,13 @@ export default function MaintenanceDuePage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {asset.status === "in_maintenance" && (
-                          <button
-                            onClick={() => handleComplete(asset.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
-                          >
-                            <CheckCircle className="w-3 h-3" />
-                            Complete
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleComplete(asset.id)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          Complete
+                        </button>
                         <Link
                           href={`/assets/list/${asset.id}`}
                           className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"

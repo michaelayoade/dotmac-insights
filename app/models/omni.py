@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+from enum import Enum
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON, Enum, Text
+from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.agent import Agent, Team
+    from app.models.unified_contact import UnifiedContact
 
 
 class OmniChannelType(str, Enum):
@@ -36,6 +41,21 @@ class OmniChannel(Base):
         return f"<OmniChannel {self.name} ({self.type})>"
 
 
+class ConversationPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class ConversationStatus(str, Enum):
+    OPEN = "open"
+    PENDING = "pending"
+    RESOLVED = "resolved"
+    SNOOZED = "snoozed"
+    CLOSED = "closed"
+
+
 class OmniConversation(Base):
     """Omnichannel conversation/thread."""
 
@@ -50,17 +70,52 @@ class OmniConversation(Base):
 
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
+    lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
 
-    status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    # Link to unified contact (replaces customer_id/lead_id after migration)
+    unified_contact_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_contacts.id"),
+        nullable=True,
+        index=True
+    )
+
+    # Status & Priority
+    status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True, default="open")
+    priority: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="medium")
+
+    # Assignment
+    assigned_agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    assigned_team_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
+    assigned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Tracking
+    is_starred: Mapped[bool] = mapped_column(Boolean, default=False)
+    unread_count: Mapped[int] = mapped_column(Integer, default=0)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # ["billing", "urgent"]
+
+    # Contact info (denormalized for quick access)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    contact_company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Dates
     last_message_at: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+    first_response_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    snoozed_until: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
     messages: Mapped[List["OmniMessage"]] = relationship(back_populates="conversation", cascade="all, delete-orphan")
+    assigned_agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[assigned_agent_id])
+    assigned_team: Mapped[Optional["Team"]] = relationship(foreign_keys=[assigned_team_id])
+    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
 
     def __repr__(self) -> str:
-        return f"<OmniConversation {self.id} channel={self.channel_id} ticket={self.ticket_id}>"
+        return f"<OmniConversation {self.id} channel={self.channel_id} status={self.status}>"
 
 
 class OmniParticipant(Base):
@@ -72,11 +127,22 @@ class OmniParticipant(Base):
     handle: Mapped[str] = mapped_column(String(255), index=True)  # email/phone/social handle
     channel_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+
+    # Link to unified contact (replaces customer_id after migration)
+    unified_contact_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_contacts.id"),
+        nullable=True,
+        index=True
+    )
+
     display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
 
     def __repr__(self) -> str:
         return f"<OmniParticipant {self.handle} ({self.channel_type})>"
@@ -157,3 +223,83 @@ class OmniWebhookEvent(Base):
 
     def __repr__(self) -> str:
         return f"<OmniWebhookEvent {self.id} provider={self.provider_event_id}>"
+
+
+class InboxRoutingRule(Base):
+    """Auto-routing rules for inbox conversations."""
+
+    __tablename__ = "inbox_routing_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # Conditions (JSON array of condition objects)
+    # e.g., [{"type": "channel", "value": "email"}, {"type": "keyword", "value": "billing,invoice"}]
+    conditions: Mapped[dict] = mapped_column(JSON, nullable=False, default=list)
+
+    # Action configuration
+    action_type: Mapped[str] = mapped_column(String(50), nullable=False)  # assign_agent, assign_team, add_tag, create_ticket
+    action_value: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # agent_id, team_id, tag name, etc.
+    action_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Additional config
+
+    # Ordering and state
+    priority: Mapped[int] = mapped_column(Integer, default=0, index=True)  # Higher = checked first
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    match_count: Mapped[int] = mapped_column(Integer, default=0)  # How many times this rule matched
+
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<InboxRoutingRule {self.id} {self.name} active={self.is_active}>"
+
+
+class InboxContact(Base):
+    """
+    Unified contact directory for inbox - links participants across channels.
+
+    DEPRECATED: This model will be replaced by UnifiedContact.
+    Use unified_contact_id to link to the new UnifiedContact model.
+    """
+
+    __tablename__ = "inbox_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Primary identifiers
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+
+    # Company info
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Links to other systems (legacy)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
+
+    # Link to unified contact (migration target)
+    unified_contact_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_contacts.id"),
+        nullable=True,
+        index=True
+    )
+
+    # Contact metadata
+    tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # ["vip", "enterprise"]
+    meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Additional data
+
+    # Stats (denormalized)
+    total_conversations: Mapped[int] = mapped_column(Integer, default=0)
+    last_contact_at: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+
+    def __repr__(self) -> str:
+        return f"<InboxContact {self.id} {self.name}>"

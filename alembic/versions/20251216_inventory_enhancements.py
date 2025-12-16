@@ -11,7 +11,8 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'inv_enhance_001'
-down_revision = None  # Will be updated based on actual head
+# Chain to latest inventory branch merge
+down_revision = '49cb88c33c38'
 branch_labels = None
 depends_on = None
 

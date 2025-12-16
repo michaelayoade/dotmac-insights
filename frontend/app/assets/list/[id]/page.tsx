@@ -144,7 +144,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
               <span
                 className={cn(
                   "px-3 py-1 text-xs font-medium rounded-full border capitalize",
-                  STATUS_COLORS[asset.status] ?? STATUS_COLORS.draft
+                  STATUS_COLORS[asset.status ?? 'draft'] ?? STATUS_COLORS.draft
                 )}
               >
                 {asset.status?.replace(/_/g, " ")}
@@ -175,7 +175,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
               Complete Maintenance
             </button>
           )}
-          {["submitted", "partially_depreciated"].includes(asset.status) && (
+          {asset.status && ["submitted", "partially_depreciated"].includes(asset.status) && (
             <>
               <button
                 onClick={handleMarkMaintenance}
@@ -287,7 +287,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* Depreciation Schedule */}
-      {asset.depreciation_schedule && asset.depreciation_schedule.length > 0 && (
+      {asset.depreciation_schedules && asset.depreciation_schedules.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <h3 className="font-semibold text-white mb-4">Depreciation Schedule</h3>
           <div className="overflow-x-auto">
@@ -303,7 +303,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border">
-                {asset.depreciation_schedule.slice(0, 12).map((entry, idx) => (
+                {asset.depreciation_schedules.slice(0, 12).map((entry, idx) => (
                   <tr key={idx}>
                     <td className="px-4 py-2 text-sm text-white">{formatDate(entry.schedule_date)}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted">{entry.finance_book || "Default"}</td>
@@ -326,9 +326,9 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                 ))}
               </tbody>
             </table>
-            {asset.depreciation_schedule.length > 12 && (
+            {asset.depreciation_schedules.length > 12 && (
               <p className="text-sm text-slate-muted text-center py-3 border-t border-slate-border">
-                Showing 12 of {asset.depreciation_schedule.length} entries
+                Showing 12 of {asset.depreciation_schedules.length} entries
               </p>
             )}
           </div>

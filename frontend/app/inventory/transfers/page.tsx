@@ -55,7 +55,7 @@ export default function TransfersPage() {
     status: status || undefined,
     limit: 100,
   });
-  const { submitTransfer, approveTransfer, rejectTransfer, executeTransfer } = useInventoryTransferMutations();
+  const { submit, approve, reject, execute } = useInventoryTransferMutations();
 
   const transfers = data?.transfers || [];
 
@@ -63,16 +63,16 @@ export default function TransfersPage() {
     try {
       switch (action) {
         case "submit":
-          await submitTransfer(id);
+          await submit(id);
           break;
         case "approve":
-          await approveTransfer(id);
+          await approve(id);
           break;
         case "reject":
-          await rejectTransfer(id, "Rejected via UI");
+          await reject(id, "Rejected via UI");
           break;
         case "execute":
-          await executeTransfer(id);
+          await execute(id);
           break;
       }
       mutate();

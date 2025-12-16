@@ -196,7 +196,7 @@ export default function CreditNotesPage() {
         keyField="id"
         loading={isLoading}
         emptyMessage="No credit notes found"
-        onRowClick={(item) => router.push(`/sales/credit-notes/${(item as any).id}`)}
+        onRowClick={(item: { id: number }) => router.push(`/sales/credit-notes/${item.id}`)}
         className="cursor-pointer"
       />
 

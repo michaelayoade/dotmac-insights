@@ -180,6 +180,27 @@ export default function SupportDashboardPage() {
   const isDataLoading = swrStates.some((state) => state.isLoading);
   const retryAll = () => swrStates.forEach((state) => state.mutate?.());
 
+  // Memoized chart data - must be called unconditionally before early returns
+  const volumeChartData = useMemo(() => {
+    if (!volumeTrend) return [];
+    return volumeTrend.map((v: any) => ({
+      period: v.period,
+      total: v.total,
+      resolved: v.resolved,
+    }));
+  }, [volumeTrend]);
+
+  // Format category breakdown for pie chart
+  const categoryChartData = useMemo(() => {
+    if (!categoryBreakdown?.by_ticket_type) return [];
+    return categoryBreakdown.by_ticket_type.slice(0, 5).map((c: any, idx: number) => ({
+      name: c.type || 'Other',
+      value: c.count,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+  }, [categoryBreakdown]);
+
+  // Early returns after all hooks
   if (isDataLoading) {
     return <LoadingState />;
   }
@@ -201,26 +222,6 @@ export default function SupportDashboardPage() {
   const latestSla = slaPerformance?.[slaPerformance.length - 1];
   const prevSla = slaPerformance?.[slaPerformance.length - 2];
   const slaTrend = latestSla && prevSla ? latestSla.attainment_rate - prevSla.attainment_rate : 0;
-
-  // Format volume trend for chart
-  const volumeChartData = useMemo(() => {
-    if (!volumeTrend) return [];
-    return volumeTrend.map((v: any) => ({
-      period: v.period,
-      total: v.total,
-      resolved: v.resolved,
-    }));
-  }, [volumeTrend]);
-
-  // Format category breakdown for pie chart
-  const categoryChartData = useMemo(() => {
-    if (!categoryBreakdown?.by_ticket_type) return [];
-    return categoryBreakdown.by_ticket_type.slice(0, 5).map((c: any, idx: number) => ({
-      name: c.type || 'Other',
-      value: c.count,
-      color: CHART_COLORS[idx % CHART_COLORS.length],
-    }));
-  }, [categoryBreakdown]);
 
   return (
     <div className="space-y-6">

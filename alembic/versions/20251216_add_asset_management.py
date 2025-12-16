@@ -11,7 +11,8 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'asset_mgmt_001'
-down_revision = None  # Will be updated based on actual head
+# Chain after existing asset management models migration
+down_revision = 'g2h3i4j5k6l7'
 branch_labels = None
 depends_on = None
 

@@ -10,6 +10,11 @@ import {
   useFinanceCreditNotes,
   usePurchasingBills,
   usePurchasingPayments,
+  useLeadsSummary,
+  usePipelineSummary,
+  usePipelineView,
+  useUpcomingActivities,
+  useOverdueActivities,
 } from '@/hooks/useApi';
 import type { FinanceAgingAnalytics } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -23,8 +28,14 @@ import {
   CheckCircle,
   ShoppingCart,
   Receipt,
+  Target,
+  UserPlus,
+  Calendar,
+  ArrowRight,
+  BarChart3,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { PageHeader } from '@/components/ui';
 
 function formatCurrency(value: number, currency = 'NGN'): string {
   return new Intl.NumberFormat('en-NG', {
@@ -174,6 +185,13 @@ export default function SalesDashboardPage() {
   const { data: recentBills, error: billsError, mutate: refetchBills, isLoading: billsLoading } = usePurchasingBills({ currency, limit: 5, sort_by: 'posting_date', sort_dir: 'desc' });
   const { data: recentPurchasePayments, error: purchasePaymentsError, mutate: refetchPurchasePayments, isLoading: purchasePaymentsLoading } = usePurchasingPayments({ currency, limit: 5 });
 
+  // CRM Data
+  const { data: leadsSummary, isLoading: leadsLoading } = useLeadsSummary();
+  const { data: pipelineSummary, isLoading: pipelineLoading } = usePipelineSummary();
+  const { data: pipelineView, isLoading: pipelineViewLoading } = usePipelineView();
+  const { data: upcomingActivities, isLoading: activitiesLoading } = useUpcomingActivities(5);
+  const { data: overdueActivities } = useOverdueActivities();
+
   const swrStates = [
     { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
     { error: agingError, isLoading: agingLoading, mutate: refetchAging },
@@ -211,7 +229,67 @@ export default function SalesDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Key Metrics */}
+      <PageHeader
+        title="Sales Dashboard"
+        subtitle="CRM pipeline, revenue metrics, and financial performance"
+        icon={BarChart3}
+        iconClassName="bg-teal-500/10 border border-teal-500/30"
+      />
+
+      {/* CRM Pipeline Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Pipeline Value"
+          value={formatCurrency(pipelineSummary?.total_value || 0, currency)}
+          subtitle={`Weighted: ${formatCurrency(pipelineSummary?.weighted_value || 0, currency)}`}
+          icon={Target}
+        />
+        <StatCard
+          title="Open Opportunities"
+          value={formatNumber(pipelineSummary?.open_count || 0)}
+          subtitle={`Win Rate: ${((pipelineSummary?.win_rate || 0) * 100).toFixed(0)}%`}
+          icon={TrendingUp}
+          trend={pipelineSummary?.win_rate >= 0.3 ? 'up' : 'down'}
+          trendValue={pipelineSummary?.win_rate >= 0.3 ? 'Above Target' : 'Below Target'}
+        />
+        <StatCard
+          title="Active Leads"
+          value={formatNumber((leadsSummary?.new || 0) + (leadsSummary?.contacted || 0) + (leadsSummary?.qualified || 0))}
+          subtitle={`New: ${leadsSummary?.new || 0} | Qualified: ${leadsSummary?.qualified || 0}`}
+          icon={UserPlus}
+        />
+        <StatCard
+          title="Activities"
+          value={formatNumber(upcomingActivities?.items?.length || 0)}
+          subtitle={overdueActivities?.items?.length ? `${overdueActivities.items.length} overdue` : 'All on track'}
+          icon={Calendar}
+          trend={overdueActivities?.items?.length ? 'down' : 'up'}
+          trendValue={overdueActivities?.items?.length ? 'Action needed' : 'Healthy'}
+        />
+      </div>
+
+      {/* Pipeline Stages Overview */}
+      {pipelineView && pipelineView.stages?.length > 0 && (
+        <div className="bg-slate-card rounded-xl border border-slate-border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Sales Pipeline</h3>
+            <Link href="/sales/pipeline" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Pipeline <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {pipelineView.stages.filter((s: any) => !s.is_won && !s.is_lost).map((stage: any) => (
+              <div key={stage.id} className="bg-slate-elevated/50 rounded-lg p-3 border border-slate-border/50">
+                <div className="text-xs text-slate-muted mb-1">{stage.name}</div>
+                <div className="text-lg font-semibold text-white">{stage.opportunity_count}</div>
+                <div className="text-xs text-teal-electric">{formatCurrency(stage.opportunity_value || 0, currency)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Key AR Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Monthly Recurring Revenue"

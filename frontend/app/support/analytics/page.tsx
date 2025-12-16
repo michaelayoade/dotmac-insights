@@ -47,6 +47,7 @@ import {
   useSupportRoutingQueueHealth,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { PageHeader, Select } from '@/components/ui';
 
 // Chart styling constants
 const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899'];
@@ -205,18 +206,12 @@ export default function SupportAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-amber-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Support Analytics</h1>
-            <p className="text-slate-muted text-sm">Ticket volumes, SLA, resolution times & patterns</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Support Analytics"
+        subtitle="Ticket volumes, SLA, resolution times & patterns"
+        icon={BarChart3}
+        iconClassName="bg-amber-500/10 border border-amber-500/30"
+      />
 
       {/* Filters */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">

@@ -53,10 +53,10 @@ export default function GeneralLedgerPage() {
     offset,
   });
 
-  const entries = data?.entries || [];
+  const entries = data?.entries;
   const totals = useMemo(
     () =>
-      entries.reduce(
+      (entries ?? []).reduce(
         (acc, entry) => ({
           total_debit: acc.total_debit + (entry.debit || 0),
           total_credit: acc.total_credit + (entry.credit || 0),
@@ -174,7 +174,7 @@ export default function GeneralLedgerPage() {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      {!!entries.length && (
+      {!!(entries ?? []).length && (
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border">
             <span className="text-xs uppercase tracking-[0.08em] text-slate-muted">Entries</span>
@@ -279,7 +279,7 @@ export default function GeneralLedgerPage() {
       {/* Table */}
       <DataTable
         columns={columns}
-        data={entries}
+        data={entries ?? []}
         keyField="id"
         loading={isLoading}
         emptyMessage="No ledger entries found"

@@ -140,29 +140,29 @@ export default function AssetsDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Assets"
-          value={summary?.total_assets ?? 0}
-          subtitle={`${summary?.active_assets ?? 0} active`}
+          value={summary?.totals?.count ?? 0}
+          subtitle={`${summary?.by_status?.find(s => s.status === 'submitted')?.count ?? 0} active`}
           icon={Building2}
           color="indigo"
           href="/assets/list"
         />
         <StatCard
           title="Total Value"
-          value={formatCurrency(summary?.total_value ?? 0)}
+          value={formatCurrency(summary?.totals?.purchase_value ?? 0)}
           subtitle="Gross purchase amount"
           icon={Package}
           color="emerald"
         />
         <StatCard
           title="Book Value"
-          value={formatCurrency(summary?.total_book_value ?? 0)}
+          value={formatCurrency(summary?.totals?.book_value ?? 0)}
           subtitle="After depreciation"
           icon={TrendingDown}
           color="purple"
         />
         <StatCard
           title="Accumulated Depreciation"
-          value={formatCurrency(summary?.total_depreciation ?? 0)}
+          value={formatCurrency(summary?.totals?.accumulated_depreciation ?? 0)}
           subtitle="Total depreciated"
           icon={Calendar}
           color="amber"
@@ -170,14 +170,14 @@ export default function AssetsDashboard() {
       </div>
 
       {/* Status Breakdown */}
-      {summary?.by_status && Object.keys(summary.by_status).length > 0 && (
+      {summary?.by_status && summary.by_status.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <h3 className="font-semibold text-white mb-4">Assets by Status</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {Object.entries(summary.by_status).map(([status, count]) => (
-              <div key={status} className="bg-slate-elevated rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-white">{count as number}</p>
-                <p className="text-xs text-slate-muted capitalize">{status.replace(/_/g, " ")}</p>
+            {summary.by_status.map((item) => (
+              <div key={item.status} className="bg-slate-elevated rounded-lg p-3 text-center">
+                <p className="text-lg font-bold text-white">{item.count}</p>
+                <p className="text-xs text-slate-muted capitalize">{item.status.replace(/_/g, " ")}</p>
               </div>
             ))}
           </div>
@@ -189,8 +189,8 @@ export default function AssetsDashboard() {
         {/* Pending Depreciation */}
         <AlertCard
           title="Pending Depreciation"
-          count={pendingDep?.length ?? 0}
-          items={pendingDep ?? []}
+          count={pendingDep?.count ?? 0}
+          items={pendingDep?.pending_entries ?? []}
           href="/assets/depreciation/pending"
           emptyText="No pending depreciation entries"
           renderItem={(item) => (
@@ -209,8 +209,8 @@ export default function AssetsDashboard() {
         {/* Maintenance Due */}
         <AlertCard
           title="Maintenance Due"
-          count={maintenanceDue?.length ?? 0}
-          items={maintenanceDue ?? []}
+          count={maintenanceDue?.count ?? 0}
+          items={maintenanceDue?.assets ?? []}
           href="/assets/maintenance"
           emptyText="No maintenance due"
           renderItem={(item) => (
@@ -227,8 +227,8 @@ export default function AssetsDashboard() {
         {/* Warranty Expiring */}
         <AlertCard
           title="Warranty Expiring (30 days)"
-          count={warrantyExpiring?.length ?? 0}
-          items={warrantyExpiring ?? []}
+          count={warrantyExpiring?.count ?? 0}
+          items={warrantyExpiring?.assets ?? []}
           href="/assets/maintenance/warranty"
           emptyText="No warranties expiring soon"
           renderItem={(item) => (
@@ -238,7 +238,7 @@ export default function AssetsDashboard() {
                 <p className="text-xs text-slate-muted">Expires: {item.warranty_expiry_date}</p>
               </div>
               <span className="text-xs px-2 py-1 bg-coral-alert/20 text-coral-alert rounded-full">
-                {item.days_until_expiry} days
+                {item.days_remaining} days
               </span>
             </div>
           )}
@@ -247,8 +247,8 @@ export default function AssetsDashboard() {
         {/* Insurance Expiring */}
         <AlertCard
           title="Insurance Expiring (30 days)"
-          count={insuranceExpiring?.length ?? 0}
-          items={insuranceExpiring ?? []}
+          count={insuranceExpiring?.count ?? 0}
+          items={insuranceExpiring?.assets ?? []}
           href="/assets/maintenance/insurance"
           emptyText="No insurance expiring soon"
           renderItem={(item) => (
@@ -258,7 +258,7 @@ export default function AssetsDashboard() {
                 <p className="text-xs text-slate-muted">Expires: {item.insurance_end_date}</p>
               </div>
               <span className="text-xs px-2 py-1 bg-coral-alert/20 text-coral-alert rounded-full">
-                {item.days_until_expiry} days
+                {item.days_remaining} days
               </span>
             </div>
           )}

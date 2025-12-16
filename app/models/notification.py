@@ -63,6 +63,20 @@ class NotificationEventType(enum.Enum):
     RECONCILIATION_COMPLETE = "reconciliation_complete"
     RECONCILIATION_DISCREPANCY = "reconciliation_discrepancy"
 
+    # Performance management events
+    PERF_PERIOD_STARTED = "perf_period_started"  # Evaluation period activated
+    PERF_SCORECARD_GENERATED = "perf_scorecard_generated"  # Scorecard created for employee
+    PERF_SCORECARD_COMPUTED = "perf_scorecard_computed"  # Metrics calculated
+    PERF_REVIEW_REQUESTED = "perf_review_requested"  # Submitted for manager review
+    PERF_SCORECARD_APPROVED = "perf_scorecard_approved"  # Manager approved
+    PERF_SCORECARD_REJECTED = "perf_scorecard_rejected"  # Manager sent back for revision
+    PERF_SCORECARD_FINALIZED = "perf_scorecard_finalized"  # Final rating assigned
+    PERF_SCORE_OVERRIDDEN = "perf_score_overridden"  # Score manually adjusted
+    PERF_REVIEW_REMINDER = "perf_review_reminder"  # Reminder to complete review
+    PERF_PERIOD_CLOSING = "perf_period_closing"  # Period ending soon
+    PERF_WEEKLY_SUMMARY = "perf_weekly_summary"  # Weekly manager summary
+    PERF_RATING_PUBLISHED = "perf_rating_published"  # Rating visible to employee
+
     # Generic
     CUSTOM = "custom"
 

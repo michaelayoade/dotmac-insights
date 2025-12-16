@@ -46,12 +46,13 @@ export default function SupportKnowledgeBasePage() {
     limit: 50,
   });
 
-  const cats = categories.data || [];
-  const articlesList = articles.data?.data || [];
+  const cats = categories.data;
+  const articlesList = articles.data?.data;
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const allArticles = articlesList;
+    const allArticles = articlesList ?? [];
+    const catsList = cats ?? [];
     const published = allArticles.filter((a: any) => a.status === 'published').length;
     const draft = allArticles.filter((a: any) => a.status === 'draft').length;
     const publicVisible = allArticles.filter((a: any) => a.visibility === 'public').length;
@@ -62,7 +63,7 @@ export default function SupportKnowledgeBasePage() {
       draft,
       publicVisible,
       internalVisible,
-      categories: cats.length,
+      categories: catsList.length,
     };
   }, [articlesList, cats]);
 
@@ -122,7 +123,7 @@ export default function SupportKnowledgeBasePage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
-            {cats.map((c) => (
+            {(cats ?? []).map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -160,13 +161,13 @@ export default function SupportKnowledgeBasePage() {
               <Layers className="w-4 h-4 text-cyan-400" />
               <h3 className="text-white font-semibold">Categories</h3>
             </div>
-            <span className="text-xs text-slate-muted">{cats.length} categories</span>
+            <span className="text-xs text-slate-muted">{(cats ?? []).length} categories</span>
           </div>
-          {cats.length === 0 ? (
+          {(cats ?? []).length === 0 ? (
             <p className="text-slate-muted text-sm">No categories configured.</p>
           ) : (
             <div className="space-y-2">
-              {cats.map((cat) => (
+              {(cats ?? []).map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setCategoryId(categoryId === String(cat.id) ? '' : String(cat.id))}
@@ -194,11 +195,11 @@ export default function SupportKnowledgeBasePage() {
               <BookOpen className="w-4 h-4 text-blue-400" />
               <h3 className="text-white font-semibold">Articles</h3>
             </div>
-            <span className="text-xs text-slate-muted">{articlesList.length} articles</span>
+            <span className="text-xs text-slate-muted">{(articlesList ?? []).length} articles</span>
           </div>
           {!articles.data ? (
             <p className="text-slate-muted text-sm">Loading articles…</p>
-          ) : articlesList.length === 0 ? (
+          ) : (articlesList ?? []).length === 0 ? (
             <div className="text-center py-8">
               <FileText className="w-12 h-12 text-slate-muted mx-auto mb-3" />
               <p className="text-slate-muted text-sm">No articles found.</p>
@@ -206,7 +207,7 @@ export default function SupportKnowledgeBasePage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {articlesList.map((article: any) => (
+              {(articlesList ?? []).map((article: any) => (
                 <div key={article.id} className="border border-slate-border rounded-lg p-4 hover:border-slate-border/80 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">

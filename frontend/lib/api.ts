@@ -20,6 +20,21 @@ export function buildApiUrl(endpoint: string, params?: Record<string, string | n
   return url.toString();
 }
 
+/**
+ * Build a query string from params object.
+ */
+export function buildQueryString(params?: Record<string, string | number | boolean | undefined | null>): string {
+  if (!params) return '';
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, String(value));
+    }
+  });
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
 // Auth event types for global handling
 type AuthEventType = 'unauthorized' | 'forbidden' | 'token_expired';
 type AuthEventHandler = (event: AuthEventType, message?: string) => void;
@@ -84,7 +99,7 @@ function getAccessToken(): string {
   return '';
 }
 
-interface FetchOptions extends RequestInit {
+export interface FetchOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
@@ -157,6 +172,22 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
   }
 
   return response.json();
+}
+
+/**
+ * SWR-compatible fetcher function for GET requests.
+ * Wraps fetchApi for use with useSWR.
+ */
+export async function fetcher<T>(endpoint: string): Promise<T> {
+  return fetchApi<T>(endpoint);
+}
+
+/**
+ * Generic API fetch function for mutations (POST, PATCH, PUT, DELETE).
+ * Exported for use in custom hooks.
+ */
+export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+  return fetchApi<T>(endpoint, options);
 }
 
 /**
@@ -1207,8 +1238,28 @@ export interface ProjectPayload {
 }
 
 export interface ProjectsDashboard {
-  cards: Record<string, number>;
-  metrics?: Record<string, any>;
+  cards?: Record<string, number>;
+  projects?: {
+    total?: number;
+    active?: number;
+    completed?: number;
+    on_hold?: number;
+    cancelled?: number;
+  };
+  tasks?: {
+    total?: number;
+    open?: number;
+    overdue?: number;
+  };
+  financials?: {
+    total_billed?: number;
+  };
+  metrics?: {
+    avg_completion_percent?: number;
+    due_this_week?: number;
+    [key: string]: any;
+  };
+  by_priority?: Record<string, number>;
 }
 
 export interface SupportOverviewRequest {
@@ -1879,7 +1930,8 @@ export const api = {
       if (value !== undefined) searchParams.set(key, String(value));
     });
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    return fetch(`${API_BASE_URL}/expenses/reports/claims?${searchParams}`, {
+    const url = buildApiUrl(`/expenses/reports/claims`, Object.fromEntries(searchParams.entries()));
+    return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then((res) => {
       if (!res.ok) throw new Error('Export failed');
@@ -1899,7 +1951,8 @@ export const api = {
       if (value !== undefined) searchParams.set(key, String(value));
     });
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    return fetch(`${API_BASE_URL}/expenses/reports/advances?${searchParams}`, {
+    const url = buildApiUrl(`/expenses/reports/advances`, Object.fromEntries(searchParams.entries()));
+    return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then((res) => {
       if (!res.ok) throw new Error('Export failed');
@@ -1919,7 +1972,8 @@ export const api = {
       if (value !== undefined) searchParams.set(key, String(value));
     });
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    return fetch(`${API_BASE_URL}/expenses/reports/transactions?${searchParams}`, {
+    const url = buildApiUrl(`/expenses/reports/transactions`, Object.fromEntries(searchParams.entries()));
+    return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     }).then((res) => {
       if (!res.ok) throw new Error('Export failed');
@@ -2164,6 +2218,23 @@ export const api = {
   getProjectsPerformance: () => fetchApi<any>('/projects/analytics/project-performance'),
   getProjectsDepartmentSummary: (months = 12) =>
     fetchApi<any>('/projects/analytics/department-summary', { params: { months } }),
+
+  // Project Tasks
+  getProjectTasks: (params?: {
+    project_id?: number;
+    status?: string;
+    priority?: string;
+    assigned_to?: string;
+    task_type?: string;
+    search?: string;
+    overdue_only?: boolean;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }) => fetchApi<{ total: number; limit: number; offset: number; data: any[] }>('/projects/tasks', { params }),
+
+  getTaskDetail: (id: number) => fetchApi<any>(`/projects/tasks/${id}`),
 
   getInvoiceAging: () =>
     fetchApi<InvoiceAging>('/analytics/invoices/aging'),
@@ -4574,16 +4645,10 @@ export const api = {
     if (options?.attachment_type) formData.append('attachment_type', options.attachment_type);
     if (options?.description) formData.append('description', options.description);
     if (options?.is_primary) formData.append('is_primary', 'true');
-    const response = await fetch(`${BASE_URL}/accounting/documents/${doctype}/${docId}/attachments`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: formData,
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Upload failed' }));
-      throw new Error(error.detail || 'Upload failed');
-    }
-    return response.json() as Promise<DocumentAttachmentUploadResponse>;
+    return fetchApi<DocumentAttachmentUploadResponse>(
+      `/accounting/documents/${doctype}/${docId}/attachments`,
+      { method: 'POST', body: formData }
+    );
   },
   getAttachment: (attachmentId: number) =>
     fetchApi<DocumentAttachment>(`/accounting/attachments/${attachmentId}`),
@@ -4594,7 +4659,288 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+
+  // =============================================================================
+  // INBOX (OMNICHANNEL) API
+  // =============================================================================
+
+  // Conversations
+  getInboxConversations: (params?: import('./inbox.types').ConversationListParams) =>
+    fetchApi<import('./inbox.types').ConversationListResponse>('/inbox/conversations', { params: params as Record<string, any> | undefined }),
+
+  getInboxConversation: (id: number) =>
+    fetchApi<import('./inbox.types').InboxConversation>(`/inbox/conversations/${id}`),
+
+  updateInboxConversation: (id: number, payload: import('./inbox.types').ConversationUpdatePayload) =>
+    fetchApi<import('./inbox.types').InboxConversation>(`/inbox/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  assignInboxConversation: (id: number, payload: import('./inbox.types').AssignPayload) =>
+    fetchApi<import('./inbox.types').InboxConversation>(`/inbox/conversations/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  sendInboxMessage: (id: number, payload: import('./inbox.types').SendMessagePayload) =>
+    fetchApi<import('./inbox.types').InboxMessage>(`/inbox/conversations/${id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  markInboxConversationRead: (id: number) =>
+    fetchApi<import('./inbox.types').InboxConversation>(`/inbox/conversations/${id}/mark-read`, { method: 'POST' }),
+
+  createTicketFromConversation: (id: number, payload?: import('./inbox.types').CreateTicketPayload) =>
+    fetchApi<{ ticket_id: number; message: string }>(`/inbox/conversations/${id}/create-ticket`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
+  createLeadFromConversation: (id: number, payload?: import('./inbox.types').CreateLeadPayload) =>
+    fetchApi<{ lead_id: number; message: string }>(`/inbox/conversations/${id}/create-lead`, {
+      method: 'POST',
+      body: JSON.stringify(payload || {}),
+    }),
+
+  archiveInboxConversation: (id: number) =>
+    fetchApi<import('./inbox.types').InboxConversation>(`/inbox/conversations/${id}/archive`, { method: 'POST' }),
+
+  // Contacts
+  getInboxContacts: (params?: import('./inbox.types').ContactListParams) =>
+    fetchApi<import('./inbox.types').ContactListResponse>('/inbox/contacts', { params: params as Record<string, any> | undefined }),
+
+  getInboxContact: (id: number) =>
+    fetchApi<import('./inbox.types').InboxContact>(`/inbox/contacts/${id}`),
+
+  createInboxContact: (payload: import('./inbox.types').ContactCreatePayload) =>
+    fetchApi<import('./inbox.types').InboxContact>('/inbox/contacts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateInboxContact: (id: number, payload: import('./inbox.types').ContactUpdatePayload) =>
+    fetchApi<import('./inbox.types').InboxContact>(`/inbox/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteInboxContact: (id: number) =>
+    fetchApi<void>(`/inbox/contacts/${id}`, { method: 'DELETE' }),
+
+  getInboxCompanies: (params?: { search?: string; limit?: number; offset?: number }) =>
+    fetchApi<import('./inbox.types').CompanyListResponse>('/inbox/contacts/companies', { params }),
+
+  // Routing Rules
+  getInboxRoutingRules: (params?: import('./inbox.types').RoutingRuleListParams) =>
+    fetchApi<import('./inbox.types').RoutingRuleListResponse>('/inbox/routing-rules', { params: params as Record<string, any> | undefined }),
+
+  getInboxRoutingRule: (id: number) =>
+    fetchApi<import('./inbox.types').InboxRoutingRule>(`/inbox/routing-rules/${id}`),
+
+  createInboxRoutingRule: (payload: import('./inbox.types').RoutingRuleCreatePayload) =>
+    fetchApi<import('./inbox.types').InboxRoutingRule>('/inbox/routing-rules', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateInboxRoutingRule: (id: number, payload: import('./inbox.types').RoutingRuleUpdatePayload) =>
+    fetchApi<import('./inbox.types').InboxRoutingRule>(`/inbox/routing-rules/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteInboxRoutingRule: (id: number) =>
+    fetchApi<void>(`/inbox/routing-rules/${id}`, { method: 'DELETE' }),
+
+  toggleInboxRoutingRule: (id: number) =>
+    fetchApi<import('./inbox.types').InboxRoutingRule>(`/inbox/routing-rules/${id}/toggle`, { method: 'POST' }),
+
+  // Analytics
+  getInboxAnalyticsSummary: (params?: { days?: number }) =>
+    fetchApi<import('./inbox.types').InboxAnalyticsSummary>('/inbox/analytics/summary', { params }),
+
+  getInboxAnalyticsVolume: (params?: { days?: number }) =>
+    fetchApi<import('./inbox.types').InboxVolumeData>('/inbox/analytics/volume', { params }),
+
+  getInboxAnalyticsAgents: (params?: { days?: number }) =>
+    fetchApi<{ period_days: number; agents: import('./inbox.types').InboxAgentStats[] }>('/inbox/analytics/agents', { params }),
+
+  getInboxAnalyticsChannels: (params?: { days?: number }) =>
+    fetchApi<{ period_days: number; channels: import('./inbox.types').InboxChannelStats[] }>('/inbox/analytics/channels', { params }),
+
+  // Generic HTTP methods for flexible API calls
+  get: <T = any>(endpoint: string, options?: { params?: Record<string, any> }) =>
+    fetchApi<T>(endpoint, { params: options?.params }),
+
+  post: <T = any>(endpoint: string, body?: any, options?: { params?: Record<string, any> }) =>
+    fetchApi<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+      params: options?.params,
+    }),
+
+  put: <T = any>(endpoint: string, body?: any, options?: { params?: Record<string, any> }) =>
+    fetchApi<T>(endpoint, {
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+      params: options?.params,
+    }),
+
+  patch: <T = any>(endpoint: string, body?: any, options?: { params?: Record<string, any> }) =>
+    fetchApi<T>(endpoint, {
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
+      params: options?.params,
+    }),
+
+  delete: <T = any>(endpoint: string, options?: { params?: Record<string, any> }) =>
+    fetchApi<T>(endpoint, { method: 'DELETE', params: options?.params }),
+
+  // ============= CRM - Leads =============
+  getLeads: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/leads', { params }),
+
+  getLead: (id: number | string) =>
+    fetchApi<any>(`/sales/leads/${id}`),
+
+  getLeadsSummary: () =>
+    fetchApi<any>('/sales/leads/summary'),
+
+  createLead: (body: Record<string, any>) =>
+    fetchApi<any>('/sales/leads', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateLead: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  qualifyLead: (id: number | string) =>
+    fetchApi<any>(`/sales/leads/${id}/qualify`, { method: 'POST' }),
+
+  disqualifyLead: (id: number | string, reason?: string) =>
+    fetchApi<any>(`/sales/leads/${id}/disqualify`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  convertLead: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/leads/${id}/convert`, { method: 'POST', body: JSON.stringify(body) }),
+
+  // ============= CRM - Opportunities =============
+  getOpportunities: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/opportunities', { params }),
+
+  getOpportunity: (id: number | string) =>
+    fetchApi<any>(`/sales/opportunities/${id}`),
+
+  getPipelineSummary: () =>
+    fetchApi<any>('/sales/pipeline/summary'),
+
+  createOpportunity: (body: Record<string, any>) =>
+    fetchApi<any>('/sales/opportunities', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateOpportunity: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/opportunities/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  moveOpportunityStage: (id: number | string, stageId: number | string) =>
+    fetchApi<any>(`/sales/opportunities/${id}/move-stage`, { method: 'POST', body: JSON.stringify({ stage_id: stageId }) }),
+
+  markOpportunityWon: (id: number | string, actualCloseDate?: string) =>
+    fetchApi<any>(`/sales/opportunities/${id}/won`, { method: 'POST', body: actualCloseDate ? JSON.stringify({ actual_close_date: actualCloseDate }) : undefined }),
+
+  markOpportunityLost: (id: number | string, lostReason?: string, competitor?: string) =>
+    fetchApi<any>(`/sales/opportunities/${id}/lost`, { method: 'POST', body: JSON.stringify({ lost_reason: lostReason, competitor }) }),
+
+  // ============= CRM - Pipeline Stages =============
+  getPipelineStages: (includeInactive?: boolean) =>
+    fetchApi<any>('/sales/pipeline/stages', { params: includeInactive !== undefined ? { include_inactive: includeInactive } : undefined }),
+
+  getPipelineView: () =>
+    fetchApi<any>('/sales/pipeline/view'),
+
+  getKanbanView: (ownerId?: number) =>
+    fetchApi<any>('/sales/pipeline/kanban', { params: ownerId !== undefined ? { owner_id: ownerId } : undefined }),
+
+  createPipelineStage: (body: Record<string, any>) =>
+    fetchApi<any>('/sales/pipeline/stages', { method: 'POST', body: JSON.stringify(body) }),
+
+  updatePipelineStage: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/pipeline/stages/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  reorderPipelineStages: (stageIds: (number | string)[]) =>
+    fetchApi<any>('/sales/pipeline/stages/reorder', { method: 'POST', body: JSON.stringify({ stage_ids: stageIds }) }),
+
+  deletePipelineStage: (id: number | string) =>
+    fetchApi<void>(`/sales/pipeline/stages/${id}`, { method: 'DELETE' }),
+
+  // ============= CRM - Activities =============
+  getActivities: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/activities', { params }),
+
+  getActivity: (id: number | string) =>
+    fetchApi<any>(`/sales/activities/${id}`),
+
+  getActivityTimeline: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/activities/timeline', { params }),
+
+  getUpcomingActivities: (days?: number) =>
+    fetchApi<any>('/sales/activities/upcoming', { params: { days } }),
+
+  getOverdueActivities: () =>
+    fetchApi<any>('/sales/activities/overdue'),
+
+  createActivity: (body: Record<string, any>) =>
+    fetchApi<any>('/sales/activities', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateActivity: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/activities/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  completeActivity: (id: number | string, notes?: string) =>
+    fetchApi<any>(`/sales/activities/${id}/complete`, { method: 'POST', body: notes ? JSON.stringify({ notes }) : undefined }),
+
+  cancelActivity: (id: number | string, reason?: string) =>
+    fetchApi<any>(`/sales/activities/${id}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  rescheduleActivity: (id: number | string, scheduledAt: string) =>
+    fetchApi<any>(`/sales/activities/${id}/reschedule`, { method: 'POST', body: JSON.stringify({ scheduled_at: scheduledAt }) }),
+
+  deleteActivity: (id: number | string) =>
+    fetchApi<void>(`/sales/activities/${id}`, { method: 'DELETE' }),
+
+  // ============= CRM - Contacts =============
+  getContacts: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/contacts', { params }),
+
+  getContact: (id: number | string) =>
+    fetchApi<any>(`/sales/contacts/${id}`),
+
+  getCustomerContacts: (customerId: number | string) =>
+    fetchApi<any>(`/customers/${customerId}/contacts`),
+
+  getLeadContacts: (leadId: number | string) =>
+    fetchApi<any>(`/sales/leads/${leadId}/contacts`),
+
+  createContact: (body: Record<string, any>) =>
+    fetchApi<any>('/sales/contacts', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateContact: (id: number | string, body: Record<string, any>) =>
+    fetchApi<any>(`/sales/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  setPrimaryContact: (contactId: number | string, entityType?: string, entityId?: number | string) =>
+    entityType && entityId
+      ? fetchApi<any>(`/sales/${entityType}/${entityId}/primary-contact`, { method: 'POST', body: JSON.stringify({ contact_id: contactId }) })
+      : fetchApi<any>(`/sales/contacts/${contactId}/set-primary`, { method: 'POST' }),
+
+  deleteContact: (id: number | string) =>
+    fetchApi<void>(`/sales/contacts/${id}`, { method: 'DELETE' }),
+
+  // ============= CRM - Lead Sources & Campaigns =============
+  getLeadSources: () =>
+    fetchApi<any>('/sales/lead-sources'),
+
+  getCampaigns: (params?: Record<string, any>) =>
+    fetchApi<any>('/sales/campaigns', { params }),
 };
+
+// Default export for convenience in legacy imports
+export default api;
 
 // Additional types
 export interface SyncLog {
@@ -7222,6 +7568,7 @@ export interface InventoryReorderAlertsResponse {
 // Inventory - Transfer Requests
 export interface InventoryTransfer {
   id: number;
+  transfer_number?: string | null;
   from_warehouse?: string | null;
   to_warehouse?: string | null;
   request_date?: string | null;
@@ -7230,7 +7577,10 @@ export interface InventoryTransfer {
   total_qty: number;
   total_value: number;
   status: string;
+  approval_status?: string | null;
   remarks?: string | null;
+  created_by?: string | null;
+  items?: InventoryTransferItemPayload[];
 }
 
 export interface InventoryTransferListResponse {
@@ -7448,6 +7798,8 @@ export interface AssetSummaryResponse {
     book_value: number;
     purchase_value: number;
     accumulated_depreciation: number;
+    pending_entries?: number;
+    disposed_count?: number;
   };
   by_status: Array<{
     status: string;
@@ -7467,6 +7819,9 @@ export interface AssetSummaryResponse {
   }>;
   maintenance_required: number;
   warranty_expiring_soon: number;
+  insurance_expiring_soon?: number;
+  expiring_warranty_assets?: WarrantyExpiringAsset[];
+  expiring_insurance_assets?: InsuranceExpiringAsset[];
 }
 
 export interface AssetCategory {
@@ -9618,4 +9973,586 @@ export interface DocumentAttachmentUploadResponse {
   id: number;
   file_name: string;
   file_size: number;
+}
+
+// ============= CRM TYPES =============
+
+// Lead Types
+export interface Lead {
+  id: number;
+  lead_name: string;
+  company_name?: string;
+  email_id?: string;
+  phone?: string;
+  mobile_no?: string;
+  website?: string;
+  source?: string;
+  lead_owner?: string;
+  territory?: string;
+  industry?: string;
+  market_segment?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  notes?: string;
+  status: string;
+  qualification_status?: string;
+  converted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadListResponse {
+  items: Lead[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface LeadSummaryResponse {
+  total_leads: number;
+  new_leads: number;
+  qualified_leads: number;
+  converted_leads: number;
+  lost_leads: number;
+  by_status: Record<string, number>;
+  by_source: Record<string, number>;
+}
+
+export interface LeadCreatePayload {
+  lead_name: string;
+  company_name?: string;
+  email_id?: string;
+  phone?: string;
+  mobile_no?: string;
+  website?: string;
+  source?: string;
+  lead_owner?: string;
+  territory?: string;
+  industry?: string;
+  market_segment?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  notes?: string;
+}
+
+export interface LeadConvertPayload {
+  customer_name?: string;
+  customer_type?: string;
+  create_opportunity?: boolean;
+  opportunity_name?: string;
+  deal_value?: number;
+}
+
+// Opportunity Types
+export interface OpportunityStage {
+  id: number;
+  name: string;
+  probability: number;
+  color?: string;
+}
+
+export interface Opportunity {
+  id: number;
+  name: string;
+  description?: string;
+  lead_id?: number;
+  lead_name?: string;
+  customer_id?: number;
+  customer_name?: string;
+  stage_id?: number;
+  stage?: OpportunityStage;
+  stage_name?: string;
+  status: string;
+  currency: string;
+  deal_value: number;
+  probability: number;
+  weighted_value: number;
+  expected_close_date?: string;
+  actual_close_date?: string;
+  owner_id?: number;
+  sales_person_id?: number;
+  source?: string;
+  campaign?: string;
+  lost_reason?: string;
+  competitor?: string;
+  quotation_id?: number;
+  sales_order_id?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpportunityListResponse {
+  items: Opportunity[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface PipelineSummaryResponse {
+  total_opportunities: number;
+  total_value: number;
+  weighted_value: number;
+  won_count: number;
+  won_value: number;
+  lost_count: number;
+  by_stage: {
+    stage_id: number;
+    stage_name: string;
+    color?: string;
+    probability: number;
+    count: number;
+    value: number;
+  }[];
+  avg_deal_size: number;
+  win_rate: number;
+}
+
+export interface OpportunityCreatePayload {
+  name: string;
+  description?: string;
+  lead_id?: number;
+  customer_id?: number;
+  stage_id?: number;
+  deal_value?: number;
+  probability?: number;
+  expected_close_date?: string;
+  owner_id?: number;
+  sales_person_id?: number;
+  source?: string;
+  campaign?: string;
+}
+
+// Activity Types
+export interface Activity {
+  id: number;
+  activity_type: string;
+  subject: string;
+  description?: string;
+  status: string;
+  lead_id?: number;
+  customer_id?: number;
+  opportunity_id?: number;
+  lead_name?: string;
+  customer_name?: string;
+  opportunity_name?: string;
+  contact_id?: number;
+  scheduled_at?: string;
+  duration_minutes?: number;
+  completed_at?: string;
+  owner_id?: number;
+  assigned_to_id?: number;
+  priority?: string;
+  reminder_at?: string;
+  call_direction?: string;
+  call_outcome?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActivityListResponse {
+  items: Activity[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ActivitySummaryResponse {
+  total_activities: number;
+  by_type: Record<string, number>;
+  by_status: Record<string, number>;
+  overdue_count: number;
+  today_count: number;
+  upcoming_week: number;
+}
+
+export interface ActivityCreatePayload {
+  activity_type: string;
+  subject: string;
+  description?: string;
+  lead_id?: number;
+  customer_id?: number;
+  opportunity_id?: number;
+  contact_id?: number;
+  scheduled_at?: string;
+  duration_minutes?: number;
+  owner_id?: number;
+  assigned_to_id?: number;
+  priority?: string;
+  reminder_at?: string;
+  call_direction?: string;
+}
+
+// Contact Types
+export interface Contact {
+  id: number;
+  customer_id?: number;
+  lead_id?: number;
+  first_name: string;
+  last_name?: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  designation?: string;
+  department?: string;
+  is_primary: boolean;
+  is_billing_contact: boolean;
+  is_decision_maker: boolean;
+  is_active: boolean;
+  unsubscribed: boolean;
+  linkedin_url?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactListResponse {
+  items: Contact[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ContactCreatePayload {
+  customer_id?: number;
+  lead_id?: number;
+  first_name: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  mobile?: string;
+  designation?: string;
+  department?: string;
+  is_primary?: boolean;
+  is_billing_contact?: boolean;
+  is_decision_maker?: boolean;
+  linkedin_url?: string;
+  notes?: string;
+}
+
+// Pipeline Stage Types
+export interface PipelineStage {
+  id: number;
+  name: string;
+  sequence: number;
+  probability: number;
+  is_won: boolean;
+  is_lost: boolean;
+  is_active: boolean;
+  color?: string;
+  opportunity_count: number;
+  opportunity_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PipelineViewResponse {
+  stages: PipelineStage[];
+  unassigned_count: number;
+  unassigned_value: number;
+  total_value: number;
+  weighted_value: number;
+}
+
+export interface KanbanColumn {
+  stage_id: number;
+  stage_name: string;
+  color?: string;
+  probability: number;
+  opportunities: {
+    id: number;
+    name: string;
+    customer_name?: string;
+    deal_value: number;
+    probability: number;
+    expected_close_date?: string;
+  }[];
+  count: number;
+  value: number;
+}
+
+export interface KanbanViewResponse {
+  columns: KanbanColumn[];
+  total_opportunities: number;
+  total_value: number;
+}
+
+// ============= CRM API FUNCTIONS =============
+
+// Leads API
+export async function getLeads(params?: {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  source?: string;
+  territory?: string;
+  converted?: boolean;
+}): Promise<LeadListResponse> {
+  return apiFetch(buildApiUrl('/crm/leads', params as Record<string, string | number | boolean | undefined>));
+}
+
+export async function getLeadsSummary(): Promise<LeadSummaryResponse> {
+  return apiFetch(buildApiUrl('/crm/leads/summary'));
+}
+
+export async function getLead(id: number): Promise<Lead> {
+  return apiFetch(buildApiUrl(`/crm/leads/${id}`));
+}
+
+export async function createLead(payload: LeadCreatePayload): Promise<Lead> {
+  return apiFetch(buildApiUrl('/crm/leads'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateLead(id: number, payload: Partial<LeadCreatePayload>): Promise<Lead> {
+  return apiFetch(buildApiUrl(`/crm/leads/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function convertLead(id: number, payload: LeadConvertPayload): Promise<{ success: boolean; customer_id: number; contact_id: number; opportunity_id?: number }> {
+  return apiFetch(buildApiUrl(`/crm/leads/${id}/convert`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function qualifyLead(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/leads/${id}/qualify`), { method: 'POST' });
+}
+
+export async function disqualifyLead(id: number, reason?: string): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/leads/${id}/disqualify`, { reason }), { method: 'POST' });
+}
+
+// Opportunities API
+export async function getOpportunities(params?: {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  status?: string;
+  stage_id?: number;
+  customer_id?: number;
+  owner_id?: number;
+  min_value?: number;
+  max_value?: number;
+}): Promise<OpportunityListResponse> {
+  return apiFetch(buildApiUrl('/crm/opportunities', params as Record<string, string | number | boolean | undefined>));
+}
+
+export async function getPipelineSummary(): Promise<PipelineSummaryResponse> {
+  return apiFetch(buildApiUrl('/crm/opportunities/pipeline'));
+}
+
+export async function getOpportunity(id: number): Promise<Opportunity> {
+  return apiFetch(buildApiUrl(`/crm/opportunities/${id}`));
+}
+
+export async function createOpportunity(payload: OpportunityCreatePayload): Promise<Opportunity> {
+  return apiFetch(buildApiUrl('/crm/opportunities'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateOpportunity(id: number, payload: Partial<OpportunityCreatePayload>): Promise<Opportunity> {
+  return apiFetch(buildApiUrl(`/crm/opportunities/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function moveOpportunityStage(id: number, stageId: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/opportunities/${id}/move-stage`, { stage_id: stageId }), { method: 'POST' });
+}
+
+export async function markOpportunityWon(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/opportunities/${id}/won`), { method: 'POST' });
+}
+
+export async function markOpportunityLost(id: number, reason?: string, competitor?: string): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/opportunities/${id}/lost`, { reason, competitor }), { method: 'POST' });
+}
+
+// Activities API
+export async function getActivities(params?: {
+  page?: number;
+  page_size?: number;
+  activity_type?: string;
+  status?: string;
+  lead_id?: number;
+  customer_id?: number;
+  opportunity_id?: number;
+  owner_id?: number;
+  assigned_to_id?: number;
+  start_date?: string;
+  end_date?: string;
+}): Promise<ActivityListResponse> {
+  return apiFetch(buildApiUrl('/crm/activities', params as Record<string, string | number | boolean | undefined>));
+}
+
+export async function getActivitiesSummary(): Promise<ActivitySummaryResponse> {
+  return apiFetch(buildApiUrl('/crm/activities/summary'));
+}
+
+export async function getActivityTimeline(params: {
+  customer_id?: number;
+  lead_id?: number;
+  opportunity_id?: number;
+  limit?: number;
+}): Promise<{ items: Activity[]; count: number }> {
+  return apiFetch(buildApiUrl('/crm/activities/timeline', params as Record<string, string | number | boolean | undefined>));
+}
+
+export async function getActivity(id: number): Promise<Activity> {
+  return apiFetch(buildApiUrl(`/crm/activities/${id}`));
+}
+
+export async function createActivity(payload: ActivityCreatePayload): Promise<Activity> {
+  return apiFetch(buildApiUrl('/crm/activities'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateActivity(id: number, payload: Partial<ActivityCreatePayload>): Promise<Activity> {
+  return apiFetch(buildApiUrl(`/crm/activities/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completeActivity(id: number, outcome?: string, notes?: string): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/activities/${id}/complete`, { outcome, notes }), { method: 'POST' });
+}
+
+export async function cancelActivity(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/activities/${id}/cancel`), { method: 'POST' });
+}
+
+export async function deleteActivity(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/activities/${id}`), { method: 'DELETE' });
+}
+
+// Contacts API
+export async function getContacts(params?: {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  customer_id?: number;
+  lead_id?: number;
+  is_primary?: boolean;
+  is_decision_maker?: boolean;
+  is_active?: boolean;
+}): Promise<ContactListResponse> {
+  return apiFetch(buildApiUrl('/crm/contacts', params as Record<string, string | number | boolean | undefined>));
+}
+
+export async function getCustomerContacts(customerId: number): Promise<{ items: Contact[]; count: number }> {
+  return apiFetch(buildApiUrl(`/crm/contacts/by-customer/${customerId}`));
+}
+
+export async function getLeadContacts(leadId: number): Promise<{ items: Contact[]; count: number }> {
+  return apiFetch(buildApiUrl(`/crm/contacts/by-lead/${leadId}`));
+}
+
+export async function getContact(id: number): Promise<Contact> {
+  return apiFetch(buildApiUrl(`/crm/contacts/${id}`));
+}
+
+export async function createContact(payload: ContactCreatePayload): Promise<Contact> {
+  return apiFetch(buildApiUrl('/crm/contacts'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateContact(id: number, payload: Partial<ContactCreatePayload>): Promise<Contact> {
+  return apiFetch(buildApiUrl(`/crm/contacts/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function setContactPrimary(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/contacts/${id}/set-primary`), { method: 'POST' });
+}
+
+export async function deleteContact(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/contacts/${id}`), { method: 'DELETE' });
+}
+
+// Pipeline API
+export async function getPipelineStages(includeInactive?: boolean): Promise<PipelineStage[]> {
+  return apiFetch(buildApiUrl('/crm/pipeline/stages', { include_inactive: includeInactive }));
+}
+
+export async function getPipelineView(): Promise<PipelineViewResponse> {
+  return apiFetch(buildApiUrl('/crm/pipeline/view'));
+}
+
+export async function getKanbanView(ownerId?: number): Promise<KanbanViewResponse> {
+  return apiFetch(buildApiUrl('/crm/pipeline/kanban', { owner_id: ownerId }));
+}
+
+export async function createPipelineStage(payload: {
+  name: string;
+  sequence?: number;
+  probability?: number;
+  is_won?: boolean;
+  is_lost?: boolean;
+  color?: string;
+}): Promise<PipelineStage> {
+  return apiFetch(buildApiUrl('/crm/pipeline/stages'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updatePipelineStage(id: number, payload: Partial<{
+  name: string;
+  sequence: number;
+  probability: number;
+  is_won: boolean;
+  is_lost: boolean;
+  is_active: boolean;
+  color: string;
+}>): Promise<PipelineStage> {
+  return apiFetch(buildApiUrl(`/crm/pipeline/stages/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reorderPipelineStages(stageIds: number[]): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl('/crm/pipeline/stages/reorder'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(stageIds),
+  });
+}
+
+export async function deletePipelineStage(id: number): Promise<{ success: boolean }> {
+  return apiFetch(buildApiUrl(`/crm/pipeline/stages/${id}`), { method: 'DELETE' });
+}
+
+export async function seedDefaultPipelineStages(): Promise<{ success: boolean; message: string }> {
+  return apiFetch(buildApiUrl('/crm/pipeline/seed-default-stages'), { method: 'POST' });
 }

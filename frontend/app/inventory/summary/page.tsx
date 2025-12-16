@@ -84,27 +84,27 @@ export default function StockSummaryPage() {
               </thead>
               <tbody className="divide-y divide-slate-border/50">
                 {items.map((item, idx) => (
-                  <tr key={`${item.item_code}-${item.warehouse}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
+                  <tr key={`${item.item_code}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
                     <td className="py-3 text-amber-400 font-mono">{item.item_code}</td>
                     <td className="py-3 text-white">{item.item_name || "-"}</td>
                     <td className="py-3 text-right">
                       <span className={cn(
                         "font-mono",
-                        (item.actual_qty ?? 0) > 0 ? "text-emerald-400" : "text-slate-muted"
+                        (item.total_qty ?? 0) > 0 ? "text-emerald-400" : "text-slate-muted"
                       )}>
-                        {(item.actual_qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        {(item.total_qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </span>
                     </td>
                     <td className="py-3 text-right font-mono text-slate-muted">
                       {(item.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3 text-right font-mono text-white">
-                      {(item.stock_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {(item.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3">
                       <div className="flex items-center gap-1 text-slate-muted">
                         <Warehouse className="w-3 h-3" />
-                        <span className="text-xs">{item.warehouse || "-"}</span>
+                        <span className="text-xs">{item.warehouses?.[0]?.warehouse || "-"}</span>
                       </div>
                     </td>
                   </tr>

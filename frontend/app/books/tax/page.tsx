@@ -14,6 +14,7 @@ import {
   ChevronRight,
   TrendingUp,
   TrendingDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';

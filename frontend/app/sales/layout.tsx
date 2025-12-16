@@ -10,27 +10,48 @@ import {
   Users,
   ShoppingCart,
   Settings,
+  Target,
+  Kanban,
+  CalendarDays,
+  Milestone,
+  UserPlus,
+  Contact2,
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
-// Sales Flow:
-// 1. QUOTE: Create quotations, manage opportunities
-// 2. ORDER: Convert quotes to orders
-// 3. INVOICE: Bill customers, track AR
-// 4. COLLECT: Receive payments, manage aging
+// CRM & Sales Flow:
+// 1. LEAD: Capture and qualify leads
+// 2. OPPORTUNITY: Convert leads, manage pipeline
+// 3. QUOTE: Create quotations, proposals
+// 4. ORDER: Convert quotes to orders
+// 5. INVOICE: Bill customers, track AR
+// 6. COLLECT: Receive payments, manage aging
 
 const sections: NavSection[] = [
   {
     key: 'overview',
     label: 'Dashboard',
-    description: 'AR overview & metrics',
+    description: 'CRM & sales overview',
     icon: LayoutDashboard,
     items: [
       { name: 'Dashboard', href: '/sales', description: 'Overview & KPIs' },
       { name: 'Analytics', href: '/sales/analytics', description: 'Sales trends' },
       { name: 'Insights', href: '/sales/insights', description: 'AI recommendations' },
+    ],
+  },
+  {
+    key: 'crm',
+    label: 'CRM',
+    description: 'Leads, pipeline & activities',
+    icon: Target,
+    items: [
+      { name: 'Leads', href: '/sales/leads', description: 'Lead management' },
+      { name: 'Opportunities', href: '/sales/opportunities', description: 'Deal pipeline' },
+      { name: 'Pipeline', href: '/sales/pipeline', description: 'Kanban board' },
+      { name: 'Activities', href: '/sales/activities', description: 'Tasks & meetings' },
+      { name: 'Contacts', href: '/sales/contacts', description: 'Contact directory' },
     ],
   },
   {
@@ -66,27 +87,31 @@ const sections: NavSection[] = [
 ];
 
 const quickLinks: QuickLink[] = [
-  { label: 'New Invoice', href: '/sales/invoices/new', icon: FileText, color: 'emerald-400' },
+  { label: 'New Lead', href: '/sales/leads/new', icon: UserPlus, color: 'violet-400' },
+  { label: 'New Deal', href: '/sales/opportunities/new', icon: Target, color: 'cyan-400' },
   { label: 'New Quote', href: '/sales/quotations/new', icon: Receipt, color: 'amber-400' },
-  { label: 'Receive Pay', href: '/sales/payments/new', icon: CreditCard, color: 'teal-400' },
-  { label: 'Analytics', href: '/sales/analytics', icon: TrendingUp, color: 'cyan-400' },
+  { label: 'New Invoice', href: '/sales/invoices/new', icon: FileText, color: 'emerald-400' },
 ];
 
 const workflowPhases: WorkflowPhase[] = [
+  { key: 'lead', label: 'Lead', description: 'Capture & qualify' },
+  { key: 'opportunity', label: 'Deal', description: 'Nurture pipeline' },
   { key: 'quote', label: 'Quote', description: 'Create proposals' },
   { key: 'invoice', label: 'Invoice', description: 'Bill customers' },
   { key: 'collect', label: 'Collect', description: 'Receive payments' },
 ];
 
 const workflowSteps: WorkflowStep[] = [
+  { label: 'Capture lead', color: 'violet' },
+  { label: 'Qualify & convert', color: 'cyan' },
   { label: 'Create quotation', color: 'amber' },
-  { label: 'Convert to order', color: 'violet' },
   { label: 'Generate invoice', color: 'emerald' },
   { label: 'Collect payment', color: 'teal' },
 ];
 
 function getWorkflowPhase(sectionKey: string | null): string {
-  if (!sectionKey) return 'quote';
+  if (!sectionKey) return 'lead';
+  if (sectionKey === 'crm') return 'opportunity';
   if (sectionKey === 'orders') return 'quote';
   if (sectionKey === 'receivables') return 'invoice';
   return 'collect';
@@ -114,9 +139,9 @@ export default function SalesLayout({ children }: { children: React.ReactNode })
   return (
     <ModuleLayout
       moduleName="Dotmac"
-      moduleSubtitle="Sales"
-      sidebarTitle="Accounts Receivable"
-      sidebarDescription="Invoicing, payments & collections"
+      moduleSubtitle="CRM & Sales"
+      sidebarTitle="CRM & Sales"
+      sidebarDescription="Leads, pipeline, invoicing & collections"
       baseRoute="/sales"
       accentColor="emerald"
       icon={TrendingUp}

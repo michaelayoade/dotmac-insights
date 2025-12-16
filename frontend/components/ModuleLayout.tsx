@@ -17,6 +17,8 @@ import {
   Menu,
   X,
   LucideIcon,
+  Home,
+  Zap,
 } from 'lucide-react';
 
 // =============================================================================
@@ -56,7 +58,7 @@ export interface WorkflowStep {
 }
 
 // Color configurations for different accent colors
-type AccentColor = 'amber' | 'teal' | 'sky' | 'violet' | 'emerald' | 'rose' | 'cyan' | 'indigo' | 'orange';
+type AccentColor = 'amber' | 'teal' | 'sky' | 'violet' | 'emerald' | 'rose' | 'cyan' | 'indigo' | 'orange' | 'blue';
 
 const ACCENT_COLORS: Record<AccentColor, {
   gradient: string;
@@ -145,6 +147,39 @@ const ACCENT_COLORS: Record<AccentColor, {
     activeItemBg: 'bg-cyan-500/20',
     activeItemText: 'text-cyan-300',
     activeDescText: 'text-cyan-400/70',
+  },
+  indigo: {
+    gradient: 'from-indigo-500 to-purple-400',
+    iconBg: 'bg-gradient-to-br from-indigo-500 to-purple-400',
+    iconText: 'text-indigo-300',
+    activeBorder: 'border-indigo-500/40',
+    activeBg: 'bg-indigo-500/5',
+    activeText: 'text-indigo-300',
+    activeItemBg: 'bg-indigo-500/20',
+    activeItemText: 'text-indigo-300',
+    activeDescText: 'text-indigo-400/70',
+  },
+  orange: {
+    gradient: 'from-orange-500 to-amber-400',
+    iconBg: 'bg-gradient-to-br from-orange-500 to-amber-400',
+    iconText: 'text-orange-300',
+    activeBorder: 'border-orange-500/40',
+    activeBg: 'bg-orange-500/5',
+    activeText: 'text-orange-300',
+    activeItemBg: 'bg-orange-500/20',
+    activeItemText: 'text-orange-300',
+    activeDescText: 'text-orange-400/70',
+  },
+  blue: {
+    gradient: 'from-blue-500 to-cyan-400',
+    iconBg: 'bg-gradient-to-br from-blue-500 to-cyan-400',
+    iconText: 'text-blue-300',
+    activeBorder: 'border-blue-500/40',
+    activeBg: 'bg-blue-500/5',
+    activeText: 'text-blue-300',
+    activeItemBg: 'bg-blue-500/20',
+    activeItemText: 'text-blue-300',
+    activeDescText: 'text-blue-400/70',
   },
 };
 
@@ -373,12 +408,20 @@ export function ModuleLayout({
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-card border-b border-slate-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
-              <ModuleIcon className="w-5 h-5 text-slate-deep" />
+            <Link
+              href="/"
+              className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center shrink-0"
+              title="Back to Home"
+            >
+              <Zap className="w-4 h-4 text-slate-900" />
+            </Link>
+            <div className="w-px h-6 bg-slate-border" />
+            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
+              <ModuleIcon className="w-4 h-4 text-slate-deep" />
             </div>
             <div className="flex flex-col">
-              <span className="font-display font-bold text-white tracking-tight">{moduleName}</span>
-              <span className="text-[10px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
+              <span className="font-display font-bold text-white tracking-tight text-sm">{moduleName}</span>
+              <span className="text-[9px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -403,15 +446,28 @@ export function ModuleLayout({
 
       {/* Desktop top bar */}
       <div className="hidden lg:flex items-center justify-between bg-slate-card border border-slate-border rounded-xl px-4 py-3">
-        <Link href={baseRoute} className="flex items-center gap-3 group">
-          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
-            <ModuleIcon className="w-5 h-5 text-slate-deep" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-display font-bold text-white tracking-tight">{moduleName}</span>
-            <span className="text-[10px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
-          </div>
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+            title="Back to Home"
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-slate-900" />
+            </div>
+            <span className="text-xs font-medium hidden xl:inline">BOS</span>
+          </Link>
+          <div className="w-px h-8 bg-slate-border" />
+          <Link href={baseRoute} className="flex items-center gap-3 group">
+            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
+              <ModuleIcon className="w-5 h-5 text-slate-deep" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display font-bold text-white tracking-tight">{moduleName}</span>
+              <span className="text-[10px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
+            </div>
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           {headerContent}
           <button

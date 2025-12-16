@@ -6,17 +6,17 @@ import {
   FileWarning,
   RefreshCw,
   Calendar,
-  MapPin,
   DollarSign,
+  MapPin,
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useInsuranceExpiring } from "@/hooks/useApi";
 
 export default function InsuranceExpiringPage() {
   const [days, setDays] = useState(30);
-  const { data: assets, isLoading, mutate } = useInsuranceExpiring(days);
+  const { data, isLoading, mutate } = useInsuranceExpiring(days);
 
-  const expiringAssets = assets ?? [];
+  const expiringAssets = data?.assets ?? [];
   const totalInsuredValue = expiringAssets.reduce((sum, a) => sum + (a.insured_value || 0), 0);
 
   return (
@@ -109,11 +109,11 @@ export default function InsuranceExpiringPage() {
                 <tr className="border-b border-slate-border bg-slate-elevated/50">
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Asset</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Category</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Location</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Insurance</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Policy End</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Days Left</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Insured Value</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Asset Value</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-slate-muted uppercase tracking-wider">Serial No</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border">
@@ -133,7 +133,7 @@ export default function InsuranceExpiringPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 text-sm text-slate-muted">
                         <MapPin className="w-3 h-3" />
-                        {asset.location || "-"}
+                        {asset.comprehensive_insurance || "-"}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -146,21 +146,21 @@ export default function InsuranceExpiringPage() {
                       <span
                         className={cn(
                           "px-2 py-1 text-xs font-medium rounded-full",
-                          asset.days_until_expiry <= 7
+                          (asset.days_remaining ?? 0) <= 7
                             ? "bg-coral-alert/20 text-coral-alert"
-                            : asset.days_until_expiry <= 14
+                            : (asset.days_remaining ?? 0) <= 14
                             ? "bg-amber-500/20 text-amber-400"
                             : "bg-slate-500/20 text-slate-400"
                         )}
                       >
-                        {asset.days_until_expiry} days
+                        {asset.days_remaining ?? 0} days
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-emerald-400">
                       {formatCurrency(asset.insured_value ?? 0)}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-white">
-                      {formatCurrency(asset.asset_value ?? 0)}
+                    <td className="px-4 py-3 text-right text-sm text-slate-muted">
+                      {asset.serial_no || "-"}
                     </td>
                   </tr>
                 ))}

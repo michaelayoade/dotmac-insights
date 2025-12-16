@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Upload,
   X,
@@ -95,34 +96,7 @@ export default function ReceiptUpload({
     });
   }, []);
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
-    const remainingSlots = maxFiles - totalFiles;
-    const filesToAdd = fileArray.slice(0, remainingSlots);
-
-    for (const file of filesToAdd) {
-      const error = validateFile(file);
-      const preview = await createPreview(file);
-      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      const pendingFile: PendingFile = {
-        id,
-        file,
-        preview,
-        progress: error ? 'error' : 'pending',
-        error: error || undefined,
-      };
-
-      setPendingFiles((prev) => [...prev, pendingFile]);
-
-      // Auto-upload if docId is provided and no error
-      if (docId && !error) {
-        uploadFile(id, file);
-      }
-    }
-  }, [docId, totalFiles, maxFiles, validateFile, createPreview]);
-
-  const uploadFile = async (id: string, file: File) => {
+  const uploadFile = useCallback(async (id: string, file: File) => {
     if (!docId) return;
 
     setPendingFiles((prev) =>
@@ -167,7 +141,34 @@ export default function ReceiptUpload({
         )
       );
     }
-  };
+  }, [docId, doctype, existingAttachments.length, onUploadComplete]);
+
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const remainingSlots = maxFiles - totalFiles;
+    const filesToAdd = fileArray.slice(0, remainingSlots);
+
+    for (const file of filesToAdd) {
+      const error = validateFile(file);
+      const preview = await createPreview(file);
+      const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const pendingFile: PendingFile = {
+        id,
+        file,
+        preview,
+        progress: error ? 'error' : 'pending',
+        error: error || undefined,
+      };
+
+      setPendingFiles((prev) => [...prev, pendingFile]);
+
+      // Auto-upload if docId is provided and no error
+      if (docId && !error) {
+        uploadFile(id, file);
+      }
+    }
+  }, [docId, totalFiles, maxFiles, validateFile, createPreview, uploadFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -221,7 +222,7 @@ export default function ReceiptUpload({
     if (pending && docId) {
       uploadFile(id, pending.file);
     }
-  }, [pendingFiles, docId]);
+  }, [pendingFiles, docId, uploadFile]);
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -345,8 +346,8 @@ export default function ReceiptUpload({
               >
                 {/* Preview or Icon */}
                 {pending.preview ? (
-                  <div className="w-12 h-12 rounded overflow-hidden bg-slate-card flex-shrink-0">
-                    <img src={pending.preview} alt="" className="w-full h-full object-cover" />
+                  <div className="w-12 h-12 rounded overflow-hidden bg-slate-card flex-shrink-0 relative">
+                    <Image src={pending.preview} alt="" fill className="object-cover" unoptimized />
                   </div>
                 ) : (
                   <div className="w-12 h-12 rounded bg-slate-card flex items-center justify-center flex-shrink-0">
@@ -414,11 +415,14 @@ export default function ReceiptUpload({
             >
               <X className="w-6 h-6" />
             </button>
-            <img
+            <Image
               src={previewUrl}
               alt="Receipt preview"
-              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+              width={800}
+              height={600}
+              className="max-w-full max-h-[90vh] w-auto h-auto rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              unoptimized
             />
           </div>
         </div>

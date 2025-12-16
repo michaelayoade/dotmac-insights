@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, BarChart3, Network, Users, Activity, Target, Filter } from 'lucide-react';
+import { BarChart3, Network, Users, Activity, Target, Filter } from 'lucide-react';
 import { useSupportRoutingQueueHealth, useSupportRoutingRules, useSupportRoutingWorkload, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { PageHeader, Select } from '@/components/ui';
 
 function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -27,16 +28,12 @@ export default function SupportRoutingPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-          <Network className="w-5 h-5 text-cyan-400" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Routing</h1>
-          <p className="text-slate-muted text-sm">Rules, workload, and queue health</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Routing"
+        subtitle="Rules, workload, and queue health"
+        icon={Network}
+        iconClassName="bg-cyan-500/10 border border-cyan-500/30"
+      />
 
       {/* Filter */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">

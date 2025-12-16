@@ -70,22 +70,24 @@ export default function SupportCannedResponsesPage() {
   });
   const categories = useSupportCannedCategories();
 
-  const list = responses.data?.data || [];
-  const categoryList = categories.data || [];
+  const list = responses.data?.data;
+  const categoryList = categories.data;
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const globalCount = list.filter((r: any) => r.scope === 'global').length;
-    const teamCount = list.filter((r: any) => r.scope === 'team').length;
-    const personalCount = list.filter((r: any) => r.scope === 'personal').length;
-    const withShortcode = list.filter((r: any) => r.shortcode).length;
+    const responsesList = list ?? [];
+    const catList = categoryList ?? [];
+    const globalCount = responsesList.filter((r: any) => r.scope === 'global').length;
+    const teamCount = responsesList.filter((r: any) => r.scope === 'team').length;
+    const personalCount = responsesList.filter((r: any) => r.scope === 'personal').length;
+    const withShortcode = responsesList.filter((r: any) => r.shortcode).length;
     return {
-      total: list.length,
+      total: responsesList.length,
       global: globalCount,
       team: teamCount,
       personal: personalCount,
       withShortcode,
-      categories: categoryList.length,
+      categories: catList.length,
     };
   }, [list, categoryList]);
 
@@ -160,7 +162,7 @@ export default function SupportCannedResponsesPage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
-            {categoryList.map((cat) => (
+            {(categoryList ?? []).map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
@@ -187,12 +189,12 @@ export default function SupportCannedResponsesPage() {
             <MessageCircle className="w-4 h-4 text-violet-400" />
             <h3 className="text-white font-semibold">Responses</h3>
           </div>
-          <span className="text-xs text-slate-muted">{list.length} responses</span>
+          <span className="text-xs text-slate-muted">{(list ?? []).length} responses</span>
         </div>
 
         {!responses.data ? (
           <p className="text-slate-muted text-sm">Loading responses…</p>
-        ) : list.length === 0 ? (
+        ) : (list ?? []).length === 0 ? (
           <div className="text-center py-8">
             <MessageCircle className="w-12 h-12 text-slate-muted mx-auto mb-3" />
             <p className="text-slate-muted text-sm">No canned responses found.</p>
@@ -200,7 +202,7 @@ export default function SupportCannedResponsesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {list.map((resp: any) => {
+            {(list ?? []).map((resp: any) => {
               const ScopeIcon = getScopeIcon(resp.scope);
               return (
                 <div key={resp.id} className="border border-slate-border rounded-lg p-4 hover:border-slate-border/80 transition-colors">

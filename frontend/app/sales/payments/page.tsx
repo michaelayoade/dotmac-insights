@@ -223,7 +223,7 @@ export default function PaymentsPage() {
         keyField="id"
         loading={isLoading}
         emptyMessage="No payments found"
-        onRowClick={(item) => router.push(`/sales/payments/${(item as any).id}`)}
+        onRowClick={(item: { id: number }) => router.push(`/sales/payments/${item.id}`)}
         className="cursor-pointer"
       />
 

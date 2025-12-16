@@ -12,7 +12,10 @@ celery_app = Celery(
     "dotmac_insights",
     broker=settings.redis_url or "redis://localhost:6379/0",
     backend=settings.redis_url or "redis://localhost:6379/0",
-    include=["app.tasks.sync_tasks"],
+    include=[
+        "app.tasks.sync_tasks",
+        "app.tasks.performance_tasks",
+    ],
 )
 
 # Celery configuration
@@ -119,5 +122,22 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.sync_tasks.process_dlq_records",
         "schedule": crontab(minute="*/10"),  # Every 10 minutes
         "kwargs": {"limit": 50},
+    },
+    # Performance module tasks
+    "performance-check-scoring-deadlines": {
+        "task": "performance.check_scoring_deadlines",
+        "schedule": crontab(hour=1, minute=0),  # Daily at 1 AM
+    },
+    "performance-check-review-deadlines": {
+        "task": "performance.check_review_deadlines",
+        "schedule": crontab(hour=8, minute=0),  # Daily at 8 AM
+    },
+    "performance-check-period-closing": {
+        "task": "performance.check_period_closing",
+        "schedule": crontab(hour=9, minute=0),  # Daily at 9 AM - warn about periods ending soon
+    },
+    "performance-weekly-summaries": {
+        "task": "performance.send_weekly_summaries",
+        "schedule": crontab(hour=8, minute=30, day_of_week=1),  # Every Monday at 8:30 AM
     },
 }

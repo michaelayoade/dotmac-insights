@@ -110,7 +110,7 @@ export default function SalesOrdersPage() {
         keyField="id"
         loading={isLoading}
         emptyMessage="No orders found"
-        onRowClick={(item) => router.push(`/sales/orders/${(item as any).id}`)}
+        onRowClick={(item: { id: number }) => router.push(`/sales/orders/${item.id}`)}
         className="cursor-pointer"
       />
 

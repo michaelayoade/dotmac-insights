@@ -245,7 +245,7 @@ export default function InvoicesPage() {
         keyField="id"
         loading={isLoading}
         emptyMessage="No invoices found"
-        onRowClick={(item) => router.push(`/sales/invoices/${(item as any).id}`)}
+        onRowClick={(item: { id: number }) => router.push(`/sales/invoices/${item.id}`)}
         className="cursor-pointer"
       />
 

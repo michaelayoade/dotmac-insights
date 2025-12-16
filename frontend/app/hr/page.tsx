@@ -232,7 +232,11 @@ export default function HrOverviewPage() {
   const { data: leaveTrend, error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
   const { data: attendanceTrend, error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance } = useHrAnalyticsAttendanceTrend({ days: 14 });
 
-  const swrStates = [
+  const swrStates: Array<{
+    error?: unknown;
+    isLoading?: boolean;
+    mutate?: (() => unknown) | undefined;
+  }> = [
     { error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes },
     { error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday },
     { error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps },
@@ -248,31 +252,9 @@ export default function HrOverviewPage() {
 
   const firstError = swrStates.find((state) => state.error)?.error;
   const isDataLoading = swrStates.some((state) => state.isLoading);
-  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
+  const retryAll = () => swrStates.forEach((state) => state.mutate && state.mutate());
 
-  if (isDataLoading) {
-    return <LoadingState />;
-  }
-
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load HR overview data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
-  const leaveAppList = extractList(leaveApplications);
-  const leaveTypeList = extractList(leaveTypes);
-  const jobOpeningList = extractList(jobOpenings);
-  const payrollEntryList = extractList(payrollEntries);
-  const trainingEventList = extractList(trainingEvents);
-  const onboardingList = extractList(onboardings);
-  const shiftAssignmentList = extractList(shiftAssignments);
-
-  const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
+  // Memoized chart data - must be called unconditionally before early returns
   const payroll30d = useMemo(() => analyticsOverview?.payroll_30d || {}, [analyticsOverview]);
 
   // Transform leave trend data for chart
@@ -321,6 +303,31 @@ export default function HrOverviewPage() {
       value: recruitmentFunnel[stage.key] || 0,
     }));
   }, [analyticsOverview]);
+
+  // Early returns after all hooks
+  if (isDataLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load HR overview data."
+        error={firstError as Error}
+        onRetry={retryAll}
+      />
+    );
+  }
+
+  const leaveAppList = extractList(leaveApplications);
+  const leaveTypeList = extractList(leaveTypes);
+  const jobOpeningList = extractList(jobOpenings);
+  const payrollEntryList = extractList(payrollEntries);
+  const trainingEventList = extractList(trainingEvents);
+  const onboardingList = extractList(onboardings);
+  const shiftAssignmentList = extractList(shiftAssignments);
+
+  const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
 
   return (
     <div className="space-y-6">

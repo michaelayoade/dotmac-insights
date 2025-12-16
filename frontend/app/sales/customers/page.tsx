@@ -85,7 +85,7 @@ export default function SalesCustomersPage() {
         keyField="id"
         loading={isLoading}
         emptyMessage="No customers found"
-        onRowClick={(item) => router.push(`/sales/customers/${(item as any).id}`)}
+        onRowClick={(item: { id: number }) => router.push(`/sales/customers/${item.id}`)}
         className="cursor-pointer"
       />
 

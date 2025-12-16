@@ -61,15 +61,16 @@ export default function SupportAgentsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const agents = data?.agents || [];
+  const agents = data?.agents;
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const activeCount = agents.filter((a) => a.is_active).length;
-    const inactiveCount = agents.filter((a) => !a.is_active).length;
-    const totalCapacity = agents.reduce((sum, a) => sum + (a.capacity ?? 0), 0);
+    const agentsList = agents ?? [];
+    const activeCount = agentsList.filter((a) => a.is_active).length;
+    const inactiveCount = agentsList.filter((a) => !a.is_active).length;
+    const totalCapacity = agentsList.reduce((sum, a) => sum + (a.capacity ?? 0), 0);
     return {
-      total: agents.length,
+      total: agentsList.length,
       active: activeCount,
       inactive: inactiveCount,
       totalCapacity,
@@ -80,7 +81,8 @@ export default function SupportAgentsPage() {
 
   // Filter agents
   const filteredAgents = useMemo(() => {
-    return agents.filter((agent) => {
+    const agentsList = agents ?? [];
+    return agentsList.filter((agent) => {
       const matchesSearch =
         !search ||
         (agent.display_name?.toLowerCase().includes(search.toLowerCase()) ||
