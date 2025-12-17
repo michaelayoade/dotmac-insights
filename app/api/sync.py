@@ -35,8 +35,8 @@ try:
         sync_erpnext_extended_accounting,
         sync_chatwoot_all,
     )
-    # Mirror worker default: fall back to local Redis when not explicitly set
-    _celery_available = bool(settings.redis_url or "redis://localhost:6379/0")
+    # Require explicit broker configuration
+    _celery_available = bool(settings.redis_url)
 except ImportError:
     pass
 

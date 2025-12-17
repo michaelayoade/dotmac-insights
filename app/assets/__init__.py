@@ -7,7 +7,7 @@ maintenance, and asset lifecycle tracking.
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import Session
 from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from datetime import date, datetime
@@ -101,7 +101,7 @@ class DepreciationPostPayload(BaseModel):
 # ============= ASSET ENDPOINTS =============
 
 @router.get("")
-async def list_assets(
+def list_assets(
     status: Optional[str] = Query(None, description="Filter by status"),
     category: Optional[str] = Query(None, description="Filter by asset category"),
     location: Optional[str] = Query(None, description="Filter by location"),
@@ -112,7 +112,7 @@ async def list_assets(
     max_value: Optional[float] = Query(None, description="Maximum asset value"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List all assets with filtering options."""
     query = select(Asset).options(
@@ -200,8 +200,8 @@ async def list_assets(
 
 
 @router.get("/summary")
-async def get_assets_summary(
-    db: AsyncSession = Depends(get_db),
+def get_assets_summary(
+    db: Session = Depends(get_db),
 ):
     """Get summary statistics for assets."""
     # Total assets by status
@@ -298,7 +298,7 @@ async def get_assets_summary(
 
 
 @router.get("/depreciation-schedule")
-async def get_depreciation_schedule(
+def get_depreciation_schedule(
     asset_id: Optional[int] = Query(None, description="Filter by asset ID"),
     finance_book: Optional[str] = Query(None, description="Filter by finance book"),
     from_date: Optional[date] = Query(None, description="Schedule date from"),
@@ -306,7 +306,7 @@ async def get_depreciation_schedule(
     pending_only: bool = Query(False, description="Show only pending (not booked)"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get depreciation schedules across assets."""
     query = (
@@ -364,9 +364,9 @@ async def get_depreciation_schedule(
 
 
 @router.get("/pending-depreciation")
-async def get_pending_depreciation(
+def get_pending_depreciation(
     as_of_date: Optional[date] = Query(None, description="Get depreciation due as of date"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get pending depreciation entries due for posting."""
     target_date = as_of_date or date.today()
@@ -409,9 +409,9 @@ async def get_pending_depreciation(
 
 
 @router.get("/{asset_id}")
-async def get_asset(
+def get_asset(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get detailed information for a single asset."""
     query = (
@@ -499,9 +499,9 @@ async def get_asset(
 
 
 @router.post("")
-async def create_asset(
+def create_asset(
     payload: AssetCreatePayload,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Create a new asset."""
     asset = Asset(
@@ -552,10 +552,10 @@ async def create_asset(
 
 
 @router.patch("/{asset_id}")
-async def update_asset(
+def update_asset(
     asset_id: int,
     payload: AssetUpdatePayload,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Update an existing asset."""
     query = select(Asset).where(Asset.id == asset_id)
@@ -575,9 +575,9 @@ async def update_asset(
 
 
 @router.post("/{asset_id}/submit")
-async def submit_asset(
+def submit_asset(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Submit asset for use (change status from draft to submitted)."""
     query = select(Asset).where(Asset.id == asset_id)
@@ -598,10 +598,10 @@ async def submit_asset(
 
 
 @router.post("/{asset_id}/scrap")
-async def scrap_asset(
+def scrap_asset(
     asset_id: int,
     scrap_date: Optional[date] = None,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Scrap an asset (mark as scrapped)."""
     query = select(Asset).where(Asset.id == asset_id)
@@ -624,10 +624,10 @@ async def scrap_asset(
 # ============= ASSET CATEGORY ENDPOINTS =============
 
 @router.get("/categories/")
-async def list_asset_categories(
+def list_asset_categories(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List all asset categories."""
     query = (
@@ -670,9 +670,9 @@ async def list_asset_categories(
 
 
 @router.post("/categories/")
-async def create_asset_category(
+def create_asset_category(
     payload: AssetCategoryCreatePayload,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Create a new asset category."""
     category = AssetCategory(
@@ -689,8 +689,8 @@ async def create_asset_category(
 # ============= MAINTENANCE ENDPOINTS =============
 
 @router.get("/maintenance/due")
-async def get_maintenance_due(
-    db: AsyncSession = Depends(get_db),
+def get_maintenance_due(
+    db: Session = Depends(get_db),
 ):
     """Get assets requiring maintenance."""
     query = (
@@ -725,9 +725,9 @@ async def get_maintenance_due(
 
 
 @router.post("/{asset_id}/mark-maintenance")
-async def mark_for_maintenance(
+def mark_for_maintenance(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Mark an asset as requiring maintenance."""
     query = select(Asset).where(Asset.id == asset_id)
@@ -745,9 +745,9 @@ async def mark_for_maintenance(
 
 
 @router.post("/{asset_id}/complete-maintenance")
-async def complete_maintenance(
+def complete_maintenance(
     asset_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Mark maintenance as complete for an asset."""
     query = select(Asset).where(Asset.id == asset_id)
@@ -771,9 +771,9 @@ async def complete_maintenance(
 # ============= WARRANTY ENDPOINTS =============
 
 @router.get("/warranty/expiring")
-async def get_warranty_expiring(
+def get_warranty_expiring(
     days: int = Query(30, description="Days until warranty expiry"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get assets with warranty expiring soon."""
     from datetime import timedelta
@@ -815,9 +815,9 @@ async def get_warranty_expiring(
 # ============= INSURANCE ENDPOINTS =============
 
 @router.get("/insurance/expiring")
-async def get_insurance_expiring(
+def get_insurance_expiring(
     days: int = Query(30, description="Days until insurance expiry"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get assets with insurance expiring soon."""
     from datetime import timedelta

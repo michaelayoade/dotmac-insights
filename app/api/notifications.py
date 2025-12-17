@@ -1,6 +1,7 @@
 """Notification and webhook API endpoints."""
 from __future__ import annotations
 
+import logging
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, HttpUrl
@@ -21,6 +22,9 @@ from app.models.notification import (
     NotificationStatus,
 )
 from app.services.notification_service import NotificationService
+from app.services.secrets_service import get_secrets, SecretsServiceError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -135,6 +139,20 @@ async def create_webhook(
     # Generate signing secret
     signing_secret = secrets.token_urlsafe(32)
 
+    # Encrypt auth value if provided
+    encrypted_auth_value = None
+    if request.auth_value:
+        try:
+            secrets_service = get_secrets()
+            encrypted_auth_value = secrets_service.encrypt(request.auth_value)
+            logger.debug("webhook_auth_value_encrypted", webhook_name=request.name)
+        except SecretsServiceError as e:
+            logger.error("webhook_auth_encryption_failed", error=str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to encrypt webhook credentials. Check secrets service configuration."
+            )
+
     webhook = WebhookConfig(
         name=request.name,
         description=request.description,
@@ -142,7 +160,7 @@ async def create_webhook(
         method=request.method,
         auth_type=request.auth_type,
         auth_header=request.auth_header,
-        auth_value_encrypted=request.auth_value,  # TODO: Actually encrypt this
+        auth_value_encrypted=encrypted_auth_value,
         custom_headers=request.custom_headers,
         event_types=request.event_types,
         filters=request.filters,
@@ -228,7 +246,17 @@ async def update_webhook(
     if request.auth_header is not None:
         webhook.auth_header = request.auth_header
     if request.auth_value is not None:
-        webhook.auth_value_encrypted = request.auth_value
+        # Encrypt new auth value
+        try:
+            secrets_service = get_secrets()
+            webhook.auth_value_encrypted = secrets_service.encrypt(request.auth_value)
+            logger.debug("webhook_auth_value_updated", webhook_id=webhook_id)
+        except SecretsServiceError as e:
+            logger.error("webhook_auth_encryption_failed", error=str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to encrypt webhook credentials. Check secrets service configuration."
+            )
     if request.custom_headers is not None:
         webhook.custom_headers = request.custom_headers
     if request.event_types is not None:
@@ -382,6 +410,74 @@ async def retry_webhook_delivery(
         "success": success,
         "status": delivery.status.value if hasattr(delivery.status, 'value') else delivery.status,
         "attempt_count": delivery.attempt_count,
+    }
+
+
+@router.post("/webhooks/{webhook_id}/rotate-secret", dependencies=[Depends(Require("books:admin"))])
+async def rotate_webhook_secret(
+    webhook_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Regenerate the signing secret for a webhook.
+
+    Returns the new secret (only shown once).
+    """
+    webhook = db.query(WebhookConfig).filter(
+        and_(WebhookConfig.id == webhook_id, WebhookConfig.is_deleted == False)
+    ).first()
+
+    if not webhook:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+
+    # Generate new signing secret
+    new_secret = secrets.token_urlsafe(32)
+    webhook.signing_secret = new_secret
+    webhook.updated_at = datetime.utcnow()
+    db.commit()
+
+    logger.info("webhook_secret_rotated", webhook_id=webhook_id)
+
+    return {
+        "webhook_id": webhook_id,
+        "signing_secret": new_secret,
+        "rotated_at": datetime.utcnow().isoformat(),
+        "message": "Secret rotated successfully. Update your endpoint to use the new secret.",
+    }
+
+
+@router.get("/webhooks/{webhook_id}/deliveries/{delivery_id}", dependencies=[Depends(Require("books:admin"))])
+async def get_webhook_delivery(
+    webhook_id: int,
+    delivery_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get detailed information about a specific webhook delivery including payload."""
+    delivery = db.query(WebhookDelivery).filter(
+        and_(
+            WebhookDelivery.id == delivery_id,
+            WebhookDelivery.webhook_id == webhook_id,
+        )
+    ).first()
+
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    return {
+        "id": delivery.id,
+        "webhook_id": delivery.webhook_id,
+        "event_type": delivery.event_type,
+        "event_id": delivery.event_id,
+        "status": delivery.status.value if hasattr(delivery.status, 'value') else delivery.status,
+        "payload": delivery.payload,
+        "attempt_count": delivery.attempt_count,
+        "response_status_code": delivery.response_status_code,
+        "response_body": delivery.response_body,
+        "response_time_ms": delivery.response_time_ms,
+        "error_message": delivery.error_message,
+        "next_retry_at": delivery.next_retry_at.isoformat() if delivery.next_retry_at else None,
+        "created_at": delivery.created_at.isoformat() if delivery.created_at else None,
+        "delivered_at": delivery.delivered_at.isoformat() if delivery.delivered_at else None,
     }
 
 

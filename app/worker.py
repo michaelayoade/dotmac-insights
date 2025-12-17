@@ -7,11 +7,20 @@ from app.config import settings
 
 logger = structlog.get_logger()
 
+# Determine broker/backend
+if settings.redis_url:
+    broker_url = backend_url = settings.redis_url
+elif settings.is_production:
+    raise ValueError("REDIS_URL must be configured in production for Celery to run")
+else:
+    broker_url = backend_url = "redis://localhost:6379/0"
+    logger.warning("celery_default_redis", message="Using local Redis fallback for Celery in non-production")
+
 # Create Celery app
 celery_app = Celery(
     "dotmac_insights",
-    broker=settings.redis_url or "redis://localhost:6379/0",
-    backend=settings.redis_url or "redis://localhost:6379/0",
+    broker=broker_url,
+    backend=backend_url,
     include=[
         "app.tasks.sync_tasks",
         "app.tasks.performance_tasks",

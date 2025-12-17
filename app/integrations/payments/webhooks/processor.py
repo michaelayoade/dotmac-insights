@@ -10,6 +10,7 @@ Handles incoming webhooks from payment providers with:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from datetime import datetime
@@ -102,6 +103,7 @@ class WebhookProcessor:
         payload: bytes,
         signature: str,
         db: AsyncSession,
+        source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a Paystack webhook.
@@ -110,6 +112,7 @@ class WebhookProcessor:
             payload: Raw request body
             signature: x-paystack-signature header
             db: Database session
+            source_ip: IP address of webhook sender
 
         Returns:
             Processing result
@@ -131,6 +134,7 @@ class WebhookProcessor:
             event_data=event_data,
             raw_payload=data,
             db=db,
+            source_ip=source_ip,
         )
 
     async def process_flutterwave_webhook(
@@ -138,6 +142,7 @@ class WebhookProcessor:
         payload: bytes,
         signature: str,
         db: AsyncSession,
+        source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a Flutterwave webhook.
@@ -146,6 +151,7 @@ class WebhookProcessor:
             payload: Raw request body
             signature: verif-hash header
             db: Database session
+            source_ip: IP address of webhook sender
 
         Returns:
             Processing result
@@ -167,6 +173,7 @@ class WebhookProcessor:
             event_data=event_data,
             raw_payload=data,
             db=db,
+            source_ip=source_ip,
         )
 
     # =========================================================================
@@ -180,6 +187,7 @@ class WebhookProcessor:
         event_data: Dict[str, Any],
         raw_payload: Dict[str, Any],
         db: AsyncSession,
+        source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Process a webhook event with idempotency.
@@ -190,30 +198,33 @@ class WebhookProcessor:
             event_data: Event payload data
             raw_payload: Full raw webhook payload
             db: Database session
+            source_ip: IP address of webhook sender
 
         Returns:
             Processing result with status
         """
-        # Extract idempotency key
-        idempotency_key = self._extract_idempotency_key(provider, event_type, event_data)
+        # Extract provider event ID for idempotency
+        provider_event_id = self._extract_provider_event_id(provider, event_type, event_data, raw_payload)
 
         # Check for duplicate
-        existing = await self._get_existing_event(db, provider.value, idempotency_key)
+        existing = await self._get_existing_event(db, provider.value, provider_event_id)
         if existing:
-            logger.info(f"Duplicate webhook ignored: {provider.value}/{idempotency_key}")
+            logger.info(f"Duplicate webhook ignored: {provider.value}/{provider_event_id}")
             return {
                 "status": "duplicate",
                 "message": "Event already processed",
                 "event_id": existing.id,
             }
 
-        # Create webhook event record
+        # Create webhook event record using correct model fields
         webhook_event = WebhookEvent(
             provider=provider.value,
+            provider_event_id=provider_event_id,
             event_type=event_type,
-            idempotency_key=idempotency_key,
             payload=raw_payload,
-            status="processing",
+            processed=False,
+            source_ip=source_ip,
+            received_at=datetime.utcnow(),
         )
         db.add(webhook_event)
         await db.flush()
@@ -226,11 +237,11 @@ class WebhookProcessor:
             await self._run_custom_handlers(event_type, event_data, db)
 
             # Mark as processed
-            webhook_event.status = "processed"
+            webhook_event.processed = True
             webhook_event.processed_at = datetime.utcnow()
             await db.commit()
 
-            logger.info(f"Webhook processed: {provider.value}/{event_type}/{idempotency_key}")
+            logger.info(f"Webhook processed: {provider.value}/{event_type}/{provider_event_id}")
             return {
                 "status": "processed",
                 "message": "Event processed successfully",
@@ -239,8 +250,9 @@ class WebhookProcessor:
 
         except Exception as e:
             logger.error(f"Webhook processing failed: {e}", exc_info=True)
-            webhook_event.status = "failed"
-            webhook_event.error_message = str(e)
+            webhook_event.error = str(e)[:1000]  # Truncate to fit TEXT field
+            webhook_event.retry_count += 1
+            webhook_event.last_retry_at = datetime.utcnow()
             await db.commit()
 
             return {
@@ -249,36 +261,48 @@ class WebhookProcessor:
                 "event_id": webhook_event.id,
             }
 
-    def _extract_idempotency_key(
+    def _extract_provider_event_id(
         self,
         provider: PaymentProvider,
         event_type: str,
         event_data: Dict[str, Any],
+        raw_payload: Dict[str, Any],
     ) -> str:
-        """Extract unique idempotency key from event data."""
+        """
+        Extract unique provider event ID for idempotency.
+
+        Uses provider-specific identifiers when available, falls back to
+        deterministic SHA-256 hash of payload for unknown providers.
+        """
         if provider == PaymentProvider.PAYSTACK:
-            # Paystack: use reference or id
-            ref = event_data.get("reference") or event_data.get("id") or ""
-            return f"{event_type}:{ref}"
+            # Paystack: prefer id, then reference
+            event_id = event_data.get("id") or event_data.get("reference")
+            if event_id:
+                return f"{event_type}:{event_id}"
 
         elif provider == PaymentProvider.FLUTTERWAVE:
-            # Flutterwave: use tx_ref or id
-            ref = event_data.get("tx_ref") or event_data.get("id") or ""
-            return f"{event_type}:{ref}"
+            # Flutterwave: prefer id, then tx_ref
+            event_id = event_data.get("id") or event_data.get("tx_ref")
+            if event_id:
+                return f"{event_type}:{event_id}"
 
-        return f"{event_type}:{hash(json.dumps(event_data, sort_keys=True))}"
+        # Fallback: deterministic SHA-256 hash of entire payload
+        # This is stable across process restarts unlike Python's hash()
+        payload_bytes = json.dumps(raw_payload, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        payload_hash = hashlib.sha256(payload_bytes).hexdigest()[:32]
+        return f"{event_type}:sha256:{payload_hash}"
 
     async def _get_existing_event(
         self,
         db: AsyncSession,
         provider: str,
-        idempotency_key: str,
+        provider_event_id: str,
     ) -> Optional[WebhookEvent]:
         """Check if event was already processed."""
         result = await db.execute(
             select(WebhookEvent).where(
                 WebhookEvent.provider == provider,
-                WebhookEvent.idempotency_key == idempotency_key,
+                WebhookEvent.provider_event_id == provider_event_id,
             )
         )
         return result.scalar_one_or_none()
@@ -302,6 +326,7 @@ class WebhookProcessor:
             "transfer.reversed": self._handle_transfer_reversed,
             "refund.processed": self._handle_refund,
             "virtual_account.credit": self._handle_virtual_account_credit,
+            "virtual_account.created": self._handle_virtual_account_created,
         }
 
         handler = handlers.get(normalized_type)
@@ -518,6 +543,24 @@ class WebhookProcessor:
         """Handle virtual account credit (payment received)."""
         # This is essentially a payment success via bank transfer
         await self._handle_payment_success(provider, event_data, db)
+
+    async def _handle_virtual_account_created(
+        self,
+        provider: PaymentProvider,
+        event_data: Dict[str, Any],
+        db: AsyncSession,
+    ) -> None:
+        """Handle virtual account assignment/creation (e.g., Paystack dedicated account)."""
+        # Log the event for now - actual handling depends on business logic
+        # Typical use: update customer record with their dedicated virtual account
+        account_number = event_data.get("dedicated_account", {}).get("account_number")
+        bank_name = event_data.get("dedicated_account", {}).get("bank", {}).get("name")
+        customer_code = event_data.get("customer", {}).get("customer_code")
+
+        logger.info(
+            f"Virtual account created: {account_number} at {bank_name} for customer {customer_code}"
+        )
+        # TODO: Update customer record with virtual account details if needed
 
     def _get_reference(self, provider: PaymentProvider, event_data: Dict[str, Any]) -> Optional[str]:
         """Extract reference from event data based on provider."""

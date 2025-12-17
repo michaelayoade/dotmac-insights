@@ -513,7 +513,14 @@ class OkraClient(BaseOpenBankingProvider):
         Okra uses SHA-256 HMAC for webhook verification.
         """
         if not self.webhook_secret:
-            logger.warning("Webhook secret not configured, skipping verification")
+            # Fail closed in production - reject webhooks if secret not configured
+            from app.config import settings
+            if settings.is_production:
+                logger.error(
+                    "okra_webhook_secret_missing: Webhook secret not configured in production - rejecting webhook"
+                )
+                return False
+            logger.warning("Webhook secret not configured, skipping verification (dev mode)")
             return True
 
         expected = hmac.new(

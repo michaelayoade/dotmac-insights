@@ -2885,6 +2885,12 @@ export const api = {
   getWebhookDeliveries: (id: number | string, params?: { status?: string; limit?: number; offset?: number }) =>
     fetchApi<any>(`/v1/notifications/webhooks/${id}/deliveries`, { params }),
 
+  getWebhookDelivery: (webhookId: number | string, deliveryId: number | string) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${webhookId}/deliveries/${deliveryId}`),
+
+  rotateWebhookSecret: (id: number | string) =>
+    fetchApi<any>(`/v1/notifications/webhooks/${id}/rotate-secret`, { method: 'POST' }),
+
   retryWebhookDelivery: (deliveryId: number | string) =>
     fetchApi<any>(`/v1/notifications/webhook-deliveries/${deliveryId}/retry`, { method: 'POST' }),
 
@@ -4605,11 +4611,38 @@ export const api = {
     fetchApi<{ status: string; message: string }>(`/integrations/openbanking/accounts/${id}`, { method: 'DELETE' }),
 
   // Webhook Events
+  getWebhookProviders: () =>
+    fetchApi<{ providers: any[] }>('/integrations/webhooks/providers'),
+
+  getWebhookProviderStats: (name: string) =>
+    fetchApi<any>(`/integrations/webhooks/providers/${name}/stats`),
+
   getWebhookEvents: (params?: { provider?: string; event_type?: string; status?: string; limit?: number; offset?: number }) =>
     fetchApi<WebhookEventListResponse>('/integrations/webhooks/events', { params }),
 
   getWebhookEvent: (id: number) =>
     fetchApi<WebhookEvent & { payload: Record<string, unknown> }>(`/integrations/webhooks/events/${id}`),
+
+  replayWebhookEvent: (id: number) =>
+    fetchApi<{ status: string }>(`/integrations/webhooks/events/${id}/replay`, { method: 'POST' }),
+
+  // Omni Webhooks / Channels
+  getOmniChannels: () => fetchApi<any[]>('/omni/channels'),
+
+  getOmniChannel: (id: number | string) =>
+    fetchApi<any>(`/omni/channels/${id}`),
+
+  getOmniChannelStats: (id: number | string) =>
+    fetchApi<any>(`/omni/channels/${id}/stats`),
+
+  getOmniChannelWebhookEvents: (id: number | string) =>
+    fetchApi<any[]>(`/omni/channels/${id}/webhook-events`),
+
+  getOmniChannelWebhookEvent: (id: number | string, eventId: number | string) =>
+    fetchApi<any>(`/omni/channels/${id}/webhook-events/${eventId}`),
+
+  rotateOmniChannelSecret: (id: number | string) =>
+    fetchApi<any>(`/omni/channels/${id}/rotate-secret`, { method: 'POST' }),
 
   // Admin Settings
   getSettingsGroups: () =>

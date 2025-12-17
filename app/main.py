@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 
-from app.database import engine, Base
 from app.api import api_router
 from app.config import settings
 from app.auth import get_current_principal
@@ -34,10 +33,6 @@ async def lifespan(app: FastAPI):
         jwt_configured=bool(settings.jwks_url),
     )
 
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("database_tables_created")
-
     yield
 
     # Shutdown
@@ -52,26 +47,18 @@ app = FastAPI(
 )
 
 # Configure CORS
-if settings.cors_origins_list:
-    # Use configured origins
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    logger.info("cors_configured", origins=settings.cors_origins_list)
-else:
-    # Fallback: allow all to avoid CORS failures when origins not set
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    logger.warning("cors_permissive_mode", message="CORS allowing all origins (no cors_origins configured)")
+if not settings.cors_origins_list:
+    logger.error("cors_not_configured", message="CORS origins must be configured")
+    raise RuntimeError("CORS_ORIGINS must be set; refusing to start with wildcard CORS")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+logger.info("cors_configured", origins=settings.cors_origins_list)
 
 
 # Include API routes with JWT/RBAC authentication

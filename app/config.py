@@ -104,3 +104,10 @@ if os.getenv("PYTEST_CURRENT_TEST"):
 # Validate JWT auth in production
 if settings.is_production and not settings.jwks_url:
     raise ValueError("JWKS_URL must be set in production environment for JWT authentication")
+
+# Production safety checks
+if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):
+    if not settings.database_url or settings.database_url.startswith("sqlite"):
+        raise ValueError("DATABASE_URL must be set to a non-sqlite database in production")
+    if not settings.cors_origins_list:
+        raise ValueError("CORS_ORIGINS must be configured in production to restrict origins")

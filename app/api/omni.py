@@ -7,6 +7,7 @@ import hashlib
 import json
 import imaplib
 import email
+import logging
 from email.header import decode_header
 from email.message import Message as EmailMessage
 import base64
@@ -16,7 +17,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
 from app.auth import Require
+from app.config import settings
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.models.omni import (
     OmniChannel,
     OmniConversation,
@@ -258,17 +262,20 @@ def _send_email_via_smtp(channel: OmniChannel, to_address: str, subject: Optiona
         server.sendmail(from_address, [to_address], msg.as_string())
 
 
-@router.post(
-    "/webhooks/{channel_name}",
-    dependencies=[Depends(Require("support:write"))],  # tighten as needed
-)
+@router.post("/webhooks/{channel_name}")
 async def ingest_webhook(
     channel_name: str,
     request: Request,
     db: Session = Depends(get_db),
     x_signature: Optional[str] = Header(default=None, convert_underscores=True),
 ) -> Dict[str, Any]:
-    """Generic webhook ingest endpoint. Validates signature if configured, stores raw event, normalizes inbound."""
+    """
+    Generic webhook ingest endpoint for external providers.
+
+    This endpoint is unauthenticated (for external providers) but uses
+    signature verification for security. In production, webhook_secret
+    must be configured on the channel.
+    """
     body = await request.body()
     try:
         payload_json = json.loads(body.decode("utf-8") or "{}")
@@ -277,9 +284,32 @@ async def ingest_webhook(
 
     channel = _get_channel_or_404(db, channel_name)
 
-    # Signature verification (optional)
-    if channel.webhook_secret and not _verify_signature(channel.webhook_secret, body, x_signature):
-        raise HTTPException(status_code=401, detail="Invalid signature")
+    # Signature verification - fail closed in production
+    if channel.webhook_secret:
+        if not _verify_signature(channel.webhook_secret, body, x_signature):
+            logger.warning(
+                "omni_webhook_signature_invalid",
+                channel=channel_name,
+                has_signature=bool(x_signature),
+            )
+            raise HTTPException(status_code=401, detail="Invalid signature")
+    else:
+        # No webhook secret configured
+        if settings.is_production:
+            logger.error(
+                "omni_webhook_secret_missing",
+                channel=channel_name,
+                message="Webhook secret not configured in production - rejecting webhook",
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Channel webhook_secret not configured"
+            )
+        logger.warning(
+            "omni_webhook_secret_missing_dev",
+            channel=channel_name,
+            message="Webhook secret not configured, skipping verification (dev mode)",
+        )
 
     provider_event_id = payload_json.get("id") or payload_json.get("event_id") or payload_json.get("message_id")
 
@@ -475,6 +505,215 @@ async def delete_channel(
     db.delete(channel)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get(
+    "/channels/{channel_id}",
+    dependencies=[Depends(Require("support:read"))],
+)
+async def get_channel(
+    channel_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get detailed information about a specific channel."""
+    channel = db.query(OmniChannel).filter(OmniChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Get basic stats
+    event_count = db.query(func.count(OmniWebhookEvent.id)).filter(
+        OmniWebhookEvent.channel_id == channel_id
+    ).scalar()
+    processed_count = db.query(func.count(OmniWebhookEvent.id)).filter(
+        OmniWebhookEvent.channel_id == channel_id,
+        OmniWebhookEvent.processed == True
+    ).scalar()
+    last_event = db.query(func.max(OmniWebhookEvent.created_at)).filter(
+        OmniWebhookEvent.channel_id == channel_id
+    ).scalar()
+
+    return {
+        "id": channel.id,
+        "name": channel.name,
+        "type": channel.type,
+        "is_active": channel.is_active,
+        "config": channel.config,
+        "webhook_secret_configured": bool(channel.webhook_secret),
+        "webhook_url": f"/api/omni/webhooks/{channel.name}",
+        "stats": {
+            "total_events": event_count,
+            "processed_events": processed_count,
+            "last_event_at": last_event.isoformat() if last_event else None,
+        },
+        "created_at": channel.created_at.isoformat() if hasattr(channel, 'created_at') and channel.created_at else None,
+    }
+
+
+@router.get(
+    "/channels/{channel_id}/webhook-events",
+    dependencies=[Depends(Require("support:read"))],
+)
+async def list_channel_webhook_events(
+    channel_id: int,
+    processed: Optional[bool] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List webhook events received for a specific channel."""
+    channel = db.query(OmniChannel).filter(OmniChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    query = db.query(OmniWebhookEvent).filter(OmniWebhookEvent.channel_id == channel_id)
+
+    if processed is not None:
+        query = query.filter(OmniWebhookEvent.processed == processed)
+
+    total = query.count()
+    events = query.order_by(OmniWebhookEvent.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "channel_id": channel_id,
+        "channel_name": channel.name,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "events": [
+            {
+                "id": e.id,
+                "provider_event_id": e.provider_event_id,
+                "processed": e.processed,
+                "headers": e.headers,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in events
+        ],
+    }
+
+
+@router.get(
+    "/channels/{channel_id}/webhook-events/{event_id}",
+    dependencies=[Depends(Require("support:read"))],
+)
+async def get_channel_webhook_event(
+    channel_id: int,
+    event_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get detailed information about a specific webhook event including payload."""
+    event = db.query(OmniWebhookEvent).filter(
+        OmniWebhookEvent.id == event_id,
+        OmniWebhookEvent.channel_id == channel_id,
+    ).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Webhook event not found")
+
+    return {
+        "id": event.id,
+        "channel_id": event.channel_id,
+        "provider_event_id": event.provider_event_id,
+        "processed": event.processed,
+        "payload": event.payload,
+        "headers": event.headers,
+        "created_at": event.created_at.isoformat() if event.created_at else None,
+    }
+
+
+@router.get(
+    "/channels/{channel_id}/stats",
+    dependencies=[Depends(Require("support:read"))],
+)
+async def get_channel_stats(
+    channel_id: int,
+    days: int = 7,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get webhook statistics for a channel."""
+    from datetime import timedelta
+    from sqlalchemy import cast, Date
+
+    channel = db.query(OmniChannel).filter(OmniChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # Overall stats
+    total = db.query(func.count(OmniWebhookEvent.id)).filter(
+        OmniWebhookEvent.channel_id == channel_id,
+        OmniWebhookEvent.created_at >= cutoff,
+    ).scalar()
+
+    processed = db.query(func.count(OmniWebhookEvent.id)).filter(
+        OmniWebhookEvent.channel_id == channel_id,
+        OmniWebhookEvent.created_at >= cutoff,
+        OmniWebhookEvent.processed == True,
+    ).scalar()
+
+    # Daily breakdown
+    daily_query = db.query(
+        cast(OmniWebhookEvent.created_at, Date).label("date"),
+        func.count(OmniWebhookEvent.id).label("count"),
+    ).filter(
+        OmniWebhookEvent.channel_id == channel_id,
+        OmniWebhookEvent.created_at >= cutoff,
+    ).group_by(
+        cast(OmniWebhookEvent.created_at, Date)
+    ).order_by(
+        cast(OmniWebhookEvent.created_at, Date)
+    ).all()
+
+    daily_data = [{"date": str(row.date), "count": row.count} for row in daily_query]
+
+    return {
+        "channel_id": channel_id,
+        "channel_name": channel.name,
+        "period_days": days,
+        "summary": {
+            "total_events": total,
+            "processed": processed,
+            "pending": total - processed,
+            "success_rate": round((processed / total) * 100, 1) if total > 0 else None,
+        },
+        "daily": daily_data,
+    }
+
+
+@router.post(
+    "/channels/{channel_id}/rotate-secret",
+    dependencies=[Depends(Require("support:write"))],
+)
+async def rotate_channel_webhook_secret(
+    channel_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Generate a new webhook secret for a channel.
+
+    Returns the new secret (only shown once).
+    """
+    import secrets as secrets_module
+
+    channel = db.query(OmniChannel).filter(OmniChannel.id == channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+
+    # Generate new secret
+    new_secret = secrets_module.token_urlsafe(32)
+    channel.webhook_secret = new_secret
+    db.commit()
+
+    logger.info(f"Channel webhook secret rotated: {channel.name}")
+
+    return {
+        "channel_id": channel_id,
+        "channel_name": channel.name,
+        "webhook_secret": new_secret,
+        "webhook_url": f"/api/omni/webhooks/{channel.name}",
+        "message": "Secret rotated. Update your provider to use the new secret.",
+    }
 
 
 @router.post(

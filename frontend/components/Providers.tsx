@@ -8,6 +8,8 @@ import { ApiError, onAuthError, clearAuthToken } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth-context';
 import { useTheme } from '@dotmac/design-tokens';
 import { applyColorScheme, getSavedColorScheme } from '@/lib/theme';
+import { FeatureGateProvider } from '@/hooks/useFeatureGate';
+import { validateEnv } from '@/lib/env';
 
 function ThemePersistence({ children }: { children: React.ReactNode }) {
   const { setColorScheme, config, resolvedColorScheme } = useTheme() as any;
@@ -120,6 +122,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    const result = validateEnv();
+    if (!result.valid) {
+      console.error('Environment validation failed:', result.errors.join(', '));
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthError((event, message) => {
       if (event === 'unauthorized') {
         clearAuthToken();
@@ -152,16 +161,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider defaultVariant="admin" defaultColorScheme={initialScheme}>
       <ThemePersistence>
         <AuthProvider>
-          <ToastProvider>
-            <SwrErrorBoundary>
-              <AuthErrorBanner
-                show={authError.show}
-                message={authError.message}
-                onDismiss={dismissAuthError}
-              />
-              <div className={authError.show ? 'pt-12' : ''}>{children}</div>
-            </SwrErrorBoundary>
-          </ToastProvider>
+          <FeatureGateProvider>
+            <ToastProvider>
+              <SwrErrorBoundary>
+                <AuthErrorBanner
+                  show={authError.show}
+                  message={authError.message}
+                  onDismiss={dismissAuthError}
+                />
+                <div className={authError.show ? 'pt-12' : ''}>{children}</div>
+              </SwrErrorBoundary>
+            </ToastProvider>
+          </FeatureGateProvider>
         </AuthProvider>
       </ThemePersistence>
     </ThemeProvider>

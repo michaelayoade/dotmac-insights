@@ -24,6 +24,7 @@ from app.models.notification import (
     NotificationStatus,
     NotificationChannel,
 )
+from app.services.secrets_service import get_secrets, SecretsServiceError
 
 logger = structlog.get_logger()
 
@@ -584,11 +585,25 @@ class NotificationService:
             if webhook.custom_headers:
                 headers.update(webhook.custom_headers)
 
-            # Add authentication
-            if webhook.auth_type == "bearer" and webhook.auth_value_encrypted:
-                headers["Authorization"] = f"Bearer {webhook.auth_value_encrypted}"
-            elif webhook.auth_type == "api_key" and webhook.auth_header and webhook.auth_value_encrypted:
-                headers[webhook.auth_header] = webhook.auth_value_encrypted
+            # Add authentication (decrypt auth value)
+            if webhook.auth_value_encrypted:
+                try:
+                    secrets_service = get_secrets()
+                    decrypted_auth_value = secrets_service.decrypt(webhook.auth_value_encrypted)
+                except SecretsServiceError as e:
+                    logger.error(
+                        "webhook_auth_decryption_failed",
+                        webhook_id=webhook.id,
+                        error=str(e),
+                    )
+                    raise ValueError(f"Failed to decrypt webhook credentials: {e}")
+
+                if webhook.auth_type == "bearer":
+                    headers["Authorization"] = f"Bearer {decrypted_auth_value}"
+                elif webhook.auth_type == "api_key" and webhook.auth_header:
+                    headers[webhook.auth_header] = decrypted_auth_value
+                elif webhook.auth_type == "basic":
+                    headers["Authorization"] = f"Basic {decrypted_auth_value}"
 
             # Add signature if secret configured
             payload_json = json.dumps(delivery.payload, cls=DecimalEncoder)

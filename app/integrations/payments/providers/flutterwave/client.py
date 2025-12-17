@@ -628,7 +628,14 @@ class FlutterwaveClient(BasePaymentGateway):
         Flutterwave uses a secret hash in the verifi-hash header.
         """
         if not self.webhook_secret:
-            logger.warning("Webhook secret not configured, skipping verification")
+            # Fail closed in production - reject webhooks if secret not configured
+            from app.config import settings
+            if settings.is_production:
+                logger.error(
+                    "flutterwave_webhook_secret_missing: Webhook secret not configured in production - rejecting webhook"
+                )
+                return False
+            logger.warning("Webhook secret not configured, skipping verification (dev mode)")
             return True
 
         return hmac.compare_digest(self.webhook_secret, signature)
