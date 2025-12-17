@@ -2,6 +2,7 @@ import { useState } from 'react';
 import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import {
   api,
+  apiFetch,
   ApiError,
   InventoryItemPayload,
   InventoryWarehousePayload,
@@ -4538,9 +4539,9 @@ export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRC
           }
         });
       }
-      const response = await fetch(`/api/contacts?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch contacts');
-      return response.json();
+      const queryString = queryParams.toString();
+      const endpoint = queryString ? `/contacts?${queryString}` : '/contacts';
+      return apiFetch(endpoint);
     },
     config
   );
@@ -4549,11 +4550,7 @@ export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRC
 export function useUnifiedContact(id: number | string | undefined, config?: SWRConfiguration) {
   return useSWR(
     id ? ['unified-contact', id] : null,
-    async () => {
-      const response = await fetch(`/api/contacts/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch contact');
-      return response.json();
-    },
+    () => apiFetch(`/contacts/${id}`),
     config
   );
 }
@@ -4570,9 +4567,9 @@ export function useUnifiedContactLeads(params?: UnifiedContactsParams, config?: 
           }
         });
       }
-      const response = await fetch(`/api/contacts/leads?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch leads');
-      return response.json();
+      const queryString = queryParams.toString();
+      const endpoint = queryString ? `/contacts/leads?${queryString}` : '/contacts/leads';
+      return apiFetch(endpoint);
     },
     config
   );
@@ -4590,9 +4587,9 @@ export function useUnifiedContactCustomers(params?: UnifiedContactsParams, confi
           }
         });
       }
-      const response = await fetch(`/api/contacts/customers?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch customers');
-      return response.json();
+      const queryString = queryParams.toString();
+      const endpoint = queryString ? `/contacts/customers?${queryString}` : '/contacts/customers';
+      return apiFetch(endpoint);
     },
     config
   );
@@ -4601,11 +4598,7 @@ export function useUnifiedContactCustomers(params?: UnifiedContactsParams, confi
 export function useUnifiedContactsDashboard(periodDays = 30, config?: SWRConfiguration) {
   return useSWR(
     ['unified-contacts-dashboard', periodDays],
-    async () => {
-      const response = await fetch(`/api/contacts/analytics/dashboard?period_days=${periodDays}`);
-      if (!response.ok) throw new Error('Failed to fetch contacts dashboard');
-      return response.json();
-    },
+    () => apiFetch(`/contacts/analytics/dashboard?period_days=${periodDays}`),
     config
   );
 }
@@ -4616,9 +4609,7 @@ export function useUnifiedContactsFunnel(periodDays = 30, ownerId?: number, conf
     async () => {
       const params = new URLSearchParams({ period_days: String(periodDays) });
       if (ownerId) params.append('owner_id', String(ownerId));
-      const response = await fetch(`/api/contacts/analytics/funnel?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch funnel');
-      return response.json();
+      return apiFetch(`/contacts/analytics/funnel?${params.toString()}`);
     },
     config
   );
@@ -4648,13 +4639,10 @@ export function useUnifiedContactMutations() {
     error,
     createContact: async (body: Record<string, unknown>) => {
       return run(async () => {
-        const response = await fetch('/api/contacts', {
+        const result = await apiFetch('/contacts', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!response.ok) throw new Error('Failed to create contact');
-        const result = await response.json();
         await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
         return result;
       });
@@ -4662,13 +4650,10 @@ export function useUnifiedContactMutations() {
 
     updateContact: async (id: number | string, body: Record<string, unknown>) => {
       return run(async () => {
-        const response = await fetch(`/api/contacts/${id}`, {
+        const result = await apiFetch(`/contacts/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
-        if (!response.ok) throw new Error('Failed to update contact');
-        const result = await response.json();
         await mutate(['unified-contact', id]);
         await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
         return result;
@@ -4677,12 +4662,11 @@ export function useUnifiedContactMutations() {
 
     deleteContact: async (id: number | string, hard = false) => {
       return run(async () => {
-        const response = await fetch(`/api/contacts/${id}?hard=${hard}`, {
+        const result = await apiFetch(`/contacts/${id}?hard=${hard}`, {
           method: 'DELETE',
         });
-        if (!response.ok) throw new Error('Failed to delete contact');
         await mutate((key) => Array.isArray(key) && typeof key[0] === 'string' && key[0].startsWith('unified-contacts'));
-        return response.json();
+        return result;
       });
     },
 

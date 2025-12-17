@@ -26,9 +26,9 @@ const config: Config = {
         'purple-accent': '#a855f7',
       },
       fontFamily: {
-        'display': ['Plus Jakarta Sans', 'sans-serif'],
-        'mono': ['JetBrains Mono', 'monospace'],
-        'body': ['Plus Jakarta Sans', 'sans-serif'],
+        'display': ['var(--font-plus-jakarta)', 'Plus Jakarta Sans', 'sans-serif'],
+        'mono': ['var(--font-jetbrains-mono)', 'JetBrains Mono', 'monospace'],
+        'body': ['var(--font-plus-jakarta)', 'Plus Jakarta Sans', 'sans-serif'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

@@ -80,20 +80,23 @@ export function hasAuthToken(): boolean {
   return false;
 }
 
+// Check if we're in development mode - service token should only work in dev
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 function getAccessToken(): string {
   if (typeof window !== 'undefined') {
     // Client-side: only use stored user token
     const token = localStorage.getItem('dotmac_access_token');
     if (token) return token;
 
-    // Fallback: allow NEXT_PUBLIC_SERVICE_TOKEN when set (primarily for local/dev)
-    if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
+    // Fallback: allow NEXT_PUBLIC_SERVICE_TOKEN only in development
+    if (isDevelopment && process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
       return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
     }
     return '';
   }
-  // Server-side fallback for SSR/exports
-  if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
+  // Server-side fallback for SSR/exports - only in development
+  if (isDevelopment && process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
     return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
   }
   return '';
@@ -1929,7 +1932,7 @@ export const api = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
     const url = buildApiUrl(`/expenses/reports/claims`, Object.fromEntries(searchParams.entries()));
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -1950,7 +1953,7 @@ export const api = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
     const url = buildApiUrl(`/expenses/reports/advances`, Object.fromEntries(searchParams.entries()));
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -1971,7 +1974,7 @@ export const api = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
     const url = buildApiUrl(`/expenses/reports/transactions`, Object.fromEntries(searchParams.entries()));
     return fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

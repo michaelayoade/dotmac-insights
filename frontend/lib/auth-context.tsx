@@ -82,13 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('dotmac_access_token');
 
     if (!token) {
-      // Check for service token fallback (primarily local/dev)
-      const serviceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN || null;
+      // Check for service token fallback - ONLY in development mode
+      const isDev = process.env.NODE_ENV === 'development';
+      const serviceToken = isDev ? (process.env.NEXT_PUBLIC_SERVICE_TOKEN || null) : null;
 
       if (serviceToken) {
         // Persist service token so fetchApi picks it up immediately
         setAuthToken(serviceToken);
-        // Grant all scopes for service token
+        // Grant all scopes for service token (dev only)
         setState({
           isAuthenticated: true,
           isLoading: false,
@@ -121,7 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Decode token to get scopes
     const payload = decodeJwtPayload(token);
-    const envServiceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN;
+    const isDev = process.env.NODE_ENV === 'development';
+    const envServiceToken = isDev ? process.env.NEXT_PUBLIC_SERVICE_TOKEN : null;
     let scopes = (payload?.scopes || []) as Scope[];
     if (scopes.length === 0 && envServiceToken && token === envServiceToken) {
       scopes = ALL_SCOPES;
@@ -139,7 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(token);
 
     // If scopes not provided, try to decode from token
-    const envServiceToken = process.env.NEXT_PUBLIC_SERVICE_TOKEN;
+    const isDev = process.env.NODE_ENV === 'development';
+    const envServiceToken = isDev ? process.env.NEXT_PUBLIC_SERVICE_TOKEN : null;
     let tokenScopes = scopes || (decodeJwtPayload(token)?.scopes as Scope[]) || [];
     if (tokenScopes.length === 0 && envServiceToken && token === envServiceToken) {
       tokenScopes = ALL_SCOPES;

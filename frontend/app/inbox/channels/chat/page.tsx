@@ -4,7 +4,9 @@ import { MessageCircle, Copy, Settings, Eye, Code, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils';
 
 export default function ChatChannelPage() {
-  const widgetCode = `<script src="https://inbox.dotmac.com/widget.js" data-key="pk_live_xxx"></script>`;
+  // Widget key should be configured per-tenant - this is a placeholder for the embed code example
+  const widgetKey = process.env.NEXT_PUBLIC_CHAT_WIDGET_KEY || 'YOUR_WIDGET_KEY';
+  const widgetCode = `<script src="https://inbox.dotmac.com/widget.js" data-key="${widgetKey}"></script>`;
 
   return (
     <div className="space-y-6">
