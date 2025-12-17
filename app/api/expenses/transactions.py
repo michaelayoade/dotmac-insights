@@ -24,7 +24,7 @@ from app.models.expense_management import (
     CardTransactionStatus,
     ExpenseClaimLine,
 )
-from app.auth import get_current_principal, Principal
+from app.auth import get_current_principal, Principal, Require
 
 router = APIRouter()
 
@@ -35,8 +35,8 @@ def compute_import_hash(card_id: int, transaction_date: datetime, amount: Decima
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-@router.get("/", response_model=List[CorporateCardTransactionRead])
-async def list_transactions(
+@router.get("/", response_model=List[CorporateCardTransactionRead], dependencies=[Depends(Require("expenses:read"))])
+def list_transactions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     card_id: Optional[int] = Query(default=None, description="Filter by card"),
@@ -74,8 +74,8 @@ async def list_transactions(
     return transactions
 
 
-@router.get("/{transaction_id}", response_model=CorporateCardTransactionRead)
-async def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
+@router.get("/{transaction_id}", response_model=CorporateCardTransactionRead, dependencies=[Depends(Require("expenses:read"))])
+def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
     """Get a single transaction by ID."""
     transaction = (
         db.query(CorporateCardTransaction)

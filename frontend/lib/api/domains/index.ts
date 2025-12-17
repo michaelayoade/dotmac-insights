@@ -21,6 +21,10 @@ export type {
   SettingsSchemaResponse,
   SettingsTestResponse,
   SettingsAuditEntry,
+  PermissionResponse,
+  RoleResponse,
+  RoleCreatePayload,
+  RoleUpdatePayload,
 } from './admin';
 
 // Projects Domain
@@ -253,38 +257,34 @@ export type {
   FinanceInvoicePayload,
   FinanceInvoiceListParams,
   FinancePayment,
-  FinancePaymentAllocation,
+  FinancePaymentReference,
   FinancePaymentDetail,
   FinancePaymentListResponse,
   FinancePaymentPayload,
   FinancePaymentListParams,
   FinanceCreditNote,
-  FinanceCreditNoteItem,
   FinanceCreditNoteDetail,
   FinanceCreditNoteListResponse,
   FinanceCreditNotePayload,
   FinanceCreditNoteListParams,
   FinanceOrder,
   FinanceOrderItem,
-  FinanceOrderDetail,
   FinanceOrderListResponse,
   FinanceOrderPayload,
   FinanceOrderListParams,
   FinanceQuotation,
   FinanceQuotationItem,
-  FinanceQuotationDetail,
   FinanceQuotationListResponse,
   FinanceQuotationPayload,
   FinanceQuotationListParams,
-  FinanceCustomer,
-  FinanceCustomerListResponse,
-  FinanceCustomerListParams,
+  FinanceCustomerPayload,
   FinanceRevenueTrend,
-  FinanceCollectionsSummary,
-  FinanceAgingSummary,
-  FinanceRevenueBySegment,
+  FinanceCollectionsAnalytics,
+  FinanceAgingBucket,
+  FinanceAgingAnalytics,
+  FinanceByCurrencyAnalytics,
   FinancePaymentBehavior,
-  FinanceRevenueForecast,
+  FinanceForecast,
 } from './finance';
 
 // Accounting Domain (GL, Journals, Bank Transactions, Financial Statements, Tax)
@@ -465,3 +465,161 @@ export type {
   PurchasingExpenseTrendItem,
   PurchasingExpenseTrendResponse,
 } from './purchasing';
+
+// HR Domain (Employees, Leave, Attendance, Payroll, Training, Appraisals, Lifecycle)
+export { hrApi } from './hr';
+export type {
+  // Generic
+  HrListResponse,
+  // Leave Management
+  HrLeaveType,
+  HrHolidayItem,
+  HrHolidayListPayload,
+  HrHolidayList,
+  HrLeavePolicyDetail,
+  HrLeavePolicyPayload,
+  HrLeavePolicy,
+  HrLeaveAllocationPayload,
+  HrLeaveAllocation,
+  HrLeaveApplicationPayload,
+  HrLeaveApplication,
+  // Attendance & Shifts
+  HrShiftType,
+  HrShiftAssignmentPayload,
+  HrShiftAssignment,
+  HrAttendancePayload,
+  HrAttendance,
+  HrAttendanceRequestPayload,
+  HrAttendanceRequest,
+  // Recruitment
+  HrJobOpeningPayload,
+  HrJobOpening,
+  HrJobApplicantPayload,
+  HrJobApplicant,
+  HrJobOfferTerm,
+  HrJobOfferPayload,
+  HrJobOffer,
+  HrInterviewPayload,
+  HrInterview,
+  // Payroll
+  HrSalaryComponentPayload,
+  HrSalaryComponent,
+  HrSalaryStructureLine,
+  HrSalaryStructurePayload,
+  HrSalaryStructure,
+  HrSalaryStructureAssignmentPayload,
+  HrSalaryStructureAssignment,
+  HrPayrollEntryPayload,
+  HrPayrollEntry,
+  HrSalarySlipPayload,
+  HrSalarySlip,
+  HrPayrollPayoutItem,
+  HrPayrollPayoutRequest,
+  // Training
+  HrTrainingProgramPayload,
+  HrTrainingProgram,
+  HrTrainingEventEmployee,
+  HrTrainingEventPayload,
+  HrTrainingEvent,
+  HrTrainingResultPayload,
+  HrTrainingResult,
+  // Appraisals
+  HrAppraisalTemplateGoal,
+  HrAppraisalTemplatePayload,
+  HrAppraisalTemplate,
+  HrAppraisalGoal,
+  HrAppraisalPayload,
+  HrAppraisal,
+  // Employee Lifecycle
+  HrOnboardingActivity,
+  HrEmployeeOnboardingPayload,
+  HrEmployeeOnboarding,
+  HrSeparationActivity,
+  HrEmployeeSeparationPayload,
+  HrEmployeeSeparation,
+  HrEmployeePromotionDetail,
+  HrEmployeePromotionPayload,
+  HrEmployeePromotion,
+  HrEmployeeTransferDetail,
+  HrEmployeeTransferPayload,
+  HrEmployeeTransfer,
+  // Analytics
+  HrAnalyticsOverview,
+  HrLeaveTrendPoint,
+  HrAttendanceTrendPoint,
+  HrPayrollSummary,
+  HrPayrollTrendPoint,
+  HrPayrollComponentBreakdown,
+  HrRecruitmentFunnel,
+  HrAppraisalStatusBreakdown,
+  HrLifecycleEventsBreakdown,
+  HrEmployee,
+  HrEmployeeListResponse,
+  // Params
+  HrLeaveTypeListParams,
+  HrHolidayListParams,
+  HrLeaveAllocationListParams,
+  HrLeaveApplicationListParams,
+  HrAttendanceListParams,
+  HrJobOpeningListParams,
+  HrJobApplicantListParams,
+  HrPayrollEntryListParams,
+  HrTrainingEventListParams,
+  HrAppraisalListParams,
+} from './hr';
+
+// Analytics Domain (Cross-Domain Reports)
+export { analyticsApi } from './analytics';
+export type {
+  // Revenue Reports
+  ReportsRevenueSummary,
+  ReportsRevenueTrendPoint,
+  ReportsRevenueByCustomer,
+  ReportsRevenueByProduct,
+  // Expense Reports
+  ReportsExpensesSummary,
+  ReportsExpenseTrendPoint,
+  ReportsExpenseByCategory,
+  ReportsExpenseByVendor,
+  // Profitability Reports
+  ReportsProfitabilityMargins,
+  ReportsProfitabilityTrendPoint,
+  ReportsProfitabilityBySegment,
+  // Cash Position Reports
+  ReportsCashPositionSummary,
+  ReportsCashPositionForecastPoint,
+  ReportsCashPositionRunway,
+} from './analytics';
+
+// Insights Domain (Deep Insights, Data Quality, Anomalies)
+export { insightsApi } from './insights';
+export type {
+  // Data Completeness
+  FieldCompleteness,
+  EntityCompleteness,
+  DataCompletenessResponse,
+  // Customer Segments (Deep)
+  InsightsCustomerSegment,
+  InsightsCustomerSegmentsResponse,
+  // Customer Health (Deep)
+  InsightsCustomerHealthRecord,
+  InsightsCustomerHealthResponse,
+  // Relationship Map
+  EntityRelationship,
+  RelationshipMapResponse,
+  // Financial Insights
+  FinancialInsightsResponse,
+  // Operational Insights
+  OperationalInsightsResponse,
+  // Anomalies
+  Anomaly,
+  AnomaliesResponse,
+  // Data Availability
+  DataAvailabilityEntity,
+  DataAvailabilityGap,
+  DataAvailabilityResponse,
+  // Churn Risk
+  ChurnRiskCustomer,
+  ChurnRiskSummary,
+  ChurnRiskResponse,
+} from './insights';

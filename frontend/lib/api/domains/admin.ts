@@ -172,6 +172,37 @@ export interface SettingsAuditEntry {
   created_at: string;
 }
 
+// Roles / Permissions
+export interface PermissionResponse {
+  id: number;
+  name: string;
+  scope: string;
+  description?: string;
+  category?: string;
+}
+
+export interface RoleResponse {
+  id: number;
+  name: string;
+  description?: string;
+  is_system: boolean;
+  permissions: string[];
+  user_count: number;
+  created_at?: string;
+}
+
+export interface RoleCreatePayload {
+  name: string;
+  description?: string | null;
+  permission_ids: number[];
+}
+
+export interface RoleUpdatePayload {
+  name?: string;
+  description?: string | null;
+  permission_ids?: number[];
+}
+
 // =============================================================================
 // API
 // =============================================================================
@@ -324,6 +355,32 @@ export const adminApi = {
 
   getSettingsAuditLog: (params?: { group?: string; skip?: number; limit?: number }) =>
     fetchApi<SettingsAuditEntry[]>('/admin/settings/audit', { params }),
+
+  // =========================================================================
+  // ROLES / PERMISSIONS
+  // =========================================================================
+
+  listRoles: () => fetchApi<RoleResponse[]>('/admin/roles'),
+
+  createRole: (payload: RoleCreatePayload) =>
+    fetchApi<RoleResponse>('/admin/roles', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateRole: (roleId: number, payload: RoleUpdatePayload) =>
+    fetchApi<RoleResponse>(`/admin/roles/${roleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteRole: (roleId: number) =>
+    fetchApi<{ status: string; role_id: number }>(`/admin/roles/${roleId}`, { method: 'DELETE' }),
+
+  listPermissions: (category?: string) =>
+    fetchApi<PermissionResponse[]>('/admin/permissions', {
+      params: category ? { category } : undefined,
+    }),
 };
 
 export default adminApi;

@@ -10,12 +10,13 @@ import uuid
 from decimal import Decimal
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.auth import Require
 from app.models.gateway_transaction import (
     GatewayTransaction,
     GatewayProvider,
@@ -108,7 +109,7 @@ def generate_reference() -> str:
 # Endpoints
 # =============================================================================
 
-@router.post("/initialize", response_model=InitializePaymentResponse)
+@router.post("/initialize", response_model=InitializePaymentResponse, dependencies=[Depends(Require("payments:write"))])
 async def initialize_payment(
     request: InitializePaymentSchema,
     db: AsyncSession = Depends(get_db),
@@ -190,7 +191,7 @@ async def initialize_payment(
         await client.close()
 
 
-@router.get("/verify/{reference}", response_model=VerifyPaymentResponse)
+@router.get("/verify/{reference}", response_model=VerifyPaymentResponse, dependencies=[Depends(Require("payments:read"))])
 async def verify_payment(
     reference: str,
     db: AsyncSession = Depends(get_db),
@@ -260,7 +261,7 @@ async def verify_payment(
         await client.close()
 
 
-@router.get("/{reference}")
+@router.get("/{reference}", dependencies=[Depends(Require("payments:read"))])
 async def get_payment(
     reference: str,
     db: AsyncSession = Depends(get_db),
@@ -293,13 +294,13 @@ async def get_payment(
     }
 
 
-@router.get("/")
+@router.get("/", dependencies=[Depends(Require("payments:read"))])
 async def list_payments(
     status: Optional[str] = None,
     provider: Optional[str] = None,
     customer_id: Optional[int] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     """List payment transactions with optional filters."""
@@ -353,7 +354,7 @@ async def list_payments(
     }
 
 
-@router.post("/{reference}/refund")
+@router.post("/{reference}/refund", dependencies=[Depends(Require("payments:write"))])
 async def refund_payment(
     reference: str,
     amount: Optional[Decimal] = None,

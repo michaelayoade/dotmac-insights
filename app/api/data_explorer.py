@@ -287,8 +287,8 @@ async def list_tables(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("/tables/{table_name}", dependencies=[Depends(Require("explorer:read"))])
 async def explore_table(
     table_name: str,
-    limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
     order_by: Optional[str] = None,
     order_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
     date_column: Optional[str] = Query(default=None, description="Column to filter by date"),

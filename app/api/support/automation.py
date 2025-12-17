@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -28,28 +28,75 @@ router = APIRouter()
 # PYDANTIC MODELS
 # =============================================================================
 
+class RuleCondition(BaseModel):
+    """Validated automation rule condition."""
+    field: str
+    operator: str
+    value: Optional[Any] = None
+
+    @field_validator("operator")
+    @classmethod
+    def validate_operator(cls, v: str) -> str:
+        valid_operators = {op.value for op in ConditionOperator}
+        if v not in valid_operators:
+            raise ValueError(f"Invalid operator '{v}'. Must be one of: {sorted(valid_operators)}")
+        return v
+
+
+class RuleAction(BaseModel):
+    """Validated automation rule action."""
+    type: str
+    params: Dict[str, Any] = {}
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        valid_types = {at.value for at in AutomationActionType}
+        if v not in valid_types:
+            raise ValueError(f"Invalid action type '{v}'. Must be one of: {sorted(valid_types)}")
+        return v
+
+
 class AutomationRuleCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     trigger: str
-    conditions: Optional[List[dict]] = None
-    actions: List[dict]
+    conditions: Optional[List[RuleCondition]] = None
+    actions: List[RuleAction]
     is_active: bool = True
     priority: int = 100
     stop_processing: bool = False
     max_executions_per_hour: Optional[int] = None
+
+    @field_validator("trigger")
+    @classmethod
+    def validate_trigger(cls, v: str) -> str:
+        valid_triggers = {t.value for t in AutomationTrigger}
+        if v not in valid_triggers:
+            raise ValueError(f"Invalid trigger '{v}'. Must be one of: {sorted(valid_triggers)}")
+        return v
 
 
 class AutomationRuleUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     trigger: Optional[str] = None
-    conditions: Optional[List[dict]] = None
-    actions: Optional[List[dict]] = None
+    conditions: Optional[List[RuleCondition]] = None
+    actions: Optional[List[RuleAction]] = None
     is_active: Optional[bool] = None
     priority: Optional[int] = None
     stop_processing: Optional[bool] = None
     max_executions_per_hour: Optional[int] = None
+
+    @field_validator("trigger")
+    @classmethod
+    def validate_trigger(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        valid_triggers = {t.value for t in AutomationTrigger}
+        if v not in valid_triggers:
+            raise ValueError(f"Invalid trigger '{v}'. Must be one of: {sorted(valid_triggers)}")
+        return v
 
 
 class AutomationTestRequest(BaseModel):
@@ -132,43 +179,17 @@ def create_rule(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create an automation rule."""
-    # Validate trigger
-    try:
-        AutomationTrigger(payload.trigger)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid trigger: {payload.trigger}")
-
-    # Validate actions
-    if not payload.actions:
-        raise HTTPException(status_code=400, detail="At least one action is required")
-
-    for action in payload.actions:
-        if "type" not in action:
-            raise HTTPException(status_code=400, detail="Each action must have a 'type' field")
-        try:
-            AutomationActionType(action["type"])
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid action type: {action['type']}")
-
-    # Validate conditions if provided
-    if payload.conditions:
-        for condition in payload.conditions:
-            if "field" not in condition or "operator" not in condition:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Each condition must have 'field' and 'operator' fields"
-                )
-            try:
-                ConditionOperator(condition["operator"])
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid operator: {condition['operator']}")
+    # Pydantic validators handle trigger, actions, and conditions validation
+    # Convert Pydantic models to dicts for JSON storage
+    conditions_data = [c.model_dump() for c in payload.conditions] if payload.conditions else None
+    actions_data = [a.model_dump() for a in payload.actions]
 
     rule = AutomationRule(
         name=payload.name,
         description=payload.description,
         trigger=payload.trigger,
-        conditions=payload.conditions,
-        actions=payload.actions,
+        conditions=conditions_data,
+        actions=actions_data,
         is_active=payload.is_active,
         priority=payload.priority,
         stop_processing=payload.stop_processing,
@@ -236,31 +257,21 @@ def update_rule(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
+    # Pydantic validators handle trigger, actions, and conditions validation
     if payload.name is not None:
         rule.name = payload.name
     if payload.description is not None:
         rule.description = payload.description
     if payload.trigger is not None:
-        try:
-            AutomationTrigger(payload.trigger)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid trigger: {payload.trigger}")
         rule.trigger = payload.trigger
     if payload.conditions is not None:
-        for condition in payload.conditions:
-            if "field" not in condition or "operator" not in condition:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Each condition must have 'field' and 'operator' fields"
-                )
-        rule.conditions = payload.conditions
+        rule.conditions = [c.model_dump() for c in payload.conditions]
     if payload.actions is not None:
         if not payload.actions:
-            raise HTTPException(status_code=400, detail="At least one action is required")
-        for action in payload.actions:
-            if "type" not in action:
-                raise HTTPException(status_code=400, detail="Each action must have a 'type' field")
-        rule.actions = payload.actions
+            raise HTTPException(
+                status_code=400, detail="At least one action is required"
+            )
+        rule.actions = [a.model_dump() for a in payload.actions]
     if payload.is_active is not None:
         rule.is_active = payload.is_active
     if payload.priority is not None:

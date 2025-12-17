@@ -7,8 +7,7 @@ maintenance, and asset lifecycle tracking.
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.ext.asyncio import Session
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
@@ -158,12 +157,12 @@ def list_assets(
     count_query = select(func.count(Asset.id))
     if conditions:
         count_query = count_query.where(and_(*conditions))
-    total_result = await db.execute(count_query)
+    total_result = db.execute(count_query)
     total = total_result.scalar() or 0
 
     # Apply pagination
     query = query.order_by(desc(Asset.created_at)).offset(offset).limit(limit)
-    result = await db.execute(query)
+    result = db.execute(query)
     assets = result.scalars().all()
 
     return {
@@ -211,7 +210,7 @@ def get_assets_summary(
         func.sum(Asset.asset_value).label("total_value"),
         func.sum(Asset.gross_purchase_amount).label("total_purchase_value"),
     ).group_by(Asset.status)
-    status_result = await db.execute(status_query)
+    status_result = db.execute(status_query)
     status_data = status_result.all()
 
     # By category
@@ -220,7 +219,7 @@ def get_assets_summary(
         func.count(Asset.id).label("count"),
         func.sum(Asset.asset_value).label("total_value"),
     ).where(Asset.asset_category.isnot(None)).group_by(Asset.asset_category)
-    category_result = await db.execute(category_query)
+    category_result = db.execute(category_query)
     category_data = category_result.all()
 
     # By location
@@ -229,12 +228,12 @@ def get_assets_summary(
         func.count(Asset.id).label("count"),
         func.sum(Asset.asset_value).label("total_value"),
     ).where(Asset.location.isnot(None)).group_by(Asset.location)
-    location_result = await db.execute(location_query)
+    location_result = db.execute(location_query)
     location_data = location_result.all()
 
     # Assets requiring maintenance
     maintenance_query = select(func.count(Asset.id)).where(Asset.maintenance_required == True)
-    maintenance_result = await db.execute(maintenance_query)
+    maintenance_result = db.execute(maintenance_query)
     maintenance_count = maintenance_result.scalar() or 0
 
     # Warranty expiring soon (next 30 days)
@@ -247,7 +246,7 @@ def get_assets_summary(
             Asset.warranty_expiry_date <= today + timedelta(days=30),
         )
     )
-    warranty_result = await db.execute(warranty_query)
+    warranty_result = db.execute(warranty_query)
     warranty_expiring = warranty_result.scalar() or 0
 
     # Total values
@@ -257,7 +256,7 @@ def get_assets_summary(
         func.sum(Asset.gross_purchase_amount).label("total_purchase_value"),
         func.sum(Asset.opening_accumulated_depreciation).label("total_accumulated_depreciation"),
     )
-    totals_result = await db.execute(totals_query)
+    totals_result = db.execute(totals_query)
     totals = totals_result.one()
 
     return {
@@ -334,12 +333,12 @@ def get_depreciation_schedule(
     count_query = select(func.count(AssetDepreciationSchedule.id))
     if conditions:
         count_query = count_query.where(and_(*conditions))
-    total_result = await db.execute(count_query)
+    total_result = db.execute(count_query)
     total = total_result.scalar() or 0
 
     # Apply ordering and pagination
     query = query.order_by(AssetDepreciationSchedule.schedule_date).offset(offset).limit(limit)
-    result = await db.execute(query)
+    result = db.execute(query)
     schedules = result.scalars().all()
 
     return {
@@ -384,7 +383,7 @@ def get_pending_depreciation(
         .options(selectinload(AssetDepreciationSchedule.asset))
         .order_by(AssetDepreciationSchedule.schedule_date)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     schedules = result.scalars().all()
 
     total_amount = sum(s.depreciation_amount for s in schedules)
@@ -422,7 +421,7 @@ def get_asset(
             selectinload(Asset.depreciation_schedules),
         )
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -527,7 +526,7 @@ def create_asset(
     )
 
     db.add(asset)
-    await db.flush()
+    db.flush()
 
     # Add finance books if provided
     if payload.finance_books:
@@ -545,8 +544,8 @@ def create_asset(
             )
             db.add(fb)
 
-    await db.commit()
-    await db.refresh(asset)
+    db.commit()
+    db.refresh(asset)
 
     return {"id": asset.id, "message": "Asset created successfully"}
 
@@ -559,7 +558,7 @@ def update_asset(
 ):
     """Update an existing asset."""
     query = select(Asset).where(Asset.id == asset_id)
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -570,7 +569,7 @@ def update_asset(
     for key, value in update_data.items():
         setattr(asset, key, value)
 
-    await db.commit()
+    db.commit()
     return {"id": asset.id, "message": "Asset updated successfully"}
 
 
@@ -581,7 +580,7 @@ def submit_asset(
 ):
     """Submit asset for use (change status from draft to submitted)."""
     query = select(Asset).where(Asset.id == asset_id)
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -592,7 +591,7 @@ def submit_asset(
 
     asset.status = AssetStatus.SUBMITTED
     asset.docstatus = 1
-    await db.commit()
+    db.commit()
 
     return {"id": asset.id, "message": "Asset submitted successfully"}
 
@@ -605,7 +604,7 @@ def scrap_asset(
 ):
     """Scrap an asset (mark as scrapped)."""
     query = select(Asset).where(Asset.id == asset_id)
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -616,7 +615,7 @@ def scrap_asset(
 
     asset.status = AssetStatus.SCRAPPED
     asset.disposal_date = scrap_date or date.today()
-    await db.commit()
+    db.commit()
 
     return {"id": asset.id, "message": "Asset scrapped successfully"}
 
@@ -637,10 +636,10 @@ def list_asset_categories(
         .offset(offset)
         .limit(limit)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     categories = result.scalars().all()
 
-    count_result = await db.execute(select(func.count(AssetCategory.id)))
+    count_result = db.execute(select(func.count(AssetCategory.id)))
     total = count_result.scalar() or 0
 
     return {
@@ -680,8 +679,8 @@ def create_asset_category(
         enable_cwip_accounting=payload.enable_cwip_accounting,
     )
     db.add(category)
-    await db.commit()
-    await db.refresh(category)
+    db.commit()
+    db.refresh(category)
 
     return {"id": category.id, "message": "Asset category created successfully"}
 
@@ -703,7 +702,7 @@ def get_maintenance_due(
         )
         .order_by(Asset.asset_name)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     assets = result.scalars().all()
 
     return {
@@ -731,7 +730,7 @@ def mark_for_maintenance(
 ):
     """Mark an asset as requiring maintenance."""
     query = select(Asset).where(Asset.id == asset_id)
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -739,7 +738,7 @@ def mark_for_maintenance(
 
     asset.maintenance_required = True
     asset.status = AssetStatus.IN_MAINTENANCE
-    await db.commit()
+    db.commit()
 
     return {"id": asset.id, "message": "Asset marked for maintenance"}
 
@@ -751,7 +750,7 @@ def complete_maintenance(
 ):
     """Mark maintenance as complete for an asset."""
     query = select(Asset).where(Asset.id == asset_id)
-    result = await db.execute(query)
+    result = db.execute(query)
     asset = result.scalar_one_or_none()
 
     if not asset:
@@ -763,7 +762,7 @@ def complete_maintenance(
         asset.status = AssetStatus.FULLY_DEPRECIATED
     else:
         asset.status = AssetStatus.PARTIALLY_DEPRECIATED
-    await db.commit()
+    db.commit()
 
     return {"id": asset.id, "message": "Maintenance completed"}
 
@@ -792,7 +791,7 @@ def get_warranty_expiring(
         )
         .order_by(Asset.warranty_expiry_date)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     assets = result.scalars().all()
 
     return {
@@ -836,7 +835,7 @@ def get_insurance_expiring(
         )
         .order_by(Asset.insurance_end_date)
     )
-    result = await db.execute(query)
+    result = db.execute(query)
     assets = result.scalars().all()
 
     return {

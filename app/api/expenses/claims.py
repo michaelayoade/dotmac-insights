@@ -11,13 +11,13 @@ from app.database import get_db
 from app.models.expense_management import ExpenseClaim
 from app.services.expense_service import ExpenseService
 from app.services.expense_posting_service import ExpensePostingService
-from app.auth import get_current_principal, Principal
+from app.auth import get_current_principal, Principal, Require
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[ExpenseClaimRead])
-async def list_claims(
+@router.get("/", response_model=List[ExpenseClaimRead], dependencies=[Depends(Require("expenses:read"))])
+def list_claims(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     status: Optional[str] = Query(default=None, description="Filter by status"),
@@ -36,8 +36,8 @@ async def list_claims(
     return claims
 
 
-@router.get("/{claim_id}", response_model=ExpenseClaimRead)
-async def get_claim(claim_id: int, db: Session = Depends(get_db)):
+@router.get("/{claim_id}", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:read"))])
+def get_claim(claim_id: int, db: Session = Depends(get_db)):
     claim = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))

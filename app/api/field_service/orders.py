@@ -543,10 +543,11 @@ async def list_orders(
             # Try full-text search first (faster for large datasets)
             try:
                 from sqlalchemy import text
-                search_query = " & ".join(search_clean.split())  # Convert to tsquery format
+                # Use plainto_tsquery for safe handling of user input
+                # (automatically escapes special characters, no injection risk)
                 query = query.filter(
-                    text("search_vector @@ to_tsquery('english', :search)")
-                ).params(search=search_query)
+                    text("search_vector @@ plainto_tsquery('english', :search)")
+                ).params(search=search_clean)
             except Exception:
                 # Fallback to ILIKE if full-text search fails
                 search_term = f"%{search}%"

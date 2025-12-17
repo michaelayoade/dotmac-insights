@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.auth import Require
 from app.models.open_banking import (
     OpenBankingConnection,
     OpenBankingProvider as OBProvider,
@@ -113,7 +114,7 @@ def get_openbanking_client(provider: Optional[str] = None):
 # Endpoints
 # =============================================================================
 
-@router.post("/widget-config", response_model=WidgetConfigResponse)
+@router.post("/widget-config", response_model=WidgetConfigResponse, dependencies=[Depends(Require("openbanking:write"))])
 async def get_widget_config(request: WidgetConfigRequest):
     """
     Get configuration for launching the account linking widget.
@@ -143,7 +144,7 @@ async def get_widget_config(request: WidgetConfigRequest):
         await client.close()
 
 
-@router.post("/link-account", response_model=LinkedAccountResponse)
+@router.post("/link-account", response_model=LinkedAccountResponse, dependencies=[Depends(Require("openbanking:write"))])
 async def link_account(
     request: LinkAccountRequest,
     db: AsyncSession = Depends(get_db),
@@ -227,7 +228,7 @@ async def link_account(
         await client.close()
 
 
-@router.get("/accounts", response_model=List[LinkedAccountResponse])
+@router.get("/accounts", response_model=List[LinkedAccountResponse], dependencies=[Depends(Require("openbanking:read"))])
 async def list_linked_accounts(
     customer_id: Optional[int] = None,
     provider: Optional[str] = None,
@@ -280,7 +281,7 @@ async def list_linked_accounts(
     ]
 
 
-@router.get("/accounts/{account_id}")
+@router.get("/accounts/{account_id}", dependencies=[Depends(Require("openbanking:read"))])
 async def get_linked_account(
     account_id: int,
     db: AsyncSession = Depends(get_db),
@@ -316,7 +317,7 @@ async def get_linked_account(
     }
 
 
-@router.get("/accounts/{account_id}/balance")
+@router.get("/accounts/{account_id}/balance", dependencies=[Depends(Require("openbanking:read"))])
 async def get_account_balance(
     account_id: int,
     db: AsyncSession = Depends(get_db),
@@ -359,7 +360,7 @@ async def get_account_balance(
         await client.close()
 
 
-@router.get("/accounts/{account_id}/transactions", response_model=List[TransactionSchema])
+@router.get("/accounts/{account_id}/transactions", response_model=List[TransactionSchema], dependencies=[Depends(Require("openbanking:read"))])
 async def get_account_transactions(
     account_id: int,
     start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -415,7 +416,7 @@ async def get_account_transactions(
         await client.close()
 
 
-@router.get("/accounts/{account_id}/identity", response_model=IdentityResponse)
+@router.get("/accounts/{account_id}/identity", response_model=IdentityResponse, dependencies=[Depends(Require("openbanking:read"))])
 async def get_account_identity(
     account_id: int,
     db: AsyncSession = Depends(get_db),
@@ -461,7 +462,7 @@ async def get_account_identity(
         await client.close()
 
 
-@router.post("/accounts/{account_id}/reauthorize")
+@router.post("/accounts/{account_id}/reauthorize", dependencies=[Depends(Require("openbanking:write"))])
 async def reauthorize_account(
     account_id: int,
     db: AsyncSession = Depends(get_db),
@@ -497,7 +498,7 @@ async def reauthorize_account(
         await client.close()
 
 
-@router.delete("/accounts/{account_id}")
+@router.delete("/accounts/{account_id}", dependencies=[Depends(Require("openbanking:write"))])
 async def unlink_account(
     account_id: int,
     db: AsyncSession = Depends(get_db),

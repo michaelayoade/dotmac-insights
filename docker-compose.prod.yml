@@ -1,0 +1,64 @@
+services:
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-dotmac_insights}
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  api:
+    extends:
+      file: docker-compose.yml
+      service: api
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      JWKS_URL: ${JWKS_URL:?set JWKS_URL}
+      JWT_ISSUER: ${JWT_ISSUER:?set JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:?set JWT_AUDIENCE}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS}
+    env_file:
+      - .env.production
+
+  celery_worker:
+    extends:
+      file: docker-compose.yml
+      service: celery_worker
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+    env_file:
+      - .env.production
+
+  celery_beat:
+    extends:
+      file: docker-compose.yml
+      service: celery_beat
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+    env_file:
+      - .env.production
+
+  frontend:
+    extends:
+      file: docker-compose.yml
+      service: frontend
+    environment:
+      NODE_ENV: production
+    env_file:
+      - .env.production
+
+volumes:
+  postgres_data:
+  redis_data:

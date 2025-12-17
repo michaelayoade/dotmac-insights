@@ -74,11 +74,11 @@ CHATWOOT_ACCOUNT_ID=1
 REDIS_URL=redis://localhost:6379/0
 ```
 
-### 4. Initialize Database
+### 4. Initialize Database (migrations only)
 
 ```bash
 # Create database tables (run migrations)
-poetry run alembic upgrade head
+scripts/run_migrations.sh
 ```
 
 ### 5. Test Connections
@@ -109,7 +109,17 @@ Access the API at: http://localhost:8000
 API Documentation: http://localhost:8000/docs
 Auth: click **Authorize** in Swagger UI and enter your API key in `X-API-Key` (or pass `api_key` as a query param).
 
-> In production, `API_KEY` must be set or the app will refuse to start. CORS is locked down unless `CORS_ORIGINS` is provided. Development without an API key is allowed but logged as a warning.
+> Production requirements: set `ENVIRONMENT=production`, `DATABASE_URL` (PostgreSQL), `CORS_ORIGINS` (no wildcards), `JWKS_URL`/`JWT_ISSUER`/`JWT_AUDIENCE`, `REDIS_URL`, and run migrations before starting the API. The app will refuse to start without the required values.
+
+### Production docker-compose
+
+Use the production overrides with an environment file:
+
+```bash
+cp .env.production.example .env.production
+# fill values
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
 ### 8. Setup Frontend
 

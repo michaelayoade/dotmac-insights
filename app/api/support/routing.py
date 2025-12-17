@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -23,15 +23,44 @@ router = APIRouter()
 # PYDANTIC MODELS
 # =============================================================================
 
+VALID_ROUTING_OPERATORS = {
+    "equals", "not_equals", "contains", "in_list", "is_empty", "is_not_empty"
+}
+
+
+class RoutingCondition(BaseModel):
+    """Validated routing rule condition."""
+    field: str
+    operator: str
+    value: Optional[Any] = None
+
+    @field_validator("operator")
+    @classmethod
+    def validate_operator(cls, v: str) -> str:
+        if v not in VALID_ROUTING_OPERATORS:
+            raise ValueError(
+                f"Invalid operator '{v}'. Must be one of: {sorted(VALID_ROUTING_OPERATORS)}"
+            )
+        return v
+
+
 class RoutingRuleCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
     team_id: Optional[int] = None
     strategy: str = RoutingStrategy.ROUND_ROBIN.value
-    conditions: Optional[List[dict]] = None
+    conditions: Optional[List[RoutingCondition]] = None
     priority: int = 100
     is_active: bool = True
     fallback_team_id: Optional[int] = None
+
+    @field_validator("strategy")
+    @classmethod
+    def validate_strategy(cls, v: str) -> str:
+        valid = {s.value for s in RoutingStrategy}
+        if v not in valid:
+            raise ValueError(f"Invalid strategy '{v}'. Must be one of: {sorted(valid)}")
+        return v
 
 
 class RoutingRuleUpdateRequest(BaseModel):
@@ -39,10 +68,20 @@ class RoutingRuleUpdateRequest(BaseModel):
     description: Optional[str] = None
     team_id: Optional[int] = None
     strategy: Optional[str] = None
-    conditions: Optional[List[dict]] = None
+    conditions: Optional[List[RoutingCondition]] = None
     priority: Optional[int] = None
     is_active: Optional[bool] = None
     fallback_team_id: Optional[int] = None
+
+    @field_validator("strategy")
+    @classmethod
+    def validate_strategy(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        valid = {s.value for s in RoutingStrategy}
+        if v not in valid:
+            raise ValueError(f"Invalid strategy '{v}'. Must be one of: {sorted(valid)}")
+        return v
 
 
 class AutoAssignRequest(BaseModel):
@@ -123,11 +162,11 @@ def create_rule(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a routing rule."""
-    # Validate strategy
-    try:
-        RoutingStrategy(payload.strategy)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid strategy: {payload.strategy}")
+    # Pydantic validators handle strategy validation
+    # Convert conditions to dicts for JSON storage
+    conditions_data = (
+        [c.model_dump() for c in payload.conditions] if payload.conditions else None
+    )
 
     # Validate team_id if provided
     if payload.team_id:
@@ -146,7 +185,7 @@ def create_rule(
         description=payload.description,
         team_id=payload.team_id,
         strategy=payload.strategy,
-        conditions=payload.conditions,
+        conditions=conditions_data,
         priority=payload.priority,
         is_active=payload.is_active,
         fallback_team_id=payload.fallback_team_id,
@@ -206,13 +245,10 @@ def update_rule(
                 raise HTTPException(status_code=400, detail="Invalid team_id")
         rule.team_id = payload.team_id
     if payload.strategy is not None:
-        try:
-            RoutingStrategy(payload.strategy)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid strategy: {payload.strategy}")
+        # Pydantic validators handle strategy validation
         rule.strategy = payload.strategy
     if payload.conditions is not None:
-        rule.conditions = payload.conditions
+        rule.conditions = [c.model_dump() for c in payload.conditions]
     if payload.priority is not None:
         rule.priority = payload.priority
     if payload.is_active is not None:

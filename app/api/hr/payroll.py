@@ -100,7 +100,7 @@ class PayrollPayoutRequest(BaseModel):
 
 
 @router.get("/salary-components", dependencies=[Depends(Require("hr:read"))])
-async def list_salary_components(
+def list_salary_components(
     type: Optional[str] = None,
     search: Optional[str] = None,
     disabled: Optional[bool] = None,
@@ -145,7 +145,7 @@ async def list_salary_components(
 
 
 @router.get("/salary-components/{component_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_salary_component(
+def get_salary_component(
     component_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -177,7 +177,7 @@ async def get_salary_component(
 
 
 @router.post("/salary-components", dependencies=[Depends(Require("hr:write"))])
-async def create_salary_component(
+def create_salary_component(
     payload: SalaryComponentCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -200,11 +200,11 @@ async def create_salary_component(
     )
     db.add(component)
     db.commit()
-    return await get_salary_component(component.id, db)
+    return get_salary_component(component.id, db)
 
 
 @router.patch("/salary-components/{component_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_salary_component(
+def update_salary_component(
     component_id: int,
     payload: SalaryComponentUpdate,
     db: Session = Depends(get_db),
@@ -219,11 +219,11 @@ async def update_salary_component(
             setattr(component, field, value)
 
     db.commit()
-    return await get_salary_component(component.id, db)
+    return get_salary_component(component.id, db)
 
 
 @router.delete("/salary-components/{component_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_salary_component(
+def delete_salary_component(
     component_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -278,7 +278,7 @@ class SalaryStructureUpdate(BaseModel):
 
 
 @router.get("/salary-structures", dependencies=[Depends(Require("hr:read"))])
-async def list_salary_structures(
+def list_salary_structures(
     is_active: Optional[str] = None,
     company: Optional[str] = None,
     search: Optional[str] = None,
@@ -321,7 +321,7 @@ async def list_salary_structures(
 
 
 @router.get("/salary-structures/{structure_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_salary_structure(
+def get_salary_structure(
     structure_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -380,7 +380,7 @@ async def get_salary_structure(
 
 
 @router.post("/salary-structures", dependencies=[Depends(Require("hr:write"))])
-async def create_salary_structure(
+def create_salary_structure(
     payload: SalaryStructureCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -430,11 +430,11 @@ async def create_salary_structure(
             db.add(deduction)
 
     db.commit()
-    return await get_salary_structure(structure.id, db)
+    return get_salary_structure(structure.id, db)
 
 
 @router.patch("/salary-structures/{structure_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_salary_structure(
+def update_salary_structure(
     structure_id: int,
     payload: SalaryStructureUpdate,
     db: Session = Depends(get_db),
@@ -491,11 +491,11 @@ async def update_salary_structure(
             db.add(deduction)
 
     db.commit()
-    return await get_salary_structure(structure.id, db)
+    return get_salary_structure(structure.id, db)
 
 
 @router.delete("/salary-structures/{structure_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_salary_structure(
+def delete_salary_structure(
     structure_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -542,7 +542,7 @@ class SalaryStructureAssignmentUpdate(BaseModel):
 
 
 @router.get("/salary-structure-assignments", dependencies=[Depends(Require("hr:read"))])
-async def list_salary_structure_assignments(
+def list_salary_structure_assignments(
     employee_id: Optional[int] = None,
     salary_structure_id: Optional[int] = None,
     from_date: Optional[date] = None,
@@ -589,7 +589,7 @@ async def list_salary_structure_assignments(
 
 
 @router.get("/salary-structure-assignments/{assignment_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_salary_structure_assignment(
+def get_salary_structure_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -618,7 +618,7 @@ async def get_salary_structure_assignment(
 
 
 @router.post("/salary-structure-assignments", dependencies=[Depends(Require("hr:write"))])
-async def create_salary_structure_assignment(
+def create_salary_structure_assignment(
     payload: SalaryStructureAssignmentCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -638,11 +638,11 @@ async def create_salary_structure_assignment(
     )
     db.add(assignment)
     db.commit()
-    return await get_salary_structure_assignment(assignment.id, db)
+    return get_salary_structure_assignment(assignment.id, db)
 
 
 @router.patch("/salary-structure-assignments/{assignment_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_salary_structure_assignment(
+def update_salary_structure_assignment(
     assignment_id: int,
     payload: SalaryStructureAssignmentUpdate,
     db: Session = Depends(get_db),
@@ -661,11 +661,11 @@ async def update_salary_structure_assignment(
                 setattr(assignment, field, value)
 
     db.commit()
-    return await get_salary_structure_assignment(assignment.id, db)
+    return get_salary_structure_assignment(assignment.id, db)
 
 
 @router.delete("/salary-structure-assignments/{assignment_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_salary_structure_assignment(
+def delete_salary_structure_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -718,7 +718,7 @@ class PayrollEntryUpdate(BaseModel):
 
 
 @router.get("/payroll-entries", dependencies=[Depends(Require("hr:read"))])
-async def list_payroll_entries(
+def list_payroll_entries(
     company: Optional[str] = None,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
@@ -761,7 +761,7 @@ async def list_payroll_entries(
 
 
 @router.get("/payroll-entries/{entry_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_payroll_entry(
+def get_payroll_entry(
     entry_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -794,7 +794,7 @@ async def get_payroll_entry(
 
 
 @router.post("/payroll-entries", dependencies=[Depends(Require("hr:write"))])
-async def create_payroll_entry(
+def create_payroll_entry(
     payload: PayrollEntryCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -818,11 +818,11 @@ async def create_payroll_entry(
     )
     db.add(entry)
     db.commit()
-    return await get_payroll_entry(entry.id, db)
+    return get_payroll_entry(entry.id, db)
 
 
 @router.patch("/payroll-entries/{entry_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_payroll_entry(
+def update_payroll_entry(
     entry_id: int,
     payload: PayrollEntryUpdate,
     db: Session = Depends(get_db),
@@ -842,11 +842,11 @@ async def update_payroll_entry(
     validate_date_order(entry.start_date, entry.end_date)
 
     db.commit()
-    return await get_payroll_entry(entry.id, db)
+    return get_payroll_entry(entry.id, db)
 
 
 @router.delete("/payroll-entries/{entry_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_payroll_entry(
+def delete_payroll_entry(
     entry_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -958,7 +958,7 @@ def _load_slip(db: Session, slip_id: int) -> SalarySlip:
 
 
 @router.get("/salary-slips", dependencies=[Depends(Require("hr:read"))])
-async def list_salary_slips(
+def list_salary_slips(
     employee_id: Optional[int] = None,
     status: Optional[str] = None,
     from_date: Optional[date] = None,
@@ -1018,7 +1018,7 @@ async def list_salary_slips(
 
 
 @router.get("/salary-slips/export", dependencies=[Depends(Require("hr:read"))])
-async def export_salary_slips(
+def export_salary_slips(
     employee_id: Optional[int] = None,
     status: Optional[str] = None,
     from_date: Optional[date] = None,
@@ -1062,7 +1062,7 @@ async def export_salary_slips(
 
 
 @router.get("/salary-slips/summary", dependencies=[Depends(Require("hr:read"))])
-async def salary_slips_summary(
+def salary_slips_summary(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     company: Optional[str] = None,
@@ -1116,7 +1116,7 @@ async def salary_slips_summary(
 
 
 @router.get("/salary-slips/{slip_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_salary_slip(
+def get_salary_slip(
     slip_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1194,7 +1194,7 @@ async def get_salary_slip(
 
 
 @router.post("/salary-slips", dependencies=[Depends(Require("hr:write"))])
-async def create_salary_slip(
+def create_salary_slip(
     payload: SalarySlipCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1267,11 +1267,11 @@ async def create_salary_slip(
             db.add(deduction)
 
     db.commit()
-    return await get_salary_slip(slip.id, db)
+    return get_salary_slip(slip.id, db)
 
 
 @router.patch("/salary-slips/{slip_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_salary_slip(
+def update_salary_slip(
     slip_id: int,
     payload: SalarySlipUpdate,
     db: Session = Depends(get_db),
@@ -1338,11 +1338,11 @@ async def update_salary_slip(
             db.add(deduction)
 
     db.commit()
-    return await get_salary_slip(slip.id, db)
+    return get_salary_slip(slip.id, db)
 
 
 @router.delete("/salary-slips/{slip_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_salary_slip(
+def delete_salary_slip(
     slip_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1357,7 +1357,7 @@ async def delete_salary_slip(
 
 
 @router.post("/salary-slips/{slip_id}/submit", dependencies=[Depends(Require("hr:write"))])
-async def submit_salary_slip(
+def submit_salary_slip(
     slip_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1367,11 +1367,11 @@ async def submit_salary_slip(
     slip.status = SalarySlipStatus.SUBMITTED
     slip.docstatus = 1
     db.commit()
-    return await get_salary_slip(slip_id, db)
+    return get_salary_slip(slip_id, db)
 
 
 @router.post("/salary-slips/{slip_id}/cancel", dependencies=[Depends(Require("hr:write"))])
-async def cancel_salary_slip(
+def cancel_salary_slip(
     slip_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1381,11 +1381,11 @@ async def cancel_salary_slip(
     slip.status = SalarySlipStatus.CANCELLED
     slip.docstatus = 2
     db.commit()
-    return await get_salary_slip(slip_id, db)
+    return get_salary_slip(slip_id, db)
 
 
 @router.post("/salary-slips/bulk/submit", dependencies=[Depends(Require("hr:write"))])
-async def bulk_submit_salary_slips(
+def bulk_submit_salary_slips(
     payload: SalarySlipBulkAction,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1402,7 +1402,7 @@ async def bulk_submit_salary_slips(
 
 
 @router.post("/salary-slips/bulk/cancel", dependencies=[Depends(Require("hr:write"))])
-async def bulk_cancel_salary_slips(
+def bulk_cancel_salary_slips(
     payload: SalarySlipBulkAction,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1423,7 +1423,7 @@ async def bulk_cancel_salary_slips(
 # =============================================================================
 
 @router.post("/payroll-entries/{entry_id}/generate-slips", dependencies=[Depends(Require("hr:write"))])
-async def generate_payroll_slips(
+def generate_payroll_slips(
     entry_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1738,7 +1738,7 @@ async def generate_payroll_slips(
 
 
 @router.post("/payroll-entries/{entry_id}/regenerate-slips", dependencies=[Depends(Require("hr:write"))])
-async def regenerate_payroll_slips(
+def regenerate_payroll_slips(
     entry_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1763,7 +1763,7 @@ async def regenerate_payroll_slips(
     db.commit()
 
     # Now generate fresh slips
-    result = await generate_payroll_slips(entry_id, db, current_user)
+    result = generate_payroll_slips(entry_id, db, current_user)
     result["deleted_drafts"] = deleted_count
     return result
 
@@ -1782,7 +1782,7 @@ class VoidSlipPayload(BaseModel):
 
 
 @router.post("/salary-slips/{slip_id}/mark-paid", dependencies=[Depends(Require("hr:write"))])
-async def mark_salary_slip_paid(
+def mark_salary_slip_paid(
     slip_id: int,
     payload: MarkPaidPayload,
     db: Session = Depends(get_db),
@@ -1817,11 +1817,11 @@ async def mark_salary_slip_paid(
     )
 
     db.commit()
-    return await get_salary_slip(slip_id, db)
+    return get_salary_slip(slip_id, db)
 
 
 @router.post("/salary-slips/{slip_id}/void", dependencies=[Depends(Require("hr:write"))])
-async def void_salary_slip(
+def void_salary_slip(
     slip_id: int,
     payload: VoidSlipPayload,
     db: Session = Depends(get_db),
@@ -1850,7 +1850,7 @@ async def void_salary_slip(
     )
 
     db.commit()
-    return await get_salary_slip(slip_id, db)
+    return get_salary_slip(slip_id, db)
 
 
 # =============================================================================
@@ -1861,7 +1861,7 @@ async def void_salary_slip(
     "/payroll-entries/{entry_id}/payouts",
     dependencies=[Depends(Require("hr:write"))],
 )
-async def initiate_payroll_payouts(
+def initiate_payroll_payouts(
     entry_id: int,
     payload: PayrollPayoutRequest,
     db: Session = Depends(get_db),
@@ -2028,7 +2028,7 @@ async def initiate_payroll_payouts(
     "/payroll-entries/{entry_id}/handoff",
     dependencies=[Depends(Require("hr:write"))],
 )
-async def handoff_payroll_to_books(
+def handoff_payroll_to_books(
     entry_id: int,
     payload: PayrollPayoutRequest,
     db: Session = Depends(get_db),
@@ -2124,7 +2124,7 @@ async def handoff_payroll_to_books(
 # =============================================================================
 
 @router.get("/salary-slips/register/export", dependencies=[Depends(Require("hr:read"))])
-async def export_payroll_register(
+def export_payroll_register(
     start_date: date,
     end_date: date,
     company: Optional[str] = None,

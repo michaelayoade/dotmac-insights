@@ -76,7 +76,7 @@ class LeaveTypeUpdate(BaseModel):
 
 
 @router.get("/leave-types", dependencies=[Depends(Require("hr:read"))])
-async def list_leave_types(
+def list_leave_types(
     search: Optional[str] = None,
     is_lwp: Optional[bool] = None,
     is_carry_forward: Optional[bool] = None,
@@ -124,7 +124,7 @@ async def list_leave_types(
 
 
 @router.get("/leave-types/{leave_type_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_leave_type(
+def get_leave_type(
     leave_type_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -154,7 +154,7 @@ async def get_leave_type(
 
 
 @router.post("/leave-types", dependencies=[Depends(Require("hr:write"))])
-async def create_leave_type(
+def create_leave_type(
     payload: LeaveTypeCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -175,11 +175,11 @@ async def create_leave_type(
     )
     db.add(lt)
     db.commit()
-    return await get_leave_type(lt.id, db)
+    return get_leave_type(lt.id, db)
 
 
 @router.patch("/leave-types/{leave_type_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_leave_type(
+def update_leave_type(
     leave_type_id: int,
     payload: LeaveTypeUpdate,
     db: Session = Depends(get_db),
@@ -196,11 +196,11 @@ async def update_leave_type(
             setattr(lt, field, value)
 
     db.commit()
-    return await get_leave_type(leave_type_id, db)
+    return get_leave_type(leave_type_id, db)
 
 
 @router.delete("/leave-types/{leave_type_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_leave_type(
+def delete_leave_type(
     leave_type_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -265,7 +265,7 @@ class BulkLeaveAllocationCreate(BaseModel):
 
 
 @router.get("/leave-allocations", dependencies=[Depends(Require("hr:read"))])
-async def list_leave_allocations(
+def list_leave_allocations(
     employee_id: Optional[int] = None,
     leave_type_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -326,7 +326,7 @@ async def list_leave_allocations(
 
 
 @router.get("/leave-allocations/export", dependencies=[Depends(Require("hr:read"))])
-async def export_leave_allocations(
+def export_leave_allocations(
     employee_id: Optional[int] = None,
     leave_type_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -372,7 +372,7 @@ async def export_leave_allocations(
 
 
 @router.get("/leave-allocations/{allocation_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_leave_allocation(
+def get_leave_allocation(
     allocation_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -406,7 +406,7 @@ async def get_leave_allocation(
 
 
 @router.post("/leave-allocations", dependencies=[Depends(Require("hr:write"))])
-async def create_leave_allocation(
+def create_leave_allocation(
     payload: LeaveAllocationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -482,11 +482,11 @@ async def create_leave_allocation(
     )
 
     db.commit()
-    return await get_leave_allocation(allocation.id, db)
+    return get_leave_allocation(allocation.id, db)
 
 
 @router.patch("/leave-allocations/{allocation_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_leave_allocation(
+def update_leave_allocation(
     allocation_id: int,
     payload: LeaveAllocationUpdate,
     db: Session = Depends(get_db),
@@ -530,11 +530,11 @@ async def update_leave_allocation(
     )
 
     db.commit()
-    return await get_leave_allocation(allocation.id, db)
+    return get_leave_allocation(allocation.id, db)
 
 
 @router.delete("/leave-allocations/{allocation_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_leave_allocation(
+def delete_leave_allocation(
     allocation_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -562,7 +562,7 @@ async def delete_leave_allocation(
 
 
 @router.post("/leave-allocations/bulk", dependencies=[Depends(Require("hr:write"))])
-async def bulk_create_leave_allocations(
+def bulk_create_leave_allocations(
     payload: BulkLeaveAllocationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -718,7 +718,7 @@ def _load_application(db: Session, application_id: int) -> LeaveApplication:
 
 
 @router.get("/leave-applications", dependencies=[Depends(Require("hr:read"))])
-async def list_leave_applications(
+def list_leave_applications(
     employee_id: Optional[int] = None,
     leave_type_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -779,7 +779,7 @@ async def list_leave_applications(
 
 
 @router.get("/leave-applications/export", dependencies=[Depends(Require("hr:read"))])
-async def export_leave_applications(
+def export_leave_applications(
     employee_id: Optional[int] = None,
     leave_type_id: Optional[int] = None,
     status: Optional[str] = None,
@@ -824,7 +824,7 @@ async def export_leave_applications(
 
 
 @router.get("/leave-applications/{application_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_leave_application(
+def get_leave_application(
     application_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -859,7 +859,7 @@ async def get_leave_application(
 
 
 @router.post("/leave-applications", dependencies=[Depends(Require("hr:write"))])
-async def create_leave_application(
+def create_leave_application(
     payload: LeaveApplicationCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -941,11 +941,11 @@ async def create_leave_application(
     )
 
     db.commit()
-    return await get_leave_application(application.id, db)
+    return get_leave_application(application.id, db)
 
 
 @router.patch("/leave-applications/{application_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_leave_application(
+def update_leave_application(
     application_id: int,
     payload: LeaveApplicationUpdate,
     db: Session = Depends(get_db),
@@ -1007,11 +1007,11 @@ async def update_leave_application(
     )
 
     db.commit()
-    return await get_leave_application(application.id, db)
+    return get_leave_application(application.id, db)
 
 
 @router.delete("/leave-applications/{application_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_leave_application(
+def delete_leave_application(
     application_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1039,7 +1039,7 @@ async def delete_leave_application(
 
 
 @router.post("/leave-applications/{application_id}/approve", dependencies=[Depends(Require("hr:write"))])
-async def approve_leave_application(
+def approve_leave_application(
     application_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1098,11 +1098,11 @@ async def approve_leave_application(
     )
 
     db.commit()
-    return await get_leave_application(application_id, db)
+    return get_leave_application(application_id, db)
 
 
 @router.post("/leave-applications/{application_id}/reject", dependencies=[Depends(Require("hr:write"))])
-async def reject_leave_application(
+def reject_leave_application(
     application_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1128,11 +1128,11 @@ async def reject_leave_application(
     )
 
     db.commit()
-    return await get_leave_application(application_id, db)
+    return get_leave_application(application_id, db)
 
 
 @router.post("/leave-applications/{application_id}/cancel", dependencies=[Depends(Require("hr:write"))])
-async def cancel_leave_application(
+def cancel_leave_application(
     application_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1182,14 +1182,14 @@ async def cancel_leave_application(
     )
 
     db.commit()
-    result = await get_leave_application(application_id, db)
+    result = get_leave_application(application_id, db)
     if balance_restore_warning:
         result["warning"] = balance_restore_warning
     return result
 
 
 @router.post("/leave-applications/bulk/approve", dependencies=[Depends(Require("hr:write"))])
-async def bulk_approve_leave_applications(
+def bulk_approve_leave_applications(
     payload: LeaveApplicationBulkAction,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1268,7 +1268,7 @@ async def bulk_approve_leave_applications(
 
 
 @router.post("/leave-applications/bulk/reject", dependencies=[Depends(Require("hr:write"))])
-async def bulk_reject_leave_applications(
+def bulk_reject_leave_applications(
     payload: LeaveApplicationBulkAction,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_principal),
@@ -1329,7 +1329,7 @@ class HolidayListUpdate(BaseModel):
 
 
 @router.get("/holiday-lists", dependencies=[Depends(Require("hr:read"))])
-async def list_holiday_lists(
+def list_holiday_lists(
     company: Optional[str] = None,
     year: Optional[int] = None,
     search: Optional[str] = None,
@@ -1372,7 +1372,7 @@ async def list_holiday_lists(
 
 
 @router.get("/holiday-lists/{list_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_holiday_list(
+def get_holiday_list(
     list_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1408,7 +1408,7 @@ async def get_holiday_list(
 
 
 @router.post("/holiday-lists", dependencies=[Depends(Require("hr:write"))])
-async def create_holiday_list(
+def create_holiday_list(
     payload: HolidayListCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1436,11 +1436,11 @@ async def create_holiday_list(
             db.add(holiday)
 
     db.commit()
-    return await get_holiday_list(holiday_list.id, db)
+    return get_holiday_list(holiday_list.id, db)
 
 
 @router.patch("/holiday-lists/{list_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_holiday_list(
+def update_holiday_list(
     list_id: int,
     payload: HolidayListUpdate,
     db: Session = Depends(get_db),
@@ -1475,11 +1475,11 @@ async def update_holiday_list(
         holiday_list.total_holidays = len(payload.holidays)
 
     db.commit()
-    return await get_holiday_list(holiday_list.id, db)
+    return get_holiday_list(holiday_list.id, db)
 
 
 @router.delete("/holiday-lists/{list_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_holiday_list(
+def delete_holiday_list(
     list_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1515,7 +1515,7 @@ class LeavePolicyUpdate(BaseModel):
 
 
 @router.get("/leave-policies", dependencies=[Depends(Require("hr:read"))])
-async def list_leave_policies(
+def list_leave_policies(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = 0,
@@ -1547,7 +1547,7 @@ async def list_leave_policies(
 
 
 @router.get("/leave-policies/{policy_id}", dependencies=[Depends(Require("hr:read"))])
-async def get_leave_policy(
+def get_leave_policy(
     policy_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1578,7 +1578,7 @@ async def get_leave_policy(
 
 
 @router.post("/leave-policies", dependencies=[Depends(Require("hr:write"))])
-async def create_leave_policy(
+def create_leave_policy(
     payload: LeavePolicyCreate,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1601,11 +1601,11 @@ async def create_leave_policy(
             db.add(detail)
 
     db.commit()
-    return await get_leave_policy(policy.id, db)
+    return get_leave_policy(policy.id, db)
 
 
 @router.patch("/leave-policies/{policy_id}", dependencies=[Depends(Require("hr:write"))])
-async def update_leave_policy(
+def update_leave_policy(
     policy_id: int,
     payload: LeavePolicyUpdate,
     db: Session = Depends(get_db),
@@ -1631,11 +1631,11 @@ async def update_leave_policy(
             db.add(detail)
 
     db.commit()
-    return await get_leave_policy(policy.id, db)
+    return get_leave_policy(policy.id, db)
 
 
 @router.delete("/leave-policies/{policy_id}", dependencies=[Depends(Require("hr:write"))])
-async def delete_leave_policy(
+def delete_leave_policy(
     policy_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:

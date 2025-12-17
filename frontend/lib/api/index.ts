@@ -2,7 +2,7 @@
  * API Module - Barrel Export
  *
  * This file provides backward compatibility by re-exporting everything
- * from the original api.ts file while also exposing new domain-specific APIs.
+ * from domain-specific modules while also exposing the unified `api` object.
  *
  * Usage (unchanged):
  *   import { api, Customer, fetchApi } from '@/lib/api';
@@ -23,6 +23,6 @@ export * from './types';
 // Re-export domain APIs and types
 export * from './domains';
 
-// Re-export everything from the original api.ts for backward compatibility
-// This includes the main `api` object and all types
-export * from '../api';
+// Re-export the unified api object from original api.ts for backward compatibility
+// Note: Domain types are now exported from ./domains, not ../api
+export { api } from '../api';

@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models.unified_contact import (
     UnifiedContact, ContactType, ContactCategory, ContactStatus, LeadQualification
 )
+from app.auth import Require
 
 router = APIRouter()
 
@@ -21,8 +22,8 @@ router = APIRouter()
 # DASHBOARD
 # =============================================================================
 
-@router.get("/analytics/dashboard")
-async def get_contacts_dashboard(
+@router.get("/analytics/dashboard", dependencies=[Depends(Require("contacts:read"))])
+def get_contacts_dashboard(
     period_days: int = Query(30, ge=7, le=365),
     db: Session = Depends(get_db),
 ):
@@ -123,8 +124,8 @@ async def get_contacts_dashboard(
 # FUNNEL ANALYTICS
 # =============================================================================
 
-@router.get("/analytics/funnel")
-async def get_sales_funnel(
+@router.get("/analytics/funnel", dependencies=[Depends(Require("contacts:read"))])
+def get_sales_funnel(
     period_days: int = Query(30, ge=7, le=365),
     owner_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -203,8 +204,8 @@ async def get_sales_funnel(
 # DISTRIBUTION ANALYSIS
 # =============================================================================
 
-@router.get("/analytics/by-category")
-async def get_contacts_by_category(db: Session = Depends(get_db)):
+@router.get("/analytics/by-category", dependencies=[Depends(Require("contacts:read"))])
+def get_contacts_by_category(db: Session = Depends(get_db)):
     """
     Contact distribution by category.
     """
@@ -229,8 +230,8 @@ async def get_contacts_by_category(db: Session = Depends(get_db)):
     return {"by_category": by_category}
 
 
-@router.get("/analytics/by-territory")
-async def get_contacts_by_territory(
+@router.get("/analytics/by-territory", dependencies=[Depends(Require("contacts:read"))])
+def get_contacts_by_territory(
     contact_type: Optional[str] = None,
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -266,8 +267,8 @@ async def get_contacts_by_territory(
     }
 
 
-@router.get("/analytics/by-source")
-async def get_contacts_by_source(
+@router.get("/analytics/by-source", dependencies=[Depends(Require("contacts:read"))])
+def get_contacts_by_source(
     period_days: int = Query(90, ge=7, le=365),
     db: Session = Depends(get_db),
 ):
@@ -302,8 +303,8 @@ async def get_contacts_by_source(
     }
 
 
-@router.get("/analytics/by-owner")
-async def get_contacts_by_owner(
+@router.get("/analytics/by-owner", dependencies=[Depends(Require("contacts:read"))])
+def get_contacts_by_owner(
     contact_type: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
@@ -345,8 +346,8 @@ async def get_contacts_by_owner(
 # LIFECYCLE ANALYTICS
 # =============================================================================
 
-@router.get("/analytics/lifecycle")
-async def get_lifecycle_analytics(
+@router.get("/analytics/lifecycle", dependencies=[Depends(Require("contacts:read"))])
+def get_lifecycle_analytics(
     period_days: int = Query(90, ge=7, le=365),
     db: Session = Depends(get_db),
 ):
@@ -412,8 +413,8 @@ async def get_lifecycle_analytics(
 # CHURN ANALYSIS
 # =============================================================================
 
-@router.get("/analytics/churn")
-async def get_churn_analytics(
+@router.get("/analytics/churn", dependencies=[Depends(Require("contacts:read"))])
+def get_churn_analytics(
     period_days: int = Query(90, ge=7, le=365),
     db: Session = Depends(get_db),
 ):
