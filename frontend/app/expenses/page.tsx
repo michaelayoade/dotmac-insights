@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { ArrowRight, ClipboardList, Wallet2, CheckCircle2, AlertCircle, Sparkles, FilePlus, PlusCircle } from 'lucide-react';
 import { useExpenseClaims, useCashAdvances } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
 const ACCENT = {
   primary: '#0ea5e9', // sky
@@ -86,8 +87,14 @@ function ActionTile({
 }
 
 export default function ExpensesDashboard() {
-  const { data: claims } = useExpenseClaims({ limit: 50 });
-  const { data: advances } = useCashAdvances({ limit: 50 });
+  const { data: claims, error: claimsError, isLoading: claimsLoading, mutate: refetchClaims } = useExpenseClaims({ limit: 50 });
+  const { data: advances, error: advancesError, isLoading: advancesLoading, mutate: refetchAdvances } = useCashAdvances({ limit: 50 });
+  const isLoading = claimsLoading || advancesLoading;
+  const firstError = (claimsError || advancesError) as Error | undefined;
+  const retryAll = () => {
+    void refetchClaims();
+    void refetchAdvances();
+  };
 
   const metrics = useMemo(() => {
     const allClaims = claims || [];
@@ -110,6 +117,20 @@ export default function ExpensesDashboard() {
 
   const recentClaims = (claims || []).slice(0, 4);
   const recentAdvances = (advances || []).slice(0, 4);
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  if (firstError) {
+    return (
+      <ErrorDisplay
+        message="Failed to load expenses data."
+        error={firstError}
+        onRetry={retryAll}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

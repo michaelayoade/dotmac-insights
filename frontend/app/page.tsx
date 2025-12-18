@@ -25,6 +25,10 @@ import {
   TrendingUp,
   Clock,
   Building2,
+  Package,
+  Landmark,
+  Contact2,
+  X,
 } from 'lucide-react';
 import { useAuth, Scope } from '@/lib/auth-context';
 import { useTheme } from '@dotmac/design-tokens';
@@ -49,6 +53,16 @@ type ModuleCard = {
 const MODULES: ModuleCard[] = [
   // Core Operations
   {
+    key: 'contacts',
+    name: 'Contacts',
+    description: 'Unified contact management for customers, leads, and suppliers.',
+    href: '/contacts',
+    icon: Contact2,
+    badge: 'CRM',
+    accentColor: 'indigo',
+    category: 'core',
+  },
+  {
     key: 'hr',
     name: 'People',
     description: 'HR operations, payroll, leave, attendance, and workforce analytics.',
@@ -57,7 +71,7 @@ const MODULES: ModuleCard[] = [
     badge: 'HR',
     accentColor: 'amber',
     requiredScopes: ['hr:read'],
-    category: 'core',
+    category: 'operations',
   },
   {
     key: 'support',
@@ -91,6 +105,16 @@ const MODULES: ModuleCard[] = [
     category: 'core',
   },
   // Operations
+  {
+    key: 'inventory',
+    name: 'Inventory',
+    description: 'Warehouse management, stock levels, batches, and serial tracking.',
+    href: '/inventory',
+    icon: Package,
+    badge: 'WMS',
+    accentColor: 'lime',
+    category: 'operations',
+  },
   {
     key: 'field-service',
     name: 'Field Service',
@@ -132,6 +156,16 @@ const MODULES: ModuleCard[] = [
     badge: 'Accounting',
     accentColor: 'teal',
     requiredScopes: ['analytics:read'],
+    category: 'finance',
+  },
+  {
+    key: 'assets',
+    name: 'Assets',
+    description: 'Fixed asset tracking, depreciation schedules, and maintenance.',
+    href: '/assets',
+    icon: Landmark,
+    badge: 'FAM',
+    accentColor: 'stone',
     category: 'finance',
   },
   {
@@ -197,6 +231,9 @@ const ACCENT_STYLES: Record<string, { bg: string; border: string; text: string; 
   blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', icon: 'from-blue-500 to-cyan-400' },
   orange: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', icon: 'from-orange-400 to-orange-300' },
   purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', icon: 'from-purple-400 to-purple-300' },
+  lime: { bg: 'bg-lime-500/10', border: 'border-lime-500/30', text: 'text-lime-400', icon: 'from-lime-400 to-lime-300' },
+  indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-400', icon: 'from-indigo-400 to-indigo-300' },
+  stone: { bg: 'bg-stone-500/10', border: 'border-stone-500/30', text: 'text-stone-400', icon: 'from-stone-400 to-stone-300' },
 };
 
 const DEFAULT_KEY = 'dotmac_default_module';
@@ -226,21 +263,21 @@ export default function HomePage() {
 
   const accessibleModules = modulesWithAccess;
 
-  useEffect(() => {
-    if (isLoading || hasRedirected.current) return;
-    if (!defaultModuleKey) return;
-
-    const target = accessibleModules.find(m => m.key === defaultModuleKey);
-    if (target && !target.stub) {
-      hasRedirected.current = true;
-      router.replace(target.href);
-    }
-  }, [accessibleModules, defaultModuleKey, isLoading, router]);
+  const defaultModule = useMemo(
+    () => accessibleModules.find((m) => m.key === defaultModuleKey) || null,
+    [accessibleModules, defaultModuleKey],
+  );
 
   const handleSetDefault = (key: string) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(DEFAULT_KEY, key);
     setDefaultModuleKey(key);
+  };
+
+  const handleResetDefault = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(DEFAULT_KEY);
+    setDefaultModuleKey(null);
   };
 
   // Group modules by category
@@ -270,7 +307,17 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b border-slate-border bg-slate-card">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-3 hover:opacity-90 transition-opacity"
+            onClick={() => {
+              // Skip auto-redirect when clicking the logo
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('skip_home_redirect', '1');
+              }
+              hasRedirected.current = true;
+            }}
+          >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
               <Zap className="w-6 h-6 text-slate-900" />
             </div>
@@ -278,7 +325,7 @@ export default function HomePage() {
               <span className="font-display font-bold text-white tracking-tight text-lg">Dotmac</span>
               <span className="text-[10px] text-slate-muted uppercase tracking-widest">Business Operating System</span>
             </div>
-          </div>
+          </Link>
           <button
             onClick={toggleTheme}
             className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
@@ -334,12 +381,31 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-6 py-10">
         {/* Quick access tip */}
         {defaultModuleKey && (
-          <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-xl">
-            <Star className="w-5 h-5 text-teal-400 flex-shrink-0" />
-            <p className="text-sm text-teal-300">
-              <span className="font-medium">{modulesWithAccess.find(m => m.key === defaultModuleKey)?.name}</span> is your default workspace.
-              You&apos;ll be redirected there automatically on your next visit.
-            </p>
+          <div className="mb-8 flex items-center justify-between gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-xl">
+            <div className="flex items-center gap-3">
+              <Star className="w-5 h-5 text-teal-400 flex-shrink-0 fill-current" />
+              <p className="text-sm text-teal-300">
+                <span className="font-medium">{defaultModule?.name}</span> is your default workspace.
+              </p>
+            </div>
+            <button
+              onClick={handleResetDefault}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-white hover:bg-teal-500/20 rounded-lg transition-colors"
+              title="Reset default workspace"
+            >
+              <X className="w-4 h-4" />
+              Reset
+            </button>
+            {defaultModule && (
+              <Link
+                href={defaultModule.href}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-white hover:bg-teal-500/20 rounded-lg transition-colors"
+                title="Go to default workspace"
+              >
+                <ArrowRight className="w-4 h-4" />
+                Open default
+              </Link>
+            )}
           </div>
         )}
 
