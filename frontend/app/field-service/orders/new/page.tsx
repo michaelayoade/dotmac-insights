@@ -14,7 +14,7 @@ import {
   ClipboardList,
   Clock,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi, customersApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const orderTypes = [
@@ -68,17 +68,17 @@ export default function NewServiceOrderPage() {
 
   // Fetch customers for selection
   const { data: customers } = useSWR('customers-list', () =>
-    api.get('/customers', { params: { limit: 100 } }).then(r => r.data?.data || [])
+    customersApi.getCustomers({ limit: 100 }).then(r => r.data || [])
   );
 
   // Fetch teams for selection
   const { data: teams } = useSWR('field-teams', () =>
-    api.get('/field-service/teams').then(r => r.data?.data || [])
+    fieldServiceApi.getTeams().then(r => r.data || [])
   );
 
   // Fetch checklist templates
   const { data: checklistTemplates } = useSWR('checklist-templates', () =>
-    api.get('/field-service/checklist-templates').then(r => r.data?.data || [])
+    fieldServiceApi.getChecklistTemplates().then(r => r.data || [])
   );
 
   // Get technicians for selected team
@@ -131,7 +131,7 @@ export default function NewServiceOrderPage() {
         scheduled_end_time: formData.scheduled_end_time || null,
       };
 
-      const response = await api.post('/field-service/orders', payload);
+      const response = await fieldServiceApi.createOrder(payload);
 
       if (createAnother) {
         // Reset form

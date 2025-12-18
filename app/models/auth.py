@@ -258,13 +258,20 @@ class ServiceToken(Base):
     use_count: Mapped[int] = mapped_column(default=0)
 
     # Audit trail
-    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # nullable=True with SET NULL on user deletion - preserves token if creator deleted
+    created_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     revoked_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    revoked_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    revoked_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Relationships
-    created_by_user: Mapped["User"] = relationship(foreign_keys=[created_by_id], back_populates="service_tokens")
+    created_by_user: Mapped[Optional["User"]] = relationship(
+        foreign_keys=[created_by_id], back_populates="service_tokens"
+    )
     revoked_by_user: Mapped[Optional["User"]] = relationship(foreign_keys=[revoked_by_id])
 
     __table_args__ = (

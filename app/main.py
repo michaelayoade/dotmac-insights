@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 
-from app.api import api_router
+from app.api import api_router, public_api_router
 from app.config import settings
 from app.auth import get_current_principal
+from app.middleware.metrics import get_metrics_response
 
 # Configure structured logging
 structlog.configure(
@@ -70,6 +71,12 @@ app.include_router(
 )
 logger.info("api_jwt_auth_enabled")
 
+# Public endpoints that must remain unauthenticated (e.g., third-party webhooks)
+app.include_router(
+    public_api_router,
+    prefix="/api",
+)
+
 
 
 @app.get("/")
@@ -95,3 +102,19 @@ async def health_check():
 async def api_health_check():
     """Health check for clients that expect /api/health."""
     return {"status": "healthy"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """
+    Prometheus metrics endpoint.
+
+    Exposes application metrics for monitoring:
+    - webhook_auth_failures_total: Webhook authentication failures by provider
+    - contacts_auth_failures_total: Contacts API auth failures
+    - outbound_sync_total: Outbound sync attempts by entity/target/status
+    - contacts_drift_pct: Contact field drift percentage by system
+    - contacts_query_latency_seconds: Contacts API query latency
+    """
+    metrics_bytes, content_type = get_metrics_response()
+    return Response(content=metrics_bytes, media_type=content_type)

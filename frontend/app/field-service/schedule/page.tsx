@@ -18,7 +18,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type ViewMode = 'calendar' | 'dispatch' | 'list';
@@ -63,24 +63,20 @@ export default function SchedulePage() {
 
   const { data: ordersData, isLoading: ordersLoading } = useSWR(
     ['field-service-calendar', dateRange, selectedTeam],
-    () => api.get('/field-service/schedule/calendar', {
-      params: {
-        start_date: dateRange.start,
-        end_date: dateRange.end,
-        team_id: selectedTeam !== 'all' ? selectedTeam : undefined,
-      }
-    }).then(r => r.data)
+    () => fieldServiceApi.getCalendar({
+      start_date: dateRange.start,
+      end_date: dateRange.end,
+      team_id: selectedTeam !== 'all' ? parseInt(selectedTeam) : undefined,
+    })
   );
 
   const { data: teams } = useSWR('field-teams', () =>
-    api.get('/field-service/teams').then(r => r.data?.data || [])
+    fieldServiceApi.getTeams().then(r => r.data || [])
   );
 
   const { data: dispatchData, mutate: mutateDispatch } = useSWR(
     viewMode === 'dispatch' ? ['dispatch-board', dateRange.start] : null,
-    () => api.get('/field-service/schedule/dispatch-board', {
-      params: { date: dateRange.start }
-    }).then(r => r.data)
+    () => fieldServiceApi.getDispatchBoard({ date: dateRange.start })
   );
 
   // Drag and drop handlers
@@ -115,7 +111,7 @@ export default function SchedulePage() {
     setErrorMessage(null);
 
     try {
-      await api.post(`/field-service/orders/${draggedOrder.id}/dispatch`, {
+      await fieldServiceApi.dispatchOrder(draggedOrder.id, {
         technician_id: techId,
         notify_customer: true,
       });

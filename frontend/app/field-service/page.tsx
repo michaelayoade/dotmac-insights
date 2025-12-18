@@ -17,7 +17,7 @@ import {
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // KPI Card Component
@@ -146,17 +146,15 @@ function OrderRow({ order }: { order: any }) {
 export default function FieldServiceDashboard() {
   const { data: dashboard, isLoading, mutate } = useSWR(
     'field-service-dashboard',
-    () => api.get('/field-service/dashboard').then(r => r.data)
+    () => fieldServiceApi.getDashboard()
   );
 
   const { data: todayOrders } = useSWR(
     'field-service-today-orders',
-    () => api.get('/field-service/orders', {
-      params: {
-        scheduled_date: new Date().toISOString().split('T')[0],
-        limit: 10,
-      }
-    }).then(r => r.data)
+    () => fieldServiceApi.getOrders({
+      scheduled_date: new Date().toISOString().split('T')[0],
+      limit: 10,
+    }).then((r: any) => r.data || r)
   );
 
   if (isLoading) {

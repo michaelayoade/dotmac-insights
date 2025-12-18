@@ -16,6 +16,7 @@ from .schemas import (
     AssignOwnerRequest, UnifiedContactResponse, ContactTypeEnum
 )
 from .contacts import _contact_to_response
+from app.auth import Require
 
 router = APIRouter()
 
@@ -24,7 +25,11 @@ router = APIRouter()
 # LEAD LIFECYCLE
 # =============================================================================
 
-@router.post("/{contact_id}/qualify", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/qualify",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def qualify_lead(contact_id: int, payload: QualifyLeadRequest, db: Session = Depends(get_db)):
     """
     Qualify a lead.
@@ -61,7 +66,11 @@ async def qualify_lead(contact_id: int, payload: QualifyLeadRequest, db: Session
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/convert-to-prospect", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/convert-to-prospect",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def convert_to_prospect(contact_id: int, db: Session = Depends(get_db)):
     """
     Convert a lead to a prospect.
@@ -85,7 +94,11 @@ async def convert_to_prospect(contact_id: int, db: Session = Depends(get_db)):
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/convert-to-customer", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/convert-to-customer",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def convert_to_customer(contact_id: int, payload: ConvertToCustomerRequest, db: Session = Depends(get_db)):
     """
     Convert a lead or prospect to a customer.
@@ -140,7 +153,11 @@ async def convert_to_customer(contact_id: int, payload: ConvertToCustomerRequest
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/reactivate", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/reactivate",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def reactivate_churned_customer(contact_id: int, db: Session = Depends(get_db)):
     """
     Reactivate a churned customer.
@@ -171,7 +188,11 @@ async def reactivate_churned_customer(contact_id: int, db: Session = Depends(get
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/mark-churned", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/mark-churned",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def mark_churned(contact_id: int, payload: MarkChurnedRequest, db: Session = Depends(get_db)):
     """
     Mark a customer as churned.
@@ -206,7 +227,11 @@ async def mark_churned(contact_id: int, payload: MarkChurnedRequest, db: Session
 # ASSIGNMENT
 # =============================================================================
 
-@router.post("/{contact_id}/assign", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/assign",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def assign_owner(contact_id: int, payload: AssignOwnerRequest, db: Session = Depends(get_db)):
     """
     Assign a contact to an owner (employee).
@@ -230,7 +255,11 @@ async def assign_owner(contact_id: int, payload: AssignOwnerRequest, db: Session
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/unassign", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/unassign",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def unassign_owner(contact_id: int, db: Session = Depends(get_db)):
     """
     Remove owner assignment from a contact.
@@ -250,7 +279,11 @@ async def unassign_owner(contact_id: int, db: Session = Depends(get_db)):
 # STATUS MANAGEMENT
 # =============================================================================
 
-@router.post("/{contact_id}/suspend", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/suspend",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def suspend_contact(contact_id: int, reason: str = None, db: Session = Depends(get_db)):
     """
     Suspend a contact (e.g., for non-payment).
@@ -273,7 +306,11 @@ async def suspend_contact(contact_id: int, reason: str = None, db: Session = Dep
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/activate", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/activate",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def activate_contact(contact_id: int, db: Session = Depends(get_db)):
     """
     Activate a contact (remove suspension, inactive status).
@@ -296,7 +333,11 @@ async def activate_contact(contact_id: int, db: Session = Depends(get_db)):
     return _contact_to_response(contact)
 
 
-@router.post("/{contact_id}/do-not-contact", response_model=UnifiedContactResponse)
+@router.post(
+    "/{contact_id}/do-not-contact",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def mark_do_not_contact(contact_id: int, reason: str = None, db: Session = Depends(get_db)):
     """
     Mark a contact as do-not-contact.
@@ -329,7 +370,10 @@ async def mark_do_not_contact(contact_id: int, reason: str = None, db: Session =
 # COMMUNICATION PREFERENCES
 # =============================================================================
 
-@router.patch("/{contact_id}/communication-preferences")
+@router.patch(
+    "/{contact_id}/communication-preferences",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def update_communication_preferences(
     contact_id: int,
     email_opt_in: bool = None,
@@ -377,7 +421,10 @@ async def update_communication_preferences(
 # TAGGING
 # =============================================================================
 
-@router.post("/{contact_id}/tags/add")
+@router.post(
+    "/{contact_id}/tags/add",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def add_tags(contact_id: int, tags: list[str], db: Session = Depends(get_db)):
     """
     Add tags to a contact.
@@ -395,7 +442,10 @@ async def add_tags(contact_id: int, tags: list[str], db: Session = Depends(get_d
     return {"success": True, "tags": contact.tags}
 
 
-@router.post("/{contact_id}/tags/remove")
+@router.post(
+    "/{contact_id}/tags/remove",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def remove_tags(contact_id: int, tags: list[str], db: Session = Depends(get_db)):
     """
     Remove tags from a contact.
@@ -413,7 +463,10 @@ async def remove_tags(contact_id: int, tags: list[str], db: Session = Depends(ge
     return {"success": True, "tags": contact.tags}
 
 
-@router.put("/{contact_id}/tags")
+@router.put(
+    "/{contact_id}/tags",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def set_tags(contact_id: int, tags: list[str], db: Session = Depends(get_db)):
     """
     Set tags for a contact (replaces existing).

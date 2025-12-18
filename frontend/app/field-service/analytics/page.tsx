@@ -17,7 +17,7 @@ import {
   Activity,
   MapPin,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 // Simple bar chart component
@@ -85,23 +85,17 @@ export default function FieldServiceAnalyticsPage() {
 
   const { data: metrics, isLoading } = useSWR(
     ['field-service-analytics', period],
-    () => api.get('/field-service/analytics/dashboard', {
-      params: { period }
-    }).then(r => r.data)
+    () => fieldServiceApi.getAnalytics({ period })
   );
 
   const { data: techPerformance } = useSWR(
     ['field-service-tech-performance', period],
-    () => api.get('/field-service/analytics/technician-performance', {
-      params: { period }
-    }).then(r => r.data)
+    () => fieldServiceApi.getTechnicianPerformance({ period })
   );
 
   const { data: typeBreakdown } = useSWR(
     ['field-service-type-breakdown', period],
-    () => api.get('/field-service/analytics/order-type-breakdown', {
-      params: { period }
-    }).then(r => r.data)
+    () => fieldServiceApi.getOrderTypeBreakdown({ period })
   );
 
   if (isLoading) {

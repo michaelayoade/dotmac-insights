@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useBanks } from '@/hooks/useApi';
 import { AlertTriangle, Landmark, Search, CheckCircle, XCircle, Building2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { paymentsApi } from '@/lib/api';
 
 export default function GatewayBanksPage() {
   const [search, setSearch] = useState('');
@@ -40,7 +40,7 @@ export default function GatewayBanksPage() {
     setResolveError('');
 
     try {
-      const result = await api.resolveAccount({ account_number: accountNumber, bank_code: selectedBank });
+      const result = await paymentsApi.resolveAccount({ account_number: accountNumber, bank_code: selectedBank });
       setResolveResult(result);
     } catch (err: any) {
       setResolveError(err.message || 'Could not resolve account');

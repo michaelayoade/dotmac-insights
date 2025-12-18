@@ -15,7 +15,7 @@ import {
   Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { api, DocumentAttachment } from '@/lib/api';
+import { documentsApi, DocumentAttachment } from '@/lib/api';
 
 interface ReceiptUploadProps {
   doctype: string;
@@ -104,7 +104,7 @@ export default function ReceiptUpload({
     );
 
     try {
-      const result = await api.uploadAttachment(doctype, docId, file, {
+      const result = await documentsApi.uploadAttachment(doctype, docId, file, {
         attachment_type: 'receipt',
         is_primary: existingAttachments.length === 0,
       });
@@ -208,7 +208,7 @@ export default function ReceiptUpload({
   const handleDelete = async (attachmentId: number) => {
     setDeletingId(attachmentId);
     try {
-      await api.deleteAttachment(attachmentId);
+      await documentsApi.deleteAttachment(attachmentId);
       onDelete?.(attachmentId);
     } catch (err) {
       console.error('Failed to delete attachment:', err);

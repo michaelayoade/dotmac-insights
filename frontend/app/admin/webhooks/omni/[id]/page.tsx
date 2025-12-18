@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, ArrowLeft, Shield, RotateCcw, Eye } from 'lucide-react';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { useToast } from '@dotmac/core';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -14,15 +14,15 @@ export default function OmniChannelDetailPage() {
   const id = params.id as string;
   const { toast } = useToast();
 
-  const { data: channel, mutate } = useSWR(id ? ['omni-channel', id] : null, () => api.getOmniChannel(id));
+  const { data: channel, mutate } = useSWR(id ? ['omni-channel', id] : null, () => webhooksApi.getOmniChannel(id));
   const { data: events, mutate: mutateEvents } = useSWR(id ? ['omni-channel-events', id] : null, () =>
-    api.getOmniChannelWebhookEvents(id)
+    webhooksApi.getOmniChannelWebhookEvents(id)
   );
   const [payload, setPayload] = useState<any | null>(null);
 
   const handleRotate = async () => {
     try {
-      await api.rotateOmniChannelSecret(id);
+      await webhooksApi.rotateOmniChannelSecret(id);
       await mutate();
       toast({ title: 'Secret rotated', variant: 'success' });
     } catch (err: any) {
@@ -32,7 +32,7 @@ export default function OmniChannelDetailPage() {
 
   const loadEvent = async (eventId: number) => {
     try {
-      const data = await api.getOmniChannelWebhookEvent(id, eventId);
+      const data = await webhooksApi.getOmniChannelWebhookEvent(id, eventId);
       setPayload(data);
     } catch (err: any) {
       toast({ title: 'Failed to load payload', description: err?.message, variant: 'error' });

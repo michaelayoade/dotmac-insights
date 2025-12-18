@@ -79,6 +79,27 @@ class TestHealthEndpoints:
         data = response.json()
         assert data["status"] == "healthy"
 
+    def test_metrics_endpoint(self, client):
+        """Test Prometheus metrics endpoint."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        # Verify Prometheus format
+        content = response.text
+        assert "# HELP" in content or "prometheus_client" in content.lower(), (
+            "Expected Prometheus metrics format or stub response"
+        )
+
+    def test_metrics_includes_auth_counters(self, client):
+        """Test that auth failure metrics are defined."""
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        content = response.text
+        # If prometheus is available, should include our custom metrics
+        if "# HELP" in content:
+            assert "webhook_auth_failures" in content or "contacts_auth_failures" in content, (
+                "Expected auth failure metrics to be defined"
+            )
+
 
 class TestDataExplorerEndpoints:
     """Test Data Explorer API endpoints."""

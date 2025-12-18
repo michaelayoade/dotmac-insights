@@ -3,7 +3,7 @@
 import useSWR from 'swr';
 import Link from 'next/link';
 import { RefreshCw, Radio, Shield } from 'lucide-react';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Channel = {
@@ -21,7 +21,7 @@ type Channel = {
 };
 
 export default function OmniWebhooksPage() {
-  const { data, isLoading, mutate } = useSWR<Channel[]>('omni-channels', api.getOmniChannels);
+  const { data, isLoading, mutate } = useSWR<Channel[]>('omni-channels', webhooksApi.getOmniChannels);
   const channels = data || [];
 
   return (

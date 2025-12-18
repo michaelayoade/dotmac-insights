@@ -155,7 +155,11 @@ def _contact_to_response(contact: UnifiedContact) -> UnifiedContactResponse:
 # LIST ENDPOINTS
 # =============================================================================
 
-@router.get("", response_model=UnifiedContactListResponse)
+@router.get(
+    "",
+    response_model=UnifiedContactListResponse,
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def list_contacts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -266,7 +270,11 @@ async def list_contacts(
     )
 
 
-@router.get("/leads", response_model=UnifiedContactListResponse)
+@router.get(
+    "/leads",
+    response_model=UnifiedContactListResponse,
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def list_leads(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -299,7 +307,11 @@ async def list_leads(
     )
 
 
-@router.get("/customers", response_model=UnifiedContactListResponse)
+@router.get(
+    "/customers",
+    response_model=UnifiedContactListResponse,
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def list_customers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -335,7 +347,11 @@ async def list_customers(
     )
 
 
-@router.get("/organizations", response_model=UnifiedContactListResponse)
+@router.get(
+    "/organizations",
+    response_model=UnifiedContactListResponse,
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def list_organizations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -364,7 +380,11 @@ async def list_organizations(
 # CRUD ENDPOINTS
 # =============================================================================
 
-@router.get("/{contact_id}", response_model=UnifiedContactResponse)
+@router.get(
+    "/{contact_id}",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def get_contact(contact_id: int, db: Session = Depends(get_db)):
     """Get a single contact by ID."""
     contact = db.query(UnifiedContact).filter(UnifiedContact.id == contact_id).first()
@@ -373,7 +393,11 @@ async def get_contact(contact_id: int, db: Session = Depends(get_db)):
     return _contact_to_response(contact)
 
 
-@router.get("/{contact_id}/persons", response_model=List[PersonContactResponse])
+@router.get(
+    "/{contact_id}/persons",
+    response_model=List[PersonContactResponse],
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def get_contact_persons(contact_id: int, db: Session = Depends(get_db)):
     """Get all person contacts associated with an organization."""
     contact = db.query(UnifiedContact).filter(UnifiedContact.id == contact_id).first()
@@ -407,7 +431,12 @@ async def get_contact_persons(contact_id: int, db: Session = Depends(get_db)):
     ]
 
 
-@router.post("", response_model=UnifiedContactResponse, status_code=201)
+@router.post(
+    "",
+    response_model=UnifiedContactResponse,
+    status_code=201,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def create_contact(payload: UnifiedContactCreate, db: Session = Depends(get_db)):
     """Create a new contact."""
     # Validate person contacts have parent
@@ -503,7 +532,11 @@ async def create_contact(payload: UnifiedContactCreate, db: Session = Depends(ge
     return _contact_to_response(contact)
 
 
-@router.patch("/{contact_id}", response_model=UnifiedContactResponse)
+@router.patch(
+    "/{contact_id}",
+    response_model=UnifiedContactResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def update_contact(contact_id: int, payload: UnifiedContactUpdate, db: Session = Depends(get_db)):
     """Update a contact."""
     contact = db.query(UnifiedContact).filter(UnifiedContact.id == contact_id).first()
@@ -542,7 +575,10 @@ async def update_contact(contact_id: int, payload: UnifiedContactUpdate, db: Ses
     return _contact_to_response(contact)
 
 
-@router.delete("/{contact_id}")
+@router.delete(
+    "/{contact_id}",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def delete_contact(contact_id: int, hard: bool = False, db: Session = Depends(get_db)):
     """
     Delete a contact.
@@ -571,7 +607,10 @@ async def delete_contact(contact_id: int, hard: bool = False, db: Session = Depe
 # SEARCH ENDPOINT
 # =============================================================================
 
-@router.get("/search/full-text")
+@router.get(
+    "/search/full-text",
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def full_text_search(
     q: str = Query(..., min_length=2),
     contact_type: Optional[ContactTypeEnum] = None,

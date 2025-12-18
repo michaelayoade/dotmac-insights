@@ -19,6 +19,7 @@ from sqlalchemy import func, and_, or_
 from app.auth import Require
 from app.config import settings
 from app.database import get_db
+from app.middleware.metrics import increment_webhook_auth_failure
 
 logger = logging.getLogger(__name__)
 from app.models.omni import (
@@ -35,7 +36,10 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from app.tasks.omni_email import poll_email_channel
 
+# Authenticated Omni endpoints
 router = APIRouter(prefix="/omni", tags=["omni"])
+# Public-facing webhook ingest (no JWT expected)
+public_router = APIRouter(prefix="/omni", tags=["omni"])
 
 
 class ChannelCreateRequest:
@@ -262,7 +266,7 @@ def _send_email_via_smtp(channel: OmniChannel, to_address: str, subject: Optiona
         server.sendmail(from_address, [to_address], msg.as_string())
 
 
-@router.post("/webhooks/{channel_name}")
+@public_router.post("/webhooks/{channel_name}")
 async def ingest_webhook(
     channel_name: str,
     request: Request,
@@ -292,6 +296,7 @@ async def ingest_webhook(
                 channel=channel_name,
                 has_signature=bool(x_signature),
             )
+            increment_webhook_auth_failure("omni", "invalid_signature")
             raise HTTPException(status_code=401, detail="Invalid signature")
     else:
         # No webhook secret configured
@@ -301,6 +306,7 @@ async def ingest_webhook(
                 channel=channel_name,
                 message="Webhook secret not configured in production - rejecting webhook",
             )
+            increment_webhook_auth_failure("omni", "no_secret")
             raise HTTPException(
                 status_code=500,
                 detail="Channel webhook_secret not configured"

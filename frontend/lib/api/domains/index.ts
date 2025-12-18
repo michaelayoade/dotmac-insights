@@ -623,3 +623,31 @@ export type {
   ChurnRiskSummary,
   ChurnRiskResponse,
 } from './insights';
+
+// Webhooks Domain (Outbound, Inbound, OmniChannel)
+export { webhooksApi } from './webhooks';
+export * from './webhooks';
+
+// Field Service Domain (Orders, Teams, Technicians, Schedule, Analytics)
+export { fieldServiceApi } from './fieldService';
+export * from './fieldService';
+
+// Payments Domain (Gateway, Transfers, Open Banking)
+export { paymentsApi } from './payments';
+export * from './payments';
+
+// Documents Domain (Attachments, Number Formats)
+export { documentsApi } from './documents';
+export * from './documents';
+
+// Inventory Domain (Items, Warehouses, Stock, Batches, Serials, Transfers)
+export { inventoryApi } from './inventory';
+export * from './inventory';
+
+// Assets Domain (Fixed Assets, Categories, Depreciation, Maintenance)
+export { assetsApi } from './assets';
+export * from './assets';
+
+// Inbox Domain (Omnichannel - Conversations, Contacts, Routing Rules, Analytics)
+export { inboxApi } from './inbox';
+export * from './inbox';

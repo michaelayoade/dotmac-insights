@@ -19,6 +19,7 @@ from .schemas import (
     MergeContactsRequest, ImportContactsRequest, ImportContactsResponse,
     UnifiedContactUpdate, ContactTypeEnum, ContactCategoryEnum
 )
+from app.auth import Require
 
 router = APIRouter()
 
@@ -27,7 +28,10 @@ router = APIRouter()
 # BULK UPDATE
 # =============================================================================
 
-@router.post("/bulk/update")
+@router.post(
+    "/bulk/update",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def bulk_update_contacts(payload: BulkUpdateRequest, db: Session = Depends(get_db)):
     """
     Update multiple contacts at once.
@@ -71,7 +75,10 @@ async def bulk_update_contacts(payload: BulkUpdateRequest, db: Session = Depends
     }
 
 
-@router.post("/bulk/assign")
+@router.post(
+    "/bulk/assign",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def bulk_assign_contacts(payload: BulkAssignRequest, db: Session = Depends(get_db)):
     """
     Assign multiple contacts to a single owner.
@@ -98,7 +105,10 @@ async def bulk_assign_contacts(payload: BulkAssignRequest, db: Session = Depends
     }
 
 
-@router.post("/bulk/tags")
+@router.post(
+    "/bulk/tags",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def bulk_tag_operation(payload: BulkTagRequest, db: Session = Depends(get_db)):
     """
     Bulk tag operation: add, remove, or set tags on multiple contacts.
@@ -137,7 +147,10 @@ async def bulk_tag_operation(payload: BulkTagRequest, db: Session = Depends(get_
     }
 
 
-@router.post("/bulk/delete")
+@router.post(
+    "/bulk/delete",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def bulk_delete_contacts(
     contact_ids: List[int],
     hard: bool = False,
@@ -184,7 +197,10 @@ async def bulk_delete_contacts(
 # MERGE DUPLICATES
 # =============================================================================
 
-@router.post("/merge")
+@router.post(
+    "/merge",
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def merge_contacts(payload: MergeContactsRequest, db: Session = Depends(get_db)):
     """
     Merge duplicate contacts into a primary contact.
@@ -278,7 +294,10 @@ async def merge_contacts(payload: MergeContactsRequest, db: Session = Depends(ge
     }
 
 
-@router.get("/duplicates")
+@router.get(
+    "/duplicates",
+    dependencies=[Depends(Require("contacts:read"))],
+)
 async def find_duplicate_contacts(
     field: str = Query("email", pattern="^(email|phone|name)$"),
     contact_type: Optional[ContactTypeEnum] = None,
@@ -348,7 +367,11 @@ async def find_duplicate_contacts(
 # IMPORT
 # =============================================================================
 
-@router.post("/import", response_model=ImportContactsResponse)
+@router.post(
+    "/import",
+    response_model=ImportContactsResponse,
+    dependencies=[Depends(Require("contacts:write"))],
+)
 async def import_contacts(payload: ImportContactsRequest, db: Session = Depends(get_db)):
     """
     Bulk import contacts from external source.

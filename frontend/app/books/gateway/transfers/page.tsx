@@ -6,7 +6,7 @@ import { useGatewayTransfers, useGatewayMutations, useBanks } from '@/hooks/useA
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, Banknote, RefreshCw, Plus, Eye, Send } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { paymentsApi } from '@/lib/api';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -330,7 +330,7 @@ function NewTransferModal({ onClose, onSuccess, initiateTransfer }: NewTransferM
     }
     setResolving(true);
     try {
-      const result = await api.resolveAccount(form.account_number, form.bank_code);
+      const result = await paymentsApi.resolveAccount({ account_number: form.account_number, bank_code: form.bank_code });
       setForm((prev) => ({ ...prev, account_name: result.account_name }));
     } catch (err: any) {
       setError('Could not resolve account');

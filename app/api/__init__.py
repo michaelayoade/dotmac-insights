@@ -23,13 +23,14 @@ from app.api import (
 )
 from app.api import expenses
 from app.api.tax import router as tax_router
-from app.api.integrations import router as integrations_router
+from app.api.integrations import router as integrations_router, public_router as public_integrations_router
 from app.assets import router as assets_router
 from app.api.crm import router as crm_router
 from app.api.field_service import router as field_service_router
 from app.api.inbox import router as inbox_router
 from app.api.contacts import router as contacts_router
 from app.api.performance import router as performance_router
+from app.api.omni import public_router as public_omni_router
 
 api_router = APIRouter()
 
@@ -81,3 +82,8 @@ api_router.include_router(admin.router)  # Already has /admin prefix
 
 # Import routers
 api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix
+
+# Public (unauthenticated) routers
+public_api_router = APIRouter()
+public_api_router.include_router(public_integrations_router)  # /integrations/webhooks
+public_api_router.include_router(public_omni_router)  # /omni/webhooks

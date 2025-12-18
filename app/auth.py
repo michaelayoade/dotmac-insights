@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.auth import User, ServiceToken, TokenDenylist
+from app.middleware.metrics import increment_contacts_auth_failure
 
 logger = structlog.get_logger()
 
@@ -432,6 +433,7 @@ async def get_current_principal(
             )
 
     # No valid authentication
+    increment_contacts_auth_failure("401")
     raise HTTPException(
         status_code=401,
         detail="Authentication required. Provide Bearer token (JWT or service token).",
@@ -509,6 +511,7 @@ def require(*scopes: str) -> Callable:
                     required_scopes=list(scopes),
                     available_scopes=list(principal.scopes),
                 )
+                increment_contacts_auth_failure("403")
                 raise HTTPException(
                     status_code=403,
                     detail=f"Permission denied. Required: {', '.join(scopes)}",
@@ -550,6 +553,7 @@ class Require:
                 principal_id=principal.id,
                 required_scopes=list(self.scopes),
             )
+            increment_contacts_auth_failure("403")
             raise HTTPException(
                 status_code=403,
                 detail=f"Permission denied. Required: {', '.join(self.scopes)}",

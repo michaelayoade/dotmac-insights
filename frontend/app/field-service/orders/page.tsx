@@ -16,10 +16,13 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
+type ServiceOrderStatus = 'draft' | 'scheduled' | 'dispatched' | 'en_route' | 'on_site' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled' | 'failed';
+type ServiceOrderPriority = 'emergency' | 'urgent' | 'high' | 'medium' | 'low';
+
+const statusConfig: Record<ServiceOrderStatus, { color: string; bg: string; label: string }> = {
   draft: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Draft' },
   scheduled: { color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Scheduled' },
   dispatched: { color: 'text-purple-400', bg: 'bg-purple-500/10', label: 'Dispatched' },
@@ -49,15 +52,13 @@ export default function ServiceOrdersPage() {
 
   const { data, isLoading } = useSWR(
     ['field-service-orders', search, statusFilter, priorityFilter, page],
-    () => api.get('/field-service/orders', {
-      params: {
-        search: search || undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
-        page,
-        limit,
-      }
-    }).then(r => r.data)
+    () => fieldServiceApi.getOrders({
+      search: search || undefined,
+      status: statusFilter !== 'all' ? statusFilter as ServiceOrderStatus : undefined,
+      priority: priorityFilter !== 'all' ? priorityFilter as ServiceOrderPriority : undefined,
+      page,
+      limit,
+    })
   );
 
   const orders = data?.data || [];

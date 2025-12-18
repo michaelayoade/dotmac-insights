@@ -17,6 +17,7 @@ from app.database import get_db
 from app.auth import get_current_principal, Require
 from app.integrations.payments.webhooks import webhook_processor
 from app.integrations.payments.exceptions import WebhookVerificationError
+from app.middleware.metrics import increment_webhook_auth_failure
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ async def paystack_webhook(
 
     except WebhookVerificationError as e:
         logger.warning(f"Paystack webhook verification failed: {e}")
+        increment_webhook_auth_failure("paystack", "invalid_signature")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature",
@@ -99,6 +101,7 @@ async def flutterwave_webhook(
 
     except WebhookVerificationError as e:
         logger.warning(f"Flutterwave webhook verification failed: {e}")
+        increment_webhook_auth_failure("flutterwave", "invalid_signature")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature",

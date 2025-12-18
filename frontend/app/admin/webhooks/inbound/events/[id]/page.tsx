@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, RefreshCw, RotateCcw } from 'lucide-react';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { useToast } from '@dotmac/core';
 
 export default function InboundEventDetailPage() {
@@ -13,12 +13,12 @@ export default function InboundEventDetailPage() {
   const { toast } = useToast();
   const id = Number(params.id);
 
-  const { data, mutate, isLoading } = useSWR(id ? ['webhook-event', id] : null, () => api.getWebhookEvent(id));
+  const { data, mutate, isLoading } = useSWR(id ? ['webhook-event', id] : null, () => webhooksApi.getWebhookEvent(id));
 
   const handleReplay = async () => {
     if (!id) return;
     try {
-      await api.replayWebhookEvent(id);
+      await webhooksApi.replayWebhookEvent(id);
       toast({ title: 'Replay scheduled', variant: 'success' });
       await mutate();
     } catch (err: any) {

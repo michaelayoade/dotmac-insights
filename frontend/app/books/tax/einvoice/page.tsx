@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useSWR from 'swr';
-import { api } from '@/lib/api';
+import { adminApi } from '@/lib/api';
 
 // Local hook for e-invoices (may need to add to useApi.ts)
 function useEInvoices(params?: { status?: string; page?: number; page_size?: number }) {
@@ -30,7 +30,7 @@ function useEInvoices(params?: { status?: string; page?: number; page_size?: num
   ).toString() : '';
   return useSWR(
     ['einvoices', queryString],
-    () => api.getEInvoices(params)
+    () => adminApi.getEInvoices(params)
   );
 }
 

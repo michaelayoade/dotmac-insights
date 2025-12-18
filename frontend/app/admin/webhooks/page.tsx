@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Plus, RefreshCw, ExternalLink, Trash2, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 
@@ -19,7 +19,7 @@ type Webhook = {
 
 export default function WebhooksPage() {
   const { toast } = useToast();
-  const { data, isLoading, mutate } = useSWR<Webhook[]>('webhooks', api.listWebhooks);
+  const { data, isLoading, mutate } = useSWR<Webhook[]>('webhooks', webhooksApi.listWebhooks);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', url: '', events: '' });
   const [saving, setSaving] = useState(false);
@@ -33,10 +33,9 @@ export default function WebhooksPage() {
     }
     setSaving(true);
     try {
-      await api.createWebhook({
-        name: form.name,
+      await webhooksApi.createWebhook({
         url: form.url,
-        event_types: form.events.split(',').map((e) => e.trim()).filter(Boolean),
+        events: form.events.split(',').map((e) => e.trim()).filter(Boolean),
       });
       setForm({ name: '', url: '', events: '' });
       setCreating(false);
@@ -52,7 +51,7 @@ export default function WebhooksPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this webhook?')) return;
     try {
-      await api.deleteWebhook(id);
+      await webhooksApi.deleteWebhook(id);
       await mutate();
       toast({ title: 'Webhook deleted', variant: 'success' });
     } catch (err: any) {

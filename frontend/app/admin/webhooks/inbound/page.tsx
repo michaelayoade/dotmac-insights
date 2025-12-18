@@ -3,7 +3,7 @@
 import useSWR from 'swr';
 import Link from 'next/link';
 import { RefreshCw, Globe2, BarChart3 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Provider = {
@@ -22,7 +22,7 @@ type Provider = {
 };
 
 export default function InboundWebhooksPage() {
-  const { data, isLoading, mutate } = useSWR<{ providers: Provider[] }>('webhook-providers', api.getWebhookProviders);
+  const { data, isLoading, mutate } = useSWR<{ providers: Provider[] }>('webhook-providers', webhooksApi.getWebhookProviders);
   const providers = data?.providers || [];
 
   return (

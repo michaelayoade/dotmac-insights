@@ -6,7 +6,7 @@ import { useOpenBankingConnections, useGatewayMutations } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { AlertTriangle, Building2, RefreshCw, Unlink, Eye, Link as LinkIcon, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { paymentsApi } from '@/lib/api';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -311,7 +311,7 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
   const [error, setError] = useState('');
 
   useState(() => {
-    api.getOpenBankingTransactions(connection.id, { limit: 50 })
+    paymentsApi.getOpenBankingTransactions(connection.id, { limit: 50 })
       .then((data) => {
         setTransactions(data.transactions || []);
         setLoading(false);

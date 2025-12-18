@@ -18,7 +18,7 @@ import {
   Award,
   TrendingUp,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type ViewMode = 'teams' | 'technicians';
@@ -29,14 +29,12 @@ export default function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<any>(null);
 
   const { data: teamsData, isLoading: teamsLoading } = useSWR('field-teams', () =>
-    api.get('/field-service/teams').then(r => r.data)
+    fieldServiceApi.getTeams().then(r => r.data)
   );
 
   const { data: techniciansData, isLoading: techniciansLoading } = useSWR(
     viewMode === 'technicians' ? ['field-technicians', search] : null,
-    () => api.get('/field-service/technicians', {
-      params: { search: search || undefined }
-    }).then(r => r.data)
+    () => fieldServiceApi.getTechnicians({ search: search || undefined }).then(r => r.data)
   );
 
   const teams = teamsData?.data || [];

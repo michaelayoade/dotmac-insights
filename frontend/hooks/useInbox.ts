@@ -5,7 +5,7 @@
  */
 
 import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
-import { api } from '@/lib/api';
+import { inboxApi } from '@/lib/api';
 import type {
   InboxConversation,
   InboxContact,
@@ -42,7 +42,7 @@ export function useInboxConversations(
 ) {
   return useSWR<ConversationListResponse>(
     ['inbox-conversations', params],
-    () => api.getInboxConversations(params),
+    () => inboxApi.getInboxConversations(params),
     config
   );
 }
@@ -51,7 +51,7 @@ export function useInboxConversation(id?: number, config?: SWRConfiguration) {
   const key = id ? (['inbox-conversation', id] as const) : null;
   return useSWR<InboxConversation>(
     key,
-    key ? () => api.getInboxConversation(id!) : null,
+    key ? () => inboxApi.getInboxConversation(id!) : null,
     config
   );
 }
@@ -63,67 +63,67 @@ export function useInboxConversationMutations() {
 
   return {
     updateConversation: async (id: number, payload: ConversationUpdatePayload) => {
-      const res = await api.updateInboxConversation(id, payload);
+      const res = await inboxApi.updateInboxConversation(id, payload);
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     assignConversation: async (id: number, payload: AssignPayload) => {
-      const res = await api.assignInboxConversation(id, payload);
+      const res = await inboxApi.assignInboxConversation(id, payload);
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     sendMessage: async (id: number, payload: SendMessagePayload) => {
-      const res = await api.sendInboxMessage(id, payload);
+      const res = await inboxApi.sendInboxMessage(id, payload);
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     markRead: async (id: number) => {
-      const res = await api.markInboxConversationRead(id);
+      const res = await inboxApi.markInboxConversationRead(id);
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     createTicket: async (id: number, payload?: CreateTicketPayload) => {
-      const res = await api.createTicketFromConversation(id, payload);
+      const res = await inboxApi.createTicketFromConversation(id, payload);
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     createLead: async (id: number, payload?: CreateLeadPayload) => {
-      const res = await api.createLeadFromConversation(id, payload);
+      const res = await inboxApi.createLeadFromConversation(id, payload);
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     archive: async (id: number) => {
-      const res = await api.archiveInboxConversation(id);
+      const res = await inboxApi.archiveInboxConversation(id);
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     starConversation: async (id: number, isStarred: boolean) => {
-      const res = await api.updateInboxConversation(id, { is_starred: isStarred });
+      const res = await inboxApi.updateInboxConversation(id, { is_starred: isStarred });
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     setPriority: async (id: number, priority: 'low' | 'medium' | 'high' | 'urgent') => {
-      const res = await api.updateInboxConversation(id, { priority });
+      const res = await inboxApi.updateInboxConversation(id, { priority });
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
     },
 
     setStatus: async (id: number, status: 'open' | 'pending' | 'resolved' | 'archived') => {
-      const res = await api.updateInboxConversation(id, { status });
+      const res = await inboxApi.updateInboxConversation(id, { status });
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
@@ -131,7 +131,7 @@ export function useInboxConversationMutations() {
 
     addTag: async (id: number, currentTags: string[], newTag: string) => {
       const tags = Array.from(new Set([...(currentTags || []), newTag]));
-      const res = await api.updateInboxConversation(id, { tags });
+      const res = await inboxApi.updateInboxConversation(id, { tags });
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
@@ -139,7 +139,7 @@ export function useInboxConversationMutations() {
 
     removeTag: async (id: number, currentTags: string[], tagToRemove: string) => {
       const tags = (currentTags || []).filter((t) => t !== tagToRemove);
-      const res = await api.updateInboxConversation(id, { tags });
+      const res = await inboxApi.updateInboxConversation(id, { tags });
       await invalidateList();
       await mutate(['inbox-conversation', id]);
       return res;
@@ -157,7 +157,7 @@ export function useInboxContacts(
 ) {
   return useSWR<ContactListResponse>(
     ['inbox-contacts', params],
-    () => api.getInboxContacts(params),
+    () => inboxApi.getInboxContacts(params),
     config
   );
 }
@@ -166,7 +166,7 @@ export function useInboxContact(id?: number, config?: SWRConfiguration) {
   const key = id ? (['inbox-contact', id] as const) : null;
   return useSWR<InboxContact>(
     key,
-    key ? () => api.getInboxContact(id!) : null,
+    key ? () => inboxApi.getInboxContact(id!) : null,
     config
   );
 }
@@ -177,7 +177,7 @@ export function useInboxCompanies(
 ) {
   return useSWR<CompanyListResponse>(
     ['inbox-companies', params],
-    () => api.getInboxCompanies(params),
+    () => inboxApi.getInboxCompanies(params),
     config
   );
 }
@@ -189,20 +189,20 @@ export function useInboxContactMutations() {
 
   return {
     createContact: async (payload: ContactCreatePayload) => {
-      const res = await api.createInboxContact(payload);
+      const res = await inboxApi.createInboxContact(payload);
       await invalidateList();
       return res;
     },
 
     updateContact: async (id: number, payload: ContactUpdatePayload) => {
-      const res = await api.updateInboxContact(id, payload);
+      const res = await inboxApi.updateInboxContact(id, payload);
       await invalidateList();
       await mutate(['inbox-contact', id]);
       return res;
     },
 
     deleteContact: async (id: number) => {
-      await api.deleteInboxContact(id);
+      await inboxApi.deleteInboxContact(id);
       await invalidateList();
     },
   };
@@ -218,7 +218,7 @@ export function useInboxRoutingRules(
 ) {
   return useSWR<RoutingRuleListResponse>(
     ['inbox-routing-rules', params],
-    () => api.getInboxRoutingRules(params),
+    () => inboxApi.getInboxRoutingRules(params),
     config
   );
 }
@@ -227,7 +227,7 @@ export function useInboxRoutingRule(id?: number, config?: SWRConfiguration) {
   const key = id ? (['inbox-routing-rule', id] as const) : null;
   return useSWR<InboxRoutingRule>(
     key,
-    key ? () => api.getInboxRoutingRule(id!) : null,
+    key ? () => inboxApi.getInboxRoutingRule(id!) : null,
     config
   );
 }
@@ -239,25 +239,25 @@ export function useInboxRoutingRuleMutations() {
 
   return {
     createRule: async (payload: RoutingRuleCreatePayload) => {
-      const res = await api.createInboxRoutingRule(payload);
+      const res = await inboxApi.createInboxRoutingRule(payload);
       await invalidateList();
       return res;
     },
 
     updateRule: async (id: number, payload: RoutingRuleUpdatePayload) => {
-      const res = await api.updateInboxRoutingRule(id, payload);
+      const res = await inboxApi.updateInboxRoutingRule(id, payload);
       await invalidateList();
       await mutate(['inbox-routing-rule', id]);
       return res;
     },
 
     deleteRule: async (id: number) => {
-      await api.deleteInboxRoutingRule(id);
+      await inboxApi.deleteInboxRoutingRule(id);
       await invalidateList();
     },
 
     toggleRule: async (id: number) => {
-      const res = await api.toggleInboxRoutingRule(id);
+      const res = await inboxApi.toggleInboxRoutingRule(id);
       await invalidateList();
       await mutate(['inbox-routing-rule', id]);
       return res;
@@ -275,7 +275,7 @@ export function useInboxAnalyticsSummary(
 ) {
   return useSWR<InboxAnalyticsSummary>(
     ['inbox-analytics-summary', params],
-    () => api.getInboxAnalyticsSummary(params),
+    () => inboxApi.getInboxAnalyticsSummary(params),
     config
   );
 }
@@ -286,7 +286,7 @@ export function useInboxAnalyticsVolume(
 ) {
   return useSWR<InboxVolumeData>(
     ['inbox-analytics-volume', params],
-    () => api.getInboxAnalyticsVolume(params),
+    () => inboxApi.getInboxAnalyticsVolume(params),
     config
   );
 }
@@ -297,7 +297,7 @@ export function useInboxAnalyticsAgents(
 ) {
   return useSWR<{ period_days: number; agents: InboxAgentStats[] }>(
     ['inbox-analytics-agents', params],
-    () => api.getInboxAnalyticsAgents(params),
+    () => inboxApi.getInboxAnalyticsAgents(params),
     config
   );
 }
@@ -308,7 +308,7 @@ export function useInboxAnalyticsChannels(
 ) {
   return useSWR<{ period_days: number; channels: InboxChannelStats[] }>(
     ['inbox-analytics-channels', params],
-    () => api.getInboxAnalyticsChannels(params),
+    () => inboxApi.getInboxAnalyticsChannels(params),
     config
   );
 }

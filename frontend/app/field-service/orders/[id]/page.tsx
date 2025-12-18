@@ -31,7 +31,7 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const statusConfig: Record<string, { color: string; bg: string; label: string; icon: any }> = {
@@ -74,19 +74,19 @@ export default function ServiceOrderDetailPage() {
 
   const { data: order, isLoading, mutate } = useSWR(
     params.id ? `field-service-order-${params.id}` : null,
-    () => api.get(`/field-service/orders/${params.id}`).then(r => r.data)
+    () => fieldServiceApi.getOrder(params.id as string)
   );
 
   const { data: technicians } = useSWR(
     showDispatchModal ? 'field-service-technicians' : null,
-    () => api.get('/field-service/technicians').then(r => r.data?.data || [])
+    () => fieldServiceApi.getTechnicians().then(r => r.data || [])
   );
 
   const updateStatus = async (action: string, payload?: any) => {
     setIsUpdating(true);
     setErrorMessage(null);
     try {
-      await api.post(`/field-service/orders/${params.id}/${action}`, payload);
+      await fieldServiceApi.updateOrderStatus(params.id as string, action, payload);
       mutate();
     } catch (error: any) {
       const detail = error.response?.data?.detail;
@@ -112,7 +112,7 @@ export default function ServiceOrderDetailPage() {
     setIsUpdating(true);
     setErrorMessage(null);
     try {
-      await api.post(`/field-service/orders/${params.id}/dispatch`, {
+      await fieldServiceApi.dispatchOrder(params.id as string, {
         technician_id: selectedTechnician,
         notes: dispatchNotes,
         notify_customer: notifyCustomer,
@@ -151,7 +151,7 @@ export default function ServiceOrderDetailPage() {
 
     try {
       // Let the client set multipart headers automatically
-      await api.post(`/field-service/orders/${params.id}/photos`, formData);
+      await fieldServiceApi.uploadPhoto(params.id as string, formData);
       mutate();
       setUploadCaption('');
       if (fileInputRef.current) {
@@ -168,7 +168,7 @@ export default function ServiceOrderDetailPage() {
     if (!confirm('Are you sure you want to delete this photo?')) return;
 
     try {
-      await api.delete(`/field-service/orders/${params.id}/photos/${photoId}`);
+      await fieldServiceApi.deletePhoto(params.id as string, photoId);
       mutate();
     } catch (error) {
       setErrorMessage('Failed to delete photo');

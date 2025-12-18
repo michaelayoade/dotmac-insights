@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, Save, Shield, ShieldCheck, TestTube, RotateCcw, Trash2, Eye, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 import Link from 'next/link';
@@ -32,9 +32,9 @@ export default function WebhookDetailPage() {
   const { toast } = useToast();
   const id = Number(params.id);
 
-  const { data: webhook, mutate } = useSWR<Webhook>(id ? ['webhook', id] : null, () => api.getWebhook(id));
+  const { data: webhook, mutate } = useSWR<Webhook>(id ? ['webhook', id] : null, () => webhooksApi.getWebhook(id));
   const { data: deliveries, mutate: mutateDeliveries } = useSWR<Delivery[]>(id ? ['webhook-deliveries', id] : null, () =>
-    api.getWebhookDeliveries(id, { limit: 50 })
+    webhooksApi.getWebhookDeliveries(id, { limit: 50 })
   );
 
   const [form, setForm] = useState({ name: '', url: '', events: '' });
@@ -57,7 +57,7 @@ export default function WebhookDetailPage() {
     if (!webhook) return;
     setSaving(true);
     try {
-      await api.updateWebhook(webhook.id, {
+      await webhooksApi.updateWebhook(webhook.id, {
         name: form.name,
         url: form.url,
         event_types: form.events.split(',').map((e) => e.trim()).filter(Boolean),
@@ -75,7 +75,7 @@ export default function WebhookDetailPage() {
     if (!webhook) return;
     setTesting(true);
     try {
-      await api.testWebhook(webhook.id);
+      await webhooksApi.testWebhook(webhook.id);
       toast({ title: 'Test event sent', variant: 'success' });
     } catch (err: any) {
       toast({ title: 'Failed to send test', description: err?.message, variant: 'error' });
@@ -88,7 +88,7 @@ export default function WebhookDetailPage() {
     if (!webhook) return;
     setRotating(true);
     try {
-      await api.rotateWebhookSecret(webhook.id);
+      await webhooksApi.rotateWebhookSecret(webhook.id);
       await mutate();
       toast({ title: 'Signing secret rotated', variant: 'success' });
     } catch (err: any) {
@@ -102,7 +102,7 @@ export default function WebhookDetailPage() {
     if (!webhook) return;
     if (!confirm('Delete this webhook?')) return;
     try {
-      await api.deleteWebhook(webhook.id);
+      await webhooksApi.deleteWebhook(webhook.id);
       toast({ title: 'Webhook deleted', variant: 'success' });
       router.push('/admin/webhooks');
     } catch (err: any) {
@@ -112,7 +112,7 @@ export default function WebhookDetailPage() {
 
   const handleRetry = async (deliveryId: number) => {
     try {
-      await api.retryWebhookDelivery(deliveryId);
+      await webhooksApi.retryWebhookDelivery(deliveryId);
       await mutateDeliveries();
       toast({ title: 'Retry scheduled', variant: 'success' });
     } catch (err: any) {
@@ -122,7 +122,7 @@ export default function WebhookDetailPage() {
 
   const loadPayload = async (deliveryId: number) => {
     try {
-      const payload = await api.getWebhookDelivery(id, deliveryId);
+      const payload = await webhooksApi.getWebhookDelivery(id, deliveryId);
       setPayloadView({ id: deliveryId, body: payload });
     } catch (err: any) {
       toast({ title: 'Failed to load payload', description: err?.message, variant: 'error' });

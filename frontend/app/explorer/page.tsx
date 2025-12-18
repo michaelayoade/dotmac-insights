@@ -20,7 +20,7 @@ import { Badge } from '@/components/Badge';
 import { DataTable } from '@/components/DataTable';
 import { DateRangePicker, DateRange } from '@/components/DateRangePicker';
 import { useTablesEnhanced, useTableDataEnhanced } from '@/hooks/useApi';
-import { api, EnhancedTableInfo } from '@/lib/api';
+import { adminApi, EnhancedTableInfo } from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -201,7 +201,7 @@ export default function ExplorerPage() {
     if (!selectedTable) return;
     setExporting(true);
     try {
-      const blob = await api.exportTableData(selectedTable, format, {
+      const blob = await adminApi.exportTableData(selectedTable, format, {
         date_column: selectedDateColumn || undefined,
         start_date: dateRange.startDate?.toISOString().split('T')[0],
         end_date: dateRange.endDate?.toISOString().split('T')[0],
