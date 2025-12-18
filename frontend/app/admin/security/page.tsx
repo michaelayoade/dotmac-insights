@@ -19,6 +19,7 @@ import {
   UserCog,
   Activity,
   Clock,
+  Cloud,
 } from 'lucide-react';
 import { adminApi, type RoleResponse, type SettingsAuditEntry } from '@/lib/api/domains';
 import { useSettingsAuditLog } from '@/hooks/useApi';
@@ -234,7 +235,7 @@ export default function SecurityPage() {
       {/* Quick Actions */}
       <div>
         <h2 className="text-lg font-semibold text-white mb-4">Access Management</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionCard
             title="Roles & Permissions"
             description="Create and manage roles with scoped access controls"
@@ -255,6 +256,13 @@ export default function SecurityPage() {
             icon={Settings}
             href="/admin/settings"
             accentColor="violet"
+          />
+          <QuickActionCard
+            title="Platform Status"
+            description="License, feature flags, and platform health"
+            icon={Cloud}
+            href="/admin/platform"
+            accentColor="teal"
           />
         </div>
       </div>

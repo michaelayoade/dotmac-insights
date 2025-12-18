@@ -4955,6 +4955,82 @@ export function useUnifiedContactMutations() {
   };
 }
 
+// =============================================================================
+// Platform Status Hooks
+// =============================================================================
+
+export interface PlatformLicense {
+  configured: boolean;
+  status: 'valid' | 'invalid' | 'expired' | 'unknown';
+  message: string;
+  in_grace_period: boolean;
+  grace_period_hours: number;
+}
+
+export interface PlatformFeatureFlag {
+  name: string;
+  enabled: boolean;
+  description: string;
+  category: string;
+}
+
+export interface PlatformFeatureFlags {
+  flags: PlatformFeatureFlag[];
+  source: 'env' | 'platform';
+  last_refresh: string | null;
+  platform_precedence: boolean;
+}
+
+export interface PlatformStatus {
+  platform_configured: boolean;
+  platform_url: string | null;
+  instance_id: string | null;
+  tenant_id: string | null;
+  license: PlatformLicense;
+  feature_flags: PlatformFeatureFlags;
+  otel_enabled: boolean;
+  environment: string;
+}
+
+export interface PlatformConfig {
+  environment: string;
+  debug: boolean;
+  otel_enabled: boolean;
+  platform_url: string | null;
+  version: string | null;
+}
+
+async function fetchPlatformApi<T>(endpoint: string): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
+  const response = await fetch(`/api/platform${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: token ? 'omit' : 'include',
+  });
+  if (!response.ok) {
+    throw new Error(`Platform API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+export function usePlatformStatus(config?: SWRConfiguration) {
+  return useSWR<PlatformStatus>('platform-status', () => fetchPlatformApi('/status'), {
+    refreshInterval: 60000, // Refresh every minute
+    ...config,
+  });
+}
+
+export function usePlatformLicense(config?: SWRConfiguration) {
+  return useSWR<PlatformLicense>('platform-license', () => fetchPlatformApi('/license'), config);
+}
+
+export function usePlatformFeatureFlags(config?: SWRConfiguration) {
+  return useSWR<PlatformFeatureFlags>('platform-feature-flags', () => fetchPlatformApi('/feature-flags'), config);
+}
+
+export function usePlatformConfig(config?: SWRConfiguration) {
+  return useSWR<PlatformConfig>('platform-config', () => fetchPlatformApi('/config'), config);
+}
+
 // Non-hook export for triggering sync
 export async function triggerSync(source: 'all' | 'splynx' | 'erpnext' | 'chatwoot', fullSync = false) {
   return api.triggerSync(source, fullSync);
