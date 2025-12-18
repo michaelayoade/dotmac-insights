@@ -158,9 +158,9 @@ export default function ContactDetailPage() {
               <h1 className="text-2xl font-bold text-white">{contact.name}</h1>
               <span className={cn(
                 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border',
-                contactTypeColors[contact.contact_type] || contactTypeColors.lead
+                contactTypeColors[contactType] || contactTypeColors.lead
               )}>
-                {contact.contact_type}
+                {contactType}
               </span>
               <span className={cn(
                 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
@@ -193,7 +193,7 @@ export default function ContactDetailPage() {
       </div>
 
       {/* Quick Actions for Leads */}
-      {(contact.contact_type === 'lead' || contact.contact_type === 'prospect') && (
+      {(contactType === 'lead' || contactType === 'prospect') && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -215,7 +215,7 @@ export default function ContactDetailPage() {
                 ))}
               </div>
             </div>
-            {contact.contact_type !== 'customer' && (
+            {contactType !== 'customer' && (
               <button
                 onClick={handleConvertToCustomer}
                 className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 hover:bg-green-500/30 transition-colors"
@@ -312,7 +312,7 @@ export default function ContactDetailPage() {
           )}
 
           {/* Financial Info (for customers) */}
-          {contact.contact_type === 'customer' && (
+          {contactType === 'customer' && (
             <div className="bg-slate-card rounded-xl border border-slate-border p-6">
               <h3 className="text-lg font-semibold text-white mb-4">Financial</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

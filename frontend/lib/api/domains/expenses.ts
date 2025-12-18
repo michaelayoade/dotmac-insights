@@ -436,11 +436,6 @@ export const expensesApi = {
       params,
     }),
 
-  getCardUtilization: (params?: { days?: number }) =>
-    fetchApi<CardUtilization[]>('/expenses/analytics/card-utilization', {
-      params,
-    }),
-
   getStatusBreakdown: (params?: { days?: number }) =>
     fetchApi<StatusBreakdownResponse>('/expenses/analytics/status-breakdown', {
       params,
@@ -697,6 +692,45 @@ export const expensesApi = {
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
   },
+
+  // Legacy aliases for corporate card APIs (used by hooks/useExpenses.ts)
+  getCorporateCards: (params?: { employee_id?: number; status?: string; include_inactive?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<CorporateCard[]>('/expenses/cards/', { params }),
+  getCorporateCardDetail: (id: number) => fetchApi<CorporateCard>(`/expenses/cards/${id}`),
+  createCorporateCard: (payload: CorporateCardCreatePayload) =>
+    fetchApi<CorporateCard>('/expenses/cards/', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCorporateCard: (id: number, payload: CorporateCardUpdatePayload) =>
+    fetchApi<CorporateCard>(`/expenses/cards/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  suspendCorporateCard: (id: number) => fetchApi<CorporateCard>(`/expenses/cards/${id}/suspend`, { method: 'POST' }),
+  activateCorporateCard: (id: number) => fetchApi<CorporateCard>(`/expenses/cards/${id}/activate`, { method: 'POST' }),
+  cancelCorporateCard: (id: number) => fetchApi<CorporateCard>(`/expenses/cards/${id}/cancel`, { method: 'POST' }),
+  deleteCorporateCard: (id: number) => fetchApi<void>(`/expenses/cards/${id}`, { method: 'DELETE' }),
+  getCorporateCardTransactions: (params?: {
+    card_id?: number;
+    statement_id?: number;
+    status?: string;
+    unmatched_only?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => fetchApi<CorporateCardTransaction[]>('/expenses/transactions/', { params }),
+  getCorporateCardTransactionDetail: (id: number) =>
+    fetchApi<CorporateCardTransaction>(`/expenses/transactions/${id}`),
+  createCorporateCardTransaction: (payload: CorporateCardTransactionCreatePayload) =>
+    fetchApi<CorporateCardTransaction>('/expenses/transactions/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getCorporateCardStatements: (params?: { card_id?: number; status?: string; limit?: number; offset?: number }) =>
+    fetchApi<CorporateCardStatement[]>('/expenses/statements/', { params }),
+  getCorporateCardStatementDetail: (id: number) => fetchApi<CorporateCardStatement>(`/expenses/statements/${id}`),
+  createCorporateCardStatement: (payload: {
+    card_id: number;
+    period_start: string;
+    period_end: string;
+    statement_date?: string;
+    import_source?: string;
+    original_filename?: string;
+  }) => expensesApi.createStatement(payload),
 };
 
 export default expensesApi;
