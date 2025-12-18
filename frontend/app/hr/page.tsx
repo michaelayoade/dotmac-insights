@@ -30,7 +30,8 @@ import {
   useHrAnalyticsLeaveTrend,
   useHrAnalyticsAttendanceTrend,
 } from '@/hooks/useApi';
-import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { DashboardShell } from '@/components/ui/DashboardShell';
+import { useSWRStatusFromArray } from '@/hooks/useSWRStatus';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
   CalendarClock,
@@ -232,11 +233,7 @@ export default function HrOverviewPage() {
   const { data: leaveTrend, error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
   const { data: attendanceTrend, error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance } = useHrAnalyticsAttendanceTrend({ days: 14 });
 
-  const swrStates: Array<{
-    error?: unknown;
-    isLoading?: boolean;
-    mutate?: (() => unknown) | undefined;
-  }> = [
+  const swrStates = [
     { error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes },
     { error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday },
     { error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps },
@@ -250,8 +247,7 @@ export default function HrOverviewPage() {
     { error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance },
   ];
 
-  const firstError = swrStates.find((state) => state.error)?.error;
-  const isDataLoading = swrStates.some((state) => state.isLoading);
+  const { isLoading, error } = useSWRStatusFromArray(swrStates);
   const retryAll = () => swrStates.forEach((state) => state.mutate && state.mutate());
 
   // Memoized chart data - must be called unconditionally before early returns
@@ -304,21 +300,6 @@ export default function HrOverviewPage() {
     }));
   }, [analyticsOverview]);
 
-  // Early returns after all hooks
-  if (isDataLoading) {
-    return <LoadingState />;
-  }
-
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load HR overview data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   const leaveAppList = extractList(leaveApplications);
   const leaveTypeList = extractList(leaveTypes);
   const jobOpeningList = extractList(jobOpenings);
@@ -330,6 +311,12 @@ export default function HrOverviewPage() {
   const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
 
   return (
+    <DashboardShell
+      isLoading={isLoading}
+      error={error}
+      onRetry={retryAll}
+      errorMessage="Failed to load HR overview data"
+    >
     <div className="space-y-6">
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
@@ -659,5 +646,6 @@ export default function HrOverviewPage() {
         </div>
       </div>
     </div>
+    </DashboardShell>
   );
 }

@@ -19,7 +19,10 @@ import {
   LucideIcon,
   Home,
   Zap,
+  Search,
 } from 'lucide-react';
+import { AccentColor, getSidebarColors } from '@/lib/config/colors';
+import { useCommandPalette } from '@/components/CommandPaletteProvider';
 
 // =============================================================================
 // TYPES
@@ -57,131 +60,6 @@ export interface WorkflowStep {
   color: string; // e.g., "violet", "emerald", "amber"
 }
 
-// Color configurations for different accent colors
-type AccentColor = 'amber' | 'teal' | 'sky' | 'violet' | 'emerald' | 'rose' | 'cyan' | 'indigo' | 'orange' | 'blue';
-
-const ACCENT_COLORS: Record<AccentColor, {
-  gradient: string;
-  iconBg: string;
-  iconText: string;
-  activeBorder: string;
-  activeBg: string;
-  activeText: string;
-  activeItemBg: string;
-  activeItemText: string;
-  activeDescText: string;
-}> = {
-  amber: {
-    gradient: 'from-amber-400 to-amber-300',
-    iconBg: 'bg-gradient-to-br from-amber-400 to-amber-300',
-    iconText: 'text-amber-300',
-    activeBorder: 'border-amber-500/40',
-    activeBg: 'bg-amber-500/5',
-    activeText: 'text-amber-300',
-    activeItemBg: 'bg-amber-500/20',
-    activeItemText: 'text-amber-300',
-    activeDescText: 'text-amber-400/70',
-  },
-  teal: {
-    gradient: 'from-teal-400 to-teal-300',
-    iconBg: 'bg-gradient-to-br from-teal-400 to-teal-300',
-    iconText: 'text-teal-300',
-    activeBorder: 'border-teal-500/40',
-    activeBg: 'bg-teal-500/5',
-    activeText: 'text-teal-300',
-    activeItemBg: 'bg-teal-500/20',
-    activeItemText: 'text-teal-300',
-    activeDescText: 'text-teal-400/70',
-  },
-  sky: {
-    gradient: 'from-sky-500 to-emerald-400',
-    iconBg: 'bg-gradient-to-br from-sky-500 to-emerald-400',
-    iconText: 'text-sky-300',
-    activeBorder: 'border-sky-500/40',
-    activeBg: 'bg-sky-500/5',
-    activeText: 'text-sky-300',
-    activeItemBg: 'bg-sky-500/20',
-    activeItemText: 'text-sky-300',
-    activeDescText: 'text-sky-400/70',
-  },
-  violet: {
-    gradient: 'from-violet-400 to-violet-300',
-    iconBg: 'bg-gradient-to-br from-violet-400 to-violet-300',
-    iconText: 'text-violet-300',
-    activeBorder: 'border-violet-500/40',
-    activeBg: 'bg-violet-500/5',
-    activeText: 'text-violet-300',
-    activeItemBg: 'bg-violet-500/20',
-    activeItemText: 'text-violet-300',
-    activeDescText: 'text-violet-400/70',
-  },
-  emerald: {
-    gradient: 'from-emerald-400 to-emerald-300',
-    iconBg: 'bg-gradient-to-br from-emerald-400 to-emerald-300',
-    iconText: 'text-emerald-300',
-    activeBorder: 'border-emerald-500/40',
-    activeBg: 'bg-emerald-500/5',
-    activeText: 'text-emerald-300',
-    activeItemBg: 'bg-emerald-500/20',
-    activeItemText: 'text-emerald-300',
-    activeDescText: 'text-emerald-400/70',
-  },
-  rose: {
-    gradient: 'from-rose-400 to-rose-300',
-    iconBg: 'bg-gradient-to-br from-rose-400 to-rose-300',
-    iconText: 'text-rose-300',
-    activeBorder: 'border-rose-500/40',
-    activeBg: 'bg-rose-500/5',
-    activeText: 'text-rose-300',
-    activeItemBg: 'bg-rose-500/20',
-    activeItemText: 'text-rose-300',
-    activeDescText: 'text-rose-400/70',
-  },
-  cyan: {
-    gradient: 'from-cyan-400 to-cyan-300',
-    iconBg: 'bg-gradient-to-br from-cyan-400 to-cyan-300',
-    iconText: 'text-cyan-300',
-    activeBorder: 'border-cyan-500/40',
-    activeBg: 'bg-cyan-500/5',
-    activeText: 'text-cyan-300',
-    activeItemBg: 'bg-cyan-500/20',
-    activeItemText: 'text-cyan-300',
-    activeDescText: 'text-cyan-400/70',
-  },
-  indigo: {
-    gradient: 'from-indigo-500 to-purple-400',
-    iconBg: 'bg-gradient-to-br from-indigo-500 to-purple-400',
-    iconText: 'text-indigo-300',
-    activeBorder: 'border-indigo-500/40',
-    activeBg: 'bg-indigo-500/5',
-    activeText: 'text-indigo-300',
-    activeItemBg: 'bg-indigo-500/20',
-    activeItemText: 'text-indigo-300',
-    activeDescText: 'text-indigo-400/70',
-  },
-  orange: {
-    gradient: 'from-orange-500 to-amber-400',
-    iconBg: 'bg-gradient-to-br from-orange-500 to-amber-400',
-    iconText: 'text-orange-300',
-    activeBorder: 'border-orange-500/40',
-    activeBg: 'bg-orange-500/5',
-    activeText: 'text-orange-300',
-    activeItemBg: 'bg-orange-500/20',
-    activeItemText: 'text-orange-300',
-    activeDescText: 'text-orange-400/70',
-  },
-  blue: {
-    gradient: 'from-blue-500 to-cyan-400',
-    iconBg: 'bg-gradient-to-br from-blue-500 to-cyan-400',
-    iconText: 'text-blue-300',
-    activeBorder: 'border-blue-500/40',
-    activeBg: 'bg-blue-500/5',
-    activeText: 'text-blue-300',
-    activeItemBg: 'bg-blue-500/20',
-    activeItemText: 'text-blue-300',
-    activeDescText: 'text-blue-400/70',
-  },
-};
 
 export interface ModuleLayoutProps {
   /** Module display name (e.g., "Dotmac People") */
@@ -264,7 +142,8 @@ export function ModuleLayout({
   const pathname = usePathname();
   const { isDarkMode, setColorScheme } = useTheme();
   const { isAuthenticated, logout } = useAuth();
-  const colors = ACCENT_COLORS[accentColor];
+  const { open: openCommandPalette } = useCommandPalette();
+  const colors = getSidebarColors(accentColor);
 
   const toggleTheme = () => {
     const next = isDarkMode ? 'light' : 'dark';
@@ -427,6 +306,13 @@ export function ModuleLayout({
           <div className="flex items-center gap-2">
             {headerContent}
             <button
+              onClick={openCommandPalette}
+              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              title="Search"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
               title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -470,6 +356,15 @@ export function ModuleLayout({
         </div>
         <div className="flex items-center gap-2">
           {headerContent}
+          <button
+            onClick={openCommandPalette}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-slate-muted hover:text-white transition-colors"
+            title="Search (Cmd+K)"
+          >
+            <Search className="w-4 h-4" />
+            <span className="text-sm hidden xl:inline">Search</span>
+            <kbd className="hidden xl:inline text-xs bg-slate-border/50 px-1.5 py-0.5 rounded">⌘K</kbd>
+          </button>
           <button
             onClick={toggleTheme}
             className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"

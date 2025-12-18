@@ -3,6 +3,9 @@
 import React from 'react';
 import { AlertTriangle, ShieldAlert, ServerCrash, Inbox, RefreshCw } from 'lucide-react';
 
+// Re-export DashboardShell components for convenience
+export { DashboardShell, DashboardLoadingState, DashboardErrorState, DashboardEmptyState } from '@/components/ui/DashboardShell';
+
 export function LoadingSpinner() {
   return (
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric"></div>

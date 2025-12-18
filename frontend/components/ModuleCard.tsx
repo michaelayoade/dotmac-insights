@@ -3,60 +3,9 @@
 import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AccentColor, getCardColors } from '@/lib/config/colors';
 
-// Color variants for module cards
-const ACCENT_COLORS = {
-  teal: {
-    bg: 'bg-teal-500/10',
-    border: 'border-teal-500/30',
-    text: 'text-teal-400',
-    glow: 'group-hover:shadow-teal-500/20',
-  },
-  blue: {
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    text: 'text-blue-400',
-    glow: 'group-hover:shadow-blue-500/20',
-  },
-  emerald: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400',
-    glow: 'group-hover:shadow-emerald-500/20',
-  },
-  amber: {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
-    glow: 'group-hover:shadow-amber-500/20',
-  },
-  violet: {
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/30',
-    text: 'text-violet-400',
-    glow: 'group-hover:shadow-violet-500/20',
-  },
-  rose: {
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/30',
-    text: 'text-rose-400',
-    glow: 'group-hover:shadow-rose-500/20',
-  },
-  orange: {
-    bg: 'bg-orange-500/10',
-    border: 'border-orange-500/30',
-    text: 'text-orange-400',
-    glow: 'group-hover:shadow-orange-500/20',
-  },
-  cyan: {
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/30',
-    text: 'text-cyan-400',
-    glow: 'group-hover:shadow-cyan-500/20',
-  },
-} as const;
-
-export type AccentColor = keyof typeof ACCENT_COLORS;
+export type { AccentColor };
 
 export interface ModuleCardProps {
   /** Module name/title */
@@ -103,7 +52,7 @@ export function ModuleCard({
   stub = false,
   className,
 }: ModuleCardProps) {
-  const colors = ACCENT_COLORS[accentColor];
+  const colors = getCardColors(accentColor);
 
   const cardContent = (
     <>

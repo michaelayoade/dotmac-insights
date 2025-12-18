@@ -542,3 +542,14 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
     </div>
   );
 }
+
+// =============================================================================
+// RE-EXPORTS
+// =============================================================================
+
+export {
+  DashboardShell,
+  DashboardLoadingState,
+  DashboardErrorState,
+  DashboardEmptyState,
+} from './DashboardShell';

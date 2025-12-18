@@ -10,6 +10,7 @@ import { useTheme } from '@dotmac/design-tokens';
 import { applyColorScheme, getSavedColorScheme } from '@/lib/theme';
 import { FeatureGateProvider } from '@/hooks/useFeatureGate';
 import { validateEnv } from '@/lib/env';
+import { CommandPaletteProvider } from '@/components/CommandPaletteProvider';
 
 function ThemePersistence({ children }: { children: React.ReactNode }) {
   const { setColorScheme, config, resolvedColorScheme } = useTheme() as any;
@@ -164,12 +165,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <FeatureGateProvider>
             <ToastProvider>
               <SwrErrorBoundary>
-                <AuthErrorBanner
-                  show={authError.show}
-                  message={authError.message}
-                  onDismiss={dismissAuthError}
-                />
-                <div className={authError.show ? 'pt-12' : ''}>{children}</div>
+                <CommandPaletteProvider>
+                  <AuthErrorBanner
+                    show={authError.show}
+                    message={authError.message}
+                    onDismiss={dismissAuthError}
+                  />
+                  <div className={authError.show ? 'pt-12' : ''}>{children}</div>
+                </CommandPaletteProvider>
               </SwrErrorBoundary>
             </ToastProvider>
           </FeatureGateProvider>

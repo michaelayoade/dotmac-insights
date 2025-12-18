@@ -4,241 +4,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  LayoutDashboard,
-  Users,
-  Briefcase,
-  BookOpen,
-  LifeBuoy,
-  Wallet2,
-  ShoppingCart,
-  Bell,
-  ShieldCheck,
   ArrowRight,
   Star,
   Activity,
   Sun,
   Moon,
-  MessageSquare,
-  Truck,
-  FolderKanban,
   Zap,
   TrendingUp,
   Clock,
   Building2,
-  Package,
-  Landmark,
-  Contact2,
   X,
 } from 'lucide-react';
-import { useAuth, Scope } from '@/lib/auth-context';
+import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@dotmac/design-tokens';
 import { applyColorScheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { AccentColor, getCardColors } from '@/lib/config/colors';
+import { MODULES, CATEGORY_META, ModuleDefinition, ModuleCategory } from '@/lib/config/modules';
 
-type ModuleCategory = 'core' | 'operations' | 'finance' | 'admin';
-
-type ModuleCard = {
-  key: string;
-  name: string;
-  description: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  accentColor: string;
-  requiredScopes?: Scope[];
-  stub?: boolean;
-  category: ModuleCategory;
-};
-
-const MODULES: ModuleCard[] = [
-  // Core Operations
-  {
-    key: 'contacts',
-    name: 'Contacts',
-    description: 'Unified contact management for customers, leads, and suppliers.',
-    href: '/contacts',
-    icon: Contact2,
-    badge: 'CRM',
-    accentColor: 'indigo',
-    category: 'core',
-  },
-  {
-    key: 'hr',
-    name: 'People',
-    description: 'HR operations, payroll, leave, attendance, and workforce analytics.',
-    href: '/hr',
-    icon: Briefcase,
-    badge: 'HR',
-    accentColor: 'amber',
-    requiredScopes: ['hr:read'],
-    category: 'operations',
-  },
-  {
-    key: 'support',
-    name: 'Support',
-    description: 'Omnichannel helpdesk, tickets, SLAs, CSAT, and automation.',
-    href: '/support',
-    icon: LifeBuoy,
-    badge: 'Helpdesk',
-    accentColor: 'teal',
-    category: 'core',
-  },
-  {
-    key: 'inbox',
-    name: 'Inbox',
-    description: 'Unified conversations across email, chat, WhatsApp, and phone.',
-    href: '/inbox',
-    icon: MessageSquare,
-    badge: 'Omnichannel',
-    accentColor: 'blue',
-    category: 'core',
-  },
-  {
-    key: 'sales',
-    name: 'Sales',
-    description: 'Invoices, quotations, orders, and customer management.',
-    href: '/sales',
-    icon: Users,
-    badge: 'CRM',
-    accentColor: 'emerald',
-    requiredScopes: ['analytics:read'],
-    category: 'core',
-  },
-  // Operations
-  {
-    key: 'inventory',
-    name: 'Inventory',
-    description: 'Warehouse management, stock levels, batches, and serial tracking.',
-    href: '/inventory',
-    icon: Package,
-    badge: 'WMS',
-    accentColor: 'lime',
-    category: 'operations',
-  },
-  {
-    key: 'field-service',
-    name: 'Field Service',
-    description: 'Dispatch, scheduling, service orders, and technician management.',
-    href: '/field-service',
-    icon: Truck,
-    badge: 'FSM',
-    accentColor: 'orange',
-    category: 'operations',
-  },
-  {
-    key: 'projects',
-    name: 'Projects',
-    description: 'Project management, tasks, milestones, and resource allocation.',
-    href: '/projects',
-    icon: FolderKanban,
-    badge: 'PM',
-    accentColor: 'purple',
-    category: 'operations',
-  },
-  {
-    key: 'purchasing',
-    name: 'Purchasing',
-    description: 'Vendor management, bills, purchase orders, and AP aging.',
-    href: '/purchasing',
-    icon: ShoppingCart,
-    badge: 'Procurement',
-    accentColor: 'violet',
-    requiredScopes: ['analytics:read'],
-    category: 'operations',
-  },
-  // Finance
-  {
-    key: 'books',
-    name: 'Books',
-    description: 'Accounting hub with ledger, AR/AP, tax compliance, and controls.',
-    href: '/books',
-    icon: BookOpen,
-    badge: 'Accounting',
-    accentColor: 'teal',
-    requiredScopes: ['analytics:read'],
-    category: 'finance',
-  },
-  {
-    key: 'assets',
-    name: 'Assets',
-    description: 'Fixed asset tracking, depreciation schedules, and maintenance.',
-    href: '/assets',
-    icon: Landmark,
-    badge: 'FAM',
-    accentColor: 'stone',
-    category: 'finance',
-  },
-  {
-    key: 'expenses',
-    name: 'Expenses',
-    description: 'Expense claims, cash advances, corporate cards, and reconciliation.',
-    href: '/expenses',
-    icon: Wallet2,
-    badge: 'Spend',
-    accentColor: 'sky',
-    requiredScopes: ['analytics:read'],
-    category: 'finance',
-  },
-  {
-    key: 'analytics',
-    name: 'Analytics',
-    description: 'Cross-domain dashboards, reports, and business insights.',
-    href: '/analytics',
-    icon: LayoutDashboard,
-    accentColor: 'cyan',
-    requiredScopes: ['analytics:read'],
-    category: 'finance',
-  },
-  // Admin
-  {
-    key: 'notifications',
-    name: 'Notifications',
-    description: 'Email, SMS, in-app digests and delivery logs.',
-    href: '/notifications',
-    icon: Bell,
-    accentColor: 'rose',
-    requiredScopes: ['admin:read'],
-    category: 'admin',
-  },
-  {
-    key: 'security',
-    name: 'Controls',
-    description: 'Access management, audit trails, and data protections.',
-    href: '/admin/security',
-    icon: ShieldCheck,
-    accentColor: 'slate',
-    requiredScopes: ['admin:read'],
-    category: 'admin',
-  },
-];
-
-const CATEGORY_META: Record<ModuleCategory, { label: string; description: string }> = {
-  core: { label: 'Core', description: 'Customer-facing operations' },
-  operations: { label: 'Operations', description: 'Internal workflows' },
-  finance: { label: 'Finance', description: 'Financial management' },
-  admin: { label: 'Admin', description: 'System administration' },
-};
-
-const ACCENT_STYLES: Record<string, { bg: string; border: string; text: string; icon: string }> = {
-  amber: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', icon: 'from-amber-400 to-amber-300' },
-  teal: { bg: 'bg-teal-500/10', border: 'border-teal-500/30', text: 'text-teal-400', icon: 'from-teal-400 to-teal-300' },
-  sky: { bg: 'bg-sky-500/10', border: 'border-sky-500/30', text: 'text-sky-400', icon: 'from-sky-400 to-sky-300' },
-  violet: { bg: 'bg-violet-500/10', border: 'border-violet-500/30', text: 'text-violet-400', icon: 'from-violet-400 to-violet-300' },
-  emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', icon: 'from-emerald-400 to-emerald-300' },
-  cyan: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-400', icon: 'from-cyan-400 to-cyan-300' },
-  rose: { bg: 'bg-rose-500/10', border: 'border-rose-500/30', text: 'text-rose-400', icon: 'from-rose-400 to-rose-300' },
-  slate: { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', icon: 'from-slate-400 to-slate-300' },
-  blue: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', icon: 'from-blue-500 to-cyan-400' },
-  orange: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', icon: 'from-orange-400 to-orange-300' },
-  purple: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', icon: 'from-purple-400 to-purple-300' },
-  lime: { bg: 'bg-lime-500/10', border: 'border-lime-500/30', text: 'text-lime-400', icon: 'from-lime-400 to-lime-300' },
-  indigo: { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-400', icon: 'from-indigo-400 to-indigo-300' },
-  stone: { bg: 'bg-stone-500/10', border: 'border-stone-500/30', text: 'text-stone-400', icon: 'from-stone-400 to-stone-300' },
-};
 
 const DEFAULT_KEY = 'dotmac_default_module';
 
-type ModuleWithAccess = ModuleCard & { hasAccess: boolean };
+type ModuleWithAccess = ModuleDefinition & { hasAccess: boolean };
 
 export default function HomePage() {
   const router = useRouter();
@@ -427,7 +214,7 @@ export default function HomePage() {
                     const Icon = module.icon;
                     const isDefault = defaultModuleKey === module.key;
                     const locked = !module.hasAccess;
-                    const accent = ACCENT_STYLES[module.accentColor] || ACCENT_STYLES.teal;
+                    const accent = getCardColors(module.accentColor as AccentColor);
 
                     return (
                       <div
