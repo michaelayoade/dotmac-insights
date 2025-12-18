@@ -1533,7 +1533,9 @@ export const accountingApi = {
     }),
 
   getAccountDetail: (id: number, params?: AccountingAccountDetailParams) =>
-    fetchApi<AccountingAccountDetail>(`/v1/accounting/accounts/${id}`, { params }),
+    fetchApi<AccountingAccountDetail>(`/v1/accounting/accounts/${id}`, {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   // Financial Statements
   getTrialBalance: (params?: { fiscal_year?: string; start_date?: string; end_date?: string; currency?: string; drill?: boolean }) =>
@@ -1565,11 +1567,15 @@ export const accountingApi = {
 
   // General Ledger
   getGeneralLedger: (params?: AccountingGeneralLedgerParams) =>
-    fetchApi<AccountingGeneralLedgerResponse>('/v1/accounting/general-ledger', { params }),
+    fetchApi<AccountingGeneralLedgerResponse>('/v1/accounting/general-ledger', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   // Journal Entries
   getJournalEntries: (params?: AccountingJournalEntryListParams) =>
-    fetchApi<AccountingJournalEntryListResponse>('/v1/accounting/journal-entries', { params }),
+    fetchApi<AccountingJournalEntryListResponse>('/v1/accounting/journal-entries', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getJournalEntryDetail: (id: number) =>
     fetchApi<AccountingJournalEntry>(`/v1/accounting/journal-entries/${id}`),
@@ -1628,7 +1634,9 @@ export const accountingApi = {
 
   // Suppliers
   getSuppliers: (params?: AccountingSupplierListParams) =>
-    fetchApi<AccountingSupplierListResponse>('/v1/accounting/suppliers', { params }),
+    fetchApi<AccountingSupplierListResponse>('/v1/accounting/suppliers', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   // Bank Accounts
   getBankAccounts: () =>
@@ -1636,7 +1644,9 @@ export const accountingApi = {
 
   // Bank Transactions
   getBankTransactions: (params?: AccountingBankTransactionListParams) =>
-    fetchApi<AccountingBankTransactionListResponse>('/v1/accounting/bank-transactions', { params }),
+    fetchApi<AccountingBankTransactionListResponse>('/v1/accounting/bank-transactions', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getBankTransactionDetail: (id: number | string) =>
     fetchApi<AccountingBankTransactionDetail>(`/v1/accounting/bank-transactions/${id}`),
@@ -1661,7 +1671,9 @@ export const accountingApi = {
 
   // Purchase Invoices (Accounting View)
   getPurchaseInvoices: (params?: AccountingPurchaseInvoiceListParams) =>
-    fetchApi<AccountingPurchaseInvoiceListResponse>('/v1/accounting/purchase-invoices', { params }),
+    fetchApi<AccountingPurchaseInvoiceListResponse>('/v1/accounting/purchase-invoices', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getPurchaseInvoiceDetail: (id: number, currency?: string) =>
     fetchApi<AccountingPurchaseInvoiceDetail>(`/v1/accounting/purchase-invoices/${id}`, { params: { currency } }),

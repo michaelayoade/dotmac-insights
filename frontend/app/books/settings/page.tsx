@@ -22,19 +22,7 @@ import {
   useNumberFormatMutations,
   useCurrencyMutations,
 } from '@/hooks/useApi';
-import type {
-  BooksSettingsResponse,
-  BooksSettingsUpdate,
-  DocumentNumberFormatResponse,
-  CurrencySettingsResponse,
-  DocumentType,
-  ResetFrequency,
-  RoundingMethod,
-  DateFormatType,
-  NumberFormatType,
-  NegativeFormat,
-  SymbolPosition,
-} from '@/lib/api';
+import type { DocumentNumberFormatResponse, DocumentType, ResetFrequency } from '@/lib/api';
 
 type TabKey = 'general' | 'formats' | 'currencies';
 
@@ -64,6 +52,65 @@ const resetFrequencyLabels: Record<ResetFrequency, string> = {
   yearly: 'Yearly',
   monthly: 'Monthly',
   quarterly: 'Quarterly',
+};
+
+type DateFormatType = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD-MMM-YYYY';
+type NumberFormatType = '1,234.56' | '1.234,56' | '1 234,56' | '1,23,456.78';
+type RoundingMethod = 'half_up' | 'half_down' | 'bankers';
+type NegativeFormat = 'minus' | 'parentheses';
+type SymbolPosition = 'before' | 'after';
+
+type BooksSettingsResponse = {
+  base_currency?: string;
+  currency_precision?: number;
+  quantity_precision?: number;
+  rate_precision?: number;
+  exchange_rate_precision?: number;
+  rounding_method?: RoundingMethod;
+  fiscal_year_start_month?: number;
+  fiscal_year_start_day?: number;
+  auto_create_fiscal_years?: boolean;
+  auto_create_fiscal_periods?: boolean;
+  date_format?: DateFormatType;
+  number_format?: NumberFormatType;
+  negative_format?: NegativeFormat;
+  currency_symbol_position?: SymbolPosition;
+  backdating_days_allowed?: number;
+  future_posting_days_allowed?: number;
+  require_posting_in_open_period?: boolean;
+  auto_voucher_numbering?: boolean;
+  allow_duplicate_party_invoice?: boolean;
+  require_attachment_journal_entry?: boolean;
+  require_attachment_expense?: boolean;
+  require_attachment_payment?: boolean;
+  require_attachment_invoice?: boolean;
+  require_approval_journal_entry?: boolean;
+  require_approval_expense?: boolean;
+  require_approval_payment?: boolean;
+  retained_earnings_account?: string;
+  fx_gain_account?: string;
+  fx_loss_account?: string;
+  default_receivable_account?: string;
+  default_payable_account?: string;
+  default_income_account?: string;
+  default_expense_account?: string;
+  allow_negative_stock?: boolean;
+  default_valuation_method?: string;
+};
+
+type BooksSettingsUpdate = Partial<BooksSettingsResponse>;
+
+type CurrencySettingsResponse = {
+  currency_code: string;
+  currency_name?: string;
+  symbol?: string;
+  symbol_position?: SymbolPosition;
+  decimal_places: number;
+  thousands_separator?: string;
+  decimal_separator?: string;
+  smallest_unit?: number;
+  is_enabled?: boolean;
+  is_base_currency?: boolean;
 };
 
 // Preset number format patterns
@@ -271,7 +318,7 @@ function GeneralSettingsTab() {
               <input
                 type="text"
                 value={form.base_currency || ''}
-                onChange={(e) => setForm((p) => ({ ...p, base_currency: e.target.value }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, base_currency: e.target.value }))}
                 className="input-field"
                 maxLength={3}
               />
@@ -280,7 +327,7 @@ function GeneralSettingsTab() {
               <FormField label="Currency Precision">
                 <select
                   value={form.currency_precision ?? 2}
-                  onChange={(e) => setForm((p) => ({ ...p, currency_precision: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, currency_precision: Number(e.target.value) }))}
                   className="input-field"
                 >
                   {[0, 2, 4].map((n) => (
@@ -291,7 +338,7 @@ function GeneralSettingsTab() {
               <FormField label="Quantity Precision">
                 <select
                   value={form.quantity_precision ?? 2}
-                  onChange={(e) => setForm((p) => ({ ...p, quantity_precision: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, quantity_precision: Number(e.target.value) }))}
                   className="input-field"
                 >
                   {[0, 2, 3, 4, 6].map((n) => (
@@ -304,7 +351,7 @@ function GeneralSettingsTab() {
               <FormField label="Rate Precision">
                 <select
                   value={form.rate_precision ?? 4}
-                  onChange={(e) => setForm((p) => ({ ...p, rate_precision: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, rate_precision: Number(e.target.value) }))}
                   className="input-field"
                 >
                   {[2, 4, 6].map((n) => (
@@ -315,7 +362,7 @@ function GeneralSettingsTab() {
               <FormField label="FX Rate Precision">
                 <select
                   value={form.exchange_rate_precision ?? 6}
-                  onChange={(e) => setForm((p) => ({ ...p, exchange_rate_precision: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, exchange_rate_precision: Number(e.target.value) }))}
                   className="input-field"
                 >
                   {[4, 6, 8].map((n) => (
@@ -327,7 +374,7 @@ function GeneralSettingsTab() {
             <FormField label="Rounding Method">
               <select
                 value={form.rounding_method || 'round_half_up'}
-                onChange={(e) => setForm((p) => ({ ...p, rounding_method: e.target.value as RoundingMethod }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, rounding_method: e.target.value as RoundingMethod }))}
                 className="input-field"
               >
                 <option value="round_half_up">Round Half Up (Standard)</option>
@@ -347,7 +394,7 @@ function GeneralSettingsTab() {
               <FormField label="Start Month">
                 <select
                   value={form.fiscal_year_start_month ?? 1}
-                  onChange={(e) => setForm((p) => ({ ...p, fiscal_year_start_month: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, fiscal_year_start_month: Number(e.target.value) }))}
                   className="input-field"
                 >
                   {[
@@ -364,7 +411,7 @@ function GeneralSettingsTab() {
                   min={1}
                   max={31}
                   value={form.fiscal_year_start_day ?? 1}
-                  onChange={(e) => setForm((p) => ({ ...p, fiscal_year_start_day: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, fiscal_year_start_day: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -373,12 +420,12 @@ function GeneralSettingsTab() {
               <CheckboxField
                 label="Auto-create fiscal years"
                 checked={form.auto_create_fiscal_years ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, auto_create_fiscal_years: v }))}
+                onChange={(v) => setForm((p: any) => ({ ...p, auto_create_fiscal_years: v }))}
               />
               <CheckboxField
                 label="Auto-create fiscal periods"
                 checked={form.auto_create_fiscal_periods ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, auto_create_fiscal_periods: v }))}
+                onChange={(v) => setForm((p: any) => ({ ...p, auto_create_fiscal_periods: v }))}
               />
             </div>
           </div>
@@ -390,7 +437,7 @@ function GeneralSettingsTab() {
             <FormField label="Date Format">
               <select
                 value={form.date_format || 'DD/MM/YYYY'}
-                onChange={(e) => setForm((p) => ({ ...p, date_format: e.target.value as DateFormatType }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, date_format: e.target.value as DateFormatType }))}
                 className="input-field"
               >
                 {Object.entries(dateFormatLabels).map(([value, label]) => (
@@ -401,7 +448,7 @@ function GeneralSettingsTab() {
             <FormField label="Number Format">
               <select
                 value={form.number_format || '1,234.56'}
-                onChange={(e) => setForm((p) => ({ ...p, number_format: e.target.value as NumberFormatType }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, number_format: e.target.value as NumberFormatType }))}
                 className="input-field"
               >
                 {Object.entries(numberFormatLabels).map(([value, label]) => (
@@ -412,7 +459,7 @@ function GeneralSettingsTab() {
             <FormField label="Negative Format">
               <select
                 value={form.negative_format || 'minus'}
-                onChange={(e) => setForm((p) => ({ ...p, negative_format: e.target.value as NegativeFormat }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, negative_format: e.target.value as NegativeFormat }))}
                 className="input-field"
               >
                 <option value="minus">-1,234.56 (Minus prefix)</option>
@@ -423,7 +470,7 @@ function GeneralSettingsTab() {
             <FormField label="Currency Symbol Position">
               <select
                 value={form.currency_symbol_position || 'before'}
-                onChange={(e) => setForm((p) => ({ ...p, currency_symbol_position: e.target.value as SymbolPosition }))}
+                onChange={(e) => setForm((p: any) => ({ ...p, currency_symbol_position: e.target.value as SymbolPosition }))}
                 className="input-field"
               >
                 <option value="before">Before amount ($1,234.56)</option>
@@ -442,7 +489,7 @@ function GeneralSettingsTab() {
                   type="number"
                   min={0}
                   value={form.backdating_days_allowed ?? 7}
-                  onChange={(e) => setForm((p) => ({ ...p, backdating_days_allowed: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, backdating_days_allowed: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -451,7 +498,7 @@ function GeneralSettingsTab() {
                   type="number"
                   min={0}
                   value={form.future_posting_days_allowed ?? 0}
-                  onChange={(e) => setForm((p) => ({ ...p, future_posting_days_allowed: Number(e.target.value) }))}
+                  onChange={(e) => setForm((p: any) => ({ ...p, future_posting_days_allowed: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -460,17 +507,17 @@ function GeneralSettingsTab() {
               <CheckboxField
                 label="Require posting in open period"
                 checked={form.require_posting_in_open_period ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, require_posting_in_open_period: v }))}
+                onChange={(v) => setForm((p: any) => ({ ...p, require_posting_in_open_period: v }))}
               />
               <CheckboxField
                 label="Auto voucher numbering"
                 checked={form.auto_voucher_numbering ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, auto_voucher_numbering: v }))}
+                onChange={(v) => setForm((p: any) => ({ ...p, auto_voucher_numbering: v }))}
               />
               <CheckboxField
                 label="Allow duplicate party invoice numbers"
                 checked={form.allow_duplicate_party_invoice ?? false}
-                onChange={(v) => setForm((p) => ({ ...p, allow_duplicate_party_invoice: v }))}
+                onChange={(v) => setForm((p: any) => ({ ...p, allow_duplicate_party_invoice: v }))}
               />
             </div>
           </div>
@@ -482,22 +529,22 @@ function GeneralSettingsTab() {
             <CheckboxField
               label="Require attachment for journal entries"
               checked={form.require_attachment_journal_entry ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_attachment_journal_entry: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_attachment_journal_entry: v }))}
             />
             <CheckboxField
               label="Require attachment for expenses"
               checked={form.require_attachment_expense ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_attachment_expense: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_attachment_expense: v }))}
             />
             <CheckboxField
               label="Require attachment for payments"
               checked={form.require_attachment_payment ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_attachment_payment: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_attachment_payment: v }))}
             />
             <CheckboxField
               label="Require attachment for invoices"
               checked={form.require_attachment_invoice ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_attachment_invoice: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_attachment_invoice: v }))}
             />
           </div>
         </Card>
@@ -508,17 +555,17 @@ function GeneralSettingsTab() {
             <CheckboxField
               label="Require approval for journal entries"
               checked={form.require_approval_journal_entry ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_approval_journal_entry: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_approval_journal_entry: v }))}
             />
             <CheckboxField
               label="Require approval for expenses"
               checked={form.require_approval_expense ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_approval_expense: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_approval_expense: v }))}
             />
             <CheckboxField
               label="Require approval for payments"
               checked={form.require_approval_payment ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_approval_payment: v }))}
+              onChange={(v) => setForm((p: any) => ({ ...p, require_approval_payment: v }))}
             />
           </div>
         </Card>
@@ -825,7 +872,7 @@ function NumberFormatsTab() {
             <p className="text-slate-muted text-sm">Click "Add Number Format" above to configure document numbering.</p>
           </div>
         ) : (
-          formats.map((fmt) => (
+          formats.map((fmt: DocumentNumberFormatResponse) => (
             <div
               key={fmt.id}
               className={cn(
@@ -877,7 +924,7 @@ function NumberFormatsTab() {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                      <span className="text-white font-medium">{documentTypeLabels[fmt.document_type]}</span>
+                      <span className="text-white font-medium">{documentTypeLabels[fmt.document_type as DocumentType]}</span>
                       <span className={cn(
                         'px-2 py-0.5 rounded text-xs font-medium',
                         fmt.is_active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-elevated text-slate-muted'
@@ -887,7 +934,7 @@ function NumberFormatsTab() {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-slate-muted">
                       <span className="font-mono bg-slate-elevated px-2 py-0.5 rounded">{fmt.format_pattern}</span>
-                      <span>Reset: {resetFrequencyLabels[fmt.reset_frequency]}</span>
+                      <span>Reset: {resetFrequencyLabels[fmt.reset_frequency as ResetFrequency]}</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-slate-muted">
                       <span>Current: <span className="text-teal-electric font-mono">{fmt.current_number}</span></span>
@@ -955,7 +1002,7 @@ function CurrenciesTab() {
 
   // Get list of currencies not already added
   const availablePresets = currencyPresets.filter(
-    (preset) => !currencies?.some((c) => c.currency_code === preset.code)
+    (preset) => !currencies?.some((c: CurrencySettingsResponse) => c.currency_code === preset.code)
   );
 
   const handlePresetSelect = (code: string) => {
@@ -1215,7 +1262,7 @@ function CurrenciesTab() {
             <p className="text-slate-muted text-sm">Click "Add Currency" above to configure currencies for your books.</p>
           </div>
         ) : (
-          currencies.map((curr) => (
+          currencies.map((curr: CurrencySettingsResponse) => (
             <div
               key={curr.currency_code}
               className={cn(
@@ -1230,7 +1277,7 @@ function CurrenciesTab() {
                       <input
                         type="text"
                         value={editForm.symbol ?? curr.symbol}
-                        onChange={(e) => setEditForm((p) => ({ ...p, symbol: e.target.value }))}
+                        onChange={(e) => setEditForm((p: any) => ({ ...p, symbol: e.target.value }))}
                         className="input-field"
                       />
                     </FormField>
@@ -1240,15 +1287,15 @@ function CurrenciesTab() {
                         min={0}
                         max={6}
                         value={editForm.decimal_places ?? curr.decimal_places}
-                        onChange={(e) => setEditForm((p) => ({ ...p, decimal_places: Number(e.target.value) }))}
+                        onChange={(e) => setEditForm((p: any) => ({ ...p, decimal_places: Number(e.target.value) }))}
                         className="input-field"
                       />
                     </FormField>
                   </div>
                   <CheckboxField
                     label="Enabled"
-                    checked={editForm.is_enabled ?? curr.is_enabled}
-                    onChange={(v) => setEditForm((p) => ({ ...p, is_enabled: v }))}
+                    checked={(editForm.is_enabled ?? curr.is_enabled) ?? false}
+                    onChange={(v) => setEditForm((p: any) => ({ ...p, is_enabled: v }))}
                   />
                   <div className="flex items-center gap-2">
                     <button onClick={handleUpdate} className="px-3 py-1.5 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold">

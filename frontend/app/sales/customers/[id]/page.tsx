@@ -155,7 +155,7 @@ export default function SalesCustomerDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.subscriptions.map((sub) => (
+                  {data.subscriptions.map((sub: any) => (
                     <tr key={sub.id} className="border-t border-slate-border/60">
                       <td className="px-2 py-2 text-white">{sub.plan_name}</td>
                       <td className="px-2 py-2 text-right text-white font-mono">{formatCurrency(sub.price)}</td>
@@ -189,7 +189,7 @@ export default function SalesCustomerDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.recent_invoices.map((inv) => (
+                {data.recent_invoices.map((inv: any) => (
                   <tr key={inv.id} className="border-t border-slate-border/60">
                     <td className="px-2 py-2 text-white font-mono">
                       <Link href={`/sales/invoices/${inv.id}`} className="hover:text-teal-electric">

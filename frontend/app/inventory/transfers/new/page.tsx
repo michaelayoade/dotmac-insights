@@ -58,7 +58,7 @@ export default function NewTransferPage() {
   const updateItem = (index: number, field: keyof TransferItem, value: string | number) => {
     const updated = [...items];
     if (field === "item_code") {
-      const selected = allItems.find((i) => i.item_code === value);
+      const selected = allItems.find((i: any) => i.item_code === value);
       updated[index] = {
         ...updated[index],
         item_code: value as string,
@@ -155,7 +155,7 @@ export default function NewTransferPage() {
                 disabled={warehousesLoading}
               >
                 <option value="">Select source warehouse</option>
-                {warehouses.map((w) => (
+                {warehouses.map((w: any) => (
                   <option key={w.erpnext_id || w.id} value={w.warehouse_name}>
                     {w.warehouse_name}
                   </option>
@@ -172,7 +172,7 @@ export default function NewTransferPage() {
                 disabled={warehousesLoading}
               >
                 <option value="">Select target warehouse</option>
-                {warehouses.map((w) => (
+                {warehouses.map((w: any) => (
                   <option key={w.erpnext_id || w.id} value={w.warehouse_name}>
                     {w.warehouse_name}
                   </option>
@@ -249,7 +249,7 @@ export default function NewTransferPage() {
                           disabled={itemsLoading}
                         >
                           <option value="">Select item</option>
-                          {allItems.map((i) => (
+                          {allItems.map((i: any) => (
                             <option key={i.item_code} value={i.item_code}>
                               {i.item_code} - {i.item_name}
                             </option>

@@ -156,7 +156,7 @@ export default function TransfersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {transfers.map((transfer) => {
+                {transfers.map((transfer: any) => {
                   const statusInfo = getStatusBadge(transfer.status);
                   const StatusIcon = statusInfo.icon;
                   return (

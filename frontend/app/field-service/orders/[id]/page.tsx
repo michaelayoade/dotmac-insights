@@ -196,6 +196,11 @@ export default function ServiceOrderDetailPage() {
     );
   }
 
+  const checklistGroups = order.checklists ?? order.checklist ?? [];
+  const timeEntries = order.time_entries ?? [];
+  const photos = order.photos ?? [];
+  const items = order.items ?? [];
+
   const status = statusConfig[order.status] || statusConfig.draft;
   const priority = priorityConfig[order.priority] || priorityConfig.medium;
   const StatusIcon = status.icon;
@@ -369,7 +374,13 @@ export default function ServiceOrderDetailPage() {
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-slate-muted mb-2">Estimated Duration</h4>
-                      <p className="text-white">{order.estimated_duration ? `${order.estimated_duration} mins` : 'Not set'}</p>
+                      <p className="text-white">
+                        {order.estimated_duration
+                          ? `${order.estimated_duration} mins`
+                          : order.estimated_duration_minutes
+                            ? `${order.estimated_duration_minutes} mins`
+                            : 'Not set'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -377,9 +388,9 @@ export default function ServiceOrderDetailPage() {
 
               {activeTab === 'checklist' && (
                 <div>
-                  {order.checklists?.length > 0 ? (
+                  {checklistGroups.length > 0 ? (
                     <div className="space-y-4">
-                      {order.checklists.map((checklist: any) => (
+                      {checklistGroups.map((checklist: any) => (
                         <div key={checklist.id} className="space-y-2">
                           <h4 className="text-white font-medium">{checklist.template_name || 'Checklist'}</h4>
                           <div className="space-y-1">
@@ -417,9 +428,9 @@ export default function ServiceOrderDetailPage() {
 
               {activeTab === 'time' && (
                 <div>
-                  {order.time_entries?.length > 0 ? (
+                  {timeEntries.length > 0 ? (
                     <div className="space-y-3">
-                      {order.time_entries.map((entry: any) => (
+                      {timeEntries.map((entry: any) => (
                         <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-elevated">
                           <div>
                             <p className="text-white text-sm capitalize">{entry.entry_type.replace('_', ' ')}</p>
@@ -498,9 +509,9 @@ export default function ServiceOrderDetailPage() {
                   </div>
 
                   {/* Photo Grid */}
-                  {order.photos?.length > 0 ? (
+                  {photos.length > 0 ? (
                     <div className="grid grid-cols-3 gap-4">
-                      {order.photos.map((photo: any) => (
+                      {photos.map((photo: any) => (
                         <div key={photo.id} className="relative aspect-square rounded-lg bg-slate-elevated overflow-hidden group">
                           <Image
                             src={photo.file_url || `/api/field-service/photos/${photo.id}`}
@@ -534,7 +545,7 @@ export default function ServiceOrderDetailPage() {
 
               {activeTab === 'items' && (
                 <div>
-                  {order.items?.length > 0 ? (
+                  {items.length > 0 ? (
                     <table className="w-full">
                       <thead>
                         <tr className="text-left text-xs text-slate-muted">
@@ -545,7 +556,7 @@ export default function ServiceOrderDetailPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-border">
-                        {order.items.map((item: any) => (
+                        {items.map((item: any) => (
                           <tr key={item.id}>
                             <td className="py-2 text-white">{item.item_name}</td>
                             <td className="py-2 text-slate-muted">{item.quantity}</td>
@@ -717,7 +728,7 @@ export default function ServiceOrderDetailPage() {
           </div>
 
           {/* Customer Rating */}
-          {order.customer_rating && (
+          {order.customer_rating !== undefined && order.customer_rating !== null && (
             <div className="bg-slate-card border border-slate-border rounded-xl p-5">
               <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" />
@@ -729,7 +740,7 @@ export default function ServiceOrderDetailPage() {
                     key={star}
                     className={cn(
                       'w-5 h-5',
-                      star <= order.customer_rating
+                      star <= (order.customer_rating || 0)
                         ? 'text-amber-400 fill-amber-400'
                         : 'text-slate-600'
                     )}

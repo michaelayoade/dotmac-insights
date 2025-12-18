@@ -234,7 +234,7 @@ export function ReconciliationPanel({
             <div className="p-4">
               <p className="text-slate-muted text-sm mb-3">Match Suggestions</p>
               <div className="space-y-2">
-                {data.suggestions.map((suggestion) => {
+                {data.suggestions.map((suggestion: any) => {
                   const key = `${suggestion.document_type}-${suggestion.document_id}`;
                   const allocation = allocations.get(key);
                   const isSelected = !!allocation;
@@ -271,7 +271,7 @@ export function ReconciliationPanel({
                           </div>
                           {suggestion.match_reasons.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
-                              {suggestion.match_reasons.map((reason, i) => (
+                              {suggestion.match_reasons.map((reason: string, i: number) => (
                                 <span
                                   key={i}
                                   className="text-xs px-1.5 py-0.5 bg-slate-elevated rounded text-slate-muted"

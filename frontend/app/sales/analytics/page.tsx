@@ -40,7 +40,7 @@ export default function SalesAnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {latestTrend.map((row, idx) => (
+                  {latestTrend.map((row: any, idx: number) => (
                     <tr key={idx} className="border-b border-slate-border/50">
                       <td className="py-2 text-white">{row.period}</td>
                       <td className="py-2 text-right font-mono text-white">{formatCurrency(row.revenue, currency)}</td>
@@ -64,7 +64,7 @@ export default function SalesAnalyticsPage() {
               <div>
                 <h3 className="text-sm text-slate-muted mb-2">By Method</h3>
                 <div className="space-y-2">
-                  {collections.by_method.map((m) => (
+                  {collections.by_method.map((m: any) => (
                     <div key={m.method} className="flex items-center justify-between text-sm">
                       <span className="text-white capitalize">{m.method || 'Unknown'}</span>
                       <span className="font-mono text-teal-electric">{formatCurrency(m.amount, currency)} ({m.count})</span>
@@ -136,7 +136,7 @@ export default function SalesAnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {byCurrency.by_currency.map((row) => (
+                  {byCurrency.by_currency.map((row: any) => (
                     <tr key={row.currency} className="border-b border-slate-border/50">
                       <td className="py-2 text-white">{row.currency}</td>
                     <td className="py-2 text-right font-mono text-white">{formatCurrency(row.mrr || 0, row.currency)}</td>

@@ -75,8 +75,8 @@ export default function PurchasingExpensesPage() {
   const expenses = data?.expenses || [];
   const total = data?.total || 0;
   const expenseTypes = typesData?.expense_types || [];
-  const totalClaimed = expenses.reduce((sum, e: any) => sum + (e.total_claimed_amount || e.amount || 0), 0);
-  const totalReimbursed = expenses.reduce((sum, e: any) => sum + (e.total_amount_reimbursed || 0), 0);
+  const totalClaimed = expenses.reduce((sum: number, e: any) => sum + (e.total_claimed_amount || e.amount || 0), 0);
+  const totalReimbursed = expenses.reduce((sum: number, e: any) => sum + (e.total_amount_reimbursed || 0), 0);
 
   const getStatusConfig = (expenseStatus: string) => {
     const statusLower = expenseStatus?.toLowerCase() || '';

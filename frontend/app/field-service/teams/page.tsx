@@ -29,12 +29,12 @@ export default function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<any>(null);
 
   const { data: teamsData, isLoading: teamsLoading } = useSWR('field-teams', () =>
-    fieldServiceApi.getTeams().then(r => r.data)
+    fieldServiceApi.getTeams()
   );
 
   const { data: techniciansData, isLoading: techniciansLoading } = useSWR(
     viewMode === 'technicians' ? ['field-technicians', search] : null,
-    () => fieldServiceApi.getTechnicians({ search: search || undefined }).then(r => r.data)
+    () => fieldServiceApi.getTechnicians({ search: search || undefined })
   );
 
   const teams = teamsData?.data || [];

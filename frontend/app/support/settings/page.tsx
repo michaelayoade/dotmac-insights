@@ -108,6 +108,8 @@ export default function SupportSettingsPage() {
   const [form, setForm] = useState<Partial<SupportSettingsResponse>>({});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const updateForm = (updater: (prev: Partial<SupportSettingsResponse>) => Partial<SupportSettingsResponse>) =>
+    setForm(updater);
 
   useEffect(() => {
     if (settings) {
@@ -183,12 +185,12 @@ export default function SupportSettingsPage() {
 
       {/* Tab Content */}
       <div className="space-y-6">
-        {activeTab === 'hours' && <HoursTab form={form} setForm={setForm} />}
-        {activeTab === 'routing' && <RoutingTab form={form} setForm={setForm} />}
-        {activeTab === 'autoclose' && <AutoCloseTab form={form} setForm={setForm} />}
-        {activeTab === 'csat' && <CSATTab form={form} setForm={setForm} />}
-        {activeTab === 'kb' && <KBTab form={form} setForm={setForm} />}
-        {activeTab === 'display' && <DisplayTab form={form} setForm={setForm} />}
+        {activeTab === 'hours' && <HoursTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'routing' && <RoutingTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'autoclose' && <AutoCloseTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'csat' && <CSATTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'kb' && <KBTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'display' && <DisplayTab form={form} setForm={setForm} updateForm={updateForm} />}
       </div>
 
       {/* Save Button */}
@@ -214,12 +216,15 @@ export default function SupportSettingsPage() {
 interface TabProps {
   form: Partial<SupportSettingsResponse>;
   setForm: React.Dispatch<React.SetStateAction<Partial<SupportSettingsResponse>>>;
+  updateForm: (updater: (prev: Partial<SupportSettingsResponse>) => Partial<SupportSettingsResponse>) => void;
 }
 
-function HoursTab({ form, setForm }: TabProps) {
-  const updateSchedule = (day: WeekDay, field: keyof WeeklyScheduleDay, value: string | boolean) => {
-    setForm((p) => {
-      const current = p.weekly_schedule || {} as Record<WeekDay, WeeklyScheduleDay>;
+type WeeklyScheduleEntry = { start: string; end: string; closed?: boolean };
+
+function HoursTab({ form, setForm, updateForm }: TabProps) {
+  const updateSchedule = (day: WeekDay, field: keyof WeeklyScheduleEntry, value: string | boolean) => {
+    updateForm((p) => {
+      const current = (p.weekly_schedule || {}) as Record<WeekDay, WeeklyScheduleEntry>;
       const daySchedule = current[day] || { start: '09:00', end: '17:00', closed: false };
       return {
         ...p,
@@ -229,7 +234,7 @@ function HoursTab({ form, setForm }: TabProps) {
             ...daySchedule,
             [field]: value,
           },
-        } as Record<WeekDay, WeeklyScheduleDay>,
+        } as Record<WeekDay, WeeklyScheduleEntry>,
       };
     });
   };
@@ -241,7 +246,7 @@ function HoursTab({ form, setForm }: TabProps) {
           <FormField label="Working Hours Type">
             <select
               value={form.working_hours_type || 'STANDARD'}
-              onChange={(e) => setForm((p) => ({ ...p, working_hours_type: e.target.value as WorkingHoursType }))}
+              onChange={(e) => updateForm((p) => ({ ...p, working_hours_type: e.target.value as WorkingHoursType }))}
               className="input-field"
             >
               {workingHoursOptions.map((opt) => (
@@ -252,7 +257,7 @@ function HoursTab({ form, setForm }: TabProps) {
           <FormField label="Timezone">
             <select
               value={form.timezone || 'Africa/Lagos'}
-              onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
+              onChange={(e) => updateForm((p) => ({ ...p, timezone: e.target.value }))}
               className="input-field"
             >
               {timezoneOptions.map((tz) => (
@@ -266,10 +271,10 @@ function HoursTab({ form, setForm }: TabProps) {
       {form.working_hours_type === 'CUSTOM' && (
         <Card title="Weekly Schedule" icon={Clock}>
           <div className="space-y-3">
-            {weekDays.map((day) => {
-              const schedule = form.weekly_schedule?.[day] || { start: '09:00', end: '17:00', closed: false };
-              return (
-                <div key={day} className="flex items-center gap-3">
+      {weekDays.map((day) => {
+        const schedule = form.weekly_schedule?.[day] || { start: '09:00', end: '17:00', closed: false };
+        return (
+          <div key={day} className="flex items-center gap-3">
                   <span className="w-16 text-sm text-slate-muted">{day.slice(0, 3)}</span>
                   <label className="flex items-center gap-2">
                     <input
@@ -312,7 +317,7 @@ function HoursTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.default_first_response_hours ?? 4}
-                onChange={(e) => setForm((p) => ({ ...p, default_first_response_hours: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, default_first_response_hours: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -321,7 +326,7 @@ function HoursTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.default_resolution_hours ?? 24}
-                onChange={(e) => setForm((p) => ({ ...p, default_resolution_hours: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, default_resolution_hours: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -332,7 +337,7 @@ function HoursTab({ form, setForm }: TabProps) {
               min={0}
               max={100}
               value={form.sla_warning_threshold_percent ?? 75}
-              onChange={(e) => setForm((p) => ({ ...p, sla_warning_threshold_percent: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, sla_warning_threshold_percent: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -340,12 +345,12 @@ function HoursTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Include holidays in SLA calculation"
               checked={form.sla_include_holidays ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, sla_include_holidays: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, sla_include_holidays: v }))}
             />
             <CheckboxField
               label="Include weekends in SLA calculation"
               checked={form.sla_include_weekends ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, sla_include_weekends: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, sla_include_weekends: v }))}
             />
           </div>
         </div>
@@ -354,7 +359,7 @@ function HoursTab({ form, setForm }: TabProps) {
   );
 }
 
-function RoutingTab({ form, setForm }: TabProps) {
+function RoutingTab({ form, setForm, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Routing Strategy" icon={Users}>
@@ -362,7 +367,7 @@ function RoutingTab({ form, setForm }: TabProps) {
           <FormField label="Default Routing">
             <select
               value={form.default_routing_strategy || 'ROUND_ROBIN'}
-              onChange={(e) => setForm((p) => ({ ...p, default_routing_strategy: e.target.value as DefaultRoutingStrategy }))}
+              onChange={(e) => updateForm((p) => ({ ...p, default_routing_strategy: e.target.value as DefaultRoutingStrategy }))}
               className="input-field"
             >
               {routingStrategyOptions.map((opt) => (
@@ -374,7 +379,7 @@ function RoutingTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Enable auto-assignment"
               checked={form.auto_assign_enabled ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, auto_assign_enabled: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, auto_assign_enabled: v }))}
             />
           </div>
           {form.auto_assign_enabled && (
@@ -384,7 +389,7 @@ function RoutingTab({ form, setForm }: TabProps) {
                   type="number"
                   min={1}
                   value={form.max_tickets_per_agent ?? 50}
-                  onChange={(e) => setForm((p) => ({ ...p, max_tickets_per_agent: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, max_tickets_per_agent: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -394,7 +399,7 @@ function RoutingTab({ form, setForm }: TabProps) {
                   min={0}
                   max={100}
                   value={form.rebalance_threshold_percent ?? 20}
-                  onChange={(e) => setForm((p) => ({ ...p, rebalance_threshold_percent: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, rebalance_threshold_percent: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -408,7 +413,7 @@ function RoutingTab({ form, setForm }: TabProps) {
           <FormField label="Default Priority">
             <select
               value={form.default_priority || 'MEDIUM'}
-              onChange={(e) => setForm((p) => ({ ...p, default_priority: e.target.value as TicketPriorityDefault }))}
+              onChange={(e) => updateForm((p) => ({ ...p, default_priority: e.target.value as TicketPriorityDefault }))}
               className="input-field"
             >
               {priorityOptions.map((opt) => (
@@ -420,7 +425,7 @@ function RoutingTab({ form, setForm }: TabProps) {
             <input
               type="text"
               value={form.default_ticket_type ?? ''}
-              onChange={(e) => setForm((p) => ({ ...p, default_ticket_type: e.target.value || null }))}
+              onChange={(e) => updateForm((p) => ({ ...p, default_ticket_type: e.target.value || null }))}
               placeholder="e.g., Support, Question"
               className="input-field"
             />
@@ -429,12 +434,12 @@ function RoutingTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Allow customer to select priority"
               checked={form.allow_customer_priority_selection ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, allow_customer_priority_selection: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_customer_priority_selection: v }))}
             />
             <CheckboxField
               label="Allow customer to select team"
               checked={form.allow_customer_team_selection ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, allow_customer_team_selection: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_customer_team_selection: v }))}
             />
           </div>
         </div>
@@ -443,7 +448,7 @@ function RoutingTab({ form, setForm }: TabProps) {
   );
 }
 
-function AutoCloseTab({ form, setForm }: TabProps) {
+function AutoCloseTab({ form, setForm, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Auto-Close Settings" icon={Zap}>
@@ -451,7 +456,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable auto-close"
             checked={form.auto_close_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, auto_close_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, auto_close_enabled: v }))}
           />
           {form.auto_close_enabled && (
             <>
@@ -460,14 +465,14 @@ function AutoCloseTab({ form, setForm }: TabProps) {
                   type="number"
                   min={1}
                   value={form.auto_close_resolved_days ?? 7}
-                  onChange={(e) => setForm((p) => ({ ...p, auto_close_resolved_days: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, auto_close_resolved_days: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
               <FormField label="Action on auto-close">
                 <select
                   value={form.auto_close_action || 'CLOSE'}
-                  onChange={(e) => setForm((p) => ({ ...p, auto_close_action: e.target.value as TicketAutoCloseAction }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, auto_close_action: e.target.value as TicketAutoCloseAction }))}
                   className="input-field"
                 >
                   {autoCloseActionOptions.map((opt) => (
@@ -478,7 +483,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
               <CheckboxField
                 label="Notify customer on auto-close"
                 checked={form.auto_close_notify_customer ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, auto_close_notify_customer: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, auto_close_notify_customer: v }))}
               />
             </>
           )}
@@ -490,7 +495,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Allow customer to reopen tickets"
             checked={form.allow_customer_reopen ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, allow_customer_reopen: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, allow_customer_reopen: v }))}
           />
           {form.allow_customer_reopen && (
             <>
@@ -500,7 +505,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
                     type="number"
                     min={1}
                     value={form.reopen_window_days ?? 14}
-                    onChange={(e) => setForm((p) => ({ ...p, reopen_window_days: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, reopen_window_days: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -509,7 +514,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
                     type="number"
                     min={1}
                     value={form.max_reopens_allowed ?? 3}
-                    onChange={(e) => setForm((p) => ({ ...p, max_reopens_allowed: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, max_reopens_allowed: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -524,19 +529,19 @@ function AutoCloseTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable escalation"
             checked={form.escalation_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, escalation_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, escalation_enabled: v }))}
           />
           {form.escalation_enabled && (
             <>
               <CheckboxField
                 label="Notify manager on escalation"
                 checked={form.escalation_notify_manager ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, escalation_notify_manager: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, escalation_notify_manager: v }))}
               />
               <CheckboxField
                 label="Escalate on idle time"
                 checked={form.idle_escalation_enabled ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, idle_escalation_enabled: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, idle_escalation_enabled: v }))}
               />
               {form.idle_escalation_enabled && (
                 <FormField label="Idle hours before escalation">
@@ -544,7 +549,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
                     type="number"
                     min={1}
                     value={form.idle_hours_before_escalation ?? 24}
-                    onChange={(e) => setForm((p) => ({ ...p, idle_hours_before_escalation: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, idle_hours_before_escalation: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -552,7 +557,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
               <CheckboxField
                 label="Escalate on multiple reopens"
                 checked={form.reopen_escalation_enabled ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, reopen_escalation_enabled: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, reopen_escalation_enabled: v }))}
               />
               {form.reopen_escalation_enabled && (
                 <FormField label="Reopen count for escalation">
@@ -560,7 +565,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
                     type="number"
                     min={1}
                     value={form.reopen_count_for_escalation ?? 2}
-                    onChange={(e) => setForm((p) => ({ ...p, reopen_count_for_escalation: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, reopen_count_for_escalation: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -577,7 +582,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.archive_closed_tickets_days ?? 90}
-              onChange={(e) => setForm((p) => ({ ...p, archive_closed_tickets_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, archive_closed_tickets_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -586,7 +591,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.delete_archived_tickets_days ?? 365}
-              onChange={(e) => setForm((p) => ({ ...p, delete_archived_tickets_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, delete_archived_tickets_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -597,7 +602,7 @@ function AutoCloseTab({ form, setForm }: TabProps) {
   );
 }
 
-function CSATTab({ form, setForm }: TabProps) {
+function CSATTab({ form, setForm, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="CSAT Survey Settings" icon={MessageSquare}>
@@ -605,14 +610,14 @@ function CSATTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable CSAT surveys"
             checked={form.csat_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, csat_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, csat_enabled: v }))}
           />
           {form.csat_enabled && (
             <>
               <FormField label="Survey Trigger">
                 <select
                   value={form.csat_survey_trigger || 'ON_RESOLVE'}
-                  onChange={(e) => setForm((p) => ({ ...p, csat_survey_trigger: e.target.value as CSATSurveyTrigger }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, csat_survey_trigger: e.target.value as CSATSurveyTrigger }))}
                   className="input-field"
                 >
                   {csatTriggerOptions.map((opt) => (
@@ -625,14 +630,14 @@ function CSATTab({ form, setForm }: TabProps) {
                   type="number"
                   min={0}
                   value={form.csat_delay_hours ?? 1}
-                  onChange={(e) => setForm((p) => ({ ...p, csat_delay_hours: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, csat_delay_hours: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
               <CheckboxField
                 label="Enable reminder"
                 checked={form.csat_reminder_enabled ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, csat_reminder_enabled: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, csat_reminder_enabled: v }))}
               />
               {form.csat_reminder_enabled && (
                 <FormField label="Reminder after (days)">
@@ -640,7 +645,7 @@ function CSATTab({ form, setForm }: TabProps) {
                     type="number"
                     min={1}
                     value={form.csat_reminder_days ?? 3}
-                    onChange={(e) => setForm((p) => ({ ...p, csat_reminder_days: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, csat_reminder_days: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -650,7 +655,7 @@ function CSATTab({ form, setForm }: TabProps) {
                   type="number"
                   min={1}
                   value={form.csat_survey_expiry_days ?? 14}
-                  onChange={(e) => setForm((p) => ({ ...p, csat_survey_expiry_days: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, csat_survey_expiry_days: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -664,34 +669,34 @@ function CSATTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable customer portal"
             checked={form.portal_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, portal_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, portal_enabled: v }))}
           />
           {form.portal_enabled && (
             <>
               <CheckboxField
                 label="Allow ticket creation via portal"
                 checked={form.portal_ticket_creation_enabled ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, portal_ticket_creation_enabled: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, portal_ticket_creation_enabled: v }))}
               />
               <CheckboxField
                 label="Show ticket history"
                 checked={form.portal_show_ticket_history ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, portal_show_ticket_history: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, portal_show_ticket_history: v }))}
               />
               <CheckboxField
                 label="Show knowledge base"
                 checked={form.portal_show_knowledge_base ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, portal_show_knowledge_base: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, portal_show_knowledge_base: v }))}
               />
               <CheckboxField
                 label="Show FAQ"
                 checked={form.portal_show_faq ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, portal_show_faq: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, portal_show_faq: v }))}
               />
               <CheckboxField
                 label="Require login"
                 checked={form.portal_require_login ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, portal_require_login: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, portal_require_login: v }))}
               />
             </>
           )}
@@ -701,7 +706,7 @@ function CSATTab({ form, setForm }: TabProps) {
   );
 }
 
-function KBTab({ form, setForm }: TabProps) {
+function KBTab({ form, setForm, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Knowledge Base Settings" icon={BookOpen}>
@@ -709,24 +714,24 @@ function KBTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable knowledge base"
             checked={form.kb_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, kb_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, kb_enabled: v }))}
           />
           {form.kb_enabled && (
             <>
               <CheckboxField
                 label="Public access (no login required)"
                 checked={form.kb_public_access ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, kb_public_access: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, kb_public_access: v }))}
               />
               <CheckboxField
                 label="Suggest articles when creating ticket"
                 checked={form.kb_suggest_articles_on_create ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, kb_suggest_articles_on_create: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, kb_suggest_articles_on_create: v }))}
               />
               <CheckboxField
                 label="Track article helpfulness (thumbs up/down)"
                 checked={form.kb_track_article_helpfulness ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, kb_track_article_helpfulness: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, kb_track_article_helpfulness: v }))}
               />
             </>
           )}
@@ -736,11 +741,11 @@ function KBTab({ form, setForm }: TabProps) {
   );
 }
 
-function DisplayTab({ form, setForm }: TabProps) {
+function DisplayTab({ form, setForm, updateForm }: TabProps) {
   const toggleChannel = (channel: NotificationChannel) => {
     const current = form.notification_channels || ['EMAIL', 'IN_APP'];
     const isSelected = current.includes(channel);
-    setForm((p) => ({
+    updateForm((p) => ({
       ...p,
       notification_channels: isSelected
         ? current.filter((c) => c !== channel)
@@ -757,7 +762,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               <input
                 type="text"
                 value={form.ticket_id_prefix ?? 'TKT'}
-                onChange={(e) => setForm((p) => ({ ...p, ticket_id_prefix: e.target.value.toUpperCase() }))}
+                onChange={(e) => updateForm((p) => ({ ...p, ticket_id_prefix: e.target.value.toUpperCase() }))}
                 className="input-field"
                 maxLength={10}
               />
@@ -768,7 +773,7 @@ function DisplayTab({ form, setForm }: TabProps) {
                 min={2}
                 max={10}
                 value={form.ticket_id_min_digits ?? 5}
-                onChange={(e) => setForm((p) => ({ ...p, ticket_id_min_digits: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, ticket_id_min_digits: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -787,7 +792,7 @@ function DisplayTab({ form, setForm }: TabProps) {
           <FormField label="Date Format">
             <select
               value={form.date_format || 'YYYY-MM-DD'}
-              onChange={(e) => setForm((p) => ({ ...p, date_format: e.target.value }))}
+              onChange={(e) => updateForm((p) => ({ ...p, date_format: e.target.value }))}
               className="input-field"
             >
               {dateFormatOptions.map((f) => (
@@ -798,7 +803,7 @@ function DisplayTab({ form, setForm }: TabProps) {
           <FormField label="Time Format">
             <select
               value={form.time_format || 'HH:mm'}
-              onChange={(e) => setForm((p) => ({ ...p, time_format: e.target.value }))}
+              onChange={(e) => updateForm((p) => ({ ...p, time_format: e.target.value }))}
               className="input-field"
             >
               {timeFormatOptions.map((f) => (
@@ -837,22 +842,22 @@ function DisplayTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Notify assigned agent"
               checked={form.notify_assigned_agent ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, notify_assigned_agent: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, notify_assigned_agent: v }))}
             />
             <CheckboxField
               label="Notify team on unassigned tickets"
               checked={form.notify_team_on_unassigned ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, notify_team_on_unassigned: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, notify_team_on_unassigned: v }))}
             />
             <CheckboxField
               label="Notify customer on status change"
               checked={form.notify_customer_on_status_change ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, notify_customer_on_status_change: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, notify_customer_on_status_change: v }))}
             />
             <CheckboxField
               label="Notify customer on reply"
               checked={form.notify_customer_on_reply ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, notify_customer_on_reply: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, notify_customer_on_reply: v }))}
             />
           </div>
         </div>
@@ -865,7 +870,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.unassigned_warning_minutes ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, unassigned_warning_minutes: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, unassigned_warning_minutes: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -874,14 +879,14 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={5}
               value={form.queue_refresh_seconds ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, queue_refresh_seconds: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, queue_refresh_seconds: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
           <CheckboxField
             label="Highlight overdue tickets"
             checked={form.overdue_highlight_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, overdue_highlight_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, overdue_highlight_enabled: v }))}
           />
         </div>
       </Card>
@@ -891,14 +896,14 @@ function DisplayTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable email-to-ticket"
             checked={form.email_to_ticket_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, email_to_ticket_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, email_to_ticket_enabled: v }))}
           />
           {form.email_to_ticket_enabled && (
             <FormField label="Reply-to address">
               <input
                 type="email"
                 value={form.email_reply_to_address ?? ''}
-                onChange={(e) => setForm((p) => ({ ...p, email_reply_to_address: e.target.value || null }))}
+                onChange={(e) => updateForm((p) => ({ ...p, email_reply_to_address: e.target.value || null }))}
                 placeholder="support@company.com"
                 className="input-field"
               />
@@ -912,17 +917,17 @@ function DisplayTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Sync to ERPNext"
             checked={form.sync_to_erpnext ?? false}
-            onChange={(v) => setForm((p) => ({ ...p, sync_to_erpnext: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, sync_to_erpnext: v }))}
           />
           <CheckboxField
             label="Sync to Splynx"
             checked={form.sync_to_splynx ?? false}
-            onChange={(v) => setForm((p) => ({ ...p, sync_to_splynx: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, sync_to_splynx: v }))}
           />
           <CheckboxField
             label="Sync to Chatwoot"
             checked={form.sync_to_chatwoot ?? false}
-            onChange={(v) => setForm((p) => ({ ...p, sync_to_chatwoot: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, sync_to_chatwoot: v }))}
           />
         </div>
       </Card>

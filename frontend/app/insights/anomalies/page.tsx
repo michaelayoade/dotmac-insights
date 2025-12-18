@@ -114,7 +114,7 @@ export default function AnomaliesPage() {
       {data?.recommendations && data.recommendations.length > 0 && (
         <InsightCard title="Recommendations">
           <ul className="space-y-2">
-            {data.recommendations.map((rec, i) => (
+            {data.recommendations.map((rec: string, i: number) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                 <span className="text-teal-electric mt-0.5">•</span>
                 {rec}

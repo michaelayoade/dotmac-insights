@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useUnifiedContact, useUnifiedContactMutations } from '@/hooks/useApi';
+import { useUnifiedContact, useUnifiedContactMutations, type UnifiedContact } from '@/hooks/useApi';
+import type { Contact as CRMContact } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
   User,
@@ -72,6 +73,9 @@ const statusColors: Record<string, string> = {
   do_not_contact: 'bg-red-500/20 text-red-400',
 };
 
+type ContactType = 'lead' | 'prospect' | 'customer' | 'person' | 'churned';
+type ContactStatus = 'active' | 'inactive' | 'suspended' | 'do_not_contact';
+
 const qualificationColors: Record<string, string> = {
   unqualified: 'bg-gray-500',
   cold: 'bg-blue-500',
@@ -86,8 +90,15 @@ export default function ContactDetailPage() {
   const id = params.id as string;
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  const { data: contact, isLoading, error, mutate } = useUnifiedContact(id);
+  const { data: contact, isLoading, error, mutate } = useUnifiedContact(id) as {
+    data?: CRMContact;
+    isLoading: boolean;
+    error?: unknown;
+    mutate: () => Promise<any>;
+  };
   const mutations = useUnifiedContactMutations();
+  const contactType = (contact?.contact_type as ContactType | undefined) || 'lead';
+  const contactStatus = (contact?.status as ContactStatus | undefined) || 'active';
 
   const handleQualify = async (qualification: string) => {
     try {
@@ -164,9 +175,9 @@ export default function ContactDetailPage() {
               </span>
               <span className={cn(
                 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                statusColors[contact.status] || statusColors.active
+                statusColors[contactStatus] || statusColors.active
               )}>
-                {contact.status}
+                {contactStatus}
               </span>
             </div>
             {contact.company_name && contact.company_name !== contact.name && (
@@ -215,15 +226,13 @@ export default function ContactDetailPage() {
                 ))}
               </div>
             </div>
-            {contactType !== 'customer' && (
-              <button
-                onClick={handleConvertToCustomer}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 hover:bg-green-500/30 transition-colors"
-              >
-                <UserCheck className="w-4 h-4" />
-                Convert to Customer
-              </button>
-            )}
+            <button
+              onClick={handleConvertToCustomer}
+              className="flex items-center gap-2 px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 hover:bg-green-500/30 transition-colors"
+            >
+              <UserCheck className="w-4 h-4" />
+              Convert to Customer
+            </button>
           </div>
         </div>
       )}
@@ -328,7 +337,7 @@ export default function ContactDetailPage() {
                   <p className="text-sm text-slate-muted">Outstanding</p>
                   <p className={cn(
                     'text-xl font-bold',
-                    contact.outstanding_balance > 0 ? 'text-red-400' : 'text-white'
+                    (contact.outstanding_balance || 0) > 0 ? 'text-red-400' : 'text-white'
                   )}>
                     {formatCurrency(contact.outstanding_balance || 0)}
                   </p>

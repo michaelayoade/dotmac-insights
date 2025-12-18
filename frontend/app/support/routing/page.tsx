@@ -24,7 +24,7 @@ export default function SupportRoutingPage() {
   const queueData = (queue.data || {}) as any;
 
   const teams = teamsData?.teams || [];
-  const teamMap = new Map(teams.map((t) => [t.id, t.team_name]));
+  const teamMap = new Map(teams.map((t: any) => [t.id, t.team_name]));
 
   return (
     <div className="space-y-6">
@@ -47,7 +47,7 @@ export default function SupportRoutingPage() {
           className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
         >
           <option value="">All teams</option>
-          {teams.map((team) => (
+          {teams.map((team: any) => (
             <option key={team.id} value={team.id}>
               {team.team_name}
             </option>
@@ -128,7 +128,7 @@ export default function SupportRoutingPage() {
             <p className="text-slate-muted text-sm">No routing rules configured.</p>
           ) : (
             <div className="space-y-3">
-              {rules.data.map((rule) => (
+              {rules.data.map((rule: any) => (
                 <div key={rule.id} className="border border-slate-border rounded-lg p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -142,7 +142,7 @@ export default function SupportRoutingPage() {
                   <div className="flex items-center gap-4 mt-2 text-xs text-slate-muted">
                     <span className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
-                      Team: {rule.team_id ? teamMap.get(rule.team_id) || `#${rule.team_id}` : 'Any'}
+                      Team: {rule.team_id ? String(teamMap.get(rule.team_id) || `#${rule.team_id}`) : 'Any'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Target className="w-3 h-3" />
@@ -176,7 +176,7 @@ export default function SupportRoutingPage() {
             <p className="text-slate-muted text-sm">No workload data available.</p>
           ) : (
             <div className="space-y-3">
-              {workload.data.map((agent) => (
+              {workload.data.map((agent: any) => (
                 <div key={agent.agent_id} className="border border-slate-border rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <div>

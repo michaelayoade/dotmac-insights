@@ -74,7 +74,7 @@ export default function PurchasingOrdersPage() {
   const orders = data?.orders || [];
   const total = data?.total || 0;
   const suppliers = suppliersData?.suppliers || [];
-  const totalValue = orders.reduce((sum, o: any) => sum + (o.total || 0), 0);
+  const totalValue = orders.reduce((sum: number, o: any) => sum + (o.total || 0), 0);
 
   const getStatusConfig = (orderStatus: string) => {
     const statusLower = orderStatus?.toLowerCase() || '';

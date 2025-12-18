@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { RefreshCw, ArrowLeft, Activity, RotateCcw } from 'lucide-react';
-import { webhooksApi } from '@/lib/api';
+import { webhooksApi, WebhookEventListResponse, WebhookProviderStats } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 
@@ -13,11 +13,14 @@ export default function ProviderDetailPage() {
   const provider = params.name as string;
   const { toast } = useToast();
 
-  const { data: stats, mutate } = useSWR(provider ? ['webhook-provider', provider] : null, () =>
-    webhooksApi.getWebhookProviderStats(provider)
+  const { data: stats, mutate } = useSWR<WebhookProviderStats | undefined>(
+    provider ? ['webhook-provider', provider] : null,
+    () => webhooksApi.getWebhookProviderStats(provider)
   );
-  const { data: events, mutate: mutateEvents } = useSWR(provider ? ['webhook-events', provider] : null, () =>
-    webhooksApi.getWebhookEvents({ provider, limit: 50 })
+  const { data: events, mutate: mutateEvents } = useSWR<WebhookEventListResponse | undefined>(
+    provider ? ['webhook-events', provider] : null,
+    () => webhooksApi.getWebhookEvents({ provider, limit: 50 }),
+    {}
   );
 
   const handleReplay = async (id: number) => {
@@ -54,8 +57,8 @@ export default function ProviderDetailPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Total Events" value={stats?.total_events} />
-        <StatCard label="Processed" value={stats?.processed_count} />
-        <StatCard label="Errors" value={stats?.error_count} accent="rose" />
+        <StatCard label="Processed" value={stats?.processed_count ?? stats?.processed_events} />
+        <StatCard label="Errors" value={stats?.error_count ?? stats?.failed_events} accent="rose" />
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -79,7 +82,7 @@ export default function ProviderDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-border">
-            {(events?.items || events?.data || events || []).map((event: any) => (
+            {((Array.isArray(events) ? events : events?.items) || []).map((event: any) => (
               <tr key={event.id}>
                 <td className="px-4 py-3 text-white">{event.id}</td>
                 <td className="px-4 py-3 text-slate-muted">{event.event_type}</td>
@@ -118,7 +121,7 @@ export default function ProviderDetailPage() {
                 </td>
               </tr>
             ))}
-            {!events?.length && !events?.items && (
+            {!events?.items?.length && !Array.isArray(events) && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-slate-muted">
                   No events yet.

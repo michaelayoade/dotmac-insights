@@ -157,7 +157,7 @@ export default function SchedulePage() {
   // Group orders by date
   const ordersByDate = useMemo(() => {
     const grouped: Record<string, any[]> = {};
-    ordersData?.data?.forEach((order: any) => {
+    (ordersData || []).forEach((order: any) => {
       const date = order.scheduled_date;
       if (!grouped[date]) grouped[date] = [];
       grouped[date].push(order);
@@ -170,6 +170,9 @@ export default function SchedulePage() {
   };
 
   const today = new Date().toISOString().split('T')[0];
+  const dispatchBoard = dispatchData as any;
+  const unassignedOrders = dispatchBoard?.unassigned || [];
+  const dispatchTechnicians = dispatchBoard?.technicians || (Array.isArray(dispatchData) ? dispatchData : []);
 
   return (
     <div className="space-y-6">
@@ -361,13 +364,13 @@ export default function SchedulePage() {
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
                   Unassigned
                   <span className="text-sm text-slate-muted">
-                    ({dispatchData?.unassigned?.length || 0})
+                    ({unassignedOrders.length})
                   </span>
                 </h3>
               </div>
               <div className="p-4 space-y-2 max-h-[500px] overflow-y-auto">
-                {dispatchData?.unassigned?.length > 0 ? (
-                  dispatchData.unassigned.map((order: any) => (
+                {unassignedOrders.length > 0 ? (
+                  unassignedOrders.map((order: any) => (
                     <div
                       key={order.id}
                       draggable
@@ -397,7 +400,7 @@ export default function SchedulePage() {
             </div>
 
             {/* Technician Columns */}
-            {dispatchData?.technicians?.slice(0, 3).map((tech: any) => (
+            {dispatchTechnicians?.slice(0, 3).map((tech: any) => (
               <div
                 key={tech.id}
                 onDragOver={(e) => handleDragOver(e, tech.id)}
@@ -495,8 +498,8 @@ export default function SchedulePage() {
                     Loading...
                   </td>
                 </tr>
-              ) : ordersData?.data?.length > 0 ? (
-                ordersData.data.map((order: any) => (
+              ) : ordersData && ordersData.length > 0 ? (
+                ordersData.map((order: any) => (
                   <tr key={order.id} className="hover:bg-slate-elevated/30 transition-colors">
                     <td className="px-4 py-3 text-sm text-white">
                       {order.scheduled_date

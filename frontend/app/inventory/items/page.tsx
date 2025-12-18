@@ -110,7 +110,7 @@ export default function InventoryItemsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {items.map((item) => (
+                {items.map((item: any) => (
                   <tr key={item.id} className="hover:bg-slate-elevated/50 transition-colors">
                     <td className="py-3">
                       <Link

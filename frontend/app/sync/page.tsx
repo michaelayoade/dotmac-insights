@@ -180,9 +180,9 @@ export default function SyncPage() {
             </div>
             <p className="text-white font-mono text-lg">
               {(() => {
-                const lastSyncs = Object.values(syncStatus)
-                  .filter((s): s is NonNullable<typeof s> => !!s?.last_sync)
-                  .map(s => new Date(s.last_sync!).getTime());
+                const lastSyncs = Object.values(syncStatus || {})
+                  .filter((s): s is NonNullable<typeof s> => !!(s as any)?.last_sync)
+                  .map((s: any) => new Date(s.last_sync).getTime());
                 const latest = lastSyncs.length > 0 ? Math.max(...lastSyncs) : null;
                 return latest ? formatDate(new Date(latest).toISOString()) : 'Never';
               })()}
@@ -195,9 +195,9 @@ export default function SyncPage() {
               <Badge variant="success">Synced</Badge>
             </div>
             <p className="text-white font-mono text-lg">
-              {Object.values(syncStatus)
+              {Object.values(syncStatus || {})
                 .filter((s): s is NonNullable<typeof s> => !!s)
-                .reduce((sum, s) => sum + (s.records_created || 0) + (s.records_updated || 0), 0)
+                .reduce((sum, s: any) => sum + (s.records_created || 0) + (s.records_updated || 0), 0)
                 .toLocaleString()}
             </p>
           </Card>
@@ -205,7 +205,7 @@ export default function SyncPage() {
           <Card className="border-teal-electric/20">
             <div className="flex items-center justify-between mb-4">
               <span className="text-slate-muted text-sm">Sync Health</span>
-              {Object.values(syncStatus).some(s => s?.error) ? (
+              {Object.values(syncStatus || {}).some((s: any) => s?.error) ? (
                 <Badge variant="warning">
                   <AlertTriangle className="w-3 h-3 mr-1" />
                   Has Errors
@@ -218,7 +218,7 @@ export default function SyncPage() {
               )}
             </div>
             <p className="text-white font-mono text-lg">
-              {Object.values(syncStatus).filter(s => s?.status === 'success').length} / {Object.keys(syncStatus).length} OK
+              {Object.values(syncStatus || {}).filter((s: any) => s?.status === 'success').length} / {Object.keys(syncStatus || {}).length} OK
             </p>
           </Card>
         </div>

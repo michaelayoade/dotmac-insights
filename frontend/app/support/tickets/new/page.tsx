@@ -13,7 +13,7 @@ export default function SupportTicketCreatePage() {
   const { data: agentsData } = useSupportAgents();
   const { data: teamsData } = useSupportTeams();
 
-  const agents = agentsData?.agents?.filter((a) => a.is_active) || [];
+const agents = agentsData?.agents?.filter((a: any) => a.is_active) || [];
   const teams = teamsData?.teams || [];
 
   const [subject, setSubject] = useState('');
@@ -50,8 +50,8 @@ export default function SupportTicketCreatePage() {
     setSubmitting(true);
     try {
       // Get assigned_to name from selected agent
-      const selectedAgent = agents.find((a) => a.id === Number(agentId));
-      const selectedTeam = teams.find((t) => t.id === Number(teamId));
+      const selectedAgent = agents.find((a: any) => a.id === Number(agentId));
+      const selectedTeam = teams.find((t: any) => t.id === Number(teamId));
 
       const payload = {
         subject: subject.trim(),
@@ -213,7 +213,7 @@ export default function SupportTicketCreatePage() {
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="">-- Select an agent --</option>
-                {agents.map((agent) => (
+                {agents.map((agent: any) => (
                   <option key={agent.id} value={agent.id}>
                     {agent.display_name || agent.email} {agent.capacity ? `(${agent.capacity} capacity)` : ''}
                   </option>
@@ -229,7 +229,7 @@ export default function SupportTicketCreatePage() {
                 className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="">-- Select a team --</option>
-                {teams.map((team) => (
+                {teams.map((team: any) => (
                   <option key={team.id} value={team.id}>
                     {team.team_name} {team.description ? `(${team.description})` : ''}
                   </option>

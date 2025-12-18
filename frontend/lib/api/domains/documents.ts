@@ -149,7 +149,7 @@ export const documentsApi = {
 
     return fetchApi<DocumentAttachmentUploadResponse>(
       `/accounting/documents/${doctype}/${docId}/attachments`,
-      { method: 'POST', body: formData, isFormData: true }
+      { method: 'POST', body: formData }
     );
   },
 

@@ -115,9 +115,8 @@ function getAccessToken(): string {
   return '';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface FetchOptions extends RequestInit {
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 /**

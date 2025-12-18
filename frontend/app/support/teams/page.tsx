@@ -49,9 +49,9 @@ export default function SupportTeamsPage() {
   // Calculate metrics
   const metrics = useMemo(() => {
     const teamsList = teams ?? [];
-    const totalMembers = teamsList.reduce((sum, t) => sum + ((t.members || []).length), 0);
-    const roundRobinCount = teamsList.filter((t) => t.assignment_rule === 'round_robin').length;
-    const loadBalancedCount = teamsList.filter((t) => t.assignment_rule === 'load_balanced').length;
+    const totalMembers = teamsList.reduce((sum: number, t: any) => sum + ((t.members || []).length), 0);
+    const roundRobinCount = teamsList.filter((t: any) => t.assignment_rule === 'round_robin').length;
+    const loadBalancedCount = teamsList.filter((t: any) => t.assignment_rule === 'load_balanced').length;
     return {
       totalTeams: teamsList.length,
       totalMembers,
@@ -64,7 +64,7 @@ export default function SupportTeamsPage() {
   const filteredTeams = useMemo(() => {
     const teamsList = teams ?? [];
     if (!search) return teamsList;
-    return teamsList.filter((team) =>
+    return teamsList.filter((team: any) =>
       team.team_name?.toLowerCase().includes(search.toLowerCase()) ||
       team.description?.toLowerCase().includes(search.toLowerCase())
     );
@@ -94,9 +94,9 @@ export default function SupportTeamsPage() {
 
   // Get agents not already in a team
   const getAvailableAgents = (teamId: number) => {
-    const team = (teams ?? []).find((t) => t.id === teamId);
+    const team = (teams ?? []).find((t: any) => t.id === teamId);
     const memberAgentIds = (team?.members || []).map((m: any) => m.agent_id);
-    return agents.filter((a) => a.is_active && !memberAgentIds.includes(a.id));
+    return agents.filter((a: any) => a.is_active && !memberAgentIds.includes(a.id));
   };
 
   return (
@@ -232,7 +232,7 @@ export default function SupportTeamsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredTeams.map((team) => {
+            {filteredTeams.map((team: any) => {
               const availableAgents = getAvailableAgents(team.id);
               return (
                 <div key={team.id} className="border border-slate-border rounded-lg p-4 space-y-3">
@@ -308,7 +308,7 @@ export default function SupportTeamsPage() {
                         className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       >
                         <option value="">-- Select an agent --</option>
-                        {availableAgents.map((agent) => (
+                        {availableAgents.map((agent: any) => (
                           <option key={agent.id} value={agent.id}>
                             {agent.display_name || agent.email} {agent.capacity ? `(${agent.capacity} capacity)` : ''}
                           </option>

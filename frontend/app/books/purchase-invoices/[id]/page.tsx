@@ -54,7 +54,9 @@ export default function PurchaseInvoiceDetailPage() {
 
   const amountPaid =
     (data as any).amount_paid ??
-    (Array.isArray(data.payments) ? data.payments.reduce((sum, p) => sum + (p.amount || 0), 0) : 0);
+    (Array.isArray(data.payments)
+      ? data.payments.reduce((sum: number, p: { amount?: number }) => sum + (p.amount || 0), 0)
+      : 0);
   const balance = data.balance ?? ((data.total_amount || 0) - amountPaid);
   const currentCurrency = data.currency || currency;
 
@@ -109,7 +111,7 @@ export default function PurchaseInvoiceDetailPage() {
           <h3 className="text-sm font-semibold text-white mb-2">Lines</h3>
           {data.lines && data.lines.length > 0 ? (
             <div className="space-y-2">
-              {data.lines.map((line, idx) => (
+              {data.lines.map((line: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 text-sm">
                   <div>
                     <p className="text-white">{line.item || line.description || 'Line'}</p>
@@ -128,7 +130,7 @@ export default function PurchaseInvoiceDetailPage() {
           <h3 className="text-sm font-semibold text-white mb-2">Payments</h3>
           {data.payments && data.payments.length > 0 ? (
             <div className="space-y-2">
-              {data.payments.map((pay) => (
+              {data.payments.map((pay: { id: number; amount: number; payment_date?: string; method?: string; status?: string }) => (
                 <div key={pay.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 text-sm">
                   <div>
                     <p className="text-white font-mono">{formatCurrency(pay.amount, currentCurrency)}</p>

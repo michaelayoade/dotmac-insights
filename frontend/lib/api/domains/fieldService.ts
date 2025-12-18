@@ -46,6 +46,7 @@ export interface FieldServiceOrder {
   technician_id?: number;
   technician_name?: string;
   team_id?: number;
+  team_name?: string;
   scheduled_date?: string;
   scheduled_start_time?: string;
   scheduled_end_time?: string;
@@ -54,9 +55,19 @@ export interface FieldServiceOrder {
   estimated_duration_minutes?: number;
   checklist_template_id?: number;
   checklist?: FieldServiceChecklistItem[];
+  checklists?: FieldServiceChecklistItem[];
   photos?: FieldServicePhoto[];
   time_entries?: FieldServiceTimeEntry[];
   items?: FieldServiceItem[];
+  resolution_notes?: string;
+  estimated_duration?: number;
+  customer_phone?: string;
+  customer_email?: string;
+  labor_cost?: number;
+  parts_cost?: number;
+  total_cost?: number;
+  customer_rating?: number;
+  customer_feedback?: string | null;
   notes?: string;
   created_at: string;
   updated_at?: string;
@@ -75,9 +86,11 @@ export interface FieldServiceOrderCreatePayload {
   priority?: FieldServiceOrderPriority;
   order_type?: string;
   customer_id?: number;
+  technician_id?: number;
   address?: string;
   city?: string;
   state?: string;
+  postal_code?: string;
   latitude?: number;
   longitude?: number;
   team_id?: number;
@@ -87,6 +100,9 @@ export interface FieldServiceOrderCreatePayload {
   estimated_duration_minutes?: number;
   checklist_template_id?: number;
   notes?: string;
+  contact_name?: string;
+  contact_phone?: string;
+  contact_email?: string;
 }
 
 export interface FieldServiceChecklistItem {
@@ -146,6 +162,7 @@ export interface FieldServiceTeam {
   manager_id?: number;
   is_active: boolean;
   technician_count?: number;
+  members?: Array<{ id: number; display_name?: string; email?: string }>;
 }
 
 export interface FieldServiceTeamListResponse {
@@ -225,6 +242,7 @@ export interface FieldServiceAnalyticsDashboard {
   by_order_type: { type: string; count: number; revenue: number }[];
   by_team: { team_id: number; team_name: string; count: number; completion_rate: number }[];
   trends: { date: string; orders: number; completed: number; revenue: number }[];
+  by_status?: Record<string, number>;
 }
 
 export interface FieldServiceTechnicianPerformance {
@@ -406,7 +424,7 @@ export const fieldServiceApi = {
   // -------------------------------------------------------------------------
 
   /** List technicians with optional filters */
-  getTechnicians: (params?: { team_id?: number; is_available?: boolean; limit?: number; offset?: number }) =>
+  getTechnicians: (params?: { team_id?: number; is_available?: boolean; limit?: number; offset?: number; search?: string }) =>
     fetchApi<FieldServiceTechnicianListResponse>('/field-service/technicians', { params }),
 
   /** Get a specific technician */

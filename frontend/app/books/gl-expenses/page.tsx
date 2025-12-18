@@ -52,7 +52,7 @@ export default function GLExpensesPage() {
   const expenses = data?.expenses || [];
   const total = data?.total || 0;
   const summary = data?.summary || {};
-  const totalAmount = expenses.reduce((sum, e: any) => sum + (e.amount || 0), 0);
+  const totalAmount = expenses.reduce((sum: number, e: { amount?: number }) => sum + (e.amount || 0), 0);
   const avgAmount = total > 0 ? totalAmount / total : 0;
 
   const columns = [

@@ -320,7 +320,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
           {completenessData?.system_linkage && (
             <InsightCard title="System Linkage">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {Object.entries(completenessData.system_linkage).map(([key, value]) => (
+                {Object.entries(completenessData.system_linkage).map(([key, value]: [string, { percent?: number; count?: number }]) => (
                   <div key={key} className="bg-slate-elevated rounded-lg p-3">
                     <div className="text-xs uppercase text-slate-muted mb-1">{key.replace(/_/g, ' ')}</div>
                     <div className="text-white text-lg font-mono">{(value.percent ?? 0).toFixed(1)}%</div>
@@ -334,7 +334,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
           {completenessData?.recommendations && completenessData.recommendations.length > 0 && (
             <InsightCard title="Recommendations">
               <ul className="space-y-2">
-                {completenessData.recommendations.map((rec, i) => (
+                {completenessData.recommendations.map((rec, i: number) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                     <span className="text-teal-electric mt-0.5 capitalize">{rec.priority}</span>
                     <div className="flex-1">
@@ -420,7 +420,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                   <EmptyState message="No plan transition data available" />
                 ) : (
                   <div className="space-y-2">
-                    {planChangesData.common_transitions.map((t, i) => (
+                    {planChangesData.common_transitions.map((t, i: number) => (
                       <div key={`${t.transition}-${i}`} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
                         <div>
                           <p className="text-white text-sm font-medium">{t.transition}</p>

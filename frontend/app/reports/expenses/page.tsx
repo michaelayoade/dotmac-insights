@@ -30,7 +30,7 @@ export default function ReportsExpensesPage() {
             {formatCurrency(summary.data?.total_expenses || 0, summary.data?.currency || 'NGN')}
           </p>
         </div>
-        {summary.data?.categories?.slice(0, 3).map((cat) => (
+        {summary.data?.categories?.slice(0, 3).map((cat: any) => (
           <div key={cat.category} className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">{cat.category}</p>
             <p className="text-xl font-bold text-white">{formatCurrency(cat.total, summary.data?.currency || 'NGN')}</p>

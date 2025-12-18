@@ -89,7 +89,7 @@ export default function OverviewPage() {
       {/* Data Availability Overview */}
       <InsightCard title="Data Availability by Entity">
         <div className="space-y-3">
-          {availability?.available?.slice(0, 10).map((entity) => (
+          {availability?.available?.slice(0, 10).map((entity: any) => (
             <div key={entity.entity} className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
@@ -102,7 +102,7 @@ export default function OverviewPage() {
                 </div>
                 <ProgressBar
                   value={entity.total}
-                  max={Math.max(...(availability?.available?.map(e => e.total) || [1]))}
+                  max={Math.max(...(availability?.available?.map((e: any) => e.total) || [1]))}
                   color={entity.total > 100 ? 'green' : entity.total > 10 ? 'yellow' : 'red'}
                 />
               </div>
@@ -118,7 +118,7 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <InsightCard title="Priority Recommendations">
           <ul className="space-y-2">
-            {completeness?.recommendations?.slice(0, 5).map((rec, i) => (
+            {completeness?.recommendations?.slice(0, 5).map((rec: any, i: number) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                 <span className="text-teal-electric mt-0.5">•</span>
                 {rec}

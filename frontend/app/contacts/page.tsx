@@ -7,6 +7,10 @@ import {
   useUnifiedContactsDashboard,
   useUnifiedContactsFunnel,
   UnifiedContactsParams,
+  type UnifiedContact,
+  type UnifiedContactsDashboard,
+  type UnifiedContactsFunnel,
+  type UnifiedContactsResponse,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import {
@@ -120,9 +124,20 @@ export default function ContactsPage() {
   });
   const [searchInput, setSearchInput] = useState('');
 
-  const { data: contacts, isLoading, error, mutate } = useUnifiedContacts(params);
-  const { data: dashboard, isLoading: dashboardLoading } = useUnifiedContactsDashboard(30);
-  const { data: funnel } = useUnifiedContactsFunnel(30);
+  const { data: contacts, isLoading, error, mutate } = useUnifiedContacts(params) as {
+    data?: UnifiedContactsResponse;
+    isLoading: boolean;
+    error?: unknown;
+    mutate: () => Promise<any>;
+  };
+  const { data: dashboard, isLoading: dashboardLoading } = useUnifiedContactsDashboard(30) as {
+    data?: UnifiedContactsDashboard;
+    isLoading: boolean;
+  };
+  const { data: funnel } = useUnifiedContactsFunnel(30) as { data?: UnifiedContactsFunnel };
+  const totalPages = contacts
+    ? contacts.total_pages ?? Math.max(1, Math.ceil((contacts.total || 0) / (params.page_size || 20)))
+    : 1;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,7 +181,7 @@ export default function ContactsPage() {
       />
 
       {/* Dashboard Cards */}
-      {!dashboardLoading && dashboard && (
+      {!dashboardLoading && dashboard ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             title="Total Contacts"
@@ -194,15 +209,15 @@ export default function ContactsPage() {
           <StatCard
             title="New This Month"
             value={formatNumber(dashboard.period_metrics?.new_contacts || 0)}
-            trend={dashboard.period_metrics?.new_contacts_change >= 0 ? 'up' : 'down'}
-            trendValue={`${dashboard.period_metrics?.new_contacts_change >= 0 ? '+' : ''}${dashboard.period_metrics?.new_contacts_change}`}
+            trend={(dashboard.period_metrics?.new_contacts_change ?? 0) >= 0 ? 'up' : 'down'}
+            trendValue={`${(dashboard.period_metrics?.new_contacts_change ?? 0) >= 0 ? '+' : ''}${dashboard.period_metrics?.new_contacts_change ?? 0}`}
             icon={Clock}
           />
         </div>
-      )}
+      ) : null}
 
       {/* Funnel */}
-      {funnel && (
+      {funnel ? (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Sales Funnel (30 days)</h3>
           <div className="grid grid-cols-3 gap-4">
@@ -222,7 +237,7 @@ export default function ContactsPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Filters */}
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
@@ -306,7 +321,7 @@ export default function ContactsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-border/50">
-              {contacts?.items?.map((contact: any) => (
+              {contacts?.items?.map((contact: UnifiedContact) => (
                 <tr key={contact.id} className="hover:bg-slate-elevated/30 transition-colors">
                   <td className="px-4 py-4">
                     <div>
@@ -419,11 +434,11 @@ export default function ContactsPage() {
                 Previous
               </button>
               <span className="text-sm text-slate-muted">
-                Page {params.page || 1} of {contacts.total_pages}
+                Page {params.page || 1} of {totalPages}
               </span>
               <button
                 onClick={() => setParams({ ...params, page: (params.page || 1) + 1 })}
-                disabled={(params.page || 1) >= contacts.total_pages}
+                disabled={(params.page || 1) >= totalPages}
                 className="px-3 py-1 text-sm bg-slate-elevated border border-slate-border rounded hover:bg-slate-border disabled:opacity-50 disabled:cursor-not-allowed text-white"
               >
                 Next

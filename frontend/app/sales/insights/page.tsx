@@ -46,7 +46,7 @@ export default function SalesInsightsPage() {
             <div className="bg-slate-elevated border border-slate-border rounded-lg p-4">
               <p className="text-sm text-slate-muted mb-2">Best Payers</p>
               <div className="space-y-2">
-                {(behavior?.best_payers || []).map((p, idx) => (
+                {(behavior?.best_payers || []).map((p: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span className="text-white">{p.customer_name || 'Customer'}</span>
                     <span className="font-mono text-teal-electric">{(p.avg_days_to_pay ?? 0).toFixed(1)} days</span>
@@ -57,7 +57,7 @@ export default function SalesInsightsPage() {
             <div className="bg-slate-elevated border border-slate-border rounded-lg p-4">
               <p className="text-sm text-slate-muted mb-2">Needs Attention</p>
               <div className="space-y-2">
-                {(behavior?.worst_payers || []).map((p, idx) => (
+                {(behavior?.worst_payers || []).map((p: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span className="text-white">{p.customer_name || 'Customer'}</span>
                     <span className="font-mono text-amber-warn">{(p.avg_days_to_pay ?? 0).toFixed(1)} days</span>

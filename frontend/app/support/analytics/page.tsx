@@ -425,7 +425,7 @@ export default function SupportAnalyticsPage() {
               </AreaChart>
             </ResponsiveContainer>
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-              {volumeTrend.slice(-6).map((v) => (
+              {volumeTrend.slice(-6).map((v: any) => (
                 <div key={v.period} className="bg-slate-elevated rounded-lg p-2 text-center">
                   <p className="text-[10px] text-slate-muted">{v.period}</p>
                   <p className="text-sm font-bold text-white">{v.total}</p>
@@ -463,7 +463,7 @@ export default function SupportAnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {categoryBreakdown.by_ticket_type.slice(0, 4).map((cat) => (
+                {categoryBreakdown.by_ticket_type.slice(0, 4).map((cat: any) => (
                   <div key={cat.type} className="flex items-center justify-between text-xs bg-slate-elevated rounded px-2 py-1">
                     <span className="text-slate-muted truncate">{cat.type || 'Other'}</span>
                     <span className="text-emerald-400 font-mono">{cat.resolution_rate}%</span>
@@ -495,7 +495,7 @@ export default function SupportAnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {agentInsights.by_assignee.slice(0, 10).map((agent) => (
+                  {agentInsights.by_assignee.slice(0, 10).map((agent: any) => (
                     <tr key={agent.assignee} className="border-t border-slate-border/40">
                       <td className="py-2 text-white truncate max-w-[120px]">{agent.assignee}</td>
                       <td className="py-2 text-right font-mono text-slate-muted">{agent.total_tickets}</td>
@@ -523,7 +523,7 @@ export default function SupportAnalyticsPage() {
           </div>
           {patterns?.peak_hours?.length ? (
             <div className="space-y-2">
-              {patterns.peak_hours.slice(0, 5).map((h, idx) => (
+                {patterns.peak_hours.slice(0, 5).map((h: any, idx: number) => (
                 <div key={h.hour} className="flex items-center justify-between">
                   <span className="text-slate-muted text-sm">
                     {idx === 0 && '🔥 '}
@@ -549,7 +549,7 @@ export default function SupportAnalyticsPage() {
           </div>
           {patterns?.peak_days?.length ? (
             <div className="space-y-2">
-              {patterns.peak_days.map((d, idx) => (
+                {patterns.peak_days.map((d: any, idx: number) => (
                 <div key={d.day} className="flex items-center justify-between">
                   <span className="text-slate-muted text-sm">
                     {idx === 0 && '🔥 '}
@@ -575,7 +575,7 @@ export default function SupportAnalyticsPage() {
           </div>
           {patterns?.by_region?.length ? (
             <div className="space-y-2">
-              {patterns.by_region.slice(0, 6).map((r) => (
+                {patterns.by_region.slice(0, 6).map((r: any) => (
                 <div key={r.region} className="flex items-center justify-between">
                   <span className="text-slate-muted text-sm truncate max-w-[140px]">{r.region}</span>
                   <span className="font-mono text-white">{r.count}</span>

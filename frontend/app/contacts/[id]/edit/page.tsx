@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useUnifiedContact, useUnifiedContactMutations } from '@/hooks/useApi';
+import type { Contact as CRMContact } from '@/lib/api';
 
 type ContactType = 'lead' | 'prospect' | 'customer' | 'person' | 'churned';
 type ContactCategory = 'residential' | 'business' | 'enterprise' | 'government' | 'nonprofit';
@@ -140,7 +141,8 @@ export default function EditContactPage() {
   const params = useParams();
   const contactId = Number(params.id);
 
-  const { data: contact, isLoading: isLoadingContact, error: loadError } = useUnifiedContact(contactId);
+  const { data: contactData, isLoading: isLoadingContact, error: loadError } = useUnifiedContact(contactId);
+  const contact = useMemo(() => (contactData as CRMContact | undefined) || ({} as CRMContact), [contactData]);
   const { updateContact, isLoading: isUpdating, error: updateError } = useUnifiedContactMutations();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -154,9 +156,9 @@ export default function EditContactPage() {
   useEffect(() => {
     if (contact) {
       setFormData({
-        contact_type: contact.contact_type || 'lead',
-        category: contact.category || 'residential',
-        status: contact.status || 'active',
+        contact_type: (contact.contact_type as ContactType | undefined) || 'lead',
+        category: (contact.category as ContactCategory | undefined) || 'residential',
+        status: (contact.status as ContactStatus | undefined) || 'active',
         is_organization: contact.is_organization || false,
 
         name: contact.name || '',

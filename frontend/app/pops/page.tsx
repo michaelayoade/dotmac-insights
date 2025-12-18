@@ -16,15 +16,15 @@ export default function POPsPage() {
   const currency = pops?.[0]?.currency || 'NGN';
 
   // Calculate aggregated stats
-  const totalMRR = pops?.reduce((sum, p) => sum + p.mrr, 0) || 0;
-  const totalCustomers = pops?.reduce((sum, p) => sum + p.active_customers, 0) || 0;
-  const totalTickets = pops?.reduce((sum, p) => sum + p.open_tickets, 0) || 0;
+  const totalMRR = pops?.reduce((sum: number, p: any) => sum + (p.mrr || 0), 0) || 0;
+  const totalCustomers = pops?.reduce((sum: number, p: any) => sum + (p.active_customers || 0), 0) || 0;
+  const totalTickets = pops?.reduce((sum: number, p: any) => sum + (p.open_tickets || 0), 0) || 0;
   const avgChurnRate = pops?.length
-    ? pops.reduce((sum, p) => sum + p.churn_rate, 0) / pops.length
+    ? pops.reduce((sum: number, p: any) => sum + (p.churn_rate || 0), 0) / pops.length
     : 0;
 
   // Find problem POPs (high churn or many tickets)
-  const problemPops = pops?.filter(p => p.churn_rate > 5 || p.open_tickets > 5) || [];
+  const problemPops = pops?.filter((p: any) => p.churn_rate > 5 || p.open_tickets > 5) || [];
 
   return (
     <div className="space-y-8">
@@ -84,7 +84,7 @@ export default function POPsPage() {
               <h3 className="font-semibold text-amber-warn">Attention Required</h3>
               <p className="text-slate-muted text-sm mt-1">
                 {problemPops.length} POP{problemPops.length !== 1 ? 's' : ''} need attention:{' '}
-                {problemPops.map(p => p.name).join(', ')}
+                {problemPops.map((p: any) => p.name).join(', ')}
               </p>
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function POPsPage() {
 
         {/* POP Cards Grid */}
         <div className="grid grid-cols-2 gap-4 content-start">
-          {(pops || []).slice(0, 6).map((pop, index) => (
+          {(pops || []).slice(0, 6).map((pop: any, index: number) => (
             <Card
               key={pop.id}
               className={cn(

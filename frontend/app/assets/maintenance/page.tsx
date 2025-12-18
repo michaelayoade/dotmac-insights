@@ -11,12 +11,13 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useMaintenanceDue, useAssetMutations } from "@/hooks/useApi";
+import type { MaintenanceDueAsset } from "@/lib/api";
 
 export default function MaintenanceDuePage() {
   const { data, isLoading, mutate } = useMaintenanceDue();
   const { completeMaintenance } = useAssetMutations();
 
-  const maintenanceAssets = data?.assets ?? [];
+  const maintenanceAssets: MaintenanceDueAsset[] = data?.assets ?? [];
 
   const handleComplete = async (assetId: number) => {
     try {

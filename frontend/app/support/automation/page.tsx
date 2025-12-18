@@ -144,7 +144,7 @@ export default function SupportAutomationPage() {
           <p className="text-slate-muted text-sm">No execution logs found.</p>
         ) : (
           <div className="space-y-2">
-            {logs.data.data.slice(0, 15).map((log) => (
+            {logs.data.data.slice(0, 15).map((log: any) => (
               <div key={log.id} className="border border-slate-border rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

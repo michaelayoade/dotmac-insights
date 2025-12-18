@@ -192,7 +192,9 @@ export const projectsApi = {
   // =========================================================================
 
   getProjects: (params?: ProjectListParams) =>
-    fetchApi<ProjectListResponse>('/projects', { params }),
+    fetchApi<ProjectListResponse>('/projects', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getProjectDetail: (id: number) => fetchApi<ProjectDetail>(`/projects/${id}`),
 
@@ -227,7 +229,9 @@ export const projectsApi = {
   // =========================================================================
 
   getProjectTasks: (params?: ProjectTaskParams) =>
-    fetchApi<ProjectTaskListResponse>('/projects/tasks', { params }),
+    fetchApi<ProjectTaskListResponse>('/projects/tasks', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getTaskDetail: (id: number) => fetchApi<unknown>(`/projects/tasks/${id}`),
 };

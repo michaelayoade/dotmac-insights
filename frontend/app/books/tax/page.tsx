@@ -112,7 +112,7 @@ export default function TaxDashboardPage() {
             <h3 className="text-red-400 font-semibold">Overdue Filings</h3>
           </div>
           <div className="space-y-2">
-            {overdue.slice(0, 3).map((filing, idx) => (
+            {overdue.slice(0, 3).map((filing: import('@/lib/api').FilingDeadline, idx: number) => (
               <div key={idx} className="flex items-center justify-between text-sm">
                 <span className="text-white">{filing.tax_type} - {filing.period}</span>
                 <span className="text-red-400">
@@ -182,7 +182,7 @@ export default function TaxDashboardPage() {
         </div>
         {upcoming && upcoming.length > 0 ? (
           <div className="space-y-3">
-            {upcoming.slice(0, 5).map((filing, idx) => (
+            {upcoming.slice(0, 5).map((filing: import('@/lib/api').FilingDeadline, idx: number) => (
               <div
                 key={idx}
                 className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg border border-slate-border/50"

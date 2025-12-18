@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useAsset, useAssetMutations } from "@/hooks/useApi";
+import type { AssetDetail } from "@/lib/api";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-slate-500/20 text-slate-400 border-slate-500/40",
@@ -67,7 +68,8 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const assetId = parseInt(resolvedParams.id, 10);
 
-  const { data: asset, isLoading, mutate } = useAsset(assetId);
+  const { data: assetData, isLoading, mutate } = useAsset(assetId);
+  const asset = assetData as AssetDetail | undefined;
   const { submitAsset, scrapAsset, markForMaintenance, completeMaintenance } = useAssetMutations();
 
   const handleSubmit = async () => {

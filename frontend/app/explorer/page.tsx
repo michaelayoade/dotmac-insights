@@ -83,17 +83,17 @@ export default function ExplorerPage() {
 
   const selectedTableInfo = useMemo(() => {
     if (!selectedTable || !tablesData?.tables) return null;
-    return tablesData.tables[selectedTable];
+    return tablesData.tables[selectedTable] as EnhancedTableInfo;
   }, [selectedTable, tablesData]);
 
-  const filteredCategories = useMemo(() => {
+  const filteredCategories = useMemo<Record<string, EnhancedTableInfo[]>>(() => {
     if (!tablesData?.by_category) return {};
     if (!searchQuery) return tablesData.by_category;
 
     const filtered: Record<string, EnhancedTableInfo[]> = {};
-    Object.entries(tablesData.by_category).forEach(([category, tables]) => {
+    Object.entries(tablesData.by_category as Record<string, EnhancedTableInfo[]>).forEach(([category, tables]) => {
       const matchingTables = tables.filter(
-        (t) =>
+        (t: EnhancedTableInfo) =>
           t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           t.category_label.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -279,7 +279,7 @@ export default function ExplorerPage() {
                 </button>
                 {expandedCategories.has(category) && (
                   <div className="ml-4 space-y-0.5">
-                    {tables.map((table) => (
+                    {tables.map((table: EnhancedTableInfo) => (
                       <button
                         key={table.name}
                         onClick={() => selectTable(table.name)}
@@ -394,7 +394,7 @@ export default function ExplorerPage() {
                     className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   >
                     <option value="">No date filter</option>
-                    {selectedTableInfo.date_columns.map((col) => (
+                    {selectedTableInfo.date_columns.map((col: string) => (
                       <option key={col} value={col}>
                         {col}
                       </option>

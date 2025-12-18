@@ -930,7 +930,9 @@ export const customersApi = {
   getDashboard: () => fetchApi<CustomerDashboard>('/customers/dashboard'),
 
   getCustomers: (params?: CustomerListParams) =>
-    fetchApi<CustomerListResponse>('/customers', { params }),
+    fetchApi<CustomerListResponse>('/customers', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getCustomer: (id: number) => fetchApi<CustomerDetail>(`/customers/${id}`),
 
@@ -960,7 +962,9 @@ export const customersApi = {
     }),
 
   getBlockedCustomers: (params?: BlockedCustomerParams) =>
-    fetchApi<BlockedCustomersResponse>('/customers/blocked', { params }),
+    fetchApi<BlockedCustomersResponse>('/customers/blocked', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   // =========================================================================
   // SUBSCRIPTIONS
@@ -1040,7 +1044,7 @@ export const customersApi = {
 
   getSignupTrend: (params?: CustomerSignupTrendParams) =>
     fetchApi<CustomerSignupTrendResponse>('/customers/analytics/signup-trend', {
-      params,
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
     }),
 
   getCohort: (months = 12) =>

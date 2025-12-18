@@ -398,7 +398,7 @@ export default function CashFlowPage() {
           </h3>
           <p className="text-slate-muted text-sm mb-3">{data.non_cash_transactions.note}</p>
           <ul className="text-slate-muted text-sm list-disc list-inside space-y-1">
-            {data.non_cash_transactions.examples.map((example, i) => (
+            {data.non_cash_transactions.examples.map((example: string, i: number) => (
               <li key={i}>{example}</li>
             ))}
           </ul>

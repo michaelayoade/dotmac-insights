@@ -388,7 +388,7 @@ export default function SalesDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {revenueTrend.slice(-6).map((item, i) => (
+                {revenueTrend.slice(-6).map((item: any, i: number) => (
                   <tr key={i} className="border-b border-slate-border/50 hover:bg-slate-elevated/30">
                     <td className="py-3 px-2 text-white">{item.period}</td>
                     <td className="py-3 px-2 text-right font-mono text-white">{formatCurrency(item.revenue, dashboard?.currency || currency)}</td>
@@ -420,7 +420,7 @@ export default function SalesDashboardPage() {
           </div>
           {recentInvoices?.invoices?.length ? (
             <div className="space-y-2">
-              {recentInvoices.invoices.map((inv) => (
+              {recentInvoices.invoices.map((inv: any) => (
                 <Link
                   key={inv.id}
                   href={`/sales/invoices/${inv.id}`}
@@ -456,7 +456,7 @@ export default function SalesDashboardPage() {
           </div>
           {recentPayments?.payments?.length ? (
             <div className="space-y-2">
-              {recentPayments.payments.map((pay) => (
+              {recentPayments.payments.map((pay: any) => (
                 <Link
                   key={pay.id}
                   href={`/sales/payments/${pay.id}`}
@@ -494,7 +494,7 @@ export default function SalesDashboardPage() {
           </div>
           {recentCredits?.credit_notes?.length ? (
             <div className="space-y-2">
-              {recentCredits.credit_notes.map((note) => (
+              {recentCredits.credit_notes.map((note: any) => (
                 <Link
                   key={note.id}
                   href={`/sales/credit-notes/${note.id}`}
@@ -534,7 +534,7 @@ export default function SalesDashboardPage() {
           </div>
           {(recentBills?.bills?.length || recentPurchasePayments?.payments?.length) ? (
             <div className="space-y-3">
-              {recentBills?.bills?.slice(0, 3).map((bill) => (
+              {recentBills?.bills?.slice(0, 3).map((bill: any) => (
                 <div key={`bill-${bill.id}`} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div>
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
@@ -548,7 +548,7 @@ export default function SalesDashboardPage() {
                   </div>
                 </div>
               ))}
-              {recentPurchasePayments?.payments?.slice(0, 2).map((pay) => (
+              {recentPurchasePayments?.payments?.slice(0, 2).map((pay: any) => (
                 <div key={`pay-${pay.id}`} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div>
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>

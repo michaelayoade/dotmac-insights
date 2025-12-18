@@ -128,8 +128,12 @@ export default function BalanceSheetPage() {
   ].filter((item) => item.children?.length);
 
   const equityItems = [
-    ...(equity.items || []).map((row) => ({ name: row.account, amount: row.balance, children: [] as any[] })),
-    { name: 'Retained Earnings', amount: equity.retained_earnings || 0, children: [] as any[] },
+    ...(equity.items || []).map((row: { account: string; balance: number }) => ({
+      name: row.account,
+      amount: row.balance,
+      children: [],
+    })),
+    { name: 'Retained Earnings', amount: equity.retained_earnings || 0, children: [] as never[] },
   ];
 
   return (

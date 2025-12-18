@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useSettingsGroups } from '@/hooks/useApi';
+import { SettingsGroupMeta } from '@/lib/api';
 
 const groupIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   email: Mail,
@@ -24,7 +25,10 @@ const groupIcons: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function SettingsPage() {
-  const { data: groups, isLoading } = useSettingsGroups();
+  const { data: groups, isLoading } = useSettingsGroups() as {
+    data: SettingsGroupMeta[] | undefined;
+    isLoading: boolean;
+  };
 
   return (
     <div className="space-y-6">

@@ -80,22 +80,34 @@ function KPICard({
   );
 }
 
+function getDateRange(period: 'week' | 'month' | 'quarter' | 'year') {
+  const end = new Date();
+  const start = new Date(end);
+  if (period === 'week') start.setDate(end.getDate() - 7);
+  if (period === 'month') start.setMonth(end.getMonth() - 1);
+  if (period === 'quarter') start.setMonth(end.getMonth() - 3);
+  if (period === 'year') start.setFullYear(end.getFullYear() - 1);
+  const toIso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start_date: toIso(start), end_date: toIso(end) };
+}
+
 export default function FieldServiceAnalyticsPage() {
   const [period, setPeriod] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+  const dateRange = getDateRange(period);
 
   const { data: metrics, isLoading } = useSWR(
     ['field-service-analytics', period],
-    () => fieldServiceApi.getAnalytics({ period })
+    () => fieldServiceApi.getAnalyticsDashboard(dateRange)
   );
 
   const { data: techPerformance } = useSWR(
     ['field-service-tech-performance', period],
-    () => fieldServiceApi.getTechnicianPerformance({ period })
+    () => fieldServiceApi.getTechnicianPerformance(dateRange)
   );
 
   const { data: typeBreakdown } = useSWR(
     ['field-service-type-breakdown', period],
-    () => fieldServiceApi.getOrderTypeBreakdown({ period })
+    () => fieldServiceApi.getOrderTypeBreakdown(dateRange)
   );
 
   if (isLoading) {
@@ -111,11 +123,11 @@ export default function FieldServiceAnalyticsPage() {
     );
   }
 
-  const stats = metrics?.summary || {};
-  const dailyTrend = metrics?.daily_trend || [];
-  const statusDistribution = metrics?.status_distribution || {};
-  const topTechnicians = techPerformance?.data || [];
-  const orderTypes = typeBreakdown?.data || [];
+  const stats = (metrics as any) || {};
+  const dailyTrend = metrics?.trends || [];
+  const statusDistribution = metrics?.by_status || {};
+  const topTechnicians = techPerformance || [];
+  const orderTypes = typeBreakdown || [];
 
   // Prepare chart data
   const trendData = dailyTrend.slice(-7).map((day: any) => ({
@@ -125,7 +137,7 @@ export default function FieldServiceAnalyticsPage() {
   }));
 
   const typeData = orderTypes.slice(0, 6).map((type: any) => ({
-    label: type.order_type?.replace('_', ' ') || 'Other',
+    label: type.type?.replace('_', ' ') || 'Other',
     value: type.count || 0,
     color: 'bg-blue-500',
   }));

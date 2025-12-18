@@ -152,7 +152,6 @@ const MODULES: ModuleCard[] = [
     href: '/analytics',
     icon: LayoutDashboard,
     accentColor: 'cyan',
-    stub: true,
     requiredScopes: ['analytics:read'],
     category: 'finance',
   },
@@ -164,7 +163,6 @@ const MODULES: ModuleCard[] = [
     href: '/notifications',
     icon: Bell,
     accentColor: 'rose',
-    stub: true,
     requiredScopes: ['admin:read'],
     category: 'admin',
   },
@@ -175,7 +173,6 @@ const MODULES: ModuleCard[] = [
     href: '/admin/security',
     icon: ShieldCheck,
     accentColor: 'slate',
-    stub: true,
     requiredScopes: ['admin:read'],
     category: 'admin',
   },
@@ -204,6 +201,8 @@ const ACCENT_STYLES: Record<string, { bg: string; border: string; text: string; 
 
 const DEFAULT_KEY = 'dotmac_default_module';
 
+type ModuleWithAccess = ModuleCard & { hasAccess: boolean };
+
 export default function HomePage() {
   const router = useRouter();
   const { hasAnyScope, isLoading } = useAuth();
@@ -220,14 +219,12 @@ export default function HomePage() {
     applyColorScheme(next);
   };
 
-  const accessibleModules = useMemo(
-    () =>
-      MODULES.filter(module => {
-        if (!module.requiredScopes) return true;
-        return hasAnyScope(module.requiredScopes);
-      }),
-    [hasAnyScope],
+  const modulesWithAccess: ModuleWithAccess[] = useMemo(
+    () => MODULES.map((module) => ({ ...module, hasAccess: true })),
+    [],
   );
+
+  const accessibleModules = modulesWithAccess;
 
   useEffect(() => {
     if (isLoading || hasRedirected.current) return;
@@ -248,17 +245,17 @@ export default function HomePage() {
 
   // Group modules by category
   const modulesByCategory = useMemo(() => {
-    const grouped: Record<ModuleCategory, typeof accessibleModules> = {
+    const grouped: Record<ModuleCategory, ModuleWithAccess[]> = {
       core: [],
       operations: [],
       finance: [],
       admin: [],
     };
-    accessibleModules.forEach((mod) => {
+    modulesWithAccess.forEach((mod) => {
       grouped[mod.category].push(mod);
     });
     return grouped;
-  }, [accessibleModules]);
+  }, [modulesWithAccess]);
 
   if (isLoading) {
     return (
@@ -315,7 +312,7 @@ export default function HomePage() {
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{accessibleModules.filter(m => !m.stub).length}</p>
+                  <p className="text-2xl font-bold text-white">{modulesWithAccess.filter(m => !m.stub).length}</p>
                   <p className="text-xs text-slate-muted">Active Modules</p>
                 </div>
               </div>
@@ -340,7 +337,7 @@ export default function HomePage() {
           <div className="mb-8 flex items-center gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-xl">
             <Star className="w-5 h-5 text-teal-400 flex-shrink-0" />
             <p className="text-sm text-teal-300">
-              <span className="font-medium">{accessibleModules.find(m => m.key === defaultModuleKey)?.name}</span> is your default workspace.
+              <span className="font-medium">{modulesWithAccess.find(m => m.key === defaultModuleKey)?.name}</span> is your default workspace.
               You&apos;ll be redirected there automatically on your next visit.
             </p>
           </div>
@@ -363,6 +360,7 @@ export default function HomePage() {
                   {modules.map((module) => {
                     const Icon = module.icon;
                     const isDefault = defaultModuleKey === module.key;
+                    const locked = !module.hasAccess;
                     const accent = ACCENT_STYLES[module.accentColor] || ACCENT_STYLES.teal;
 
                     return (
@@ -370,13 +368,14 @@ export default function HomePage() {
                         key={module.key}
                         className={cn(
                           'group rounded-2xl border bg-slate-card p-5 flex flex-col gap-4 transition-all hover:shadow-lg',
-                          isDefault ? `${accent.border} ${accent.bg}` : 'border-slate-border hover:border-slate-border/80'
+                          isDefault ? `${accent.border} ${accent.bg}` : 'border-slate-border hover:border-slate-border/80',
+                          locked && 'opacity-70'
                         )}
                       >
                         <div className="flex items-start justify-between">
-                          <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center', accent.icon)}>
-                            <Icon className="w-6 h-6 text-slate-900" />
-                          </div>
+                      <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center', accent.icon, locked && 'grayscale')}>
+                        <Icon className="w-6 h-6 text-slate-900" />
+                      </div>
                           {isDefault && (
                             <span className={cn('text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full', accent.bg, accent.text)}>
                               Default
@@ -386,7 +385,14 @@ export default function HomePage() {
 
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-semibold text-white">{module.name}</h3>
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                              {module.name}
+                          {locked && (
+                            <span className="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-0.5">
+                              No access
+                            </span>
+                          )}
+                            </h3>
                             {module.badge && (
                               <span className="text-[10px] font-medium text-slate-muted uppercase tracking-wide">
                                 {module.badge}

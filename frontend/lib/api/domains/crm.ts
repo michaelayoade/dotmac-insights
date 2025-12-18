@@ -276,11 +276,18 @@ export interface Contact {
   id: number;
   customer_id?: number;
   lead_id?: number;
+  contact_type?: string;
+  category?: string;
+  status?: string;
+  is_organization?: boolean;
+  name?: string;
   first_name: string;
   last_name?: string;
   full_name: string;
   email?: string;
+  billing_email?: string;
   phone?: string;
+  phone_secondary?: string;
   mobile?: string;
   designation?: string;
   department?: string;
@@ -289,8 +296,42 @@ export interface Contact {
   is_decision_maker: boolean;
   is_active: boolean;
   unsubscribed: boolean;
+  company_name?: string;
+  website?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  industry?: string;
+  territory?: string;
+  source?: string;
+  source_campaign?: string;
   linkedin_url?: string;
+  twitter_handle?: string;
+  facebook_url?: string;
   notes?: string;
+  tags?: string[];
+  mrr?: number;
+  total_revenue?: number;
+  outstanding_balance?: number;
+  credit_limit?: number;
+  account_number?: string;
+  lead_qualification?: string;
+  lead_score?: number;
+  first_contact_date?: string | null;
+  qualified_date?: string | null;
+  conversion_date?: string | null;
+  last_contact_date?: string | null;
+  total_conversations?: number;
+  total_tickets?: number;
+  total_orders?: number;
+  total_invoices?: number;
+  email_opt_in?: boolean;
+  sms_opt_in?: boolean;
+  whatsapp_opt_in?: boolean;
+  phone_opt_in?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -300,23 +341,65 @@ export interface ContactListResponse {
   total: number;
   page: number;
   page_size: number;
+  total_pages?: number;
 }
 
 export interface ContactCreatePayload {
   customer_id?: number;
   lead_id?: number;
+  contact_type?: string;
+  category?: string;
+  status?: string;
+  is_organization?: boolean;
+  name?: string;
   first_name: string;
   last_name?: string;
   email?: string;
+  billing_email?: string;
   phone?: string;
+  phone_secondary?: string;
   mobile?: string;
   designation?: string;
   department?: string;
   is_primary?: boolean;
   is_billing_contact?: boolean;
   is_decision_maker?: boolean;
+  company_name?: string;
+  website?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  industry?: string;
+  territory?: string;
+  source?: string;
+  source_campaign?: string;
   linkedin_url?: string;
+  twitter_handle?: string;
+  facebook_url?: string;
   notes?: string;
+  tags?: string[];
+  mrr?: number;
+  total_revenue?: number;
+  outstanding_balance?: number;
+  credit_limit?: number;
+  account_number?: string;
+  lead_qualification?: string;
+  lead_score?: number;
+  first_contact_date?: string | null;
+  qualified_date?: string | null;
+  conversion_date?: string | null;
+  last_contact_date?: string | null;
+  total_conversations?: number;
+  total_tickets?: number;
+  total_orders?: number;
+  total_invoices?: number;
+  email_opt_in?: boolean;
+  sms_opt_in?: boolean;
+  whatsapp_opt_in?: boolean;
+  phone_opt_in?: boolean;
 }
 
 export interface ContactListParams {
@@ -421,7 +504,9 @@ export const crmApi = {
   // =========================================================================
 
   getLeads: (params?: LeadListParams) =>
-    fetchApi<LeadListResponse>('/crm/leads', { params }),
+    fetchApi<LeadListResponse>('/crm/leads', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getLeadsSummary: () =>
     fetchApi<LeadSummaryResponse>('/crm/leads/summary'),
@@ -455,7 +540,9 @@ export const crmApi = {
   // =========================================================================
 
   getOpportunities: (params?: OpportunityListParams) =>
-    fetchApi<OpportunityListResponse>('/crm/opportunities', { params }),
+    fetchApi<OpportunityListResponse>('/crm/opportunities', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getPipelineSummary: () =>
     fetchApi<PipelineSummaryResponse>('/crm/opportunities/pipeline'),
@@ -495,13 +582,17 @@ export const crmApi = {
   // =========================================================================
 
   getActivities: (params?: ActivityListParams) =>
-    fetchApi<ActivityListResponse>('/crm/activities', { params }),
+    fetchApi<ActivityListResponse>('/crm/activities', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getActivitiesSummary: () =>
     fetchApi<ActivitySummaryResponse>('/crm/activities/summary'),
 
   getActivityTimeline: (params: ActivityTimelineParams) =>
-    fetchApi<ActivityTimelineResponse>('/crm/activities/timeline', { params }),
+    fetchApi<ActivityTimelineResponse>('/crm/activities/timeline', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getActivity: (id: number) =>
     fetchApi<Activity>(`/crm/activities/${id}`),
@@ -535,7 +626,9 @@ export const crmApi = {
   // =========================================================================
 
   getContacts: (params?: ContactListParams) =>
-    fetchApi<ContactListResponse>('/crm/contacts', { params }),
+    fetchApi<ContactListResponse>('/crm/contacts', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getCustomerContacts: (customerId: number) =>
     fetchApi<ContactsByEntityResponse>(`/crm/contacts/by-customer/${customerId}`),

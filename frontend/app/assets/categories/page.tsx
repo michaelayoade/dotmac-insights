@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAssetCategories, useAssetCategoryMutations } from "@/hooks/useApi";
+import type { AssetCategory } from "@/lib/api";
 
 export default function AssetCategoriesPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -25,7 +26,7 @@ export default function AssetCategoriesPage() {
   const { data, isLoading, mutate } = useAssetCategories();
   const { create: createCategory } = useAssetCategoryMutations();
 
-  const categories = data?.categories ?? [];
+  const categories: AssetCategory[] = data?.categories ?? [];
 
   const toggleExpand = (id: number) => {
     setExpandedCategories((prev) => {

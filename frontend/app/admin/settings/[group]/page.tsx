@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings, useSettingsSchema, useSettingsMutations } from '@/hooks/useApi';
+import { SettingsSchemaResponse } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const GROUP_LABELS: Record<string, string> = {
@@ -120,8 +121,8 @@ export default function SettingsGroupPage() {
   };
 
   const isLoading = settingsLoading || schemaLoading;
-  const schema = schemaData?.schema;
-  const schemaDescription = (schema as any)?.description || (schemaData as any)?.schema?.description;
+  const schema = schemaData?.schema as SettingsSchemaResponse['schema'] | undefined;
+  const schemaDescription = schema?.description;
   const secretFields = new Set(schemaData?.secret_fields || []);
 
   const canTest = ['email', 'payments', 'sms', 'webhooks'].includes(group);
@@ -146,7 +147,8 @@ export default function SettingsGroupPage() {
     );
   }
 
-  const properties = schema?.properties || {};
+  type FieldSchema = SettingsSchemaResponse['schema']['properties'][string];
+  const properties: Record<string, FieldSchema> = (schema?.properties as Record<string, FieldSchema>) || {};
 
   return (
     <div className="space-y-6">

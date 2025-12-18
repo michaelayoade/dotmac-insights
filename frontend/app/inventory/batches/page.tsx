@@ -117,7 +117,7 @@ export default function BatchesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {batches.map((batch) => {
+                {batches.map((batch: any) => {
                   const expired = isExpired(batch.expiry_date);
                   const expiringSoon = isExpiringSoon(batch.expiry_date);
                   return (

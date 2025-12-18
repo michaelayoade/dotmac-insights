@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { usePendingDepreciation } from "@/hooks/useApi";
+import type { PendingDepreciationEntry } from "@/lib/api";
 
 export default function PendingDepreciationPage() {
   const today = new Date().toISOString().split("T")[0];
@@ -19,11 +20,12 @@ export default function PendingDepreciationPage() {
 
   const { data, isLoading, mutate } = usePendingDepreciation(asOfDate);
 
-  const pendingEntries = data?.pending_entries ?? [];
+  const pendingEntries: PendingDepreciationEntry[] = data?.pending_entries ?? [];
   const totalPending = data?.total_pending_amount ?? 0;
 
   // Group by asset
-  const byAsset = pendingEntries.reduce((acc, entry) => {
+  type PendingGroup = { asset_name: string; asset_id: number; entries: PendingDepreciationEntry[] };
+  const byAsset = pendingEntries.reduce<Record<number, PendingGroup>>((acc, entry) => {
     const key = entry.asset_id;
     if (!acc[key]) {
       acc[key] = { asset_name: entry.asset_name ?? 'Unknown Asset', asset_id: entry.asset_id, entries: [] };

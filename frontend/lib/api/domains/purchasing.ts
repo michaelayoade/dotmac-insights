@@ -448,8 +448,7 @@ export interface PurchasingExpenseListResponse {
   total: number;
   limit: number;
   offset: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  summary?: Record<string, any>;
+  summary?: Record<string, unknown>;
 }
 
 export interface PurchasingExpenseDetail extends PurchasingExpense {

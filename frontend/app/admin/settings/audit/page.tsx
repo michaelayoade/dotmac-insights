@@ -3,11 +3,15 @@
 import { useState } from 'react';
 import { History, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSettingsAuditLog } from '@/hooks/useApi';
+import { SettingsAuditEntry } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function SettingsAuditPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const { data: entries, isLoading } = useSettingsAuditLog({ limit: 100 });
+  const { data: entries, isLoading } = useSettingsAuditLog({ limit: 100 }) as {
+    data: SettingsAuditEntry[] | undefined;
+    isLoading: boolean;
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -59,7 +63,7 @@ export default function SettingsAuditPage() {
           </div>
         ) : (
           <div className="divide-y divide-slate-border">
-            {entries.map((entry) => (
+            {entries.map((entry: SettingsAuditEntry) => (
               <div key={entry.id}>
                 <button
                   onClick={() =>

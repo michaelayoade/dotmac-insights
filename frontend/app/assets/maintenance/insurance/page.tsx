@@ -11,12 +11,13 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useInsuranceExpiring } from "@/hooks/useApi";
+import type { InsuranceExpiringAsset } from "@/lib/api";
 
 export default function InsuranceExpiringPage() {
   const [days, setDays] = useState(30);
   const { data, isLoading, mutate } = useInsuranceExpiring(days);
 
-  const expiringAssets = data?.assets ?? [];
+  const expiringAssets: InsuranceExpiringAsset[] = data?.assets ?? [];
   const totalInsuredValue = expiringAssets.reduce((sum, a) => sum + (a.insured_value || 0), 0);
 
   return (

@@ -49,7 +49,7 @@ export default function TransferDetailPage() {
   const { data, isLoading, error, mutate } = useInventoryTransfers({ limit: 1000 });
   const { submit, approve, reject, execute } = useInventoryTransferMutations();
 
-  const transfer = data?.transfers?.find(t => t.id === transferId);
+  const transfer = data?.transfers?.find((t: any) => t.id === transferId);
 
   const handleAction = async (action: "submit" | "approve" | "reject" | "execute") => {
     try {
@@ -238,7 +238,7 @@ export default function TransferDetailPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-border/50">
-                    {transfer.items.map((item, idx) => (
+                    {transfer.items.map((item: any, idx: number) => (
                       <tr key={idx}>
                         <td className="py-3">
                           <span className="text-amber-400 font-mono">{item.item_code}</span>

@@ -4,7 +4,7 @@ import useSWR from 'swr';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, ArrowLeft, Shield, RotateCcw, Eye } from 'lucide-react';
-import { webhooksApi } from '@/lib/api';
+import { webhooksApi, OmniChannel, OmniChannelWebhookEvent } from '@/lib/api';
 import { useToast } from '@dotmac/core';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -14,11 +14,17 @@ export default function OmniChannelDetailPage() {
   const id = params.id as string;
   const { toast } = useToast();
 
-  const { data: channel, mutate } = useSWR(id ? ['omni-channel', id] : null, () => webhooksApi.getOmniChannel(id));
-  const { data: events, mutate: mutateEvents } = useSWR(id ? ['omni-channel-events', id] : null, () =>
-    webhooksApi.getOmniChannelWebhookEvents(id)
+  const { data: channel, mutate } = useSWR<OmniChannel | undefined>(
+    id ? ['omni-channel', id] : null,
+    () => webhooksApi.getOmniChannel(id),
+    {}
   );
-  const [payload, setPayload] = useState<any | null>(null);
+  const { data: events, mutate: mutateEvents } = useSWR<OmniChannelWebhookEvent[] | undefined>(
+    id ? ['omni-channel-events', id] : null,
+    () => webhooksApi.getOmniChannelWebhookEvents(id),
+    {}
+  );
+  const [payload, setPayload] = useState<OmniChannelWebhookEvent | null>(null);
 
   const handleRotate = async () => {
     try {
@@ -103,10 +109,10 @@ export default function OmniChannelDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-border">
-            {(events || []).map((event: any) => (
+            {(events || []).map((event) => (
               <tr key={event.id}>
                 <td className="px-4 py-3 text-white">{event.id}</td>
-                <td className="px-4 py-3 text-slate-muted">{event.event_type || event.type}</td>
+                <td className="px-4 py-3 text-slate-muted">{event.event_type}</td>
                 <td className="px-4 py-3">
                   <span
                     className={cn(

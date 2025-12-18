@@ -612,7 +612,7 @@ export const financeApi = {
   // =========================================================================
 
   getInvoices: (params?: FinanceInvoiceListParams) =>
-    fetchApi<FinanceInvoiceListResponse>('/v1/sales/invoices', { params }),
+    fetchApi<FinanceInvoiceListResponse>('/v1/sales/invoices', { params: params as any }),
 
   getInvoiceDetail: (id: number, currency?: string) =>
     fetchApi<FinanceInvoiceDetail>(`/v1/sales/invoices/${id}`, {
@@ -641,7 +641,7 @@ export const financeApi = {
   // =========================================================================
 
   getPayments: (params?: FinancePaymentListParams) =>
-    fetchApi<FinancePaymentListResponse>('/v1/sales/payments', { params }),
+    fetchApi<FinancePaymentListResponse>('/v1/sales/payments', { params: params as any }),
 
   getPaymentDetail: (id: number, currency?: string) =>
     fetchApi<FinancePaymentDetail>(`/v1/sales/payments/${id}`, {
@@ -671,7 +671,7 @@ export const financeApi = {
 
   getCreditNotes: (params?: FinanceCreditNoteListParams) =>
     fetchApi<FinanceCreditNoteListResponse>('/v1/sales/credit-notes', {
-      params,
+      params: params as any,
     }),
 
   getCreditNoteDetail: (id: number, currency?: string) =>
@@ -702,7 +702,7 @@ export const financeApi = {
   // =========================================================================
 
   getOrders: (params?: FinanceOrderListParams) =>
-    fetchApi<FinanceOrderListResponse>('/v1/sales/orders', { params }),
+    fetchApi<FinanceOrderListResponse>('/v1/sales/orders', { params: params as any }),
 
   getOrderDetail: (id: number, currency?: string) =>
     fetchApi<FinanceOrder>(`/v1/sales/orders/${id}`, { params: { currency } }),
@@ -729,7 +729,7 @@ export const financeApi = {
   // =========================================================================
 
   getQuotations: (params?: FinanceQuotationListParams) =>
-    fetchApi<FinanceQuotationListResponse>('/v1/sales/quotations', { params }),
+    fetchApi<FinanceQuotationListResponse>('/v1/sales/quotations', { params: params as any }),
 
   getQuotationDetail: (id: number, currency?: string) =>
     fetchApi<FinanceQuotation>(`/v1/sales/quotations/${id}`, {

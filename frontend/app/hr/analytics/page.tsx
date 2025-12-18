@@ -69,7 +69,7 @@ export default function HrAnalyticsPage() {
   const { data: lifecycleEvents } = useHrAnalyticsLifecycleEvents({ company: SINGLE_COMPANY || undefined });
 
   const payrollComponentRows = useMemo(
-    () => (payrollComponents || []).map((item, idx) => ({ ...item, id: item.salary_component || idx })),
+    () => (payrollComponents || []).map((item: any, idx: number) => ({ ...item, id: item.salary_component || idx })),
     [payrollComponents]
   );
 
@@ -77,8 +77,8 @@ export default function HrAnalyticsPage() {
     <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Leave Applications (30d)" value={Object.values(overview?.leave_by_status || {}).reduce((a, b) => a + b, 0)} tone="text-amber-300" />
-        <Stat label="Attendance Records (30d)" value={Object.values(overview?.attendance_status_30d || {}).reduce((a, b) => a + b, 0)} tone="text-emerald-300" />
+        <Stat label="Leave Applications (30d)" value={Object.values(overview?.leave_by_status || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-amber-300" />
+        <Stat label="Attendance Records (30d)" value={Object.values(overview?.attendance_status_30d || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-emerald-300" />
         <Stat label="Net Payroll (30d)" value={formatCurrency(overview?.payroll_30d?.net_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-violet-300" />
       </div>
 
@@ -112,7 +112,7 @@ export default function HrAnalyticsPage() {
               { key: 'month', header: 'Month', render: (item: any) => <span className="text-white font-medium">{item.month}</span> },
               { key: 'count', header: 'Applications', align: 'right' as const, render: (item: any) => <span className="font-mono text-amber-300">{item.count}</span> },
             ]}
-            data={(leaveTrend || []).map((row, idx) => ({ ...row, id: `${row.month}-${idx}` }))}
+            data={(leaveTrend || []).map((row: any, idx: number) => ({ ...row, id: `${row.month}-${idx}` }))}
             keyField="id"
             emptyMessage="No leave trend data"
           />
@@ -127,7 +127,7 @@ export default function HrAnalyticsPage() {
               { key: 'date', header: 'Date', render: (item: any) => <span className="text-white font-medium">{formatDate(item.date)}</span> },
               { key: 'total', header: 'Total Records', align: 'right' as const, render: (item: any) => <span className="font-mono text-emerald-300">{item.total ?? Object.values(item.status_counts || {}).reduce((a: number, b: any) => a + (b as number), 0)}</span> },
             ]}
-            data={(attendanceTrend || []).map((row, idx) => ({ ...row, id: `${row.date}-${idx}` }))}
+            data={(attendanceTrend || []).map((row: any, idx: number) => ({ ...row, id: `${row.date}-${idx}` }))}
             keyField="id"
             emptyMessage="No attendance trend data"
           />
@@ -161,7 +161,7 @@ export default function HrAnalyticsPage() {
               { key: 'net_total', header: 'Net Pay', align: 'right' as const, render: (item: any) => <span className="font-mono text-emerald-300">{formatCurrency(item.net_total || 0, 'NGN', { maximumFractionDigits: 0 })}</span> },
               { key: 'gross_total', header: 'Gross Pay', align: 'right' as const, render: (item: any) => <span className="font-mono text-slate-muted">{formatCurrency(item.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })}</span> },
             ]}
-            data={(payrollTrend || []).map((row, idx) => ({ ...row, id: `${row.month}-${idx}` }))}
+            data={(payrollTrend || []).map((row: any, idx: number) => ({ ...row, id: `${row.month}-${idx}` }))}
             keyField="id"
             emptyMessage="No payroll trend data"
           />

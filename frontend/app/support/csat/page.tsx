@@ -176,7 +176,7 @@ export default function SupportCsatPage() {
   const { data: agents } = useSupportCsatAgentPerformance({ days });
   const { data: trends } = useSupportCsatTrends({ months: 6 });
 
-  const activeSurveys = surveys?.filter((s) => s.is_active) || [];
+  const activeSurveys = surveys?.filter((s: any) => s.is_active) || [];
   const avgRating = summary?.average_rating || 0;
   const responseRate = summary?.response_rate || 0;
   const totalResponses = summary?.total_responses || 0;
@@ -280,21 +280,21 @@ export default function SupportCsatPage() {
               <Smile className="w-4 h-4 text-emerald-400 mx-auto" />
               <p className="text-xs text-slate-muted mt-1">Satisfied</p>
               <p className="text-sm font-bold text-white">
-                {agents?.filter((a) => a.satisfaction_pct >= 80).length || 0}
+                {agents?.filter((a: any) => a.satisfaction_pct >= 80).length || 0}
               </p>
             </div>
             <div className="bg-slate-elevated rounded-lg p-2">
               <Meh className="w-4 h-4 text-amber-400 mx-auto" />
               <p className="text-xs text-slate-muted mt-1">Neutral</p>
               <p className="text-sm font-bold text-white">
-                {agents?.filter((a) => a.satisfaction_pct >= 50 && a.satisfaction_pct < 80).length || 0}
+                {agents?.filter((a: any) => a.satisfaction_pct >= 50 && a.satisfaction_pct < 80).length || 0}
               </p>
             </div>
             <div className="bg-slate-elevated rounded-lg p-2">
               <Frown className="w-4 h-4 text-rose-400 mx-auto" />
               <p className="text-xs text-slate-muted mt-1">Unhappy</p>
               <p className="text-sm font-bold text-white">
-                {agents?.filter((a) => a.satisfaction_pct < 50).length || 0}
+                {agents?.filter((a: any) => a.satisfaction_pct < 50).length || 0}
               </p>
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function SupportCsatPage() {
                   <p className="text-xs text-slate-muted">6-Month Avg</p>
                   <p className="text-lg font-bold text-white">
                     {trends.length
-                      ? (trends.reduce((s, t) => s + (t.avg_rating || 0), 0) / trends.length).toFixed(2)
+                      ? (trends.reduce((s: number, t: any) => s + (t.avg_rating || 0), 0) / trends.length).toFixed(2)
                       : '-'}
                   </p>
                 </div>
@@ -394,7 +394,7 @@ export default function SupportCsatPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {agents.map((agent) => (
+                  {agents.map((agent: any) => (
                     <tr key={agent.agent_id} className="border-t border-slate-border/40">
                       <td className="py-2 text-white truncate max-w-[120px]">
                         {agent.agent_name || `Agent ${agent.agent_id}`}
@@ -447,7 +447,7 @@ export default function SupportCsatPage() {
           </div>
         ) : surveys?.length ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {surveys.map((survey) => (
+            {surveys.map((survey: any) => (
               <div
                 key={survey.id}
                 className={cn(

@@ -313,7 +313,8 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
   useState(() => {
     paymentsApi.getOpenBankingTransactions(connection.id, { limit: 50 })
       .then((data) => {
-        setTransactions(data.transactions || []);
+        const txns = Array.isArray(data) ? data : data?.transactions || [];
+        setTransactions(txns);
         setLoading(false);
       })
       .catch((err) => {

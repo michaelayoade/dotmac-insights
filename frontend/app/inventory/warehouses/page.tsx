@@ -116,7 +116,7 @@ export default function InventoryWarehousesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {warehouses.map((wh) => (
+                {warehouses.map((wh: any) => (
                   <tr key={wh.id} className="hover:bg-slate-elevated/50 transition-colors">
                     <td className="py-3">
                       <div className="flex items-center gap-2">

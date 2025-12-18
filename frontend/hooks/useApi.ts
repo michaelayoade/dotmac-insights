@@ -1,9 +1,27 @@
 import { useState } from 'react';
 import useSWR, { SWRConfiguration, useSWRConfig } from 'swr';
 import {
-  api,
+  accountingApi,
+  adminApi,
+  analyticsApi,
   apiFetch,
   ApiError,
+  assetsApi,
+  customersApi,
+  documentsApi,
+  expensesApi,
+  fieldServiceApi,
+  financeApi,
+  hrApi,
+  inboxApi,
+  inventoryApi,
+  insightsApi,
+  paymentsApi,
+  projectsApi,
+  purchasingApi,
+  supportApi,
+  webhooksApi,
+  fetchApi,
   InventoryItemPayload,
   InventoryWarehousePayload,
   InventoryStockEntryPayload,
@@ -42,6 +60,87 @@ import {
   AccountingBankTransactionDetail,
   PurchasingSupplierDetail,
 } from '@/lib/api';
+import { crmApi } from '@/lib/api/domains';
+
+type ApiGroup = Record<string, (...args: any[]) => any>;
+
+function withDomainPrefix(apiGroup: ApiGroup, prefix: string): ApiGroup {
+  return Object.fromEntries(
+    Object.entries(apiGroup).map(([key, value]) => {
+      const firstUpper = key.search(/[A-Z]/);
+      const base = firstUpper > 0 ? key.slice(0, firstUpper) : key;
+      const rest = firstUpper > 0 ? key.slice(firstUpper) : '';
+      return [`${base}${prefix}${rest}`, value];
+    })
+  ) as ApiGroup;
+}
+
+const api: ApiGroup = {
+  ...supportApi,
+  ...withDomainPrefix(supportApi, 'Support'),
+  ...customersApi,
+  ...withDomainPrefix(customersApi, 'Customer'),
+  ...financeApi,
+  ...withDomainPrefix(financeApi, 'Finance'),
+  ...purchasingApi,
+  ...withDomainPrefix(purchasingApi, 'Purchasing'),
+  ...accountingApi,
+  ...withDomainPrefix(accountingApi, 'Accounting'),
+  ...inventoryApi,
+  ...withDomainPrefix(inventoryApi, 'Inventory'),
+  ...hrApi,
+  ...withDomainPrefix(hrApi, 'Hr'),
+  ...analyticsApi,
+  ...withDomainPrefix(analyticsApi, 'Reports'),
+  ...insightsApi,
+  ...projectsApi,
+  ...crmApi,
+  ...assetsApi,
+  ...paymentsApi,
+  ...fieldServiceApi,
+  ...webhooksApi,
+  ...documentsApi,
+  ...inboxApi,
+  ...expensesApi,
+  ...adminApi,
+  // Legacy analytics endpoints not yet mapped to domain modules
+  getOverview: (currency?: string) =>
+    fetchApi<import('@/lib/api').OverviewData>('/analytics/overview', {
+      params: { currency },
+    }),
+  getRevenueTrend: (months = 12, startDate?: string, endDate?: string) =>
+    fetchApi<import('@/lib/api').RevenueTrend[]>('/analytics/revenue/trend', {
+      params: { months, start_date: startDate, end_date: endDate },
+    }),
+  getChurnTrend: (months = 12, startDate?: string, endDate?: string) =>
+    fetchApi<import('@/lib/api').ChurnTrend[]>('/analytics/churn/trend', {
+      params: { months, start_date: startDate, end_date: endDate },
+    }),
+  getPopPerformance: (currency?: string) =>
+    fetchApi<import('@/lib/api').PopPerformance[]>('/analytics/pop/performance', {
+      params: { currency },
+    }),
+  getInvoiceAging: () => fetchApi<import('@/lib/api').InvoiceAging>('/analytics/invoices/aging'),
+  getPlanDistribution: (currency?: string) =>
+    fetchApi<import('@/lib/api').PlanDistribution[]>('/analytics/customers/by-plan', {
+      params: { currency },
+    }),
+  getDSOTrend: (months = 12, startDate?: string, endDate?: string) =>
+    fetchApi<import('@/lib/api').DSOTrend>('/analytics/revenue/dso', {
+      params: { months, start_date: startDate, end_date: endDate },
+    }),
+  getRevenueByTerritory: (months = 12, startDate?: string, endDate?: string) =>
+    fetchApi<import('@/lib/api').TerritoryRevenue[]>('/analytics/revenue/by-territory', {
+      params: { months, start_date: startDate, end_date: endDate },
+    }),
+  getRevenueCohort: () => fetchApi<import('@/lib/api').CohortData>('/analytics/revenue/cohort'),
+  getAgingBySegment: () => fetchApi<import('@/lib/api').AgingBySegment>('/analytics/collections/aging-by-segment'),
+  getSalesPipeline: () => fetchApi<import('@/lib/api').SalesPipeline>('/analytics/sales/pipeline'),
+  getTicketsByType: (days = 30) =>
+    fetchApi<import('@/lib/api').TicketsByType>('/analytics/support/by-type', { params: { days } }),
+  getNetworkDeviceStatus: () => fetchApi<import('@/lib/api').NetworkDeviceStatus>('/analytics/network/device-status'),
+  getIPUtilization: () => fetchApi<import('@/lib/api').IPUtilization>('/analytics/network/ip-utilization'),
+};
 
 // Generic fetcher for SWR
 export function useOverview(currency?: string, config?: SWRConfiguration) {
@@ -671,11 +770,15 @@ export function useCustomerPaymentTimeliness(days = 30, config?: SWRConfiguratio
 
 // Customer Insights Hooks
 export function useCustomerSegmentsInsights(config?: SWRConfiguration) {
-  return useSWR('customer-segments-insights', () => api.getCustomerSegmentsInsights(), config);
+  return useSWR<import('@/lib/api').CustomerSegmentsInsightsResponse>(
+    'customer-segments-insights',
+    () => api.getCustomerSegmentsInsights(),
+    config
+  );
 }
 
 export function useCustomerHealthInsights(config?: SWRConfiguration) {
-  return useSWR(
+  return useSWR<import('@/lib/api').CustomerHealthInsightsResponse>(
     'customer-health-insights',
     () => api.getCustomerHealthInsights(),
     config
@@ -683,11 +786,15 @@ export function useCustomerHealthInsights(config?: SWRConfiguration) {
 }
 
 export function useCustomerCompletenessInsights(config?: SWRConfiguration) {
-  return useSWR('customer-completeness-insights', () => api.getCustomerCompletenessInsights(), config);
+  return useSWR<import('@/lib/api').CustomerCompletenessResponse>(
+    'customer-completeness-insights',
+    () => api.getCustomerCompletenessInsights(),
+    config
+  );
 }
 
 export function useCustomerPlanChanges(months = 6, config?: SWRConfiguration) {
-  return useSWR(
+  return useSWR<import('@/lib/api').CustomerPlanChangesResponse>(
     ['customer-plan-changes', months],
     () => api.getCustomerPlanChanges(months),
     config
@@ -4527,6 +4634,94 @@ export interface UnifiedContactsParams {
   sort_order?: 'asc' | 'desc';
 }
 
+export interface UnifiedContact {
+  id: number;
+  name: string;
+  contact_type: string;
+  status: string;
+  company_name?: string | null;
+  lead_qualification?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  website?: string | null;
+  linkedin_url?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  mrr?: number | null;
+  total_revenue?: number | null;
+  outstanding_balance?: number | null;
+  credit_limit?: number | null;
+  account_number?: string | null;
+  notes?: string | null;
+  category?: string | null;
+  territory?: string | null;
+  source?: string | null;
+  lead_score?: number | null;
+  tags?: string[];
+  created_at?: string;
+  first_contact_date?: string | null;
+  qualified_date?: string | null;
+  conversion_date?: string | null;
+  last_contact_date?: string | null;
+  total_conversations?: number;
+  total_tickets?: number;
+  total_orders?: number;
+  total_invoices?: number;
+  email_opt_in?: boolean;
+  sms_opt_in?: boolean;
+  whatsapp_opt_in?: boolean;
+  phone_opt_in?: boolean;
+}
+
+export interface UnifiedContactsResponse {
+  items: UnifiedContact[];
+  total: number;
+  total_pages?: number;
+  page?: number;
+  page_size?: number;
+}
+
+export interface UnifiedContactsDashboard {
+  overview?: {
+    total_contacts?: number;
+    leads?: number;
+    prospects?: number;
+    customers?: number;
+  };
+  status_distribution?: {
+    active?: number;
+    inactive?: number;
+    churned?: number;
+  };
+  financials?: {
+    total_mrr?: number;
+    avg_mrr?: number;
+  };
+  period_metrics?: {
+    new_contacts?: number;
+    new_contacts_change?: number;
+    total_engagements?: number;
+    total_engagements_change?: number;
+  };
+}
+
+export interface UnifiedContactsFunnel {
+  funnel?: {
+    leads_created?: number;
+    prospects_qualified?: number;
+    customers_converted?: number;
+  };
+  conversion_rates?: {
+    lead_to_prospect?: number;
+    overall?: number;
+  };
+}
+
 export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRConfiguration) {
   return useSWR(
     ['unified-contacts', params],
@@ -4541,7 +4736,7 @@ export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRC
       }
       const queryString = queryParams.toString();
       const endpoint = queryString ? `/contacts?${queryString}` : '/contacts';
-      return apiFetch(endpoint);
+      return apiFetch<UnifiedContactsResponse>(endpoint);
     },
     config
   );
@@ -4550,7 +4745,7 @@ export function useUnifiedContacts(params?: UnifiedContactsParams, config?: SWRC
 export function useUnifiedContact(id: number | string | undefined, config?: SWRConfiguration) {
   return useSWR(
     id ? ['unified-contact', id] : null,
-    () => apiFetch(`/contacts/${id}`),
+    () => apiFetch<UnifiedContact>(`/contacts/${id}`),
     config
   );
 }
@@ -4598,7 +4793,7 @@ export function useUnifiedContactCustomers(params?: UnifiedContactsParams, confi
 export function useUnifiedContactsDashboard(periodDays = 30, config?: SWRConfiguration) {
   return useSWR(
     ['unified-contacts-dashboard', periodDays],
-    () => apiFetch(`/contacts/analytics/dashboard?period_days=${periodDays}`),
+    () => apiFetch<UnifiedContactsDashboard>(`/contacts/analytics/dashboard?period_days=${periodDays}`),
     config
   );
 }
@@ -4609,7 +4804,7 @@ export function useUnifiedContactsFunnel(periodDays = 30, ownerId?: number, conf
     async () => {
       const params = new URLSearchParams({ period_days: String(periodDays) });
       if (ownerId) params.append('owner_id', String(ownerId));
-      return apiFetch(`/contacts/analytics/funnel?${params.toString()}`);
+      return apiFetch<UnifiedContactsFunnel>(`/contacts/analytics/funnel?${params.toString()}`);
     },
     config
   );

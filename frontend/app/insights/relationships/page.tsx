@@ -63,7 +63,7 @@ export default function RelationshipsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <InsightCard title="Strong Links">
           <div className="flex flex-wrap gap-2">
-            {data?.data_quality.strong_links.map((link, i) => (
+            {data?.data_quality.strong_links.map((link: any, i: number) => (
               <InsightBadge key={i} color="green">{link}</InsightBadge>
             ))}
             {data?.data_quality.strong_links.length === 0 && (
@@ -73,7 +73,7 @@ export default function RelationshipsPage() {
         </InsightCard>
         <InsightCard title="Weak Links">
           <div className="flex flex-wrap gap-2">
-            {data?.data_quality.weak_links.map((link, i) => (
+            {data?.data_quality.weak_links.map((link: any, i: number) => (
               <InsightBadge key={i} color="yellow">{link}</InsightBadge>
             ))}
             {data?.data_quality.weak_links.length === 0 && (
@@ -83,7 +83,7 @@ export default function RelationshipsPage() {
         </InsightCard>
         <InsightCard title="Missing Links">
           <div className="flex flex-wrap gap-2">
-            {data?.data_quality.missing_links.map((link, i) => (
+            {data?.data_quality.missing_links.map((link: any, i: number) => (
               <InsightBadge key={i} color="red">{link}</InsightBadge>
             ))}
             {data?.data_quality.missing_links.length === 0 && (
@@ -138,7 +138,7 @@ export default function RelationshipsPage() {
       {data?.recommendations && data.recommendations.length > 0 && (
         <InsightCard title="Recommendations">
           <ul className="space-y-2">
-            {data.recommendations.map((rec, i) => (
+            {data.recommendations.map((rec: any, i: number) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                 <span className="text-teal-electric mt-0.5">•</span>
                 {rec}

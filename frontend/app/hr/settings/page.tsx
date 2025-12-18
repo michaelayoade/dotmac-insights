@@ -105,6 +105,8 @@ export default function HRSettingsPage() {
   const [form, setForm] = useState<Partial<HRSettingsResponse>>({});
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const updateForm = (updater: (prev: Partial<HRSettingsResponse>) => Partial<HRSettingsResponse>) =>
+    setForm(updater);
 
   useEffect(() => {
     if (settings) {
@@ -180,12 +182,12 @@ export default function HRSettingsPage() {
 
       {/* Tab Content */}
       <div className="space-y-6">
-        {activeTab === 'leave' && <LeaveTab form={form} setForm={setForm} />}
-        {activeTab === 'attendance' && <AttendanceTab form={form} setForm={setForm} />}
-        {activeTab === 'payroll' && <PayrollTab form={form} setForm={setForm} />}
-        {activeTab === 'lifecycle' && <LifecycleTab form={form} setForm={setForm} />}
-        {activeTab === 'performance' && <PerformanceTab form={form} setForm={setForm} />}
-        {activeTab === 'display' && <DisplayTab form={form} setForm={setForm} />}
+        {activeTab === 'leave' && <LeaveTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'attendance' && <AttendanceTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'payroll' && <PayrollTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'lifecycle' && <LifecycleTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'performance' && <PerformanceTab form={form} setForm={setForm} updateForm={updateForm} />}
+        {activeTab === 'display' && <DisplayTab form={form} setForm={setForm} updateForm={updateForm} />}
       </div>
 
       {/* Save Button */}
@@ -211,9 +213,10 @@ export default function HRSettingsPage() {
 interface TabProps {
   form: Partial<HRSettingsResponse>;
   setForm: React.Dispatch<React.SetStateAction<Partial<HRSettingsResponse>>>;
+  updateForm: (updater: (prev: Partial<HRSettingsResponse>) => Partial<HRSettingsResponse>) => void;
 }
 
-function LeaveTab({ form, setForm }: TabProps) {
+function LeaveTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Leave Accounting" icon={Calendar}>
@@ -221,7 +224,7 @@ function LeaveTab({ form, setForm }: TabProps) {
           <FormField label="Accounting Frequency">
             <select
               value={form.leave_accounting_frequency || 'ANNUAL'}
-              onChange={(e) => setForm((p) => ({ ...p, leave_accounting_frequency: e.target.value as LeaveAccountingFrequency }))}
+              onChange={(e) => updateForm((p) => ({ ...p, leave_accounting_frequency: e.target.value as LeaveAccountingFrequency }))}
               className="input-field"
             >
               {leaveAccountingOptions.map((opt) => (
@@ -232,7 +235,7 @@ function LeaveTab({ form, setForm }: TabProps) {
           <FormField label="Pro-Rata Method">
             <select
               value={form.pro_rata_method || 'WORKING_DAYS'}
-              onChange={(e) => setForm((p) => ({ ...p, pro_rata_method: e.target.value as ProRataMethod }))}
+              onChange={(e) => updateForm((p) => ({ ...p, pro_rata_method: e.target.value as ProRataMethod }))}
               className="input-field"
             >
               {proRataOptions.map((opt) => (
@@ -246,7 +249,7 @@ function LeaveTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.max_carryforward_days ?? 5}
-                onChange={(e) => setForm((p) => ({ ...p, max_carryforward_days: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, max_carryforward_days: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -255,7 +258,7 @@ function LeaveTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.carryforward_expiry_months ?? 3}
-                onChange={(e) => setForm((p) => ({ ...p, carryforward_expiry_months: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, carryforward_expiry_months: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -270,7 +273,7 @@ function LeaveTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.min_leave_notice_days ?? 1}
-              onChange={(e) => setForm((p) => ({ ...p, min_leave_notice_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, min_leave_notice_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -279,7 +282,7 @@ function LeaveTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.sick_leave_auto_approve_days ?? 2}
-              onChange={(e) => setForm((p) => ({ ...p, sick_leave_auto_approve_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, sick_leave_auto_approve_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -288,7 +291,7 @@ function LeaveTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.medical_certificate_required_after_days ?? 2}
-              onChange={(e) => setForm((p) => ({ ...p, medical_certificate_required_after_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, medical_certificate_required_after_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -296,12 +299,12 @@ function LeaveTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Allow negative leave balance"
               checked={form.allow_negative_leave_balance ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, allow_negative_leave_balance: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_negative_leave_balance: v }))}
             />
             <CheckboxField
               label="Allow leave overlap"
               checked={form.allow_leave_overlap ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, allow_leave_overlap: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_leave_overlap: v }))}
             />
           </div>
         </div>
@@ -310,7 +313,7 @@ function LeaveTab({ form, setForm }: TabProps) {
   );
 }
 
-function AttendanceTab({ form, setForm }: TabProps) {
+function AttendanceTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Attendance Mode" icon={Clock}>
@@ -318,7 +321,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
           <FormField label="Marking Mode">
             <select
               value={form.attendance_marking_mode || 'MANUAL'}
-              onChange={(e) => setForm((p) => ({ ...p, attendance_marking_mode: e.target.value as AttendanceMarkingMode }))}
+              onChange={(e) => updateForm((p) => ({ ...p, attendance_marking_mode: e.target.value as AttendanceMarkingMode }))}
               className="input-field"
             >
               {attendanceModeOptions.map((opt) => (
@@ -332,7 +335,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.late_entry_grace_minutes ?? 15}
-                onChange={(e) => setForm((p) => ({ ...p, late_entry_grace_minutes: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, late_entry_grace_minutes: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -341,7 +344,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.early_exit_grace_minutes ?? 15}
-                onChange={(e) => setForm((p) => ({ ...p, early_exit_grace_minutes: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, early_exit_grace_minutes: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -353,7 +356,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
                 min={0}
                 step={0.5}
                 value={form.half_day_hours_threshold ?? 4}
-                onChange={(e) => setForm((p) => ({ ...p, half_day_hours_threshold: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, half_day_hours_threshold: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -363,7 +366,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
                 min={0}
                 step={0.5}
                 value={form.full_day_hours_threshold ?? 8}
-                onChange={(e) => setForm((p) => ({ ...p, full_day_hours_threshold: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, full_day_hours_threshold: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -372,17 +375,17 @@ function AttendanceTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Require checkout"
               checked={form.require_checkout ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_checkout: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_checkout: v }))}
             />
             <CheckboxField
               label="Auto-mark absent"
               checked={form.auto_mark_absent_enabled ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, auto_mark_absent_enabled: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, auto_mark_absent_enabled: v }))}
             />
             <CheckboxField
               label="Allow backdated attendance"
               checked={form.allow_backdated_attendance ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, allow_backdated_attendance: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_backdated_attendance: v }))}
             />
           </div>
         </div>
@@ -395,7 +398,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.max_weekly_hours ?? 48}
-              onChange={(e) => setForm((p) => ({ ...p, max_weekly_hours: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, max_weekly_hours: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -405,7 +408,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
               min={0}
               step={0.5}
               value={form.night_shift_allowance_percent ?? 10}
-              onChange={(e) => setForm((p) => ({ ...p, night_shift_allowance_percent: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, night_shift_allowance_percent: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -414,7 +417,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.shift_change_notice_days ?? 3}
-              onChange={(e) => setForm((p) => ({ ...p, shift_change_notice_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, shift_change_notice_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -422,7 +425,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Require geolocation check-in"
               checked={form.geolocation_required ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, geolocation_required: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, geolocation_required: v }))}
             />
           </div>
           {form.geolocation_required && (
@@ -431,7 +434,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
                 type="number"
                 min={10}
                 value={form.geolocation_radius_meters ?? 100}
-                onChange={(e) => setForm((p) => ({ ...p, geolocation_radius_meters: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, geolocation_radius_meters: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -442,7 +445,7 @@ function AttendanceTab({ form, setForm }: TabProps) {
   );
 }
 
-function PayrollTab({ form, setForm }: TabProps) {
+function PayrollTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Payroll Settings" icon={Wallet}>
@@ -450,7 +453,7 @@ function PayrollTab({ form, setForm }: TabProps) {
           <FormField label="Payroll Frequency">
             <select
               value={form.payroll_frequency || 'MONTHLY'}
-              onChange={(e) => setForm((p) => ({ ...p, payroll_frequency: e.target.value as PayrollFrequency }))}
+              onChange={(e) => updateForm((p) => ({ ...p, payroll_frequency: e.target.value as PayrollFrequency }))}
               className="input-field"
             >
               {payrollFrequencyOptions.map((opt) => (
@@ -461,7 +464,7 @@ function PayrollTab({ form, setForm }: TabProps) {
           <FormField label="Salary Currency">
             <select
               value={form.salary_currency || 'NGN'}
-              onChange={(e) => setForm((p) => ({ ...p, salary_currency: e.target.value }))}
+              onChange={(e) => updateForm((p) => ({ ...p, salary_currency: e.target.value }))}
               className="input-field"
             >
               {currencyOptions.map((c) => (
@@ -476,7 +479,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                 min={0}
                 max={31}
                 value={form.salary_payment_day ?? 28}
-                onChange={(e) => setForm((p) => ({ ...p, salary_payment_day: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, salary_payment_day: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -486,7 +489,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                 min={1}
                 max={31}
                 value={form.payroll_cutoff_day ?? 25}
-                onChange={(e) => setForm((p) => ({ ...p, payroll_cutoff_day: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, payroll_cutoff_day: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -495,7 +498,7 @@ function PayrollTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Allow salary advance"
               checked={form.allow_salary_advance ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, allow_salary_advance: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_salary_advance: v }))}
             />
           </div>
           {form.allow_salary_advance && (
@@ -506,7 +509,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                   min={0}
                   max={100}
                   value={form.max_advance_percent ?? 50}
-                  onChange={(e) => setForm((p) => ({ ...p, max_advance_percent: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, max_advance_percent: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -515,7 +518,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                   type="number"
                   min={1}
                   value={form.max_advance_months ?? 2}
-                  onChange={(e) => setForm((p) => ({ ...p, max_advance_months: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, max_advance_months: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -529,14 +532,14 @@ function PayrollTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable overtime"
             checked={form.overtime_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, overtime_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, overtime_enabled: v }))}
           />
           {form.overtime_enabled && (
             <>
               <FormField label="Calculation Method">
                 <select
                   value={form.overtime_calculation || 'HOURLY_RATE'}
-                  onChange={(e) => setForm((p) => ({ ...p, overtime_calculation: e.target.value as OvertimeCalculation }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, overtime_calculation: e.target.value as OvertimeCalculation }))}
                   className="input-field"
                 >
                   {overtimeCalcOptions.map((opt) => (
@@ -551,7 +554,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                     min={1}
                     step={0.25}
                     value={form.overtime_multiplier_weekday ?? 1.5}
-                    onChange={(e) => setForm((p) => ({ ...p, overtime_multiplier_weekday: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, overtime_multiplier_weekday: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -561,7 +564,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                     min={1}
                     step={0.25}
                     value={form.overtime_multiplier_weekend ?? 2}
-                    onChange={(e) => setForm((p) => ({ ...p, overtime_multiplier_weekend: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, overtime_multiplier_weekend: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -571,7 +574,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                     min={1}
                     step={0.25}
                     value={form.overtime_multiplier_holiday ?? 2.5}
-                    onChange={(e) => setForm((p) => ({ ...p, overtime_multiplier_holiday: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, overtime_multiplier_holiday: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -579,7 +582,7 @@ function PayrollTab({ form, setForm }: TabProps) {
               <CheckboxField
                 label="Require overtime approval"
                 checked={form.require_overtime_approval ?? true}
-                onChange={(v) => setForm((p) => ({ ...p, require_overtime_approval: v }))}
+                onChange={(v) => updateForm((p) => ({ ...p, require_overtime_approval: v }))}
               />
             </>
           )}
@@ -591,14 +594,14 @@ function PayrollTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable gratuity"
             checked={form.gratuity_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, gratuity_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, gratuity_enabled: v }))}
           />
           {form.gratuity_enabled && (
             <>
               <FormField label="Calculation Method">
                 <select
                   value={form.gratuity_calculation || 'LAST_SALARY'}
-                  onChange={(e) => setForm((p) => ({ ...p, gratuity_calculation: e.target.value as GratuityCalculation }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, gratuity_calculation: e.target.value as GratuityCalculation }))}
                   className="input-field"
                 >
                   {gratuityCalcOptions.map((opt) => (
@@ -612,7 +615,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                     type="number"
                     min={0}
                     value={form.gratuity_eligibility_years ?? 5}
-                    onChange={(e) => setForm((p) => ({ ...p, gratuity_eligibility_years: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, gratuity_eligibility_years: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -621,7 +624,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                     type="number"
                     min={0}
                     value={form.gratuity_days_per_year ?? 15}
-                    onChange={(e) => setForm((p) => ({ ...p, gratuity_days_per_year: Number(e.target.value) }))}
+                    onChange={(e) => updateForm((p) => ({ ...p, gratuity_days_per_year: Number(e.target.value) }))}
                     className="input-field"
                   />
                 </FormField>
@@ -636,7 +639,7 @@ function PayrollTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable pension"
             checked={form.pension_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, pension_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, pension_enabled: v }))}
           />
           {form.pension_enabled && (
             <div className="grid grid-cols-2 gap-4">
@@ -646,7 +649,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                   min={0}
                   step={0.5}
                   value={form.pension_employer_percent ?? 10}
-                  onChange={(e) => setForm((p) => ({ ...p, pension_employer_percent: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, pension_employer_percent: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -656,7 +659,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                   min={0}
                   step={0.5}
                   value={form.pension_employee_percent ?? 8}
-                  onChange={(e) => setForm((p) => ({ ...p, pension_employee_percent: Number(e.target.value) }))}
+                  onChange={(e) => updateForm((p) => ({ ...p, pension_employee_percent: Number(e.target.value) }))}
                   className="input-field"
                 />
               </FormField>
@@ -665,7 +668,7 @@ function PayrollTab({ form, setForm }: TabProps) {
           <CheckboxField
             label="Enable NHF (National Housing Fund)"
             checked={form.nhf_enabled ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, nhf_enabled: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, nhf_enabled: v }))}
           />
           {form.nhf_enabled && (
             <FormField label="NHF Rate (%)">
@@ -674,7 +677,7 @@ function PayrollTab({ form, setForm }: TabProps) {
                 min={0}
                 step={0.5}
                 value={form.nhf_percent ?? 2.5}
-                onChange={(e) => setForm((p) => ({ ...p, nhf_percent: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, nhf_percent: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -685,7 +688,7 @@ function PayrollTab({ form, setForm }: TabProps) {
   );
 }
 
-function LifecycleTab({ form, setForm }: TabProps) {
+function LifecycleTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Probation & Notice" icon={Users}>
@@ -696,7 +699,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.default_probation_months ?? 3}
-                onChange={(e) => setForm((p) => ({ ...p, default_probation_months: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, default_probation_months: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -705,7 +708,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
                 type="number"
                 min={0}
                 value={form.max_probation_extension_months ?? 3}
-                onChange={(e) => setForm((p) => ({ ...p, max_probation_extension_months: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, max_probation_extension_months: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -715,7 +718,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.default_notice_period_days ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, default_notice_period_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, default_notice_period_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -724,7 +727,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.final_settlement_days ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, final_settlement_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, final_settlement_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -732,12 +735,12 @@ function LifecycleTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Require exit interview"
               checked={form.require_exit_interview ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_exit_interview: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_exit_interview: v }))}
             />
             <CheckboxField
               label="Require clearance before settlement"
               checked={form.require_clearance_before_settlement ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_clearance_before_settlement: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_clearance_before_settlement: v }))}
             />
           </div>
         </div>
@@ -751,7 +754,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
                 type="number"
                 min={1}
                 value={form.job_posting_validity_days ?? 30}
-                onChange={(e) => setForm((p) => ({ ...p, job_posting_validity_days: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, job_posting_validity_days: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -760,7 +763,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
                 type="number"
                 min={1}
                 value={form.offer_validity_days ?? 7}
-                onChange={(e) => setForm((p) => ({ ...p, offer_validity_days: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, offer_validity_days: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -771,7 +774,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
               min={15}
               step={15}
               value={form.default_interview_duration_minutes ?? 60}
-              onChange={(e) => setForm((p) => ({ ...p, default_interview_duration_minutes: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, default_interview_duration_minutes: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -780,7 +783,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
               type="number"
               min={1}
               value={form.document_submission_days ?? 7}
-              onChange={(e) => setForm((p) => ({ ...p, document_submission_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, document_submission_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -788,12 +791,12 @@ function LifecycleTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Require background check"
               checked={form.require_background_check ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_background_check: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_background_check: v }))}
             />
             <CheckboxField
               label="Allow offer negotiation"
               checked={form.allow_offer_negotiation ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, allow_offer_negotiation: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, allow_offer_negotiation: v }))}
             />
           </div>
         </div>
@@ -802,7 +805,7 @@ function LifecycleTab({ form, setForm }: TabProps) {
   );
 }
 
-function PerformanceTab({ form, setForm }: TabProps) {
+function PerformanceTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Performance Appraisal" icon={Target}>
@@ -810,7 +813,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
           <FormField label="Appraisal Frequency">
             <select
               value={form.appraisal_frequency || 'ANNUAL'}
-              onChange={(e) => setForm((p) => ({ ...p, appraisal_frequency: e.target.value as AppraisalFrequency }))}
+              onChange={(e) => updateForm((p) => ({ ...p, appraisal_frequency: e.target.value as AppraisalFrequency }))}
               className="input-field"
             >
               {appraisalFrequencyOptions.map((opt) => (
@@ -822,7 +825,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
             <FormField label="Cycle Start Month">
               <select
                 value={form.appraisal_cycle_start_month ?? 1}
-                onChange={(e) => setForm((p) => ({ ...p, appraisal_cycle_start_month: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, appraisal_cycle_start_month: Number(e.target.value) }))}
                 className="input-field"
               >
                 {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
@@ -833,7 +836,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
             <FormField label="Rating Scale">
               <select
                 value={form.appraisal_rating_scale ?? 5}
-                onChange={(e) => setForm((p) => ({ ...p, appraisal_rating_scale: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, appraisal_rating_scale: Number(e.target.value) }))}
                 className="input-field"
               >
                 <option value={3}>1-3</option>
@@ -849,7 +852,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
               max={form.appraisal_rating_scale ?? 5}
               step={0.5}
               value={form.min_rating_for_promotion ?? 4}
-              onChange={(e) => setForm((p) => ({ ...p, min_rating_for_promotion: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, min_rating_for_promotion: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -857,17 +860,17 @@ function PerformanceTab({ form, setForm }: TabProps) {
             <CheckboxField
               label="Require self-review"
               checked={form.require_self_review ?? true}
-              onChange={(v) => setForm((p) => ({ ...p, require_self_review: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_self_review: v }))}
             />
             <CheckboxField
               label="Require peer review"
               checked={form.require_peer_review ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, require_peer_review: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, require_peer_review: v }))}
             />
             <CheckboxField
               label="Enable 360-degree feedback"
               checked={form.enable_360_feedback ?? false}
-              onChange={(v) => setForm((p) => ({ ...p, enable_360_feedback: v }))}
+              onChange={(v) => updateForm((p) => ({ ...p, enable_360_feedback: v }))}
             />
           </div>
         </div>
@@ -880,7 +883,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.mandatory_training_hours_yearly ?? 40}
-              onChange={(e) => setForm((p) => ({ ...p, mandatory_training_hours_yearly: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, mandatory_training_hours_yearly: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -890,14 +893,14 @@ function PerformanceTab({ form, setForm }: TabProps) {
               min={0}
               max={100}
               value={form.training_completion_threshold_percent ?? 80}
-              onChange={(e) => setForm((p) => ({ ...p, training_completion_threshold_percent: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, training_completion_threshold_percent: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
           <CheckboxField
             label="Require training approval"
             checked={form.require_training_approval ?? true}
-            onChange={(v) => setForm((p) => ({ ...p, require_training_approval: v }))}
+            onChange={(v) => updateForm((p) => ({ ...p, require_training_approval: v }))}
           />
         </div>
       </Card>
@@ -914,10 +917,10 @@ function PerformanceTab({ form, setForm }: TabProps) {
                     type="button"
                     onClick={() => {
                       const current = form.work_week_days || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
-                      setForm((p) => ({
+                      updateForm((p) => ({
                         ...p,
                         work_week_days: isSelected
-                          ? current.filter((d) => d !== day)
+                          ? current.filter((d: string) => d !== day)
                           : [...current, day],
                       }));
                     }}
@@ -942,7 +945,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
                 max={24}
                 step={0.5}
                 value={form.standard_work_hours_per_day ?? 8}
-                onChange={(e) => setForm((p) => ({ ...p, standard_work_hours_per_day: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, standard_work_hours_per_day: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -952,7 +955,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
                 min={1}
                 max={24}
                 value={form.max_work_hours_per_day ?? 12}
-                onChange={(e) => setForm((p) => ({ ...p, max_work_hours_per_day: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, max_work_hours_per_day: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -963,7 +966,7 @@ function PerformanceTab({ form, setForm }: TabProps) {
   );
 }
 
-function DisplayTab({ form, setForm }: TabProps) {
+function DisplayTab({ form, updateForm }: TabProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card title="Employee ID Format" icon={Settings}>
@@ -971,7 +974,7 @@ function DisplayTab({ form, setForm }: TabProps) {
           <FormField label="ID Format">
             <select
               value={form.employee_id_format || 'NUMERIC'}
-              onChange={(e) => setForm((p) => ({ ...p, employee_id_format: e.target.value as EmployeeIDFormat }))}
+              onChange={(e) => updateForm((p) => ({ ...p, employee_id_format: e.target.value as EmployeeIDFormat }))}
               className="input-field"
             >
               {employeeIdFormatOptions.map((opt) => (
@@ -984,7 +987,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               <input
                 type="text"
                 value={form.employee_id_prefix ?? 'EMP'}
-                onChange={(e) => setForm((p) => ({ ...p, employee_id_prefix: e.target.value.toUpperCase() }))}
+                onChange={(e) => updateForm((p) => ({ ...p, employee_id_prefix: e.target.value.toUpperCase() }))}
                 className="input-field"
                 maxLength={10}
               />
@@ -995,7 +998,7 @@ function DisplayTab({ form, setForm }: TabProps) {
                 min={2}
                 max={10}
                 value={form.employee_id_min_digits ?? 4}
-                onChange={(e) => setForm((p) => ({ ...p, employee_id_min_digits: Number(e.target.value) }))}
+                onChange={(e) => updateForm((p) => ({ ...p, employee_id_min_digits: Number(e.target.value) }))}
                 className="input-field"
               />
             </FormField>
@@ -1016,7 +1019,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.notify_leave_balance_below ?? 3}
-              onChange={(e) => setForm((p) => ({ ...p, notify_leave_balance_below: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, notify_leave_balance_below: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -1025,7 +1028,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.notify_appraisal_due_days ?? 7}
-              onChange={(e) => setForm((p) => ({ ...p, notify_appraisal_due_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, notify_appraisal_due_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -1034,7 +1037,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.notify_probation_end_days ?? 14}
-              onChange={(e) => setForm((p) => ({ ...p, notify_probation_end_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, notify_probation_end_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -1043,7 +1046,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.notify_contract_expiry_days ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, notify_contract_expiry_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, notify_contract_expiry_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>
@@ -1052,7 +1055,7 @@ function DisplayTab({ form, setForm }: TabProps) {
               type="number"
               min={0}
               value={form.notify_document_expiry_days ?? 30}
-              onChange={(e) => setForm((p) => ({ ...p, notify_document_expiry_days: Number(e.target.value) }))}
+              onChange={(e) => updateForm((p) => ({ ...p, notify_document_expiry_days: Number(e.target.value) }))}
               className="input-field"
             />
           </FormField>

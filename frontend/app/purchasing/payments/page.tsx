@@ -70,7 +70,7 @@ export default function PurchasingPaymentsPage() {
 
   const payments = data?.payments || [];
   const total = data?.total || 0;
-  const totalPaid = payments.reduce((sum, p: any) => sum + (p.amount || 0), 0);
+  const totalPaid = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
   const suppliers = suppliersData?.suppliers || [];
 
   const getStatusConfig = (paymentStatus: string) => {

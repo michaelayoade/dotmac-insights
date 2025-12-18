@@ -170,9 +170,9 @@ export default function FieldServiceDashboard() {
     );
   }
 
-  const summary = dashboard?.summary || {};
-  const byStatus = dashboard?.by_status || {};
-  const byType = dashboard?.by_type || {};
+  const summary = (dashboard as any)?.summary || {};
+  const byStatus = (dashboard as any)?.by_status || {};
+  const byType = (dashboard as any)?.by_type || {};
 
   return (
     <div className="space-y-6">
@@ -197,28 +197,28 @@ export default function FieldServiceDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Today's Orders"
-          value={summary.today_orders || 0}
-          subtitle={`${summary.today_completed || 0} completed`}
+          value={summary.today_orders ?? summary.total_orders_today ?? 0}
+          subtitle={`${summary.today_completed ?? summary.completed_today ?? 0} completed`}
           icon={ClipboardList}
           colorClass="text-blue-400"
         />
         <KPICard
           title="Unassigned"
-          value={summary.unassigned || 0}
+          value={summary.unassigned ?? 0}
           subtitle="Need dispatch"
           icon={AlertTriangle}
-          colorClass={summary.unassigned > 0 ? 'text-amber-400' : 'text-green-400'}
+          colorClass={(summary.unassigned || 0) > 0 ? 'text-amber-400' : 'text-green-400'}
         />
         <KPICard
           title="Overdue"
-          value={summary.overdue || 0}
+          value={summary.overdue ?? 0}
           subtitle="Require attention"
           icon={Clock}
-          colorClass={summary.overdue > 0 ? 'text-red-400' : 'text-green-400'}
+          colorClass={(summary.overdue || 0) > 0 ? 'text-red-400' : 'text-green-400'}
         />
         <KPICard
           title="Completion Rate"
-          value={`${summary.week_completion_rate || 0}%`}
+          value={`${summary.week_completion_rate || summary.first_time_fix_rate || 0}%`}
           subtitle="This week"
           icon={TrendingUp}
           colorClass="text-teal-electric"
@@ -314,7 +314,7 @@ export default function FieldServiceDashboard() {
       </div>
 
       {/* Customer Satisfaction */}
-      {summary.avg_customer_rating > 0 && (
+      {(summary.avg_customer_rating || 0) > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
             <Star className="w-4 h-4 text-amber-400" />
@@ -322,7 +322,7 @@ export default function FieldServiceDashboard() {
           </h3>
           <div className="flex items-center gap-4">
             <div className="text-4xl font-bold text-amber-400">
-              {summary.avg_customer_rating.toFixed(1)}
+              {(summary.avg_customer_rating || 0).toFixed(1)}
             </div>
             <div className="flex items-center">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -330,7 +330,7 @@ export default function FieldServiceDashboard() {
                   key={star}
                   className={cn(
                     'w-6 h-6',
-                    star <= Math.round(summary.avg_customer_rating)
+                    star <= Math.round(summary.avg_customer_rating || 0)
                       ? 'text-amber-400 fill-amber-400'
                       : 'text-slate-600'
                   )}

@@ -4,27 +4,18 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Plus, RefreshCw, ExternalLink, Trash2, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { webhooksApi } from '@/lib/api';
+import { webhooksApi, Webhook } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 
-type Webhook = {
-  id: number;
-  name: string;
-  url: string;
-  event_types?: string[];
-  is_active?: boolean;
-  created_at?: string;
-};
-
 export default function WebhooksPage() {
   const { toast } = useToast();
-  const { data, isLoading, mutate } = useSWR<Webhook[]>('webhooks', webhooksApi.listWebhooks);
+  const { data, isLoading, mutate } = useSWR<Webhook[]>('webhooks', () => webhooksApi.listWebhooks());
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', url: '', events: '' });
   const [saving, setSaving] = useState(false);
 
-  const webhooks = data || [];
+  const webhooks = data ?? [];
 
   const handleCreate = async () => {
     if (!form.name || !form.url) {
@@ -34,8 +25,9 @@ export default function WebhooksPage() {
     setSaving(true);
     try {
       await webhooksApi.createWebhook({
+        name: form.name,
         url: form.url,
-        events: form.events.split(',').map((e) => e.trim()).filter(Boolean),
+        event_types: form.events.split(',').map((e) => e.trim()).filter(Boolean),
       });
       setForm({ name: '', url: '', events: '' });
       setCreating(false);
@@ -59,7 +51,10 @@ export default function WebhooksPage() {
     }
   };
 
-  const activeCount = useMemo(() => webhooks.filter((w) => w.is_active !== false).length, [webhooks]);
+  const activeCount = useMemo(
+    () => (data ?? []).filter((w) => w.is_active !== false).length,
+    [data]
+  );
 
   return (
     <div className="space-y-6">

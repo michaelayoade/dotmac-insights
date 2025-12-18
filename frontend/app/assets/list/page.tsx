@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useAssets, useAssetMutations } from "@/hooks/useApi";
+import type { Asset } from "@/lib/api";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -70,7 +71,7 @@ export default function AssetsListPage() {
   const { data, isLoading, mutate } = useAssets(params);
   const { submitAsset, scrapAsset } = useAssetMutations();
 
-  const assets = data?.assets ?? [];
+  const assets: Asset[] = data?.assets ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 

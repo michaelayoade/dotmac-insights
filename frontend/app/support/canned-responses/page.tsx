@@ -162,7 +162,7 @@ export default function SupportCannedResponsesPage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
-            {(categoryList ?? []).map((cat) => (
+            {(categoryList ?? []).map((cat: any) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>

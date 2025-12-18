@@ -237,13 +237,13 @@ export default function CustomersPage() {
       return { count: 0, amount: 0 };
     }
 
-    const overdueInvoices = recentInvoices.filter((inv) => {
+    const overdueInvoices = recentInvoices.filter((inv: any) => {
       const status = String((inv as any).status || '').toLowerCase();
       const overdueDays = (inv as any).days_overdue;
       return status === 'overdue' || status === 'unpaid' || status === 'pending' || status === 'partially_paid' || (typeof overdueDays === 'number' && overdueDays > 0);
     });
 
-    const amount = overdueInvoices.reduce((sum, inv) => {
+    const amount = overdueInvoices.reduce((sum: number, inv: any) => {
       const total = Number((inv as any).total_amount ?? (inv as any).total ?? 0);
       const paid = Number((inv as any).amount_paid ?? 0);
       return sum + Math.max(total - paid, 0);
@@ -255,8 +255,8 @@ export default function CustomersPage() {
   const mrrFromSubscriptions = useMemo(() => {
     if (!selectedCustomer?.subscriptions) return 0;
     return selectedCustomer.subscriptions
-      .filter((sub) => (sub.status || '').toLowerCase() === 'active')
-      .reduce((sum, sub) => sum + Number(sub.price || 0), 0);
+      .filter((sub: any) => (sub.status || '').toLowerCase() === 'active')
+      .reduce((sum: number, sub: any) => sum + Number(sub.price || 0), 0);
   }, [selectedCustomer?.subscriptions]);
 
   const financeSummary = useMemo(() => {
@@ -731,9 +731,9 @@ export default function CustomersPage() {
                       <Badge variant="default" size="sm">{customer360.profile.billing_type}</Badge>
                     )}
                   </div>
-                  {customer360?.profile?.labels && customer360.profile.labels.length > 0 && (
+                    {customer360?.profile?.labels && customer360.profile.labels.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {customer360.profile.labels.map((label) => (
+                      {customer360.profile.labels.map((label: string) => (
                         <span key={label} className="px-2 py-1 bg-slate-elevated text-xs text-slate-muted rounded-md border border-slate-border">
                           {label}
                         </span>
@@ -815,7 +815,7 @@ export default function CustomersPage() {
                           {Object.entries(customer360.profile.external_ids).map(([key, val]) =>
                             val ? (
                               <Badge key={key} variant="default" size="sm" className="uppercase">
-                                {key}: {val}
+                                {key}: {String(val)}
                               </Badge>
                             ) : null
                           )}
@@ -857,7 +857,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Recent Invoices</p>
                         <div className="space-y-2">
-                          {recentInvoices.slice(0, 4).map((inv) => (
+                          {recentInvoices.slice(0, 4).map((inv: any) => (
                             <div key={inv.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
                                 <p className="text-white font-mono">{inv.invoice_number || `#${inv.id}`}</p>
@@ -877,7 +877,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Recent Payments</p>
                         <div className="space-y-2">
-                          {customer360.finance.recent_payments.slice(0, 3).map((pay) => (
+                          {customer360.finance.recent_payments.slice(0, 3).map((pay: any) => (
                             <div key={pay.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div className="text-white font-mono">{formatCurrency(pay.amount)}</div>
                               <div className="text-right text-xs text-slate-muted">
@@ -897,7 +897,7 @@ export default function CustomersPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <MetricCard label="Total Subs" value={(customer360?.services?.summary?.total_subscriptions ?? selectedCustomer.subscriptions?.length ?? 0).toString()} icon={Activity} />
-                      <MetricCard label="Active Subs" value={(customer360?.services?.summary?.active_subscriptions ?? selectedCustomer.subscriptions?.filter((s) => s.status === 'active').length ?? 0).toString()} icon={TrendingUp} variant="success" />
+                      <MetricCard label="Active Subs" value={(customer360?.services?.summary?.active_subscriptions ?? selectedCustomer.subscriptions?.filter((s: any) => s.status === 'active').length ?? 0).toString()} icon={TrendingUp} variant="success" />
                       <MetricCard label="Services MRR" value={formatCurrency(customer360?.services?.summary?.total_mrr ?? selectedCustomer.mrr ?? mrrFromSubscriptions)} icon={TrendingUp} />
                       <MetricCard label="Usage 30d" value={`${customer360?.services?.usage_30d?.total_gb ?? usageData?.totals?.total_gb ?? 0} GB`} icon={Activity} />
                     </div>
@@ -906,7 +906,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Subscriptions</p>
                         <div className="space-y-2">
-                          {customer360.services.subscriptions.map((sub) => (
+                          {customer360.services.subscriptions.map((sub: any) => (
                             <div key={sub.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
                                 <p className="text-white font-medium">{sub.plan_name}</p>
@@ -952,7 +952,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">IP Addresses</p>
                         <div className="space-y-2">
-                          {customer360.network.ip_addresses.map((ip) => (
+                          {customer360.network.ip_addresses.map((ip: any) => (
                             <div key={ip.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div className="text-white font-mono">{ip.ip}</div>
                               <div className="text-xs text-slate-muted text-right">
@@ -968,7 +968,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Routers</p>
                         <div className="space-y-2">
-                          {customer360.network.routers.map((r) => (
+                          {customer360.network.routers.map((r: any) => (
                             <div key={r.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
                                 <p className="text-white font-medium">{r.name}</p>
@@ -994,7 +994,7 @@ export default function CustomersPage() {
                     )}
                     {customer360?.support?.tickets && customer360.support.tickets.length > 0 && (
                       <div className="space-y-2">
-                        {customer360.support.tickets.slice(0, 5).map((t) => (
+                        {customer360.support.tickets.slice(0, 5).map((t: any) => (
                           <div key={t.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                             <div className="min-w-0">
                               <p className="text-white font-medium truncate">{t.subject}</p>
@@ -1020,7 +1020,7 @@ export default function CustomersPage() {
                     )}
                     {customer360?.projects?.projects && customer360.projects.projects.length > 0 && (
                       <div className="space-y-2">
-                        {customer360.projects.projects.slice(0, 5).map((p) => (
+                        {customer360.projects.projects.slice(0, 5).map((p: any) => (
                           <div key={p.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                             <div className="min-w-0">
                               <p className="text-white font-medium truncate">{p.name}</p>
@@ -1050,7 +1050,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Conversations</p>
                         <div className="space-y-2">
-                          {customer360.crm.conversations.slice(0, 4).map((c) => (
+                          {customer360.crm.conversations.slice(0, 4).map((c: any) => (
                             <div key={c.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
                                 <p className="text-white capitalize">{c.channel}</p>
@@ -1066,7 +1066,7 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-xs uppercase text-slate-muted mb-2">Notes</p>
                         <div className="space-y-2">
-                          {customer360.crm.notes.slice(0, 4).map((n) => (
+                          {customer360.crm.notes.slice(0, 4).map((n: any) => (
                             <div key={n.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <p className="text-white font-medium">{n.title || n.type || 'Note'}</p>
                               <p className="text-xs text-slate-muted">{n.comment || 'No comment'}</p>
@@ -1082,7 +1082,7 @@ export default function CustomersPage() {
                 {detailTab === 'timeline' && (
                   <div className="space-y-2">
                     {customer360?.timeline && customer360.timeline.length > 0 ? (
-                      customer360.timeline.slice(0, 10).map((event, idx) => (
+                      customer360.timeline.slice(0, 10).map((event: any, idx: number) => (
                         <div key={`${event.type}-${idx}`} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                           <div className="min-w-0">
                             <p className="text-white font-medium capitalize">{event.type}: {event.title}</p>

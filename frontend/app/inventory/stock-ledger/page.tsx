@@ -108,7 +108,7 @@ export default function StockLedgerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {entries.map((entry) => {
+                {entries.map((entry: any) => {
                   const isIncoming = entry.actual_qty > 0;
                   return (
                     <tr key={entry.id} className="hover:bg-slate-elevated/50 transition-colors">

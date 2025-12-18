@@ -123,7 +123,7 @@ export default function SupportKnowledgeBasePage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
-            {(cats ?? []).map((c) => (
+            {(cats ?? []).map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -167,7 +167,7 @@ export default function SupportKnowledgeBasePage() {
             <p className="text-slate-muted text-sm">No categories configured.</p>
           ) : (
             <div className="space-y-2">
-              {(cats ?? []).map((cat) => (
+              {(cats ?? []).map((cat: any) => (
                 <button
                   key={cat.id}
                   onClick={() => setCategoryId(categoryId === String(cat.id) ? '' : String(cat.id))}

@@ -147,7 +147,7 @@ export default function InventoryDashboard() {
             </div>
           ) : recentItems.length > 0 ? (
             <div className="space-y-2">
-              {recentItems.map((item) => (
+              {recentItems.map((item: any) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between py-2 border-b border-slate-border/50 last:border-0"
@@ -196,7 +196,7 @@ export default function InventoryDashboard() {
             </div>
           ) : recentEntries.length > 0 ? (
             <div className="space-y-2">
-              {recentEntries.map((entry) => (
+              {recentEntries.map((entry: any) => (
                 <div
                   key={entry.id}
                   className="flex items-center justify-between py-2 border-b border-slate-border/50 last:border-0"

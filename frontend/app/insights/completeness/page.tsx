@@ -141,7 +141,7 @@ export default function CompletenessPage() {
       {data?.recommendations && data.recommendations.length > 0 && (
         <InsightCard title="Recommendations">
           <ul className="space-y-2">
-            {data.recommendations.map((rec, i) => (
+            {data.recommendations.map((rec: any, i: number) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                 <span className="text-teal-electric mt-0.5 capitalize">{rec.priority}</span>
                 <div className="flex-1">
@@ -159,7 +159,7 @@ export default function CompletenessPage() {
       {data?.system_linkage && (
         <InsightCard title="System Linkage">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {Object.entries(data.system_linkage).map(([key, value]) => (
+            {Object.entries(data.system_linkage).map(([key, value]: [string, any]) => (
               <div key={key} className="bg-slate-elevated rounded-lg p-3">
                 <div className="text-xs uppercase text-slate-muted mb-1">{key.replace(/_/g, ' ')}</div>
                 <div className="text-white text-lg font-mono">{value.percent?.toFixed(1) ?? 0}%</div>

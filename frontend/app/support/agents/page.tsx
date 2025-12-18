@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { AlertTriangle, Plus, User, Users, CheckCircle2, XCircle, Activity, Briefcase, Search, Filter } from 'lucide-react';
 import { useSupportAgents, useSupportAgentMutations, useSupportRoutingQueueHealth } from '@/hooks/useApi';
+import type { SupportAgent } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 function MetricCard({
@@ -65,7 +66,7 @@ export default function SupportAgentsPage() {
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const agentsList = agents ?? [];
+    const agentsList: SupportAgent[] = agents ?? [];
     const activeCount = agentsList.filter((a) => a.is_active).length;
     const inactiveCount = agentsList.filter((a) => !a.is_active).length;
     const totalCapacity = agentsList.reduce((sum, a) => sum + (a.capacity ?? 0), 0);
@@ -81,7 +82,7 @@ export default function SupportAgentsPage() {
 
   // Filter agents
   const filteredAgents = useMemo(() => {
-    const agentsList = agents ?? [];
+    const agentsList: SupportAgent[] = agents ?? [];
     return agentsList.filter((agent) => {
       const matchesSearch =
         !search ||
@@ -287,7 +288,7 @@ export default function SupportAgentsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredAgents.map((agent) => {
+            {filteredAgents.map((agent: SupportAgent) => {
               const agentAny = agent as any;
               const currentLoad = agentAny.current_load ?? 0;
               const utilization = agent.capacity ? (currentLoad / agent.capacity) * 100 : 0;

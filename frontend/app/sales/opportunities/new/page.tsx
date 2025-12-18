@@ -183,7 +183,7 @@ export default function NewOpportunityPage() {
                 className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
                 <option value="">Select customer...</option>
-                {customers?.items?.map((customer) => (
+                {customers?.items?.map((customer: any) => (
                   <option key={customer.id} value={customer.id}>{customer.name}</option>
                 ))}
               </select>

@@ -162,7 +162,7 @@ export default function SalesPaymentDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.references.map((ref) => (
+                {data.references.map((ref: any) => (
                   <tr key={ref.id || ref.reference_name} className="border-t border-slate-border/60">
                     <td className="px-2 py-2 text-slate-200">
                       {ref.reference_doctype || '-'} {ref.reference_name || ''}

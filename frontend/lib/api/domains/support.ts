@@ -76,6 +76,112 @@ export interface SupportTicketCommunication {
   communication_date: string | null;
 }
 
+// Settings
+export type WorkingHoursType =
+  | 'FIXED'
+  | 'FLEXIBLE'
+  | '24_7'
+  | 'STANDARD'
+  | 'EXTENDED'
+  | 'ROUND_THE_CLOCK'
+  | 'CUSTOM';
+export type DefaultRoutingStrategy =
+  | 'ROUND_ROBIN'
+  | 'LOAD_BALANCE'
+  | 'SKILL_BASED'
+  | 'MANUAL'
+  | 'LEAST_BUSY'
+  | 'LOAD_BALANCED';
+export type TicketAutoCloseAction = 'CLOSE' | 'RESOLVE' | 'ARCHIVE' | 'NOTIFY_ONLY';
+export type CSATSurveyTrigger = 'ON_RESOLVE' | 'ON_CLOSE' | 'ON_FIRST_RESPONSE' | 'MANUAL' | 'DISABLED';
+export type TicketPriorityDefault = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type NotificationChannel = 'EMAIL' | 'SMS' | 'PUSH' | 'SLACK' | 'IN_APP' | 'WEBHOOK';
+export type WeeklyScheduleDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+export type SupportWeekDay = WeeklyScheduleDay;
+
+export interface SupportSettingsResponse {
+  company?: string | null;
+  working_hours_type?: WorkingHoursType;
+  timezone?: string | null;
+  business_hours?: Array<{
+    day: WeeklyScheduleDay;
+    start_time: string;
+    end_time: string;
+    is_closed?: boolean;
+  }>;
+  weekly_schedule?: Record<WeeklyScheduleDay, { start: string; end: string; closed?: boolean }>;
+  working_hours_standard?: { start?: string; end?: string; days?: WeeklyScheduleDay[] };
+  default_routing_strategy?: DefaultRoutingStrategy;
+  allow_agent_auto_assign?: boolean;
+  max_tickets_per_agent?: number;
+  rebalance_threshold_percent?: number;
+  default_priority?: TicketPriorityDefault;
+  default_ticket_type?: string | null;
+  allow_customer_priority_selection?: boolean;
+  allow_customer_team_selection?: boolean;
+  auto_assign_enabled?: boolean;
+  auto_close_enabled?: boolean;
+  auto_close_action?: TicketAutoCloseAction;
+  auto_close_hours?: number;
+  auto_close_resolved_days?: number;
+  auto_close_resolution?: string | null;
+  auto_close_notify_customer?: boolean;
+  allow_customer_reopen?: boolean;
+  reopen_window_days?: number;
+  max_reopens_allowed?: number;
+  escalation_enabled?: boolean;
+  escalation_notify_manager?: boolean;
+  idle_escalation_enabled?: boolean;
+  idle_hours_before_escalation?: number;
+  reopen_escalation_enabled?: boolean;
+  reopen_count_for_escalation?: number;
+  archive_closed_tickets_days?: number;
+  delete_archived_tickets_days?: number;
+  csat_enabled?: boolean;
+  csat_survey_trigger?: CSATSurveyTrigger;
+  csat_trigger?: CSATSurveyTrigger;
+  csat_delay_hours?: number;
+  csat_reminder_enabled?: boolean;
+  csat_reminder_days?: number;
+  csat_survey_expiry_days?: number;
+  ticket_priority_default?: TicketPriorityDefault;
+  notification_channels?: NotificationChannel[];
+  notify_assigned_agent?: boolean;
+  notify_team_on_unassigned?: boolean;
+  notify_customer_on_status_change?: boolean;
+  notify_customer_on_reply?: boolean;
+  unassigned_warning_minutes?: number;
+  queue_refresh_seconds?: number;
+  overdue_highlight_enabled?: boolean;
+  portal_enabled?: boolean;
+  portal_ticket_creation_enabled?: boolean;
+  portal_show_ticket_history?: boolean;
+  portal_show_knowledge_base?: boolean;
+  portal_show_faq?: boolean;
+  portal_require_login?: boolean;
+  kb_enabled?: boolean;
+  kb_public_access?: boolean;
+  kb_suggest_articles_on_create?: boolean;
+  kb_track_article_helpfulness?: boolean;
+  ticket_id_prefix?: string;
+  ticket_id_min_digits?: number;
+  date_format?: string;
+  time_format?: string;
+  notification_channel_settings?: NotificationChannel[];
+  email_to_ticket_enabled?: boolean;
+  email_reply_to_address?: string | null;
+  sync_to_erpnext?: boolean;
+  sync_to_splynx?: boolean;
+  sync_to_chatwoot?: boolean;
+  sla_include_holidays?: boolean;
+  sla_include_weekends?: boolean;
+  default_first_response_hours?: number;
+  default_resolution_hours?: number;
+  sla_warning_threshold_percent?: number;
+}
+
+export type SupportSettingsUpdate = Partial<SupportSettingsResponse>;
+
 export interface SupportTicketCommunicationPayload {
   communication_type?: string | null;
   communication_medium?: string | null;
@@ -623,7 +729,9 @@ export const supportApi = {
   // =========================================================================
 
   getTickets: (params?: SupportTicketListParams) =>
-    fetchApi<SupportTicketListResponse>('/support/tickets', { params }),
+    fetchApi<SupportTicketListResponse>('/support/tickets', {
+      params: params ? ({ ...params } as Record<string, unknown>) : undefined,
+    }),
 
   getTicketDetail: (id: number | string) =>
     fetchApi<SupportTicketDetail>(`/support/tickets/${id}`),

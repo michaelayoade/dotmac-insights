@@ -193,7 +193,7 @@ export default function SupportSlaPage() {
             <h3 className="text-white font-semibold">SLA Performance Trend (6 months)</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {slaPerformance.data.map((perf) => (
+            {slaPerformance.data.map((perf: any) => (
               <div key={perf.period} className="bg-slate-elevated rounded-lg p-3 text-center">
                 <p className="text-xs text-slate-muted mb-1">{perf.period}</p>
                 <p className={cn(

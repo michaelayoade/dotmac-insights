@@ -141,7 +141,7 @@ export default function SerialsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {serials.map((serial) => {
+                {serials.map((serial: any) => {
                   const statusInfo = getStatusBadge(serial.status);
                   const StatusIcon = statusInfo.icon;
                   return (

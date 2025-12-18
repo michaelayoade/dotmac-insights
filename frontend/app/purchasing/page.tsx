@@ -371,7 +371,7 @@ export default function PurchasingDashboardPage() {
           </div>
           {recentBills?.bills?.length ? (
             <div className="space-y-2">
-              {recentBills.bills.map((bill) => (
+              {recentBills.bills.map((bill: any) => (
                 <div key={bill.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
@@ -401,7 +401,7 @@ export default function PurchasingDashboardPage() {
           </div>
           {recentPayments?.payments?.length ? (
             <div className="space-y-2">
-              {recentPayments.payments.map((pay) => (
+              {recentPayments.payments.map((pay: any) => (
                 <div key={pay.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
@@ -433,7 +433,7 @@ export default function PurchasingDashboardPage() {
           </div>
           {recentOrders?.orders?.length ? (
             <div className="space-y-2">
-              {recentOrders.orders.map((order) => (
+              {recentOrders.orders.map((order: any) => (
                 <div key={order.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">PO #{order.id}</p>
@@ -463,7 +463,7 @@ export default function PurchasingDashboardPage() {
           </div>
           {recentDebitNotes?.debit_notes?.length ? (
             <div className="space-y-2">
-              {recentDebitNotes.debit_notes.map((note) => (
+              {recentDebitNotes.debit_notes.map((note: any) => (
                 <div key={note.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Debit #{note.id}</p>

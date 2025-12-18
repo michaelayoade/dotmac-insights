@@ -83,7 +83,7 @@ export default function StockSummaryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {items.map((item, idx) => (
+                {items.map((item: any, idx: number) => (
                   <tr key={`${item.item_code}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
                     <td className="py-3 text-amber-400 font-mono">{item.item_code}</td>
                     <td className="py-3 text-white">{item.item_name || "-"}</td>

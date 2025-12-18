@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
 
   // Calculate average monthly churn
   const avgChurn = churnTrend && churnTrend.length > 0
-    ? churnTrend.reduce((sum, m) => sum + m.churned, 0) / churnTrend.length
+    ? churnTrend.reduce((sum: number, m: { churned: number }) => sum + m.churned, 0) / churnTrend.length
     : 0;
 
   // Prepare funnel data
@@ -533,7 +533,9 @@ export default function AnalyticsPage() {
                   <div className="pt-4 border-t border-slate-border">
                     <h4 className="text-sm font-medium text-white mb-3">Quotations by Status</h4>
                     <div className="space-y-2">
-                      {Object.entries(pipelineData.quotations.by_status).map(([status, data]) => (
+                      {(Object.entries(pipelineData.quotations.by_status) as Array<
+                        [string, { count: number; value: number }]
+                      >).map(([status, data]) => (
                         <div key={status} className="flex items-center justify-between text-sm">
                           <span className="text-slate-muted capitalize">{status.replace(/_/g, ' ')}</span>
                           <div className="text-right">
@@ -775,7 +777,9 @@ export default function AnalyticsPage() {
               </CardHeader>
               {agingBySegment ? (
                 <div className="space-y-4">
-                  {Object.entries(agingBySegment.by_segment).map(([segment, data]) => (
+                  {(Object.entries(agingBySegment.by_segment) as Array<
+                    [string, Record<string, { count: number; amount: number }> & { total: { count: number; amount: number } }]
+                  >).map(([segment, data]) => (
                     <div key={segment} className="p-4 bg-slate-elevated/50 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-white font-medium capitalize">{segment}</span>
@@ -1058,11 +1062,15 @@ export default function AnalyticsPage() {
                   render: (item) => formatCurrency(item.outstanding as number, currency),
                 },
               ]}
-              data={((vendorSpend?.vendors || []).map((vendor, idx) => ({
-                ...vendor,
-                supplier_label: vendor.supplier_name || vendor.supplier || 'Unknown',
-                row_id: vendor.supplier || vendor.supplier_name || `vendor-${idx}`,
-              })) || []) as unknown as Record<string, unknown>[]}
+              data={
+                ((vendorSpend?.vendors || []).map(
+                  (vendor: { supplier_name?: string; supplier?: string; [key: string]: unknown }, idx: number): Record<string, unknown> => ({
+                    ...vendor,
+                    supplier_label: vendor.supplier_name || vendor.supplier || 'Unknown',
+                    row_id: vendor.supplier || vendor.supplier_name || `vendor-${idx}`,
+                  })
+                ) || []) as unknown as Record<string, unknown>[]
+              }
               keyField="row_id"
               loading={!vendorSpend}
               emptyMessage="No vendor spend data"

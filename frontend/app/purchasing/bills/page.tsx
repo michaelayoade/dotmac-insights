@@ -80,10 +80,10 @@ export default function PurchasingBillsPage() {
   const bills = data?.bills || [];
   const total = data?.total || 0;
   const suppliers = suppliersData?.suppliers || [];
-  const totalOutstanding = bills.reduce((sum, b: any) => sum + (b.outstanding_amount || 0), 0);
+  const totalOutstanding = bills.reduce((sum: number, b: any) => sum + (b.outstanding_amount || 0), 0);
   const totalOverdue = bills
     .filter((b: any) => b.is_overdue)
-    .reduce((sum, b: any) => sum + (b.outstanding_amount || 0), 0);
+    .reduce((sum: number, b: any) => sum + (b.outstanding_amount || 0), 0);
 
   const getStatusConfig = (billStatus: string) => {
     const statusLower = billStatus?.toLowerCase() || '';

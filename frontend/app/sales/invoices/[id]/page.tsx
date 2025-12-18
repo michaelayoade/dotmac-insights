@@ -167,7 +167,7 @@ export default function SalesInvoiceDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.payments.map((p) => (
+                {data.payments.map((p: any) => (
                   <tr key={p.id} className="border-t border-slate-border/60">
                     <td className="px-2 py-2 text-slate-200">{p.payment_method || '-'}</td>
                     <td className="px-2 py-2 text-right text-white font-mono">{formatCurrency(p.amount, data.currency || 'NGN')}</td>

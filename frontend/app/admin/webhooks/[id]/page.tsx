@@ -4,27 +4,10 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, RefreshCw, Save, Shield, ShieldCheck, TestTube, RotateCcw, Trash2, Eye, X } from 'lucide-react';
-import { webhooksApi } from '@/lib/api';
+import { webhooksApi, Webhook, WebhookDelivery } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 import Link from 'next/link';
-
-type Webhook = {
-  id: number;
-  name: string;
-  url: string;
-  event_types?: string[];
-  is_active?: boolean;
-  secret_last_rotated_at?: string | null;
-};
-
-type Delivery = {
-  id: number;
-  status: string;
-  event_type?: string;
-  created_at?: string;
-  response_code?: number;
-};
 
 export default function WebhookDetailPage() {
   const params = useParams();
@@ -32,9 +15,13 @@ export default function WebhookDetailPage() {
   const { toast } = useToast();
   const id = Number(params.id);
 
-  const { data: webhook, mutate } = useSWR<Webhook>(id ? ['webhook', id] : null, () => webhooksApi.getWebhook(id));
-  const { data: deliveries, mutate: mutateDeliveries } = useSWR<Delivery[]>(id ? ['webhook-deliveries', id] : null, () =>
-    webhooksApi.getWebhookDeliveries(id, { limit: 50 })
+  const { data: webhook, mutate } = useSWR<Webhook>(id ? ['webhook', id] : null, ([, webhookId]) =>
+    webhooksApi.getWebhook(Number(webhookId))
+  );
+  const { data: deliveries, mutate: mutateDeliveries } = useSWR<WebhookDelivery[]>(id ? ['webhook-deliveries', id] : null, ([, webhookId]) =>
+    webhooksApi
+      .getWebhookDeliveries(Number(webhookId), { limit: 50 })
+      .then((response) => response.deliveries || response.items || [])
   );
 
   const [form, setForm] = useState({ name: '', url: '', events: '' });
@@ -240,7 +227,7 @@ export default function WebhookDetailPage() {
                 <div>
                   <p className="text-sm text-white">{delivery.event_type || 'event'}</p>
                   <p className="text-xs text-slate-muted">
-                    {delivery.status} • {delivery.response_code || '--'}
+                    {delivery.status} • {delivery.response_status_code ?? '--'}
                   </p>
                 </div>
                 {delivery.status !== 'success' && (
@@ -296,7 +283,7 @@ export default function WebhookDetailPage() {
                     {delivery.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-muted">{delivery.response_code || '--'}</td>
+                <td className="px-4 py-3 text-slate-muted">{delivery.response_status_code ?? '--'}</td>
                 <td className="px-4 py-3 text-slate-muted">
                   {delivery.created_at ? new Date(delivery.created_at).toLocaleString() : '--'}
                 </td>

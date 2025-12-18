@@ -403,7 +403,7 @@ export default function EquityStatementPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {components.map((component, idx) => (
+            {components.map((component: any, idx: number) => (
               <ComponentCard key={idx} component={component} currency={currency} />
             ))}
           </div>

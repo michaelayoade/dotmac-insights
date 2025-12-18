@@ -35,7 +35,7 @@ export default function TrialBalancePage() {
     window.open(url, '_blank');
   };
 
-  const rows = (data?.accounts || []).map((acc, idx) => ({
+  const rows = (data?.accounts || []).map((acc: any, idx: number) => ({
     ...acc,
     rowId: `${acc.account_number}-${acc.account_name}-${idx}`,
   }));

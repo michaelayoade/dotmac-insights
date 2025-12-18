@@ -138,7 +138,7 @@ export default function StockEntriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {entries.map((entry) => {
+                {entries.map((entry: any) => {
                   const Icon = getEntryIcon(entry.stock_entry_type);
                   const status = getStatusBadge(entry.docstatus);
                   return (

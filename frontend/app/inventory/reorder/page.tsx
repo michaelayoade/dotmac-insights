@@ -46,7 +46,7 @@ export default function ReorderPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {alerts.filter(a => (a.current_stock ?? 0) <= (a.safety_stock ?? 0)).length}
+                {alerts.filter((a: any) => (a.current_stock ?? 0) <= (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Critical (below safety stock)</p>
             </div>
@@ -59,7 +59,7 @@ export default function ReorderPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">
-                {alerts.filter(a => (a.current_stock ?? 0) > (a.safety_stock ?? 0)).length}
+                {alerts.filter((a: any) => (a.current_stock ?? 0) > (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Low (below reorder level)</p>
             </div>
@@ -117,7 +117,7 @@ export default function ReorderPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border/50">
-                {alerts.map((alert, idx) => {
+                {alerts.map((alert: any, idx: number) => {
                   const stockLevel = getStockLevel(
                     alert.current_stock ?? 0,
                     alert.reorder_level ?? 0,

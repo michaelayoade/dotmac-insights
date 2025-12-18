@@ -10,12 +10,13 @@ import {
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import { useWarrantyExpiring } from "@/hooks/useApi";
+import type { WarrantyExpiringAsset } from "@/lib/api";
 
 export default function WarrantyExpiringPage() {
   const [days, setDays] = useState(30);
   const { data, isLoading, mutate } = useWarrantyExpiring(days);
 
-  const expiringAssets = data?.assets ?? [];
+  const expiringAssets: WarrantyExpiringAsset[] = data?.assets ?? [];
 
   return (
     <div className="space-y-6">

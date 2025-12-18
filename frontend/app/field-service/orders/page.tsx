@@ -16,13 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { fieldServiceApi } from '@/lib/api';
+import { fieldServiceApi, FieldServiceOrder, FieldServiceOrderPriority, FieldServiceOrderStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type ServiceOrderStatus = 'draft' | 'scheduled' | 'dispatched' | 'en_route' | 'on_site' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled' | 'failed';
-type ServiceOrderPriority = 'emergency' | 'urgent' | 'high' | 'medium' | 'low';
-
-const statusConfig: Record<ServiceOrderStatus, { color: string; bg: string; label: string }> = {
+const statusConfig: Record<FieldServiceOrderStatus, { color: string; bg: string; label: string }> = {
   draft: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Draft' },
   scheduled: { color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Scheduled' },
   dispatched: { color: 'text-purple-400', bg: 'bg-purple-500/10', label: 'Dispatched' },
@@ -54,9 +51,9 @@ export default function ServiceOrdersPage() {
     ['field-service-orders', search, statusFilter, priorityFilter, page],
     () => fieldServiceApi.getOrders({
       search: search || undefined,
-      status: statusFilter !== 'all' ? statusFilter as ServiceOrderStatus : undefined,
-      priority: priorityFilter !== 'all' ? priorityFilter as ServiceOrderPriority : undefined,
-      page,
+      status: statusFilter !== 'all' ? statusFilter as FieldServiceOrderStatus : undefined,
+      priority: priorityFilter !== 'all' ? priorityFilter as FieldServiceOrderPriority : undefined,
+      offset: (page - 1) * limit,
       limit,
     })
   );
@@ -163,8 +160,8 @@ export default function ServiceOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border">
-                {orders.map((order: any) => {
-                  const status = statusConfig[order.status] || statusConfig.draft;
+                {orders.map((order: FieldServiceOrder) => {
+                  const status = statusConfig[order.status as FieldServiceOrderStatus] || statusConfig.draft;
                   const priority = priorityConfig[order.priority] || priorityConfig.medium;
 
                   return (

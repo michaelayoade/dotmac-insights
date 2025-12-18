@@ -378,6 +378,114 @@ export interface HrPayrollPayoutRequest {
 }
 
 // =============================================================================
+// HR SETTINGS
+// =============================================================================
+
+export type LeaveAccountingFrequency = 'ANNUAL' | 'MONTHLY' | 'QUARTERLY' | 'BIANNUAL';
+export type ProRataMethod = 'LINEAR' | 'CALENDAR_DAYS' | 'WORKING_DAYS' | 'MONTHLY';
+export type PayrollFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'SEMIMONTHLY';
+export type OvertimeCalculation = 'HOURLY_RATE' | 'DAILY_RATE' | 'MONTHLY_RATE';
+export type GratuityCalculation = 'LAST_SALARY' | 'AVERAGE_SALARY' | 'BASIC_SALARY';
+export type AttendanceMarkingMode = 'MANUAL' | 'BIOMETRIC' | 'GEOLOCATION' | 'HYBRID';
+export type AppraisalFrequency = 'ANNUAL' | 'SEMIANNUAL' | 'QUARTERLY' | 'MONTHLY';
+export type EmployeeIDFormat = 'NUMERIC' | 'ALPHANUMERIC' | 'YEAR_BASED' | 'DEPARTMENT_BASED';
+export type WeekDay = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
+export interface HRSettingsResponse {
+  id: number;
+  company: string | null;
+  leave_accounting_frequency: LeaveAccountingFrequency;
+  pro_rata_method: ProRataMethod;
+  max_carryforward_days: number;
+  carryforward_expiry_months: number;
+  min_leave_notice_days: number;
+  allow_negative_leave_balance: boolean;
+  allow_leave_overlap: boolean;
+  sick_leave_auto_approve_days: number;
+  medical_certificate_required_after_days: number;
+  attendance_marking_mode: AttendanceMarkingMode;
+  allow_backdated_attendance: boolean;
+  backdated_attendance_days: number;
+  auto_mark_absent_enabled: boolean;
+  late_entry_grace_minutes: number;
+  early_exit_grace_minutes: number;
+  half_day_hours_threshold: number;
+  full_day_hours_threshold: number;
+  require_checkout: boolean;
+  geolocation_required: boolean;
+  geolocation_radius_meters: number;
+  default_shift_id?: number | null;
+  max_weekly_hours: number;
+  night_shift_allowance_percent: number;
+  shift_change_notice_days: number;
+  payroll_frequency: PayrollFrequency;
+  salary_payment_day: number;
+  payroll_cutoff_day: number;
+  allow_salary_advance: boolean;
+  max_advance_percent: number;
+  max_advance_months: number;
+  salary_currency: string;
+  overtime_enabled: boolean;
+  overtime_calculation: OvertimeCalculation;
+  overtime_multiplier_weekday: number;
+  overtime_multiplier_weekend: number;
+  overtime_multiplier_holiday: number;
+  min_overtime_hours: number;
+  require_overtime_approval?: boolean;
+  gratuity_enabled?: boolean;
+  gratuity_calculation?: GratuityCalculation;
+  gratuity_eligibility_years?: number;
+  gratuity_days_per_year?: number;
+  pension_enabled?: boolean;
+  pension_employer_percent?: number;
+  pension_employee_percent?: number;
+  nhf_enabled?: boolean;
+  nhf_percent?: number;
+  default_probation_months?: number;
+  max_probation_extension_months?: number;
+  default_notice_period_days?: number;
+  final_settlement_days?: number;
+  require_exit_interview?: boolean;
+  require_clearance_before_settlement?: boolean;
+  job_posting_validity_days?: number;
+  offer_validity_days?: number;
+  appraisal_frequency?: AppraisalFrequency;
+  employee_id_format?: EmployeeIDFormat;
+  work_week?: WeekDay[];
+  display_currency?: string;
+  // Recruitment
+  default_interview_duration_minutes?: number;
+  document_submission_days?: number;
+  require_background_check?: boolean;
+  allow_offer_negotiation?: boolean;
+  // Performance & Training
+  appraisal_cycle_start_month?: number;
+  appraisal_rating_scale?: number;
+  min_rating_for_promotion?: number;
+  require_self_review?: boolean;
+  require_peer_review?: boolean;
+  enable_360_feedback?: boolean;
+  mandatory_training_hours_yearly?: number;
+  training_completion_threshold_percent?: number;
+  require_training_approval?: boolean;
+  // Work Week
+  work_week_days?: WeekDay[];
+  standard_work_hours_per_day?: number;
+  max_work_hours_per_day?: number;
+  // Display / IDs
+  employee_id_prefix?: string;
+  employee_id_min_digits?: number;
+  // Notifications
+  notify_leave_balance_below?: number;
+  notify_appraisal_due_days?: number;
+  notify_probation_end_days?: number;
+  notify_contract_expiry_days?: number;
+  notify_document_expiry_days?: number;
+}
+
+export type HRSettingsUpdate = Partial<HRSettingsResponse>;
+
+// =============================================================================
 // TRAINING
 // =============================================================================
 
@@ -749,14 +857,14 @@ export interface HrAppraisalListParams {
 export const hrApi = {
   // Leave Types
   getLeaveTypes: (params?: HrLeaveTypeListParams) =>
-    fetchApi<HrListResponse<HrLeaveType>>('/hr/leave-types', { params }),
+    fetchApi<HrListResponse<HrLeaveType>>('/hr/leave-types', { params: params as any }),
 
   getLeaveTypeDetail: (id: number | string) =>
     fetchApi<HrLeaveType>(`/hr/leave-types/${id}`),
 
   // Holiday Lists
   getHolidayLists: (params?: HrHolidayListParams) =>
-    fetchApi<HrListResponse<HrHolidayList>>('/hr/holiday-lists', { params }),
+    fetchApi<HrListResponse<HrHolidayList>>('/hr/holiday-lists', { params: params as any }),
 
   getHolidayListDetail: (id: number | string) =>
     fetchApi<HrHolidayList>(`/hr/holiday-lists/${id}`),
@@ -788,7 +896,7 @@ export const hrApi = {
 
   // Leave Allocations
   getLeaveAllocations: (params?: HrLeaveAllocationListParams) =>
-    fetchApi<HrListResponse<HrLeaveAllocation>>('/hr/leave-allocations', { params }),
+    fetchApi<HrListResponse<HrLeaveAllocation>>('/hr/leave-allocations', { params: params as any }),
 
   getLeaveAllocationDetail: (id: number | string) =>
     fetchApi<HrLeaveAllocation>(`/hr/leave-allocations/${id}`),
@@ -807,7 +915,7 @@ export const hrApi = {
 
   // Leave Applications
   getLeaveApplications: (params?: HrLeaveApplicationListParams) =>
-    fetchApi<HrListResponse<HrLeaveApplication>>('/hr/leave-applications', { params }),
+    fetchApi<HrListResponse<HrLeaveApplication>>('/hr/leave-applications', { params: params as any }),
 
   getLeaveApplicationDetail: (id: number | string) =>
     fetchApi<HrLeaveApplication>(`/hr/leave-applications/${id}`),
@@ -860,7 +968,7 @@ export const hrApi = {
 
   // Attendance
   getAttendances: (params?: HrAttendanceListParams) =>
-    fetchApi<HrListResponse<HrAttendance>>('/hr/attendances', { params }),
+    fetchApi<HrListResponse<HrAttendance>>('/hr/attendances', { params: params as any }),
 
   getAttendanceDetail: (id: number | string) =>
     fetchApi<HrAttendance>(`/hr/attendances/${id}`),
@@ -913,7 +1021,7 @@ export const hrApi = {
 
   // Job Openings
   getJobOpenings: (params?: HrJobOpeningListParams) =>
-    fetchApi<HrListResponse<HrJobOpening>>('/hr/job-openings', { params }),
+    fetchApi<HrListResponse<HrJobOpening>>('/hr/job-openings', { params: params as any }),
 
   getJobOpeningDetail: (id: number | string) =>
     fetchApi<HrJobOpening>(`/hr/job-openings/${id}`),
@@ -929,7 +1037,7 @@ export const hrApi = {
 
   // Job Applicants
   getJobApplicants: (params?: HrJobApplicantListParams) =>
-    fetchApi<HrListResponse<HrJobApplicant>>('/hr/job-applicants', { params }),
+    fetchApi<HrListResponse<HrJobApplicant>>('/hr/job-applicants', { params: params as any }),
 
   getJobApplicantDetail: (id: number | string) =>
     fetchApi<HrJobApplicant>(`/hr/job-applicants/${id}`),
@@ -1058,7 +1166,7 @@ export const hrApi = {
 
   // Payroll Entries
   getPayrollEntries: (params?: HrPayrollEntryListParams) =>
-    fetchApi<HrListResponse<HrPayrollEntry>>('/hr/payroll-entries', { params }),
+    fetchApi<HrListResponse<HrPayrollEntry>>('/hr/payroll-entries', { params: params as any }),
 
   getPayrollEntryDetail: (id: number | string) =>
     fetchApi<HrPayrollEntry>(`/hr/payroll-entries/${id}`),
@@ -1102,7 +1210,7 @@ export const hrApi = {
 
   // Training Events
   getTrainingEvents: (params?: HrTrainingEventListParams) =>
-    fetchApi<HrListResponse<HrTrainingEvent>>('/hr/training-events', { params }),
+    fetchApi<HrListResponse<HrTrainingEvent>>('/hr/training-events', { params: params as any }),
 
   getTrainingEventDetail: (id: number | string) =>
     fetchApi<HrTrainingEvent>(`/hr/training-events/${id}`),
@@ -1156,7 +1264,7 @@ export const hrApi = {
 
   // Appraisals
   getAppraisals: (params?: HrAppraisalListParams) =>
-    fetchApi<HrListResponse<HrAppraisal>>('/hr/appraisals', { params }),
+    fetchApi<HrListResponse<HrAppraisal>>('/hr/appraisals', { params: params as any }),
 
   getAppraisalDetail: (id: number | string) =>
     fetchApi<HrAppraisal>(`/hr/appraisals/${id}`),
@@ -1274,4 +1382,18 @@ export const hrApi = {
 
   getAnalyticsLifecycleEvents: (params?: { company?: string; start_date?: string; end_date?: string }) =>
     fetchApi<HrLifecycleEventsBreakdown>('/hr/analytics/lifecycle-events', { params }),
+
+  // Settings
+  getHRSettings: (params?: { company?: string }) =>
+    fetchApi<HRSettingsResponse>('/hr/settings', { params }),
+
+  updateHRSettings: (body: HRSettingsUpdate, company?: string) =>
+    fetchApi<HRSettingsResponse>('/hr/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      params: company ? { company } : undefined,
+    }),
+
+  seedHRDefaults: () =>
+    fetchApi<{ status: string }>('/hr/settings/seed-defaults', { method: 'POST' }),
 };

@@ -24,7 +24,7 @@ export default function SegmentsPage() {
 
   const totalCustomers = useMemo(() => {
     if (!data?.by_status) return 0;
-    return data.by_status.reduce((sum, item) => sum + item.count, 0);
+    return data.by_status.reduce((sum: number, item: { count: number }) => sum + item.count, 0);
   }, [data?.by_status]);
 
   const viewConfigs: Array<{

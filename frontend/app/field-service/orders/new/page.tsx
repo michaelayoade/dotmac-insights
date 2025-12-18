@@ -14,7 +14,7 @@ import {
   ClipboardList,
   Clock,
 } from 'lucide-react';
-import { fieldServiceApi, customersApi } from '@/lib/api';
+import { fieldServiceApi, customersApi, FieldServiceOrderPriority, FieldServiceOrderCreatePayload } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const orderTypes = [
@@ -68,7 +68,7 @@ export default function NewServiceOrderPage() {
 
   // Fetch customers for selection
   const { data: customers } = useSWR('customers-list', () =>
-    customersApi.getCustomers({ limit: 100 }).then(r => r.data || [])
+    customersApi.getCustomers({ limit: 100 }).then((r: any) => r.items || r.data || r.customers || [])
   );
 
   // Fetch teams for selection
@@ -117,18 +117,26 @@ export default function NewServiceOrderPage() {
     setError(null);
 
     try {
-      const payload = {
+      const payload: FieldServiceOrderCreatePayload & {
+        technician_id?: number | null;
+        contact_name?: string;
+        contact_phone?: string;
+        contact_email?: string;
+        postal_code?: string;
+      } = {
         ...formData,
-        customer_id: formData.customer_id ? parseInt(formData.customer_id) : null,
-        assigned_team_id: formData.assigned_team_id ? parseInt(formData.assigned_team_id) : null,
-        assigned_technician_id: formData.assigned_technician_id ? parseInt(formData.assigned_technician_id) : null,
-        estimated_duration: formData.estimated_duration ? parseInt(formData.estimated_duration) : null,
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        checklist_template_id: formData.checklist_template_id ? parseInt(formData.checklist_template_id) : null,
-        scheduled_date: formData.scheduled_date || null,
-        scheduled_start_time: formData.scheduled_start_time || null,
-        scheduled_end_time: formData.scheduled_end_time || null,
+        priority: formData.priority as FieldServiceOrderPriority,
+        customer_id: formData.customer_id ? parseInt(formData.customer_id) : undefined,
+        team_id: formData.assigned_team_id ? parseInt(formData.assigned_team_id) : undefined,
+        technician_id: formData.assigned_technician_id ? parseInt(formData.assigned_technician_id) : undefined,
+        estimated_duration_minutes: formData.estimated_duration ? parseInt(formData.estimated_duration) : undefined,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
+        checklist_template_id: formData.checklist_template_id ? parseInt(formData.checklist_template_id) : undefined,
+        scheduled_date: formData.scheduled_date || undefined,
+        scheduled_start_time: formData.scheduled_start_time || undefined,
+        scheduled_end_time: formData.scheduled_end_time || undefined,
+        postal_code: formData.postal_code || undefined,
       };
 
       const response = await fieldServiceApi.createOrder(payload);
@@ -160,7 +168,7 @@ export default function NewServiceOrderPage() {
           checklist_template_id: '',
         });
       } else {
-        router.push(`/field-service/orders/${response.data.id}`);
+        router.push(`/field-service/orders/${response.id}`);
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to create order');

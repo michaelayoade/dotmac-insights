@@ -6,10 +6,11 @@ import { RefreshCw, Globe2, BarChart3 } from 'lucide-react';
 import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-type Provider = {
-  name: string;
-  display_name: string;
-  webhook_url: string;
+import type { WebhookProvider } from '@/lib/api';
+
+type Provider = WebhookProvider & {
+  display_name?: string;
+  webhook_url?: string;
   secret_configured?: boolean;
   events_supported?: string[];
   stats?: {
@@ -22,7 +23,12 @@ type Provider = {
 };
 
 export default function InboundWebhooksPage() {
-  const { data, isLoading, mutate } = useSWR<{ providers: Provider[] }>('webhook-providers', webhooksApi.getWebhookProviders);
+  const fetchProviders = () => webhooksApi.getWebhookProviders() as Promise<{ providers: Provider[] }>;
+  const { data, isLoading, mutate } = useSWR<{ providers: Provider[] }>(
+    'webhook-providers',
+    fetchProviders,
+    {}
+  );
   const providers = data?.providers || [];
 
   return (

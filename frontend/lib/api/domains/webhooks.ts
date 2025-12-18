@@ -32,40 +32,73 @@ export interface WebhookEventDetail extends WebhookEvent {
 
 export interface Webhook {
   id: number;
+  name: string;
   url: string;
-  events: string[];
+  event_types: string[];
   is_active: boolean;
+  description?: string | null;
+  method?: 'POST' | 'PUT';
+  auth_type?: string | null;
+  auth_header?: string | null;
+  custom_headers?: Record<string, string> | null;
+  filters?: Record<string, unknown> | null;
   secret?: string;
-  created_at: string;
+  secret_last_rotated_at?: string | null;
+  created_at?: string;
   updated_at?: string;
 }
 
 export interface WebhookCreatePayload {
+  name: string;
   url: string;
-  events: string[];
+  event_types?: string[];
   is_active?: boolean;
+  description?: string | null;
+  method?: 'POST' | 'PUT';
+  auth_type?: string | null;
+  auth_header?: string | null;
+  auth_value?: string | null;
+  custom_headers?: Record<string, string> | null;
+  filters?: Record<string, unknown> | null;
+  max_retries?: number;
+  retry_delay_seconds?: number;
 }
 
 export interface WebhookUpdatePayload {
+  name?: string;
   url?: string;
-  events?: string[];
+  event_types?: string[];
   is_active?: boolean;
+  description?: string | null;
+  method?: 'POST' | 'PUT';
+  auth_type?: string | null;
+  auth_header?: string | null;
+  auth_value?: string | null;
+  custom_headers?: Record<string, string> | null;
+  filters?: Record<string, unknown> | null;
+  max_retries?: number;
+  retry_delay_seconds?: number;
 }
 
 export interface WebhookDelivery {
   id: number;
-  webhook_id: number;
+  webhook_id?: number;
   event_type: string;
+  event_id?: number;
   status: string;
-  response_code?: number;
+  attempt_count?: number;
+  response_status_code?: number;
+  response_time_ms?: number;
   response_body?: string;
   error_message?: string;
-  created_at: string;
+  created_at?: string;
   delivered_at?: string;
 }
 
 export interface WebhookDeliveryListResponse {
-  items: WebhookDelivery[];
+  deliveries: WebhookDelivery[];
+  items?: WebhookDelivery[];
+  total?: number;
   limit: number;
   offset: number;
 }
@@ -83,6 +116,8 @@ export interface WebhookProviderStats {
   processed_events: number;
   failed_events: number;
   pending_events: number;
+  processed_count?: number;
+  error_count?: number;
 }
 
 export interface OmniChannel {
@@ -92,6 +127,7 @@ export interface OmniChannel {
   is_active: boolean;
   webhook_url?: string;
   secret?: string;
+  webhook_secret_configured?: boolean;
   created_at: string;
   updated_at?: string;
 }
