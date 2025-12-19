@@ -2,34 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   CSS VARIABLES - Single Source of Truth for Theming
+   See lib/design-tokens.ts for semantic mappings
+   ============================================================================= */
+
 /* Light theme (default) */
 :root {
+  /* Slate palette (backgrounds, borders) */
   --color-slate-deep: #f8fafc;
   --color-slate-card: #ffffff;
   --color-slate-elevated: #f1f5f9;
   --color-slate-border: #e2e8f0;
   --color-slate-muted: #64748b;
+
+  /* Text colors */
   --color-text-primary: #0f172a;
   --color-text-secondary: #334155;
+
+  /* Brand colors */
   --color-teal-electric: #0d9488;
   --color-teal-glow: #14b8a6;
+
+  /* Semantic colors */
   --color-coral-alert: #ef4444;
   --color-amber-warn: #f59e0b;
+  --color-blue-info: #3b82f6;
+  --color-purple-accent: #a855f7;
+  --color-cyan-accent: #06b6d4;
 }
 
 /* Dark theme */
 .dark {
+  /* Slate palette (backgrounds, borders) */
   --color-slate-deep: #0f1419;
   --color-slate-card: #1a2332;
   --color-slate-elevated: #243042;
   --color-slate-border: #2d3a4f;
   --color-slate-muted: #64748b;
+
+  /* Text colors */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #cbd5e1;
+
+  /* Brand colors */
   --color-teal-electric: #00d4aa;
   --color-teal-glow: #00ffcc;
+
+  /* Semantic colors */
   --color-coral-alert: #ff6b6b;
   --color-amber-warn: #fbbf24;
+  --color-blue-info: #60a5fa;
+  --color-purple-accent: #c084fc;
+  --color-cyan-accent: #22d3ee;
 }
 
 * {
@@ -425,6 +450,15 @@ body {
 
 /* =============================================================================
    BUTTON SYSTEM
+
+   @deprecated These CSS classes are deprecated.
+   Use the Button component from components/ui/index.tsx instead.
+
+   Migration:
+     <button className="btn btn-primary"> → <Button variant="primary">
+     <button className="btn btn-secondary"> → <Button variant="secondary">
+     <button className="btn btn-danger"> → <Button variant="danger">
+     <button className="btn btn-ghost"> → <Button variant="ghost">
    ============================================================================= */
 
 .btn {

@@ -7,6 +7,8 @@ from app.api import api_router, public_api_router
 from app.config import settings
 from app.auth import get_current_principal
 from app.middleware.metrics import get_metrics_response
+from app.observability.otel import setup_otel, shutdown_otel
+from app.middleware.license import enforce_license
 
 # Configure structured logging
 structlog.configure(
@@ -32,11 +34,19 @@ async def lifespan(app: FastAPI):
         app="dotmac-insights",
         environment=settings.environment,
         jwt_configured=bool(settings.jwks_url),
+        otel_enabled=settings.otel_enabled,
     )
+
+    # Initialize OTEL instrumentation (if enabled)
+    # Pass app for FastAPI instrumentation
+    otel_initialized = setup_otel(app)
+    if otel_initialized:
+        logger.info("otel_setup_complete")
 
     yield
 
     # Shutdown
+    shutdown_otel()
     logger.info("shutting_down_application")
 
 
@@ -67,7 +77,7 @@ logger.info("cors_configured", origins=settings.cors_origins_list)
 app.include_router(
     api_router,
     prefix="/api",
-    dependencies=[Depends(get_current_principal)],
+    dependencies=[Depends(get_current_principal), Depends(enforce_license)],
 )
 logger.info("api_jwt_auth_enabled")
 
@@ -112,9 +122,16 @@ async def metrics():
     Exposes application metrics for monitoring:
     - webhook_auth_failures_total: Webhook authentication failures by provider
     - contacts_auth_failures_total: Contacts API auth failures
+    - contacts_dual_write_success_total: Successful contact dual-write operations
+    - contacts_dual_write_failures_total: Failed contact dual-write operations
+    - tickets_dual_write_success_total: Successful ticket dual-write operations
+    - tickets_dual_write_failures_total: Failed ticket dual-write operations
     - outbound_sync_total: Outbound sync attempts by entity/target/status
     - contacts_drift_pct: Contact field drift percentage by system
+    - tickets_drift_pct: Ticket field drift percentage by system
     - contacts_query_latency_seconds: Contacts API query latency
+    - api_request_latency_seconds: General API request latency
+    - api_requests_total: Total API requests by method/endpoint/status
     """
     metrics_bytes, content_type = get_metrics_response()
     return Response(content=metrics_bytes, media_type=content_type)

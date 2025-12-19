@@ -690,9 +690,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-slate-muted hover:text-white transition-colors"
+            className="p-2 text-slate-muted hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-sidebar"
           >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {mobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -706,11 +709,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile sidebar */}
-      <div className={cn(
-        'lg:hidden fixed top-14 left-0 bottom-0 z-40 w-64 border-r transform transition-transform duration-300',
-        sidebarBg,
-        mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
+      <nav
+        id="mobile-sidebar"
+        role="navigation"
+        aria-label="Mobile navigation"
+        className={cn(
+          'lg:hidden fixed top-14 left-0 bottom-0 z-40 w-64 border-r transform transition-transform duration-300',
+          sidebarBg,
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
         {isBooksShell ? renderBooksMobileNav() : (
           <nav className="p-4 space-y-4">
             {filteredGroups.map((group) => (
@@ -760,7 +768,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <AuthStatusIndicator collapsed={false} />
           <ThemeToggle collapsed={false} />
         </div>
-      </div>
+      </nav>
 
       {/* Desktop sidebar */}
       <aside

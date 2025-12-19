@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 from app.models.document_lines import InvoiceLine
 from app.models.payment_allocation import PaymentAllocation, AllocationType
 
@@ -32,7 +32,7 @@ class InvoiceSource(enum.Enum):
     INTERNAL = "internal"
 
 
-class Invoice(Base):
+class Invoice(SoftDeleteMixin, Base):
     """Customer invoices from Splynx, ERPNext, or internal creation."""
 
     __tablename__ = "invoices"

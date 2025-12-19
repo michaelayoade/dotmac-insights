@@ -15,6 +15,8 @@ from app.models.payment import Payment
 from app.models.supplier_payment import SupplierPayment
 from app.models.credit_note import CreditNote
 from app.models.books_settings import DebitNote
+from app.services.account_resolver import AccountResolver
+from app.services.transaction_manager import transactional_session
 
 
 class PostingError(Exception):
@@ -34,8 +36,9 @@ class DocumentPostingService:
     - Debit notes
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, account_resolver: Optional[AccountResolver] = None):
         self.db = db
+        self.account_resolver = account_resolver or AccountResolver(db)
 
     def post_invoice(
         self,
@@ -59,58 +62,59 @@ class DocumentPostingService:
         Returns:
             Created JournalEntry
         """
-        invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        if not invoice:
-            raise PostingError("Invoice not found")
+        with transactional_session(self.db):
+            invoice = self.db.query(Invoice).filter(Invoice.id == invoice_id).first()
+            if not invoice:
+                raise PostingError("Invoice not found")
 
-        if invoice.docstatus == 1:
-            raise PostingError("Invoice is already posted")
+            if invoice.docstatus == 1:
+                raise PostingError("Invoice is already posted")
 
-        posting_dt = posting_date or invoice.invoice_date
-        self._validate_fiscal_period(posting_dt)
+            posting_dt = posting_date or invoice.invoice_date
+            self._validate_fiscal_period(posting_dt)
 
-        # Build GL entries
-        entries = []
+            # Build GL entries
+            entries = []
 
-        # Debit AR
-        entries.append({
-            "account": self._get_ar_account(invoice),
-            "party_type": "Customer",
-            "party": str(invoice.customer_id),
-            "debit": invoice.total_amount,
-            "credit": Decimal("0"),
-        })
-
-        # Credit Revenue (net amount)
-        entries.append({
-            "account": self._get_revenue_account(invoice),
-            "debit": Decimal("0"),
-            "credit": invoice.amount,
-        })
-
-        # Credit Tax Payable (if tax)
-        if invoice.tax_amount and invoice.tax_amount > 0:
+            # Debit AR
             entries.append({
-                "account": self._get_tax_liability_account(),
-                "debit": Decimal("0"),
-                "credit": invoice.tax_amount,
+                "account": self._get_ar_account(invoice),
+                "party_type": "Customer",
+                "party": str(invoice.customer_id),
+                "debit": invoice.total_amount,
+                "credit": Decimal("0"),
             })
 
-        # Create journal entry
-        je = self._create_journal_entry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=posting_dt,
-            entries=entries,
-            user_remark=f"Invoice {invoice.invoice_number}",
-            company=invoice.company,
-        )
+            # Credit Revenue (net amount)
+            entries.append({
+                "account": self._get_revenue_account(invoice),
+                "debit": Decimal("0"),
+                "credit": invoice.amount,
+            })
 
-        # Update invoice
-        invoice.docstatus = 1
-        invoice.journal_entry_id = je.id
-        invoice.workflow_status = "posted"
+            # Credit Tax Payable (if tax)
+            if invoice.tax_amount and invoice.tax_amount > 0:
+                entries.append({
+                    "account": self._get_tax_liability_account(),
+                    "debit": Decimal("0"),
+                    "credit": invoice.tax_amount,
+                })
 
-        return je
+            # Create journal entry
+            je = self._create_journal_entry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=posting_dt,
+                entries=entries,
+                user_remark=f"Invoice {invoice.invoice_number}",
+                company=invoice.company,
+            )
+
+            # Update invoice
+            invoice.docstatus = 1
+            invoice.journal_entry_id = je.id
+            invoice.workflow_status = "posted"
+
+            return je
 
     def post_bill(
         self,
@@ -134,56 +138,57 @@ class DocumentPostingService:
         Returns:
             Created JournalEntry
         """
-        bill = self.db.query(PurchaseInvoice).filter(PurchaseInvoice.id == bill_id).first()
-        if not bill:
-            raise PostingError("Bill not found")
+        with transactional_session(self.db):
+            bill = self.db.query(PurchaseInvoice).filter(PurchaseInvoice.id == bill_id).first()
+            if not bill:
+                raise PostingError("Bill not found")
 
-        if bill.docstatus == 1:
-            raise PostingError("Bill is already posted")
+            if bill.docstatus == 1:
+                raise PostingError("Bill is already posted")
 
-        posting_dt = posting_date or bill.posting_date
-        self._validate_fiscal_period(posting_dt)
+            posting_dt = posting_date or bill.posting_date
+            self._validate_fiscal_period(posting_dt)
 
-        entries = []
+            entries = []
 
-        # Credit AP
-        entries.append({
-            "account": self._get_ap_account(bill),
-            "party_type": "Supplier",
-            "party": bill.supplier,
-            "debit": Decimal("0"),
-            "credit": bill.grand_total,
-        })
-
-        # Debit Expense (net amount)
-        net_amount = bill.grand_total - (bill.tax_amount or Decimal("0"))
-        entries.append({
-            "account": self._get_expense_account(bill),
-            "debit": net_amount,
-            "credit": Decimal("0"),
-        })
-
-        # Debit Tax Receivable (if tax)
-        if bill.tax_amount and bill.tax_amount > 0:
+            # Credit AP
             entries.append({
-                "account": self._get_tax_asset_account(),
-                "debit": bill.tax_amount,
+                "account": self._get_ap_account(bill),
+                "party_type": "Supplier",
+                "party": bill.supplier,
+                "debit": Decimal("0"),
+                "credit": bill.grand_total,
+            })
+
+            # Debit Expense (net amount)
+            net_amount = bill.grand_total - (bill.tax_amount or Decimal("0"))
+            entries.append({
+                "account": self._get_expense_account(bill),
+                "debit": net_amount,
                 "credit": Decimal("0"),
             })
 
-        je = self._create_journal_entry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=posting_dt,
-            entries=entries,
-            user_remark=f"Bill {bill.erpnext_id or bill.bill_number}",
-            company=bill.company,
-        )
+            # Debit Tax Receivable (if tax)
+            if bill.tax_amount and bill.tax_amount > 0:
+                entries.append({
+                    "account": self._get_tax_asset_account(),
+                    "debit": bill.tax_amount,
+                    "credit": Decimal("0"),
+                })
 
-        bill.docstatus = 1
-        bill.journal_entry_id = je.id
-        bill.workflow_status = "posted"
+            je = self._create_journal_entry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=posting_dt,
+                entries=entries,
+                user_remark=f"Bill {bill.erpnext_id or bill.bill_number}",
+                company=bill.company,
+            )
 
-        return je
+            bill.docstatus = 1
+            bill.journal_entry_id = je.id
+            bill.workflow_status = "posted"
+
+            return je
 
     def post_payment(
         self,
@@ -206,47 +211,48 @@ class DocumentPostingService:
         Returns:
             Created JournalEntry
         """
-        payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
-        if not payment:
-            raise PostingError("Payment not found")
+        with transactional_session(self.db):
+            payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+            if not payment:
+                raise PostingError("Payment not found")
 
-        if payment.docstatus == 1:
-            raise PostingError("Payment is already posted")
+            if payment.docstatus == 1:
+                raise PostingError("Payment is already posted")
 
-        posting_dt = posting_date or payment.payment_date
-        self._validate_fiscal_period(posting_dt)
+            posting_dt = posting_date or payment.payment_date
+            self._validate_fiscal_period(posting_dt)
 
-        entries = []
+            entries = []
 
-        # Debit Bank
-        entries.append({
-            "account": self._get_bank_account(payment),
-            "debit": payment.amount,
-            "credit": Decimal("0"),
-        })
+            # Debit Bank
+            entries.append({
+                "account": self._get_bank_account(payment),
+                "debit": payment.amount,
+                "credit": Decimal("0"),
+            })
 
-        # Credit AR
-        entries.append({
-            "account": self._get_ar_account(None),
-            "party_type": "Customer",
-            "party": str(payment.customer_id),
-            "debit": Decimal("0"),
-            "credit": payment.amount,
-        })
+            # Credit AR
+            entries.append({
+                "account": self._get_ar_account(None, company=payment.company),
+                "party_type": "Customer",
+                "party": str(payment.customer_id),
+                "debit": Decimal("0"),
+                "credit": payment.amount,
+            })
 
-        je = self._create_journal_entry(
-            voucher_type=JournalEntryType.BANK_ENTRY,
-            posting_date=posting_dt,
-            entries=entries,
-            user_remark=f"Payment {payment.receipt_number}",
-            company=None,
-        )
+            je = self._create_journal_entry(
+                voucher_type=JournalEntryType.BANK_ENTRY,
+                posting_date=posting_dt,
+                entries=entries,
+                user_remark=f"Payment {payment.receipt_number}",
+                company=payment.company,
+            )
 
-        payment.docstatus = 1
-        payment.journal_entry_id = je.id
-        payment.workflow_status = "posted"
+            payment.docstatus = 1
+            payment.journal_entry_id = je.id
+            payment.workflow_status = "posted"
 
-        return je
+            return je
 
     def post_supplier_payment(
         self,
@@ -269,47 +275,48 @@ class DocumentPostingService:
         Returns:
             Created JournalEntry
         """
-        payment = self.db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-        if not payment:
-            raise PostingError("Supplier payment not found")
+        with transactional_session(self.db):
+            payment = self.db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
+            if not payment:
+                raise PostingError("Supplier payment not found")
 
-        if payment.docstatus == 1:
-            raise PostingError("Payment is already posted")
+            if payment.docstatus == 1:
+                raise PostingError("Payment is already posted")
 
-        posting_dt = posting_date or payment.posting_date
-        self._validate_fiscal_period(posting_dt)
+            posting_dt = posting_date or payment.posting_date
+            self._validate_fiscal_period(posting_dt)
 
-        entries = []
+            entries = []
 
-        # Credit Bank
-        entries.append({
-            "account": self._get_bank_account_for_supplier(payment),
-            "debit": Decimal("0"),
-            "credit": payment.paid_amount,
-        })
+            # Credit Bank
+            entries.append({
+                "account": self._get_bank_account_for_supplier(payment),
+                "debit": Decimal("0"),
+                "credit": payment.paid_amount,
+            })
 
-        # Debit AP
-        entries.append({
-            "account": self._get_ap_account(None),
-            "party_type": "Supplier",
-            "party": str(payment.supplier_id),
-            "debit": payment.paid_amount,
-            "credit": Decimal("0"),
-        })
+            # Debit AP
+            entries.append({
+                "account": self._get_ap_account(None, company=payment.company),
+                "party_type": "Supplier",
+                "party": str(payment.supplier_id),
+                "debit": payment.paid_amount,
+                "credit": Decimal("0"),
+            })
 
-        je = self._create_journal_entry(
-            voucher_type=JournalEntryType.BANK_ENTRY,
-            posting_date=posting_dt,
-            entries=entries,
-            user_remark=f"Supplier Payment {payment.payment_number}",
-            company=payment.company,
-        )
+            je = self._create_journal_entry(
+                voucher_type=JournalEntryType.BANK_ENTRY,
+                posting_date=posting_dt,
+                entries=entries,
+                user_remark=f"Supplier Payment {payment.payment_number}",
+                company=payment.company,
+            )
 
-        payment.docstatus = 1
-        payment.journal_entry_id = je.id
-        payment.workflow_status = "posted"
+            payment.docstatus = 1
+            payment.journal_entry_id = je.id
+            payment.workflow_status = "posted"
 
-        return je
+            return je
 
     def post_credit_note(
         self,
@@ -332,47 +339,48 @@ class DocumentPostingService:
         Returns:
             Created JournalEntry
         """
-        cn = self.db.query(CreditNote).filter(CreditNote.id == credit_note_id).first()
-        if not cn:
-            raise PostingError("Credit note not found")
+        with transactional_session(self.db):
+            cn = self.db.query(CreditNote).filter(CreditNote.id == credit_note_id).first()
+            if not cn:
+                raise PostingError("Credit note not found")
 
-        if cn.docstatus == 1:
-            raise PostingError("Credit note is already posted")
+            if cn.docstatus == 1:
+                raise PostingError("Credit note is already posted")
 
-        posting_dt = posting_date or cn.issue_date or cn.posting_date
-        self._validate_fiscal_period(posting_dt)
+            posting_dt = posting_date or cn.issue_date or cn.posting_date
+            self._validate_fiscal_period(posting_dt)
 
-        entries = []
+            entries = []
 
-        # Credit AR
-        entries.append({
-            "account": self._get_ar_account(None),
-            "party_type": "Customer",
-            "party": str(cn.customer_id),
-            "debit": Decimal("0"),
-            "credit": cn.amount,
-        })
+            # Credit AR
+            entries.append({
+                "account": self._get_ar_account(None, company=cn.company),
+                "party_type": "Customer",
+                "party": str(cn.customer_id),
+                "debit": Decimal("0"),
+                "credit": cn.amount,
+            })
 
-        # Debit Sales Returns
-        entries.append({
-            "account": self._get_sales_returns_account(),
-            "debit": cn.amount,
-            "credit": Decimal("0"),
-        })
+            # Debit Sales Returns
+            entries.append({
+                "account": self._get_sales_returns_account(cn.company),
+                "debit": cn.amount,
+                "credit": Decimal("0"),
+            })
 
-        je = self._create_journal_entry(
-            voucher_type=JournalEntryType.CREDIT_NOTE,
-            posting_date=posting_dt,
-            entries=entries,
-            user_remark=f"Credit Note {cn.credit_number}",
-            company=cn.company,
-        )
+            je = self._create_journal_entry(
+                voucher_type=JournalEntryType.CREDIT_NOTE,
+                posting_date=posting_dt,
+                entries=entries,
+                user_remark=f"Credit Note {cn.credit_number}",
+                company=cn.company,
+            )
 
-        cn.docstatus = 1
-        cn.journal_entry_id = je.id
-        cn.workflow_status = "posted"
+            cn.docstatus = 1
+            cn.journal_entry_id = je.id
+            cn.workflow_status = "posted"
 
-        return je
+            return je
 
     def reverse_posting(
         self,
@@ -391,44 +399,45 @@ class DocumentPostingService:
         Returns:
             Reversal JournalEntry
         """
-        original = self.db.query(JournalEntry).filter(
-            JournalEntry.id == journal_entry_id
-        ).first()
-        if not original:
-            raise PostingError("Journal entry not found")
+        with transactional_session(self.db):
+            original = self.db.query(JournalEntry).filter(
+                JournalEntry.id == journal_entry_id
+            ).first()
+            if not original:
+                raise PostingError("Journal entry not found")
 
-        if original.docstatus != 1:
-            raise PostingError("Can only reverse posted entries")
+            if original.docstatus != 1:
+                raise PostingError("Can only reverse posted entries")
 
-        # Get original GL entries
-        gl_entries = self.db.query(GLEntry).filter(
-            GLEntry.voucher_no == original.erpnext_id,
-            GLEntry.voucher_type == "Journal Entry",
-        ).all()
+            # Get original GL entries
+            gl_entries = self.db.query(GLEntry).filter(
+                GLEntry.voucher_no == original.erpnext_id,
+                GLEntry.voucher_type == "Journal Entry",
+            ).all()
 
-        # Create reversal entries (swap debits and credits)
-        reversal_entries = []
-        for gl in gl_entries:
-            reversal_entries.append({
-                "account": gl.account,
-                "party_type": gl.party_type,
-                "party": gl.party,
-                "debit": gl.credit,  # Swap
-                "credit": gl.debit,  # Swap
-            })
+            # Create reversal entries (swap debits and credits)
+            reversal_entries = []
+            for gl in gl_entries:
+                reversal_entries.append({
+                    "account": gl.account,
+                    "party_type": gl.party_type,
+                    "party": gl.party,
+                    "debit": gl.credit,  # Swap
+                    "credit": gl.debit,  # Swap
+                })
 
-        je = self._create_journal_entry(
-            voucher_type=original.voucher_type,
-            posting_date=datetime.utcnow(),
-            entries=reversal_entries,
-            user_remark=f"Reversal of {original.erpnext_id}: {reason}",
-            company=original.company,
-        )
+            je = self._create_journal_entry(
+                voucher_type=original.voucher_type,
+                posting_date=datetime.utcnow(),
+                entries=reversal_entries,
+                user_remark=f"Reversal of {original.erpnext_id}: {reason}",
+                company=original.company,
+            )
 
-        # Mark original as cancelled
-        original.docstatus = 2
+            # Mark original as cancelled
+            original.docstatus = 2
 
-        return je
+            return je
 
     def _create_journal_entry(
         self,
@@ -493,44 +502,42 @@ class DocumentPostingService:
                 f"Fiscal period {period.period_name} is {period.status.value}, not open"
             )
 
-    def _get_ar_account(self, invoice: Optional[Invoice]) -> str:
+    def _get_ar_account(self, invoice: Optional[Invoice], company: Optional[str] = None) -> str:
         """Get the Accounts Receivable account."""
-        # TODO: Look up from company settings or customer
-        return "Debtors - Company"
+        return self.account_resolver.resolve_receivable_account(
+            company or (invoice.company if invoice else None)
+        )
 
-    def _get_ap_account(self, bill: Optional[PurchaseInvoice]) -> str:
+    def _get_ap_account(self, bill: Optional[PurchaseInvoice], company: Optional[str] = None) -> str:
         """Get the Accounts Payable account."""
-        # TODO: Look up from company settings or supplier
-        return "Creditors - Company"
+        return self.account_resolver.resolve_payable_account(
+            company or (bill.company if bill else None)
+        )
 
     def _get_revenue_account(self, invoice: Invoice) -> str:
         """Get the revenue account for an invoice."""
-        # TODO: Look up from line items or invoice category
-        return "Sales - Company"
+        return self.account_resolver.resolve_income_account(invoice.company)
 
     def _get_expense_account(self, bill: PurchaseInvoice) -> str:
         """Get the expense account for a bill."""
-        # TODO: Look up from line items or bill category
-        return "Cost of Goods Sold - Company"
+        return self.account_resolver.resolve_expense_account(bill.company)
 
     def _get_tax_liability_account(self) -> str:
         """Get the tax liability account (VAT payable)."""
-        return "VAT - Company"
+        return self.account_resolver.resolve_tax_liability_account(None)
 
     def _get_tax_asset_account(self) -> str:
         """Get the tax asset account (input VAT)."""
-        return "Input VAT - Company"
+        return self.account_resolver.resolve_tax_asset_account(None)
 
     def _get_bank_account(self, payment: Payment) -> str:
         """Get the bank account for a payment."""
-        # TODO: Look up from bank_account_id
-        return "Bank - Company"
+        return self.account_resolver.resolve_bank_account(payment.company)
 
     def _get_bank_account_for_supplier(self, payment: SupplierPayment) -> str:
         """Get the bank account for a supplier payment."""
-        # TODO: Look up from bank_account_id
-        return "Bank - Company"
+        return self.account_resolver.resolve_bank_account(payment.company)
 
-    def _get_sales_returns_account(self) -> str:
+    def _get_sales_returns_account(self, company: Optional[str] = None) -> str:
         """Get the sales returns account."""
-        return "Sales Returns - Company"
+        return self.account_resolver.resolve_sales_returns_account(company)

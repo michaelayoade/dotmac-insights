@@ -15,6 +15,7 @@ from typing import List, Dict, Optional, Tuple, Any
 import uuid
 
 from sqlalchemy import select, func, and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.tax_ng import (
@@ -90,10 +91,8 @@ class NigerianTaxService:
     def _generate_vat_reference(self) -> str:
         """Generate unique VAT reference number."""
         today = date.today()
-        count = self.db.query(VATTransaction).filter(
-            func.date(VATTransaction.created_at) == today
-        ).count()
-        return f"VAT-{today.strftime('%Y%m%d')}-{count + 1:04d}"
+        unique_suffix = uuid.uuid4().hex[:8].upper()
+        return f"VAT-{today.strftime('%Y%m%d')}-{unique_suffix}"
 
     def record_output_vat(
         self,
@@ -297,13 +296,14 @@ class NigerianTaxService:
 
     # ============= WHT OPERATIONS =============
 
-    def _generate_wht_reference(self) -> str:
+    def _generate_wht_reference(self, suffix: Optional[str] = None) -> str:
         """Generate unique WHT reference number."""
         today = date.today()
         count = self.db.query(WHTTransaction).filter(
             func.date(WHTTransaction.created_at) == today
         ).count()
-        return f"WHT-{today.strftime('%Y%m%d')}-{count + 1:04d}"
+        base = f"WHT-{today.strftime('%Y%m%d')}-{count + 1:04d}"
+        return f"{base}-{suffix}" if suffix else base
 
     def record_wht_deduction(
         self,
@@ -344,34 +344,45 @@ class NigerianTaxService:
         # Calculate remittance deadline
         remittance_due = get_wht_remittance_deadline(transaction_date, jurisdiction)
 
-        transaction = WHTTransaction(
-            reference_number=self._generate_wht_reference(),
-            transaction_date=transaction_date,
-            payment_type=payment_type,
-            supplier_id=supplier_id,
-            supplier_name=supplier_name,
-            supplier_tin=supplier_tin,
-            supplier_is_corporate=supplier_is_corporate,
-            has_valid_tin=has_valid_tin,
-            source_doctype=source_doctype,
-            source_docname=source_docname,
-            gross_amount=gross_amount,
-            standard_rate=standard_rate,
-            wht_rate=rate,
-            wht_amount=wht_amount,
-            net_amount=net_amount,
-            currency=currency,
-            exchange_rate=exchange_rate,
-            jurisdiction=jurisdiction,
-            remittance_due_date=remittance_due,
-            company=company,
-            created_by_id=created_by_id,
-        )
+        payload = {
+            "transaction_date": transaction_date,
+            "payment_type": payment_type,
+            "supplier_id": supplier_id,
+            "supplier_name": supplier_name,
+            "supplier_tin": supplier_tin,
+            "supplier_is_corporate": supplier_is_corporate,
+            "has_valid_tin": has_valid_tin,
+            "source_doctype": source_doctype,
+            "source_docname": source_docname,
+            "gross_amount": gross_amount,
+            "standard_rate": standard_rate,
+            "wht_rate": rate,
+            "wht_amount": wht_amount,
+            "net_amount": net_amount,
+            "currency": currency,
+            "exchange_rate": exchange_rate,
+            "jurisdiction": jurisdiction,
+            "remittance_due_date": remittance_due,
+            "company": company,
+            "created_by_id": created_by_id,
+        }
 
-        self.db.add(transaction)
-        self.db.commit()
-        self.db.refresh(transaction)
-        return transaction
+        for attempt in range(5):
+            suffix = None if attempt == 0 else uuid.uuid4().hex[:6].upper()
+            transaction = WHTTransaction(
+                reference_number=self._generate_wht_reference(suffix),
+                **payload,
+            )
+            self.db.add(transaction)
+            try:
+                self.db.commit()
+            except IntegrityError:
+                self.db.rollback()
+                continue
+            self.db.refresh(transaction)
+            return transaction
+
+        raise ValueError("Unable to generate a unique WHT reference number")
 
     def get_wht_transactions(
         self,
@@ -467,13 +478,14 @@ class NigerianTaxService:
             "due_this_week_amount": sum(t.wht_amount for t in due_this_week),
         }
 
-    def _generate_certificate_number(self) -> str:
+    def _generate_certificate_number(self, suffix: Optional[str] = None) -> str:
         """Generate unique WHT certificate number."""
         today = date.today()
         count = self.db.query(WHTCertificate).filter(
             func.extract('year', WHTCertificate.created_at) == today.year
         ).count()
-        return f"WHTC-{today.year}-{count + 1:06d}"
+        base = f"WHTC-{today.year}-{count + 1:06d}"
+        return f"{base}-{suffix}" if suffix else base
 
     def generate_wht_certificate(
         self,
@@ -504,32 +516,42 @@ class NigerianTaxService:
         settings = self.get_settings(company)
 
         # Create certificate
-        certificate = WHTCertificate(
-            certificate_number=self._generate_certificate_number(),
-            issue_date=date.today(),
-            supplier_id=supplier_id,
-            supplier_name=transactions[0].supplier_name,
-            supplier_tin=transactions[0].supplier_tin,
-            period_start=period_start,
-            period_end=period_end,
-            total_gross_amount=total_gross,
-            total_wht_amount=total_wht,
-            transaction_count=len(transactions),
-            company=company,
-            company_tin=settings.tin if settings else None,
-            created_by_id=created_by_id,
-        )
+        payload = {
+            "issue_date": date.today(),
+            "supplier_id": supplier_id,
+            "supplier_name": transactions[0].supplier_name,
+            "supplier_tin": transactions[0].supplier_tin,
+            "period_start": period_start,
+            "period_end": period_end,
+            "total_gross_amount": total_gross,
+            "total_wht_amount": total_wht,
+            "transaction_count": len(transactions),
+            "company": company,
+            "company_tin": settings.tin if settings else None,
+            "created_by_id": created_by_id,
+        }
 
-        self.db.add(certificate)
-        self.db.flush()
+        for attempt in range(5):
+            suffix = None if attempt == 0 else uuid.uuid4().hex[:6].upper()
+            certificate = WHTCertificate(
+                certificate_number=self._generate_certificate_number(suffix),
+                **payload,
+            )
+            self.db.add(certificate)
+            self.db.flush()
 
-        # Link transactions to certificate
-        for txn in transactions:
-            txn.certificate_id = certificate.id
+            for txn in transactions:
+                txn.certificate_id = certificate.id
 
-        self.db.commit()
-        self.db.refresh(certificate)
-        return certificate
+            try:
+                self.db.commit()
+            except IntegrityError:
+                self.db.rollback()
+                continue
+            self.db.refresh(certificate)
+            return certificate
+
+        raise ValueError("Unable to generate a unique WHT certificate number")
 
     # ============= PAYE OPERATIONS =============
 
@@ -561,9 +583,12 @@ class NigerianTaxService:
             housing_allowance=housing_allowance,
             transport_allowance=transport_allowance,
             other_allowances=other_allowances,
+            bonus=bonus,
             pension_contribution=pension_contribution,
             nhf_contribution=nhf_contribution,
+            life_assurance=life_assurance,
             other_reliefs=other_reliefs,
+            tax_date=period_start,
         )
 
         gross_income = basic_salary + housing_allowance + transport_allowance + other_allowances + bonus
@@ -671,12 +696,13 @@ class NigerianTaxService:
 
     # ============= CIT OPERATIONS =============
 
-    def _generate_cit_assessment_number(self, fiscal_year: str) -> str:
+    def _generate_cit_assessment_number(self, fiscal_year: str, suffix: Optional[str] = None) -> str:
         """Generate CIT assessment number."""
         count = self.db.query(CITAssessment).filter(
             CITAssessment.fiscal_year == fiscal_year
         ).count()
-        return f"CIT-{fiscal_year}-{count + 1:04d}"
+        base = f"CIT-{fiscal_year}-{count + 1:04d}"
+        return f"{base}-{suffix}" if suffix else base
 
     def create_cit_assessment(
         self,
@@ -719,38 +745,49 @@ class NigerianTaxService:
         else:
             due_date = date(due_date.year, due_date.month + 6, min(due_date.day, 28))
 
-        assessment = CITAssessment(
-            assessment_number=self._generate_cit_assessment_number(fiscal_year),
-            fiscal_year=fiscal_year,
-            period_start=period_start,
-            period_end=period_end,
-            company_size=company_size,
-            gross_turnover=gross_turnover,
-            gross_profit=gross_profit,
-            disallowed_expenses=disallowed_expenses,
-            capital_allowances=capital_allowances,
-            loss_brought_forward=loss_brought_forward,
-            investment_allowances=investment_allowances,
-            adjusted_profit=adjusted_profit,
-            assessable_profit=assessable_profit,
-            cit_rate=cit_rate,
-            cit_amount=cit_amount,
-            tet_rate=Decimal("0.03"),
-            tet_amount=tet_amount,
-            minimum_tax=minimum_tax,
-            is_minimum_tax_applicable=is_minimum_tax,
-            total_tax_liability=total_tax,
-            balance_due=total_tax,
-            due_date=due_date,
-            company=company,
-            company_tin=company_tin,
-            created_by_id=created_by_id,
-        )
+        payload = {
+            "fiscal_year": fiscal_year,
+            "period_start": period_start,
+            "period_end": period_end,
+            "company_size": company_size,
+            "gross_turnover": gross_turnover,
+            "gross_profit": gross_profit,
+            "disallowed_expenses": disallowed_expenses,
+            "capital_allowances": capital_allowances,
+            "loss_brought_forward": loss_brought_forward,
+            "investment_allowances": investment_allowances,
+            "adjusted_profit": adjusted_profit,
+            "assessable_profit": assessable_profit,
+            "cit_rate": cit_rate,
+            "cit_amount": cit_amount,
+            "tet_rate": Decimal("0.03"),
+            "tet_amount": tet_amount,
+            "minimum_tax": minimum_tax,
+            "is_minimum_tax_applicable": is_minimum_tax,
+            "total_tax_liability": total_tax,
+            "balance_due": total_tax,
+            "due_date": due_date,
+            "company": company,
+            "company_tin": company_tin,
+            "created_by_id": created_by_id,
+        }
 
-        self.db.add(assessment)
-        self.db.commit()
-        self.db.refresh(assessment)
-        return assessment
+        for attempt in range(5):
+            suffix = None if attempt == 0 else uuid.uuid4().hex[:6].upper()
+            assessment = CITAssessment(
+                assessment_number=self._generate_cit_assessment_number(fiscal_year, suffix),
+                **payload,
+            )
+            self.db.add(assessment)
+            try:
+                self.db.commit()
+            except IntegrityError:
+                self.db.rollback()
+                continue
+            self.db.refresh(assessment)
+            return assessment
+
+        raise ValueError("Unable to generate a unique CIT assessment number")
 
     def get_cit_assessments(
         self,
@@ -779,14 +816,15 @@ class NigerianTaxService:
         """Generate UUID for e-invoice."""
         return str(uuid.uuid4())
 
-    def _generate_invoice_number(self, company: str) -> str:
+    def _generate_invoice_number(self, company: str, suffix: Optional[str] = None) -> str:
         """Generate e-invoice number."""
         today = date.today()
         count = self.db.query(EInvoice).filter(
             EInvoice.company == company,
             func.extract('year', EInvoice.created_at) == today.year
         ).count()
-        return f"EINV-{today.year}-{count + 1:08d}"
+        base = f"EINV-{today.year}-{count + 1:08d}"
+        return f"{base}-{suffix}" if suffix else base
 
     def create_einvoice(
         self,
@@ -856,55 +894,65 @@ class NigerianTaxService:
         tax_inclusive = line_extension + total_tax
         payable = tax_inclusive
 
-        # Create invoice
-        einvoice = EInvoice(
-            invoice_number=self._generate_invoice_number(company),
-            uuid=self._generate_invoice_uuid(),
-            issue_date=issue_date,
-            due_date=due_date,
-            source_doctype=source_doctype,
-            source_docname=source_docname,
-            supplier_name=supplier_name,
-            supplier_tin=supplier_tin,
-            supplier_vat_number=supplier_vat_number,
-            supplier_street=supplier_street,
-            supplier_city=supplier_city,
-            supplier_state=supplier_state,
-            supplier_phone=supplier_phone,
-            supplier_email=supplier_email,
-            customer_name=customer_name,
-            customer_tin=customer_tin,
-            customer_street=customer_street,
-            customer_city=customer_city,
-            customer_state=customer_state,
-            customer_phone=customer_phone,
-            customer_email=customer_email,
-            payment_means_code=payment_means_code,
-            payment_terms=payment_terms,
-            line_extension_amount=line_extension,
-            tax_exclusive_amount=tax_exclusive,
-            tax_inclusive_amount=tax_inclusive,
-            tax_amount=total_tax,
-            payable_amount=payable,
-            note=note,
-            company=company,
-            created_by_id=created_by_id,
-        )
+        payload = {
+            "issue_date": issue_date,
+            "due_date": due_date,
+            "source_doctype": source_doctype,
+            "source_docname": source_docname,
+            "supplier_name": supplier_name,
+            "supplier_tin": supplier_tin,
+            "supplier_vat_number": supplier_vat_number,
+            "supplier_street": supplier_street,
+            "supplier_city": supplier_city,
+            "supplier_state": supplier_state,
+            "supplier_phone": supplier_phone,
+            "supplier_email": supplier_email,
+            "customer_name": customer_name,
+            "customer_tin": customer_tin,
+            "customer_street": customer_street,
+            "customer_city": customer_city,
+            "customer_state": customer_state,
+            "customer_phone": customer_phone,
+            "customer_email": customer_email,
+            "payment_means_code": payment_means_code,
+            "payment_terms": payment_terms,
+            "line_extension_amount": line_extension,
+            "tax_exclusive_amount": tax_exclusive,
+            "tax_inclusive_amount": tax_inclusive,
+            "tax_amount": total_tax,
+            "payable_amount": payable,
+            "note": note,
+            "company": company,
+            "created_by_id": created_by_id,
+        }
 
-        self.db.add(einvoice)
-        self.db.flush()
-
-        # Add lines
-        for line_data in invoice_lines:
-            line = EInvoiceLine(
-                einvoice_id=einvoice.id,
-                **line_data
+        for attempt in range(5):
+            suffix = None if attempt == 0 else uuid.uuid4().hex[:6].upper()
+            einvoice = EInvoice(
+                invoice_number=self._generate_invoice_number(company, suffix),
+                uuid=self._generate_invoice_uuid(),
+                **payload,
             )
-            self.db.add(line)
 
-        self.db.commit()
-        self.db.refresh(einvoice)
-        return einvoice
+            self.db.add(einvoice)
+            self.db.flush()
+
+            for line_data in invoice_lines:
+                line = EInvoiceLine(
+                    einvoice_id=einvoice.id,
+                    **line_data
+                )
+                self.db.add(line)
+
+            try:
+                self.db.commit()
+            except IntegrityError:
+                self.db.rollback()
+                continue
+            self.db.refresh(einvoice)
+            return einvoice
+
+        raise ValueError("Unable to generate a unique e-invoice number")
 
     def validate_einvoice(self, einvoice_id: int) -> Dict:
         """Validate e-invoice against BIS 3.0 requirements."""

@@ -3,10 +3,11 @@ from __future__ import annotations
 from sqlalchemy import String, Text, ForeignKey, Enum, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.pop import Pop
@@ -40,7 +41,7 @@ class BillingType(enum.Enum):
     RECURRING = "recurring"
 
 
-class Customer(Base):
+class Customer(SoftDeleteMixin, Base):
     """Unified customer record from all sources."""
 
     __tablename__ = "customers"
@@ -127,8 +128,9 @@ class Customer(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+    # is_deleted, deleted_at, deleted_by_id inherited from SoftDeleteMixin
 
     # Link to unified contact (for migration to UnifiedContact model)
     # Once fully migrated, Customer data will be derived from UnifiedContact

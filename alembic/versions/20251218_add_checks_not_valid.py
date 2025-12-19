@@ -36,11 +36,12 @@ def upgrade() -> None:
     """)
 
     # Payment allocations: total_allocated + unallocated must not exceed amount
+    # For refunds (amount < 0), skip allocation check since there's no allocation
     op.execute("""
         ALTER TABLE payments
         ADD CONSTRAINT chk_payment_allocation_valid
         CHECK (
-            (total_allocated + unallocated_amount) <= (amount + 0.01)
+            (amount < 0 OR (total_allocated + unallocated_amount) <= (amount + 0.01))
             AND total_allocated >= 0
             AND unallocated_amount >= 0
         )

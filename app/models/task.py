@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import String, Text, ForeignKey, Numeric, Date, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -111,8 +112,8 @@ class Task(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="tasks")

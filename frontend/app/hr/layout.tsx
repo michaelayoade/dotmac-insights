@@ -11,7 +11,9 @@ import {
   UserPlus,
   Activity,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useEntitlements } from '@/hooks/useApi';
 
 // HR Information Flow:
 // 1. SETUP: Define policies, structures, components (Foundation)
@@ -21,7 +23,7 @@ import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from
 // 5. DEVELOPMENT: Training, appraisals, career growth (Continuous)
 // 6. ANALYTICS: Reports, insights, compliance (Monitoring)
 
-const sections: NavSection[] = [
+const baseSections: NavSection[] = [
   {
     key: 'overview',
     label: 'Dashboard',
@@ -111,6 +113,24 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function HrLayout({ children }: { children: React.ReactNode }) {
+  const { data: entitlements } = useEntitlements();
+  const nigeriaEnabled = entitlements?.feature_flags?.NIGERIA_COMPLIANCE_ENABLED ?? false;
+  const sections = useMemo(() => {
+    if (!nigeriaEnabled) {
+      return baseSections;
+    }
+    return baseSections.map((section) => {
+      if (section.key !== 'compensation') return section;
+      return {
+        ...section,
+        items: [
+          ...section.items,
+          { name: 'Statutory (Nigeria)', href: '/books/tax/paye', description: 'PAYE compliance tools' },
+        ],
+      };
+    });
+  }, [nigeriaEnabled]);
+
   return (
     <ModuleLayout
       moduleName="Dotmac People"

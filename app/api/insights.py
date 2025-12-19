@@ -839,7 +839,7 @@ async def get_financial_insights(
             func.count(Payment.id).label("count"),
             func.sum(Payment.amount).label("total")
         ).filter(
-            Payment.status == PaymentStatus.COMPLETED
+            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED])
         ).group_by(Payment.payment_method).all()
 
         # Credit notes impact
@@ -853,7 +853,7 @@ async def get_financial_insights(
             extract('month', Payment.payment_date).label('month'),
             func.sum(Payment.amount).label('total')
         ).filter(
-            Payment.status == PaymentStatus.COMPLETED,
+            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
             Payment.payment_date.isnot(None),
             Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30)
         ).group_by(
@@ -1113,7 +1113,7 @@ async def detect_anomalies(
     # Payments without invoices
     orphan_payments = db.query(Payment).filter(
         Payment.invoice_id.is_(None),
-        Payment.status == PaymentStatus.COMPLETED
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED])
     ).count()
 
     if orphan_payments > 0:

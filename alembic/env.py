@@ -13,8 +13,11 @@ from app.config import settings
 
 config = context.config
 
-# Override sqlalchemy.url with environment variable if set
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# Prefer an explicit Alembic-configured URL when provided (e.g., tests),
+# otherwise fall back to settings.database_url.
+configured_url = config.get_main_option("sqlalchemy.url")
+if not configured_url or "${" in configured_url:
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

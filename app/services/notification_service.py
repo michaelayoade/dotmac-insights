@@ -25,6 +25,10 @@ from app.models.notification import (
     NotificationChannel,
 )
 from app.services.secrets_service import get_secrets, SecretsServiceError
+from app.services.notification_templates import (
+    NotificationTemplateRegistry,
+    render_template,
+)
 
 logger = structlog.get_logger()
 
@@ -45,6 +49,7 @@ class NotificationService:
     def __init__(self, db: Session):
         self.db = db
         self.http_client = httpx.Client(timeout=30.0)
+        self.template_registry = NotificationTemplateRegistry()
 
     def emit_event(
         self,
@@ -338,158 +343,35 @@ class NotificationService:
         self, event_type: NotificationEventType, payload: Dict[str, Any]
     ) -> tuple[str, str, str, str]:
         """Get notification title, message, icon, and priority for event type."""
-        templates = {
-            NotificationEventType.APPROVAL_REQUESTED: (
-                "Approval Required",
-                f"A {payload.get('doctype', 'document')} requires your approval",
-                "clipboard-check",
-                "high",
-            ),
-            NotificationEventType.APPROVAL_APPROVED: (
-                "Document Approved",
-                f"Your {payload.get('doctype', 'document')} has been approved",
-                "check-circle",
-                "normal",
-            ),
-            NotificationEventType.APPROVAL_REJECTED: (
-                "Document Rejected",
-                f"Your {payload.get('doctype', 'document')} was rejected: {payload.get('reason', 'No reason provided')}",
-                "x-circle",
-                "high",
-            ),
-            NotificationEventType.INVOICE_OVERDUE: (
-                "Invoice Overdue",
-                f"Invoice {payload.get('invoice_number', '')} is {payload.get('days_overdue', 0)} days overdue",
-                "alert-triangle",
-                "high",
-            ),
-            NotificationEventType.INVOICE_PAID: (
-                "Payment Received",
-                f"Invoice {payload.get('invoice_number', '')} has been paid",
-                "dollar-sign",
-                "normal",
-            ),
-            NotificationEventType.PAYMENT_RECEIVED: (
-                "Payment Received",
-                f"Payment of {payload.get('amount', 0)} received from {payload.get('customer_name', 'customer')}",
-                "dollar-sign",
-                "normal",
-            ),
-            NotificationEventType.CREDIT_LIMIT_WARNING: (
-                "Credit Limit Warning",
-                f"Customer {payload.get('customer_name', '')} is at {payload.get('utilization_percent', 0)}% of credit limit",
-                "alert-circle",
-                "high",
-            ),
-            NotificationEventType.CREDIT_HOLD_APPLIED: (
-                "Credit Hold Applied",
-                f"Customer {payload.get('customer_name', '')} has been placed on credit hold",
-                "ban",
-                "urgent",
-            ),
-            NotificationEventType.TAX_DUE_REMINDER: (
-                "Tax Filing Due",
-                f"{payload.get('tax_type', 'Tax')} filing due on {payload.get('due_date', '')}",
-                "calendar",
-                "high",
-            ),
-            NotificationEventType.PERIOD_CLOSING: (
-                "Period Closing",
-                f"Fiscal period {payload.get('period_name', '')} is closing soon",
-                "clock",
-                "normal",
-            ),
-            NotificationEventType.RECONCILIATION_DISCREPANCY: (
-                "Reconciliation Issue",
-                f"Discrepancy of {payload.get('discrepancy_amount', 0)} found in bank reconciliation",
-                "alert-triangle",
-                "high",
-            ),
-            # Performance management templates
-            NotificationEventType.PERF_PERIOD_STARTED: (
-                "Performance Evaluation Started",
-                f"The {payload.get('period_name', 'evaluation period')} has begun. Your scorecard is being prepared.",
-                "calendar",
-                "normal",
-            ),
-            NotificationEventType.PERF_SCORECARD_GENERATED: (
-                "Performance Scorecard Ready",
-                f"Your performance scorecard for {payload.get('period_name', 'this period')} has been generated and is ready for tracking.",
-                "clipboard-list",
-                "normal",
-            ),
-            NotificationEventType.PERF_SCORECARD_COMPUTED: (
-                "Performance Metrics Calculated",
-                f"Your performance metrics for {payload.get('period_name', 'this period')} have been calculated. Score: {payload.get('score', 'N/A')}",
-                "calculator",
-                "normal",
-            ),
-            NotificationEventType.PERF_REVIEW_REQUESTED: (
-                "Performance Review Pending",
-                f"{payload.get('employee_name', 'An employee')}'s scorecard is awaiting your review for {payload.get('period_name', 'this period')}.",
-                "user-check",
-                "high",
-            ),
-            NotificationEventType.PERF_SCORECARD_APPROVED: (
-                "Scorecard Approved",
-                f"Your performance scorecard for {payload.get('period_name', 'this period')} has been approved by {payload.get('reviewer_name', 'your manager')}.",
-                "check-circle",
-                "normal",
-            ),
-            NotificationEventType.PERF_SCORECARD_REJECTED: (
-                "Scorecard Needs Revision",
-                f"Your scorecard for {payload.get('period_name', 'this period')} requires revision. Reason: {payload.get('reason', 'Please review comments.')}",
-                "alert-circle",
-                "high",
-            ),
-            NotificationEventType.PERF_SCORECARD_FINALIZED: (
-                "Performance Rating Finalized",
-                f"Your final performance rating for {payload.get('period_name', 'this period')} is: {payload.get('rating', 'N/A')} ({payload.get('score', 'N/A')} points)",
-                "award",
-                "high",
-            ),
-            NotificationEventType.PERF_SCORE_OVERRIDDEN: (
-                "Score Adjusted",
-                f"A score on your {payload.get('period_name', '')} scorecard was adjusted from {payload.get('old_score', 'N/A')} to {payload.get('new_score', 'N/A')}. Reason: {payload.get('reason', 'N/A')}",
-                "edit",
-                "normal",
-            ),
-            NotificationEventType.PERF_REVIEW_REMINDER: (
-                "Review Reminder",
-                f"You have {payload.get('pending_count', 0)} performance reviews pending. Deadline: {payload.get('deadline', 'N/A')}",
-                "clock",
-                "high",
-            ),
-            NotificationEventType.PERF_PERIOD_CLOSING: (
-                "Evaluation Period Ending",
-                f"The {payload.get('period_name', 'evaluation period')} ends on {payload.get('end_date', 'N/A')}. Please complete all pending reviews.",
-                "alert-triangle",
-                "high",
-            ),
-            NotificationEventType.PERF_WEEKLY_SUMMARY: (
-                "Weekly Performance Summary",
-                f"Your team performance summary: {payload.get('computed_count', 0)} scorecards computed, {payload.get('pending_review', 0)} pending review.",
-                "bar-chart-2",
-                "normal",
-            ),
-            NotificationEventType.PERF_RATING_PUBLISHED: (
-                "Performance Rating Published",
-                f"Your performance rating for {payload.get('period_name', 'this period')} has been published. View your detailed scorecard.",
-                "eye",
-                "normal",
-            ),
-        }
-
-        return templates.get(
-            event_type,
-            ("Notification", str(payload.get("message", "You have a new notification")), "bell", "normal")
-        )
+        template = self.template_registry.get_template(event_type)
+        context = {**template.context, **payload}
+        title = render_template(template.title, context)
+        message = render_template(template.message, context)
+        return title, message, template.icon, template.priority
 
     def _get_email_template(
         self, event_type: NotificationEventType, payload: Dict[str, Any]
     ) -> tuple[str, str, str]:
         """Get email subject, HTML body, and text body for event type."""
-        title, message, _, _ = self._get_notification_template(event_type, payload)
+        template = self.template_registry.get_template(event_type)
+        context = {**template.context, **payload}
+        title = render_template(template.title, context)
+        message = render_template(template.message, context)
+
+        if template.email_body_html or template.email_body_text or template.email_subject:
+            subject = render_template(
+                template.email_subject or "[DotMac] {title}",
+                {**context, "title": title, "message": message},
+            )
+            body_html = render_template(
+                template.email_body_html or "",
+                {**context, "title": title, "message": message},
+            )
+            body_text = render_template(
+                template.email_body_text or "",
+                {**context, "title": title, "message": message},
+            )
+            return subject, body_html, body_text
 
         # Simple HTML template
         body_html = f"""

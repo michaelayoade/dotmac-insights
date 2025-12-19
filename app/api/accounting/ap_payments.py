@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
 from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
 from app.models.payment_allocation import PaymentAllocation
@@ -318,7 +318,7 @@ def update_ap_payment(
 def delete_ap_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a draft supplier payment."""
     payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
@@ -333,7 +333,9 @@ def delete_ap_payment(
         PaymentAllocation.supplier_payment_id == payment_id
     ).delete()
 
-    db.delete(payment)
+    payment.is_deleted = True
+    payment.deleted_at = datetime.utcnow()
+    payment.deleted_by_id = principal.id
     db.commit()
 
     return {"message": "Payment deleted"}

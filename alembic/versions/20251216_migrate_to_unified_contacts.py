@@ -835,12 +835,5 @@ def downgrade() -> None:
         op.drop_index('ix_erpnext_leads_unified_contact_id', table_name='erpnext_leads')
         op.drop_column('erpnext_leads', 'unified_contact_id')
 
-    # Clear migrated data from unified_contacts
-    if table_exists('unified_contacts'):
-        op.execute("DELETE FROM unified_contacts WHERE legacy_customer_id IS NOT NULL")
-        op.execute("DELETE FROM unified_contacts WHERE legacy_lead_id IS NOT NULL")
-        op.execute("DELETE FROM unified_contacts WHERE legacy_contact_id IS NOT NULL")
-        op.execute("DELETE FROM unified_contacts WHERE legacy_inbox_contact_id IS NOT NULL")
-
     # Drop migration log table
     op.execute("DROP TABLE IF EXISTS unified_contact_migration_log")

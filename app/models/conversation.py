@@ -10,6 +10,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.employee import Employee
+    from app.models.unified_ticket import UnifiedTicket
 
 
 class ConversationStatus(enum.Enum):
@@ -39,6 +40,13 @@ class Conversation(Base):
     # Customer link
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     chatwoot_contact_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+
+    # Link to UnifiedTicket (for dual-write sync)
+    unified_ticket_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_tickets.id"),
+        nullable=True,
+        index=True
+    )
 
     # Conversation details
     subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -83,6 +91,13 @@ class Conversation(Base):
     customer: Mapped[Optional[Customer]] = relationship(back_populates="conversations")
     messages: Mapped[List[Message]] = relationship(back_populates="conversation")
     employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])
+
+    # Link to UnifiedTicket (for dual-write sync)
+    unified_ticket: Mapped[Optional["UnifiedTicket"]] = relationship(
+        "UnifiedTicket",
+        foreign_keys=[unified_ticket_id],
+        backref="legacy_conversation"
+    )
 
     def __repr__(self) -> str:
         return f"<Conversation {self.chatwoot_id} - {self.status.value}>"

@@ -93,23 +93,20 @@ export function hasAuthToken(): boolean {
   return false;
 }
 
-// Check if we're in development mode - service token should only work in dev
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 function getAccessToken(): string {
   if (typeof window !== 'undefined') {
-    // Client-side: only use stored user token
+    // Client-side: first check for stored user token
     const token = localStorage.getItem('dotmac_access_token');
     if (token) return token;
 
-    // Fallback: allow NEXT_PUBLIC_SERVICE_TOKEN only in development
-    if (isDevelopment && process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
+    // Fallback: use service token if available
+    if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
       return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
     }
     return '';
   }
-  // Server-side fallback for SSR/exports - only in development
-  if (isDevelopment && process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
+  // Server-side fallback for SSR
+  if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
     return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
   }
   return '';

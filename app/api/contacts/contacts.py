@@ -1,6 +1,7 @@
 """
 Unified Contact CRUD Endpoints
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func, text
@@ -13,11 +14,18 @@ from app.models.unified_contact import (
     BillingType, LeadQualification
 )
 from app.auth import Require
+from app.feature_flags import feature_flags
+from app.services.legacy_customer_sync import LegacyCustomerSync
+from app.services.outbound_sync import OutboundSyncService
+from app.middleware.metrics import record_dual_write
+from app.middleware.metrics import record_dual_write
 from .schemas import (
     UnifiedContactCreate, UnifiedContactUpdate, UnifiedContactResponse,
     UnifiedContactSummary, UnifiedContactListResponse, PersonContactResponse,
     ContactTypeEnum, ContactCategoryEnum, ContactStatusEnum, LeadQualificationEnum
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -156,7 +164,7 @@ def _contact_to_response(contact: UnifiedContact) -> UnifiedContactResponse:
 # =============================================================================
 
 @router.get(
-    "",
+    "/",
     response_model=UnifiedContactListResponse,
     dependencies=[Depends(Require("contacts:read"))],
 )
@@ -262,11 +270,10 @@ async def list_contacts(
     contacts = query.offset(offset).limit(page_size).all()
 
     return UnifiedContactListResponse(
-        items=[_contact_to_summary(c) for c in contacts],
+        data=[_contact_to_summary(c) for c in contacts],
         total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size,
+        limit=page_size,
+        offset=offset,
     )
 
 
@@ -296,14 +303,14 @@ async def list_leads(
         query = query.filter(UnifiedContact.source == source)
 
     total = query.count()
-    contacts = query.order_by(UnifiedContact.lead_score.desc().nullslast(), UnifiedContact.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    offset = (page - 1) * page_size
+    contacts = query.order_by(UnifiedContact.lead_score.desc().nullslast(), UnifiedContact.created_at.desc()).offset(offset).limit(page_size).all()
 
     return UnifiedContactListResponse(
-        items=[_contact_to_summary(c) for c in contacts],
+        data=[_contact_to_summary(c) for c in contacts],
         total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size,
+        limit=page_size,
+        offset=offset,
     )
 
 
@@ -336,14 +343,14 @@ async def list_customers(
         query = query.filter(UnifiedContact.outstanding_balance > 0)
 
     total = query.count()
-    contacts = query.order_by(UnifiedContact.name).offset((page - 1) * page_size).limit(page_size).all()
+    offset = (page - 1) * page_size
+    contacts = query.order_by(UnifiedContact.name).offset(offset).limit(page_size).all()
 
     return UnifiedContactListResponse(
-        items=[_contact_to_summary(c) for c in contacts],
+        data=[_contact_to_summary(c) for c in contacts],
         total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size,
+        limit=page_size,
+        offset=offset,
     )
 
 
@@ -365,14 +372,14 @@ async def list_organizations(
         query = query.filter(UnifiedContact.contact_type == ContactType(contact_type.value))
 
     total = query.count()
-    contacts = query.order_by(UnifiedContact.name).offset((page - 1) * page_size).limit(page_size).all()
+    offset = (page - 1) * page_size
+    contacts = query.order_by(UnifiedContact.name).offset(offset).limit(page_size).all()
 
     return UnifiedContactListResponse(
-        items=[_contact_to_summary(c) for c in contacts],
+        data=[_contact_to_summary(c) for c in contacts],
         total=total,
-        page=page,
-        page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size,
+        limit=page_size,
+        offset=offset,
     )
 
 
@@ -432,7 +439,7 @@ async def get_contact_persons(contact_id: int, db: Session = Depends(get_db)):
 
 
 @router.post(
-    "",
+    "/",
     response_model=UnifiedContactResponse,
     status_code=201,
     dependencies=[Depends(Require("contacts:write"))],
@@ -526,6 +533,30 @@ async def create_contact(payload: UnifiedContactCreate, db: Session = Depends(ge
         ).update({"is_primary_contact": False})
 
     db.add(contact)
+    db.flush()  # Get ID before dual-write
+
+    # Dual-write to legacy Customer table if enabled
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        if contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+            try:
+                sync = LegacyCustomerSync(db)
+                sync.sync_to_customer(contact)
+                record_dual_write("create", True)
+                logger.info(f"Dual-write: synced contact {contact.id} to Customer table")
+            except Exception as e:
+                record_dual_write("create", False)
+                logger.error(f"Dual-write failed for contact {contact.id}: {e}")
+                # Continue despite dual-write failure - UnifiedContact is source of truth
+
+    # Outbound sync to external systems if enabled
+    if feature_flags.CONTACTS_OUTBOUND_SYNC_ENABLED:
+        try:
+            outbound = OutboundSyncService(db)
+            outbound.sync_contact_to_all(contact)
+            logger.info(f"Outbound sync: triggered for contact {contact.id}")
+        except Exception as e:
+            logger.error(f"Outbound sync failed for contact {contact.id}: {e}")
+
     db.commit()
     db.refresh(contact)
 
@@ -569,6 +600,28 @@ async def update_contact(contact_id: int, payload: UnifiedContactUpdate, db: Ses
         setattr(contact, key, value)
 
     contact.updated_at = datetime.utcnow()
+
+    # Dual-write to legacy Customer table if enabled
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        if contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+            try:
+                sync = LegacyCustomerSync(db)
+                sync.sync_to_customer(contact)
+                record_dual_write("update", True)
+                logger.info(f"Dual-write: synced contact {contact.id} update to Customer table")
+            except Exception as e:
+                record_dual_write("update", False)
+                logger.error(f"Dual-write update failed for contact {contact.id}: {e}")
+
+    # Outbound sync to external systems if enabled
+    if feature_flags.CONTACTS_OUTBOUND_SYNC_ENABLED:
+        try:
+            outbound = OutboundSyncService(db)
+            outbound.sync_contact_to_all(contact)
+            logger.info(f"Outbound sync: triggered for contact {contact.id} update")
+        except Exception as e:
+            logger.error(f"Outbound sync update failed for contact {contact.id}: {e}")
+
     db.commit()
     db.refresh(contact)
 
@@ -590,17 +643,46 @@ async def delete_contact(contact_id: int, hard: bool = False, db: Session = Depe
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
 
-    if hard:
+    # Honor soft-delete flag by forcing soft delete even if hard=True when enabled
+    soft_delete = not hard or feature_flags.SOFT_DELETE_ENABLED
+
+    if not soft_delete:
         # Hard delete - also delete child contacts
         db.query(UnifiedContact).filter(UnifiedContact.parent_id == contact_id).delete()
         db.delete(contact)
+
+        # Dual-write: remove/deactivate legacy customer if present
+        if feature_flags.CONTACTS_DUAL_WRITE_ENABLED and contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+            try:
+                sync = LegacyCustomerSync(db)
+                legacy = sync.sync_to_customer(contact)
+                record_dual_write("delete", True)
+                if legacy:
+                    db.delete(legacy)
+                    logger.info(f"Dual-write: hard-deleted legacy customer for contact {contact.id}")
+            except Exception as e:
+                record_dual_write("delete", False)
+                logger.error(f"Dual-write hard-delete failed for contact {contact.id}: {e}")
+
         db.commit()
         return {"success": True, "message": "Contact permanently deleted"}
-    else:
-        # Soft delete
-        contact.status = ContactStatus.INACTIVE
-        db.commit()
-        return {"success": True, "message": "Contact deactivated"}
+
+    # Soft delete path
+    contact.status = ContactStatus.INACTIVE
+
+    # Dual-write: also soft-delete in Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED and contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+        try:
+            sync = LegacyCustomerSync(db)
+            sync.sync_to_customer(contact)  # Will set status to INACTIVE
+            record_dual_write("status_change", True)
+            logger.info(f"Dual-write: soft-deleted contact {contact.id} in Customer table")
+        except Exception as e:
+            record_dual_write("status_change", False)
+            logger.error(f"Dual-write soft-delete failed for contact {contact.id}: {e}")
+
+    db.commit()
+    return {"success": True, "message": "Contact deactivated"}
 
 
 # =============================================================================

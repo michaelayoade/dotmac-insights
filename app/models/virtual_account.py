@@ -17,6 +17,7 @@ from sqlalchemy import (
     Enum as SAEnum
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.utils.datetime_utils import utc_now
 
 from app.database import Base
 from app.models.gateway_transaction import GatewayProvider
@@ -128,13 +129,13 @@ class VirtualAccount(Base):
         """Check if account is active."""
         if self.status != VirtualAccountStatus.ACTIVE:
             return False
-        if self.expires_at and datetime.utcnow() > self.expires_at:
+        if self.expires_at and utc_now() > self.expires_at:
             return False
         return True
 
     @property
     def is_expired(self) -> bool:
         """Check if account has expired."""
-        if self.expires_at and datetime.utcnow() > self.expires_at:
+        if self.expires_at and utc_now() > self.expires_at:
             return True
         return False

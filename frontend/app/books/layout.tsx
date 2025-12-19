@@ -23,7 +23,9 @@ import {
   Activity,
   BadgePercent,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useEntitlements } from '@/hooks/useApi';
 
 // Books & Accounting Flow:
 // 1. CAPTURE: Record transactions (invoices, bills, payments)
@@ -31,7 +33,7 @@ import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from
 // 3. CLOSE: Period close, tax filing, compliance
 // 4. REPORT: Generate financial statements and reports
 
-const sections: NavSection[] = [
+const baseSections: NavSection[] = [
   {
     key: 'overview',
     label: 'Dashboard',
@@ -172,6 +174,22 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function BooksLayout({ children }: { children: React.ReactNode }) {
+  const { data: entitlements } = useEntitlements();
+  const nigeriaEnabled = entitlements?.feature_flags?.NIGERIA_COMPLIANCE_ENABLED ?? false;
+  const sections = useMemo(() => {
+    if (nigeriaEnabled) {
+      return baseSections.map((section) => {
+        if (section.key !== 'tax') return section;
+        return {
+          ...section,
+          label: 'Compliance (Nigeria)',
+          description: 'Nigeria VAT, WHT, PAYE, CIT, e-invoice',
+        };
+      });
+    }
+    return baseSections.filter((section) => section.key !== 'tax');
+  }, [nigeriaEnabled]);
+
   return (
     <ModuleLayout
       moduleName="Dotmac"

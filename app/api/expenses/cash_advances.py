@@ -16,6 +16,7 @@ from app.api.expenses.schemas import (
 from app.auth import get_current_principal, Principal
 from app.database import get_db
 from app.models.expense_management import CashAdvance, CashAdvanceStatus
+from app.services.errors import ValidationError
 from app.services.cash_advance_service import CashAdvanceService
 
 router = APIRouter()
@@ -73,7 +74,10 @@ async def submit_advance(
         raise HTTPException(status_code=404, detail="Cash advance not found")
 
     service = CashAdvanceService(db)
-    advance = service.submit(advance, user_id=principal.id, company_code=company_code)
+    try:
+        advance = service.submit(advance, user_id=principal.id, company_code=company_code)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(advance)
     return advance
@@ -90,7 +94,10 @@ async def approve_advance(
         raise HTTPException(status_code=404, detail="Cash advance not found")
 
     service = CashAdvanceService(db)
-    advance = service.approve(advance, user_id=principal.id)
+    try:
+        advance = service.approve(advance, user_id=principal.id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(advance)
     return advance
@@ -111,7 +118,10 @@ async def reject_advance(
         raise HTTPException(status_code=404, detail="Cash advance not found")
 
     service = CashAdvanceService(db)
-    advance = service.reject(advance, user_id=principal.id, reason=reason)
+    try:
+        advance = service.reject(advance, user_id=principal.id, reason=reason)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(advance)
     return advance
@@ -129,14 +139,17 @@ async def disburse_advance(
         raise HTTPException(status_code=404, detail="Cash advance not found")
 
     service = CashAdvanceService(db)
-    advance = service.disburse(
-        advance,
-        amount=payload.amount,
-        mode_of_payment=payload.mode_of_payment,
-        payment_reference=payload.payment_reference,
-        bank_account_id=payload.bank_account_id,
-        user_id=principal.id,
-    )
+    try:
+        advance = service.disburse(
+            advance,
+            amount=payload.amount,
+            mode_of_payment=payload.mode_of_payment,
+            payment_reference=payload.payment_reference,
+            bank_account_id=payload.bank_account_id,
+            user_id=principal.id,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(advance)
     return advance
@@ -154,11 +167,14 @@ async def settle_advance(
         raise HTTPException(status_code=404, detail="Cash advance not found")
 
     service = CashAdvanceService(db)
-    advance = service.settle(
-        advance,
-        amount=payload.amount,
-        refund_amount=payload.refund_amount or Decimal("0"),
-    )
+    try:
+        advance = service.settle(
+            advance,
+            amount=payload.amount,
+            refund_amount=payload.refund_amount or Decimal("0"),
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(advance)
     return advance

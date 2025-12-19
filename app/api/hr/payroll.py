@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
+from app.feature_flags import feature_flags
 from app.models.auth import User
 from app.services.audit_logger import AuditLogger, serialize_for_audit
 from app.models.hr_payroll import (
@@ -1558,18 +1559,43 @@ def generate_payroll_slips(
                 delta = today - employee.date_of_joining.date() if hasattr(employee.date_of_joining, 'date') else today - employee.date_of_joining
                 months_of_service = delta.days // 30
 
-        # Calculate statutory deductions using Nigerian tax module
-        # Respects employment type eligibility (e.g., INTERN, NYSC exempt from some deductions)
-        statutory = calculate_slip_deductions(
-            basic_salary=basic_salary,
-            housing_allowance=housing_allowance,
-            transport_allowance=transport_allowance,
-            other_allowances=other_allowances,
-            employment_type=employment_type,
-            months_of_service=months_of_service,
-            db=db,
-            payroll_date=entry.posting_date,
-        )
+        if feature_flags.NIGERIA_COMPLIANCE_ENABLED:
+            # Calculate statutory deductions using Nigerian tax module
+            # Respects employment type eligibility (e.g., INTERN, NYSC exempt from some deductions)
+            statutory = calculate_slip_deductions(
+                basic_salary=basic_salary,
+                housing_allowance=housing_allowance,
+                transport_allowance=transport_allowance,
+                other_allowances=other_allowances,
+                employment_type=employment_type,
+                months_of_service=months_of_service,
+                db=db,
+                payroll_date=entry.posting_date,
+            )
+        else:
+            statutory = {
+                "paye": Decimal("0"),
+                "pension_employee": Decimal("0"),
+                "pension_employer": Decimal("0"),
+                "nhf": Decimal("0"),
+                "nhis_employee": Decimal("0"),
+                "nhis_employer": Decimal("0"),
+                "nsitf_employer": Decimal("0"),
+                "itf_provision": Decimal("0"),
+                "total_employee_deductions": Decimal("0"),
+                "total_employer_contributions": Decimal("0"),
+                "net_pay": gross_pay,
+                "gross_monthly": gross_pay,
+                "is_paye_exempt": True,
+                "eligibility": {
+                    "paye": False,
+                    "pension": False,
+                    "nhf": False,
+                    "nhis": False,
+                    "nsitf": False,
+                    "itf": False,
+                },
+            }
 
         # Sum non-statutory deductions from structure
         for deduction in structure.deductions:
@@ -1861,7 +1887,7 @@ def void_salary_slip(
     "/payroll-entries/{entry_id}/payouts",
     dependencies=[Depends(Require("hr:write"))],
 )
-def initiate_payroll_payouts(
+async def initiate_payroll_payouts(
     entry_id: int,
     payload: PayrollPayoutRequest,
     db: Session = Depends(get_db),

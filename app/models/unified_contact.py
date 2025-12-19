@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, date
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -339,9 +340,16 @@ class UnifiedContact(Base):
     # ==========================================================================
 
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    # Outbound sync tracking (for idempotency)
+    splynx_sync_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    erpnext_sync_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    last_synced_to_splynx: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    last_synced_to_erpnext: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     created_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # ==========================================================================
     # RELATIONSHIPS
@@ -425,18 +433,18 @@ class UnifiedContact(Base):
         """Days since becoming customer."""
         if not self.conversion_date:
             return 0
-        end_date = self.cancellation_date or datetime.utcnow()
+        end_date = self.cancellation_date or utc_now()
         return (end_date - self.conversion_date).days
 
     def convert_to_customer(self) -> None:
         """Convert lead/prospect to customer."""
         self.contact_type = ContactType.CUSTOMER
-        self.conversion_date = datetime.utcnow()
+        self.conversion_date = utc_now()
 
     def mark_churned(self, reason: Optional[str] = None) -> None:
         """Mark customer as churned."""
         self.contact_type = ContactType.CHURNED
-        self.cancellation_date = datetime.utcnow()
+        self.cancellation_date = utc_now()
         self.churn_reason = reason
 
     def qualify_lead(self, qualification: LeadQualification) -> None:
@@ -444,4 +452,4 @@ class UnifiedContact(Base):
         self.lead_qualification = qualification
         if qualification == LeadQualification.QUALIFIED:
             self.contact_type = ContactType.PROSPECT
-            self.qualified_date = datetime.utcnow()
+            self.qualified_date = utc_now()

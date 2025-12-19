@@ -5000,6 +5000,13 @@ export interface PlatformConfig {
   version: string | null;
 }
 
+export interface EntitlementsResponse {
+  license_status: string;
+  in_grace_period: boolean;
+  entitlements?: Record<string, any> | null;
+  feature_flags: Record<string, boolean>;
+}
+
 async function fetchPlatformApi<T>(endpoint: string): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
   const response = await fetch(`/api/platform${endpoint}`, {
@@ -5008,6 +5015,18 @@ async function fetchPlatformApi<T>(endpoint: string): Promise<T> {
   });
   if (!response.ok) {
     throw new Error(`Platform API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function fetchEntitlements<T>(): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
+  const response = await fetch('/api/entitlements', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: token ? 'omit' : 'include',
+  });
+  if (!response.ok) {
+    throw new Error(`Entitlements API error: ${response.status}`);
   }
   return response.json();
 }
@@ -5029,6 +5048,10 @@ export function usePlatformFeatureFlags(config?: SWRConfiguration) {
 
 export function usePlatformConfig(config?: SWRConfiguration) {
   return useSWR<PlatformConfig>('platform-config', () => fetchPlatformApi('/config'), config);
+}
+
+export function useEntitlements(config?: SWRConfiguration) {
+  return useSWR<EntitlementsResponse>('entitlements', () => fetchEntitlements(), config);
 }
 
 // Non-hook export for triggering sync

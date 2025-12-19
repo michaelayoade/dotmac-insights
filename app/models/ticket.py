@@ -3,16 +3,18 @@ from __future__ import annotations
 from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.employee import Employee
     from app.models.project import Project
     from app.models.expense import Expense
+    from app.models.unified_ticket import UnifiedTicket
 
 
 class TicketStatus(enum.Enum):
@@ -36,7 +38,7 @@ class TicketSource(enum.Enum):
     CHATWOOT = "chatwoot"
 
 
-class Ticket(Base):
+class Ticket(SoftDeleteMixin, Base):
     """HD Tickets (Help Desk) from ERPNext and other sources."""
 
     __tablename__ = "tickets"
@@ -54,6 +56,13 @@ class Ticket(Base):
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
+
+    # Link to UnifiedTicket (for dual-write sync)
+    unified_ticket_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("unified_tickets.id"),
+        nullable=True,
+        index=True
+    )
 
     # ERPNext references (for linking)
     erpnext_customer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -106,8 +115,8 @@ class Ticket(Base):
     # Dates
     opening_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
     resolution_date: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Sync metadata / audit
     origin_system: Mapped[str] = mapped_column(String(50), default="external")
@@ -116,9 +125,7 @@ class Ticket(Base):
     write_back_attempted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
-    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(default=False)
+    # is_deleted, deleted_at, deleted_by_id inherited from SoftDeleteMixin
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Relationships
@@ -130,6 +137,13 @@ class Ticket(Base):
         foreign_keys=[assigned_employee_id]
     )
     project: Mapped[Optional[Project]] = relationship(back_populates="tickets")
+
+    # Link to UnifiedTicket (for dual-write sync)
+    unified_ticket: Mapped[Optional["UnifiedTicket"]] = relationship(
+        "UnifiedTicket",
+        foreign_keys=[unified_ticket_id],
+        backref="legacy_ticket"
+    )
 
     # Child tables
     comments: Mapped[List["HDTicketComment"]] = relationship(
@@ -173,7 +187,7 @@ class Ticket(Base):
     def is_overdue(self) -> bool:
         """Check if ticket is overdue based on resolution_by SLA."""
         if self.resolution_by and self.status not in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
-            return datetime.utcnow() > self.resolution_by
+            return utc_now() > self.resolution_by
         return False
 
     @property
@@ -217,7 +231,7 @@ class HDTicketComment(Base):
 
     # Timestamps
     comment_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     # Row ordering
     idx: Mapped[int] = mapped_column(default=0)
@@ -260,7 +274,7 @@ class HDTicketActivity(Base):
 
     # Timestamps
     activity_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     # Row ordering
     idx: Mapped[int] = mapped_column(default=0)
@@ -315,7 +329,7 @@ class TicketCommunication(Base):
 
     # Timestamps
     communication_date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -357,7 +371,7 @@ class HDTicketDependency(Base):
     idx: Mapped[int] = mapped_column(default=0)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     # Relationships
     ticket: Mapped["Ticket"] = relationship(

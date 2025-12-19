@@ -6,11 +6,15 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 from app.database import Base
 from app.models.sync_log import SyncSource
+from app.utils.datetime_utils import utc_now
 
 
 def utcnow() -> datetime:
-    """Get current UTC time as timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    """Get current UTC time as timezone-aware datetime.
+
+    Deprecated: Use utc_now from app.utils.datetime_utils instead.
+    """
+    return utc_now()
 
 
 def parse_datetime(value: Union[str, datetime, int, float, None]) -> Optional[datetime]:
@@ -158,12 +162,12 @@ class FailedSyncRecord(Base):
     def mark_retry(self):
         """Mark that a retry was attempted."""
         self.retry_count += 1
-        self.last_retry_at = datetime.utcnow()
+        self.last_retry_at = utc_now()
 
     def mark_resolved(self, notes: Optional[str] = None):
         """Mark the record as resolved."""
         self.is_resolved = True
-        self.resolved_at = datetime.utcnow()
+        self.resolved_at = utc_now()
         self.resolution_notes = notes
 
     @property

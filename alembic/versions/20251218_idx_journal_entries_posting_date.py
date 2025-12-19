@@ -5,7 +5,7 @@ Revises: 20251218_add_domain_rbac_scopes
 Create Date: 2025-12-18
 
 Adds index on journal_entries.posting_date for date-range queries.
-Uses CREATE INDEX CONCURRENTLY to avoid blocking writes.
+Uses CREATE INDEX CONCURRENTLY to avoid table locks.
 """
 from typing import Sequence, Union
 
@@ -19,13 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create index CONCURRENTLY (non-blocking)."""
-    # Exit transaction for CONCURRENTLY
-    op.execute("COMMIT")
-    op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_journal_entries_posting_date
-        ON journal_entries (posting_date)
-    """)
+    """Create index CONCURRENTLY to avoid table locks."""
+    # Must run outside transaction for CONCURRENTLY
+    with op.get_context().autocommit_block():
+        op.execute("""
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_journal_entries_posting_date
+            ON journal_entries (posting_date)
+        """)
 
 
 def downgrade() -> None:

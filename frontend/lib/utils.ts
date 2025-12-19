@@ -80,26 +80,56 @@ export function formatRelativeTime(dateString: string | null | undefined): strin
   return formatDate(dateString);
 }
 
+/**
+ * Maps status strings to variant names.
+ * Uses the standard vocabulary: default | success | warning | danger | info
+ *
+ * @see lib/design-tokens.ts for the canonical STATUS_VARIANT_MAP
+ */
 export function getStatusColor(status: string): string {
   const statusMap: Record<string, string> = {
+    // Success states
     active: 'success',
-    inactive: 'warning',
-    blocked: 'danger',
-    new: 'info',
-    suspended: 'warning',
-    cancelled: 'danger',
-    open: 'warning',
-    pending: 'warning',
-    resolved: 'success',
-    paid: 'success',
-    unpaid: 'danger',
-    overdue: 'danger',
-    partially_paid: 'warning',
     completed: 'success',
+    paid: 'success',
+    approved: 'success',
+    online: 'success',
+    connected: 'success',
+    healthy: 'success',
+    resolved: 'success',
+
+    // Warning states
+    pending: 'warning',
+    processing: 'warning',
+    partial: 'warning',
+    partially_paid: 'warning',
+    review: 'warning',
+    expiring: 'warning',
+    degraded: 'warning',
+    suspended: 'warning',
+    open: 'warning',
+    inactive: 'warning',
+
+    // Danger states
     failed: 'danger',
+    error: 'danger',
+    cancelled: 'danger',
+    overdue: 'danger',
+    offline: 'danger',
+    critical: 'danger',
+    rejected: 'danger',
+    blocked: 'danger',
+    unpaid: 'danger',
+
+    // Info states
+    draft: 'info',
+    new: 'info',
+    scheduled: 'info',
     started: 'info',
   };
-  return statusMap[status.toLowerCase()] || 'info';
+
+  const normalized = status.toLowerCase().replace(/[_-]/g, '');
+  return statusMap[status.toLowerCase()] ?? statusMap[normalized] ?? 'default';
 }
 
 export function getInitials(name: string): string {

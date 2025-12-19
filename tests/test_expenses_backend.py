@@ -1,36 +1,5 @@
-import os
 import pytest
-from fastapi.testclient import TestClient
-
-# Use SQLite for tests
-os.environ.setdefault("TEST_DATABASE_URL", "sqlite:///./test.db")
-
-from app.main import app as fastapi_app
-from app.auth import get_current_principal, Principal
 import app.models  # noqa: F401
-
-# Permit all scopes during tests
-mock_principal = Principal(
-    type="user",
-    id=1,
-    external_id="test_user",
-    email="test@example.com",
-    name="Test User",
-    is_superuser=True,
-    scopes={"*"},
-)
-
-
-async def override_get_current_principal():
-    return mock_principal
-
-
-@pytest.fixture
-def client():
-    fastapi_app.dependency_overrides[get_current_principal] = override_get_current_principal
-    with TestClient(fastapi_app) as c:
-        yield c
-    fastapi_app.dependency_overrides = {}
 
 
 # ---------------------------------------------------------------------------

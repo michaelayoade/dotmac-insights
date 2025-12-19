@@ -289,9 +289,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               </kbd>
               <button
                 onClick={onClose}
-                className="p-1 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                aria-label="Close command palette"
+                className="p-1 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
           </div>

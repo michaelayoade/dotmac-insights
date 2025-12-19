@@ -1,38 +1,12 @@
-import os
 import pytest
-from fastapi.testclient import TestClient
-
-# Force SQLite for tests
-os.environ.setdefault("TEST_DATABASE_URL", "sqlite:///./test.db")
-
-from app.main import app as fastapi_app
-from app.auth import get_current_principal, Principal
 import app.models  # noqa: F401
 
-# Mock principal with full access
-mock_principal = Principal(
-    type="user",
-    id=1,
-    external_id="test_user",
-    email="test@example.com",
-    name="Test User",
-    is_superuser=True,
-    scopes={"*"},
-)
 
-
-async def override_get_current_principal():
-    return mock_principal
-
-
-@pytest.fixture
-def client():
-    fastapi_app.dependency_overrides[get_current_principal] = override_get_current_principal
-    with TestClient(fastapi_app) as c:
-        # Seed default support settings if missing to avoid 404s
-        c.post("/api/support/settings/seed-defaults")
-        yield c
-    fastapi_app.dependency_overrides = {}
+@pytest.fixture(autouse=True)
+def seed_support_defaults(client):
+    """Ensure default support settings exist for smoke tests."""
+    client.post("/api/support/settings/seed-defaults")
+    yield
 
 
 # ---------------------------------------------------------------------------

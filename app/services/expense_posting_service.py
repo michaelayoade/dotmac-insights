@@ -5,13 +5,12 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import List
 
-from fastapi import HTTPException
-
 from sqlalchemy.orm import Session
 
 from app.models.accounting import JournalEntry, JournalEntryType, GLEntry
 from app.models.expense_management import ExpenseClaim, ExpenseClaimLine, ExpenseClaimStatus, CashAdvanceStatus, CashAdvance
 from app.services.document_posting import DocumentPostingService, PostingError
+from app.services.errors import ValidationError
 
 
 class ExpensePostingService:
@@ -29,9 +28,9 @@ class ExpensePostingService:
     ) -> JournalEntry:
         """Post an expense claim to the GL."""
         if claim.journal_entry_id:
-            raise HTTPException(status_code=400, detail="Claim already posted")
+            raise ValidationError("Claim already posted")
         if claim.status == ExpenseClaimStatus.REVERSED:
-            raise HTTPException(status_code=400, detail="Cannot post a reversed claim")
+            raise ValidationError("Cannot post a reversed claim")
 
         posting_dt = posting_date or claim.posting_date or claim.claim_date
         posting_ts = datetime.combine(posting_dt, datetime.min.time())
@@ -77,7 +76,7 @@ class ExpensePostingService:
                 total_credit += base_tax
 
         if total_credit <= 0:
-            raise HTTPException(status_code=400, detail="Claim has no amount to post")
+            raise ValidationError("Claim has no amount to post")
 
         payable_account = claim.payable_account or "Employee Payable - Default"
         payable_amount = total_credit
@@ -140,7 +139,7 @@ class ExpensePostingService:
     def reverse_claim(self, claim: ExpenseClaim, reason: str, user_id: int) -> JournalEntry:
         """Reverse a posted claim by creating an opposite JE."""
         if not claim.journal_entry_id:
-            raise HTTPException(status_code=400, detail="Claim is not posted")
+            raise ValidationError("Claim is not posted")
 
         reversal = self.posting.reverse_posting(
             journal_entry_id=claim.journal_entry_id,
@@ -215,7 +214,7 @@ class ExpensePostingService:
     ) -> JournalEntry:
         """Record refund of unused advance: Dr Bank, Cr Employee Advances."""
         if refund_amount <= 0:
-            raise HTTPException(status_code=400, detail="Refund amount must be positive")
+            raise ValidationError("Refund amount must be positive")
 
         posting_dt = posting_date or advance.request_date
         posting_ts = datetime.combine(posting_dt, datetime.min.time())

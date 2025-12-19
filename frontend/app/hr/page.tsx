@@ -56,17 +56,25 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-// Warm People color palette
+// HR color palette using CSS variables for theme switching
 const HR_COLORS = {
-  primary: '#f59e0b', // Amber
-  secondary: '#8b5cf6', // Violet
-  accent: '#ec4899', // Pink
-  success: '#10b981', // Emerald
-  warning: '#f97316', // Orange
-  info: '#06b6d4', // Cyan
+  primary: 'var(--color-amber-warn)',
+  secondary: 'var(--color-purple-accent)',
+  accent: 'var(--color-coral-alert)',
+  success: 'var(--color-teal-electric)',
+  warning: 'var(--color-amber-warn)',
+  info: 'var(--color-cyan-accent)',
 };
 
-const CHART_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4'];
+// Chart colors from centralized design tokens
+const CHART_COLORS = [
+  'var(--color-amber-warn)',
+  'var(--color-purple-accent)',
+  'var(--color-coral-alert)',
+  'var(--color-teal-electric)',
+  'var(--color-cyan-accent)',
+  'var(--color-blue-info)',
+];
 
 function MetricCard({
   label,

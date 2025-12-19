@@ -112,7 +112,7 @@ export function EmptyState({
           action.href ? (
             <Link
               href={action.href}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -120,7 +120,7 @@ export function EmptyState({
           ) : (
             <button
               onClick={action.onClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -160,7 +160,7 @@ export function ErrorState({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             <RefreshCw className="w-4 h-4" />
             Retry
@@ -365,7 +365,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200',
+        'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric focus-visible:ring-offset-2 focus-visible:ring-offset-slate-deep',
         variants[variant],
         sizes[size],
         (disabled || loading) && 'opacity-60 cursor-not-allowed',
@@ -516,7 +516,7 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
             key={tab.key}
             onClick={() => onChange(tab.key)}
             className={cn(
-              'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+              'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric',
               isActive
                 ? 'bg-slate-card text-white shadow-sm'
                 : 'text-slate-muted hover:text-white'

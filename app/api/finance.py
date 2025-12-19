@@ -142,7 +142,7 @@ async def get_finance_dashboard(
     # Collections last 30 days
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     collections_30d_query = db.query(func.sum(Payment.amount)).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= thirty_days_ago
     )
     invoiced_30d_query = db.query(func.sum(Invoice.total_amount)).filter(
@@ -642,7 +642,7 @@ async def get_revenue_trend(
         func.min(Payment.payment_date).label("period_start"),
         func.max(Payment.payment_date).label("period_end"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -698,7 +698,7 @@ async def get_collections_analytics(
         func.count(Payment.id).label("count"),
         func.sum(Payment.amount).label("total"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -726,7 +726,7 @@ async def get_collections_analytics(
         )).label("late"),
         func.count(Payment.id).label("total"),
     ).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Invoice.due_date.isnot(None),
         Payment.payment_date.isnot(None),
         Payment.payment_date >= start_dt,
@@ -742,7 +742,7 @@ async def get_collections_analytics(
         func.date(Payment.payment_date).label("date"),
         func.sum(Payment.amount).label("total"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -898,7 +898,7 @@ async def get_payment_behavior_insights(
         Payment.customer_id,
         func.count(Payment.id).label("total_payments"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.customer_id.isnot(None),
     )
     if currency:
@@ -920,7 +920,7 @@ async def get_payment_behavior_insights(
     late_payments_query = db.query(
         func.avg(func.date_part("day", Payment.payment_date - Invoice.due_date)).label("avg_delay")
     ).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date > Invoice.due_date,
     )
     if currency:
@@ -929,11 +929,11 @@ async def get_payment_behavior_insights(
 
     # Late payments percentage
     late_count_query = db.query(func.count(Payment.id)).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date > Invoice.due_date,
     )
     total_payments_query = db.query(func.count(Payment.id)).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date.isnot(None),
     )
     if currency:

@@ -5,10 +5,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.expense_management import CashAdvance, CashAdvanceStatus
+from app.services.errors import ValidationError
 from app.services.approval_engine import (
     ApprovalEngine,
     WorkflowNotFoundError,
@@ -55,7 +55,7 @@ class CashAdvanceService:
 
     def submit(self, advance: CashAdvance, user_id: int, company_code: Optional[str]) -> CashAdvance:
         if advance.status not in {CashAdvanceStatus.DRAFT, CashAdvanceStatus.RECALLED if hasattr(CashAdvanceStatus, "RECALLED") else CashAdvanceStatus.DRAFT}:
-            raise HTTPException(status_code=400, detail="Only draft advances can be submitted")
+            raise ValidationError("Only draft advances can be submitted")
 
         advance.status = CashAdvanceStatus.PENDING_APPROVAL
         advance.docstatus = 1
@@ -86,7 +86,7 @@ class CashAdvanceService:
         try:
             approval = engine.approve_document("cash_advance", advance.id, user_id=user_id)
         except (ApprovalNotFoundError, UnauthorizedApprovalError, InvalidStateError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise ValidationError(str(exc)) from exc
 
         self._sync_status_from_approval(advance, approval)
         return advance
@@ -96,7 +96,7 @@ class CashAdvanceService:
         try:
             approval = engine.reject_document("cash_advance", advance.id, user_id=user_id, reason=reason)
         except (ApprovalNotFoundError, UnauthorizedApprovalError, InvalidStateError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise ValidationError(str(exc)) from exc
 
         advance.rejection_reason = reason
         self._sync_status_from_approval(advance, approval)
@@ -104,7 +104,7 @@ class CashAdvanceService:
 
     def disburse(self, advance: CashAdvance, amount: Decimal, mode_of_payment: Optional[str], payment_reference: Optional[str], bank_account_id: Optional[int], user_id: int) -> CashAdvance:
         if advance.status not in {CashAdvanceStatus.APPROVED, CashAdvanceStatus.PENDING_APPROVAL}:
-            raise HTTPException(status_code=400, detail="Advance must be approved before disbursement")
+            raise ValidationError("Advance must be approved before disbursement")
 
         advance.disbursed_amount += amount
         advance.disbursed_at = datetime.utcnow()
@@ -122,7 +122,7 @@ class CashAdvanceService:
 
     def settle(self, advance: CashAdvance, amount: Decimal, refund_amount: Decimal) -> CashAdvance:
         if advance.status not in {CashAdvanceStatus.DISBURSED, CashAdvanceStatus.PARTIALLY_SETTLED, CashAdvanceStatus.APPROVED}:
-            raise HTTPException(status_code=400, detail="Advance must be disbursed before settlement")
+            raise ValidationError("Advance must be disbursed before settlement")
 
         advance.settled_amount += amount
         advance.refund_amount = (advance.refund_amount or Decimal("0")) + refund_amount

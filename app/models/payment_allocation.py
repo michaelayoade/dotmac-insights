@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from app.database import Base
+from app.utils.datetime_utils import utc_now
 from app.models.supplier_payment import SupplierPayment
 
 if TYPE_CHECKING:
@@ -44,10 +45,10 @@ class PaymentAllocation(Base):
 
     # Payment links (one or the other, not both)
     payment_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("payments.id"), nullable=True, index=True
+        ForeignKey("payments.id", ondelete="CASCADE"), nullable=True, index=True
     )
     supplier_payment_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("supplier_payments.id"), nullable=True, index=True
+        ForeignKey("supplier_payments.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
     # Document being allocated to
@@ -77,8 +78,8 @@ class PaymentAllocation(Base):
     write_off_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Audit
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Relationships

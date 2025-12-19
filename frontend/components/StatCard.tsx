@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus, LucideIcon } from 'lucide-react';
 
+/**
+ * Variant type matches the standard vocabulary from lib/design-tokens.ts
+ */
+type StatCardVariant = 'default' | 'success' | 'warning' | 'danger' | 'info';
+
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -13,7 +18,7 @@ interface StatCardProps {
     value: number;
     label?: string;
   };
-  variant?: 'default' | 'success' | 'warning' | 'danger';
+  variant?: StatCardVariant;
   loading?: boolean;
   className?: string;
   animateValue?: boolean;
@@ -58,7 +63,8 @@ export function StatCard({
   className,
   animateValue = true,
 }: StatCardProps) {
-  const variantStyles = {
+  // Variant styles matching design-tokens.ts vocabulary
+  const variantStyles: Record<StatCardVariant, { iconBg: string; iconColor: string; valueBorder: string }> = {
     default: {
       iconBg: 'bg-slate-elevated',
       iconColor: 'text-teal-electric',
@@ -78,6 +84,11 @@ export function StatCard({
       iconBg: 'bg-coral-alert/10',
       iconColor: 'text-coral-alert',
       valueBorder: 'border-coral-alert/30',
+    },
+    info: {
+      iconBg: 'bg-blue-info/10',
+      iconColor: 'text-blue-info',
+      valueBorder: 'border-blue-info/30',
     },
   };
 
@@ -170,13 +181,14 @@ export function StatInline({
 }: {
   label: string;
   value: string | number;
-  variant?: 'default' | 'success' | 'warning' | 'danger';
+  variant?: StatCardVariant;
 }) {
-  const colors = {
+  const colors: Record<StatCardVariant, string> = {
     default: 'text-white',
     success: 'text-teal-electric',
     warning: 'text-amber-warn',
     danger: 'text-coral-alert',
+    info: 'text-blue-info',
   };
 
   return (

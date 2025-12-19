@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import List, Optional, Literal
+from contextlib import contextmanager
 
 from sqlalchemy.orm import Session
 
@@ -63,6 +64,74 @@ class PaymentAllocationService:
     def __init__(self, db: Session):
         self.db = db
 
+    @contextmanager
+    def _transaction(self):
+        if self.db.in_transaction():
+            with self.db.begin_nested():
+                yield
+        else:
+            with self.db.begin():
+                yield
+
+    def _get_payment_for_update(self, payment_id: int, is_supplier_payment: bool):
+        if is_supplier_payment:
+            return self.db.query(SupplierPayment).filter(
+                SupplierPayment.id == payment_id
+            ).with_for_update().first()
+        return self.db.query(Payment).filter(
+            Payment.id == payment_id
+        ).with_for_update().first()
+
+    def _get_document_for_update(
+        self,
+        doc_type: str,
+        doc_id: int,
+    ):
+        if doc_type == "invoice":
+            return self.db.query(Invoice).filter(Invoice.id == doc_id).with_for_update().first()
+        if doc_type == "bill":
+            return self.db.query(PurchaseInvoice).filter(PurchaseInvoice.id == doc_id).with_for_update().first()
+        if doc_type == "credit_note":
+            return self.db.query(CreditNote).filter(CreditNote.id == doc_id).with_for_update().first()
+        if doc_type == "debit_note":
+            return self.db.query(DebitNote).filter(DebitNote.id == doc_id).with_for_update().first()
+        return None
+
+    def _get_outstanding_from_doc(self, doc_type: str, doc) -> Optional[Decimal]:
+        if doc_type == "invoice":
+            return doc.balance if doc.balance is not None else (doc.total_amount - doc.amount_paid)
+        if doc_type == "bill":
+            return doc.outstanding_amount or (doc.grand_total - doc.paid_amount)
+        if doc_type == "credit_note":
+            return doc.amount
+        if doc_type == "debit_note":
+            return doc.amount_remaining or doc.total_amount
+        return None
+
+    def _apply_document_settlement(
+        self,
+        doc_type: str,
+        doc,
+        amount_paid: Decimal,
+    ) -> None:
+        if doc_type == "invoice":
+            doc.amount_paid = (doc.amount_paid or Decimal("0")) + amount_paid
+            doc.balance = doc.total_amount - doc.amount_paid
+            if doc.balance <= 0:
+                doc.status = "paid"
+            elif doc.amount_paid > 0:
+                doc.status = "partially_paid"
+        elif doc_type == "bill":
+            doc.paid_amount = (doc.paid_amount or Decimal("0")) + amount_paid
+            doc.outstanding_amount = doc.grand_total - doc.paid_amount
+            if doc.outstanding_amount <= 0:
+                doc.status = "paid"
+        elif doc_type == "debit_note":
+            doc.amount_applied = (doc.amount_applied or Decimal("0")) + amount_paid
+            doc.amount_remaining = doc.total_amount - doc.amount_applied
+            if doc.amount_remaining <= 0:
+                doc.status = "applied"
+
     def allocate_payment(
         self,
         payment_id: int,
@@ -82,103 +151,95 @@ class PaymentAllocationService:
         Returns:
             List of created PaymentAllocation records
         """
-        # Get payment
-        if is_supplier_payment:
-            payment = self.db.query(SupplierPayment).filter(
-                SupplierPayment.id == payment_id
-            ).first()
-        else:
-            payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+        with self._transaction():
+            payment = self._get_payment_for_update(payment_id, is_supplier_payment)
+            if not payment:
+                raise PaymentAllocationError("Payment not found")
 
-        if not payment:
-            raise PaymentAllocationError("Payment not found")
+            available = getattr(payment, "unallocated_amount", Decimal("0"))
+            if available is None:
+                available = payment.amount if hasattr(payment, "amount") else payment.paid_amount
 
-        # Check available amount
-        available = getattr(payment, "unallocated_amount", Decimal("0"))
-        if available is None:
-            available = payment.amount if hasattr(payment, "amount") else payment.paid_amount
-
-        total_allocating = sum(a.allocated_amount for a in allocations)
-        if total_allocating > available:
-            raise PaymentAllocationError(
-                f"Allocation total ({total_allocating}) exceeds available amount ({available})"
-            )
-
-        created_allocations = []
-
-        for alloc_req in allocations:
-            # Map document type to enum
-            try:
-                alloc_type = AllocationType(alloc_req.document_type)
-            except ValueError:
-                raise PaymentAllocationError(f"Invalid document type: {alloc_req.document_type}")
-
-            # Verify document exists and get outstanding
-            doc_outstanding = self._get_document_outstanding(
-                alloc_req.document_type, alloc_req.document_id
-            )
-            if doc_outstanding is None:
+            total_allocating = sum(a.allocated_amount for a in allocations)
+            if total_allocating > available:
                 raise PaymentAllocationError(
-                    f"Document not found: {alloc_req.document_type}:{alloc_req.document_id}"
+                    f"Allocation total ({total_allocating}) exceeds available amount ({available})"
                 )
 
-            total_settling = (
-                alloc_req.allocated_amount +
-                alloc_req.discount_amount +
-                alloc_req.write_off_amount
-            )
-            if total_settling > doc_outstanding:
-                raise PaymentAllocationError(
-                    f"Settlement amount ({total_settling}) exceeds outstanding ({doc_outstanding})"
+            created_allocations = []
+
+            for alloc_req in allocations:
+                try:
+                    alloc_type = AllocationType(alloc_req.document_type)
+                except ValueError:
+                    raise PaymentAllocationError(f"Invalid document type: {alloc_req.document_type}")
+
+                doc = self._get_document_for_update(
+                    alloc_req.document_type, alloc_req.document_id
+                )
+                if doc is None:
+                    raise PaymentAllocationError(
+                        f"Document not found: {alloc_req.document_type}:{alloc_req.document_id}"
+                    )
+
+                doc_outstanding = self._get_outstanding_from_doc(alloc_req.document_type, doc)
+                if doc_outstanding is None:
+                    raise PaymentAllocationError(
+                        f"Document not found: {alloc_req.document_type}:{alloc_req.document_id}"
+                    )
+
+                total_settling = (
+                    alloc_req.allocated_amount +
+                    alloc_req.discount_amount +
+                    alloc_req.write_off_amount
+                )
+                if total_settling > doc_outstanding:
+                    raise PaymentAllocationError(
+                        f"Settlement amount ({total_settling}) exceeds outstanding ({doc_outstanding})"
+                    )
+
+                allocation = PaymentAllocation(
+                    payment_id=None if is_supplier_payment else payment_id,
+                    supplier_payment_id=payment_id if is_supplier_payment else None,
+                    allocation_type=alloc_type,
+                    document_id=alloc_req.document_id,
+                    allocated_amount=alloc_req.allocated_amount,
+                    discount_amount=alloc_req.discount_amount,
+                    write_off_amount=alloc_req.write_off_amount,
+                    conversion_rate=getattr(payment, "conversion_rate", Decimal("1")),
+                    discount_type=DiscountType(alloc_req.discount_type) if alloc_req.discount_type else None,
+                    discount_account=alloc_req.discount_account,
+                    write_off_account=alloc_req.write_off_account,
+                    write_off_reason=alloc_req.write_off_reason,
+                    created_by_id=user_id,
                 )
 
-            # Create allocation
-            allocation = PaymentAllocation(
-                payment_id=None if is_supplier_payment else payment_id,
-                supplier_payment_id=payment_id if is_supplier_payment else None,
-                allocation_type=alloc_type,
-                document_id=alloc_req.document_id,
-                allocated_amount=alloc_req.allocated_amount,
-                discount_amount=alloc_req.discount_amount,
-                write_off_amount=alloc_req.write_off_amount,
-                conversion_rate=getattr(payment, "conversion_rate", Decimal("1")),
-                discount_type=DiscountType(alloc_req.discount_type) if alloc_req.discount_type else None,
-                discount_account=alloc_req.discount_account,
-                write_off_account=alloc_req.write_off_account,
-                write_off_reason=alloc_req.write_off_reason,
-                created_by_id=user_id,
-            )
+                rate = allocation.conversion_rate or Decimal("1")
+                allocation.base_allocated_amount = alloc_req.allocated_amount * rate
+                allocation.base_discount_amount = alloc_req.discount_amount * rate
+                allocation.base_write_off_amount = alloc_req.write_off_amount * rate
 
-            # Calculate base amounts
-            rate = allocation.conversion_rate or Decimal("1")
-            allocation.base_allocated_amount = alloc_req.allocated_amount * rate
-            allocation.base_discount_amount = alloc_req.discount_amount * rate
-            allocation.base_write_off_amount = alloc_req.write_off_amount * rate
+                allocation.exchange_gain_loss = self._calculate_fx_gain_loss(
+                    allocation, alloc_req.document_type, alloc_req.document_id
+                )
 
-            # Calculate FX gain/loss if needed
-            allocation.exchange_gain_loss = self._calculate_fx_gain_loss(
-                allocation, alloc_req.document_type, alloc_req.document_id
-            )
+                self.db.add(allocation)
+                created_allocations.append(allocation)
 
-            self.db.add(allocation)
-            created_allocations.append(allocation)
+                self._apply_document_settlement(
+                    alloc_req.document_type,
+                    doc,
+                    total_settling,
+                )
 
-            # Update document outstanding
-            self._update_document_outstanding(
-                alloc_req.document_type,
-                alloc_req.document_id,
-                total_settling,
-            )
+            if is_supplier_payment:
+                payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocating
+                payment.unallocated_amount = payment.paid_amount - payment.total_allocated
+            else:
+                payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocating
+                payment.unallocated_amount = payment.amount - payment.total_allocated
 
-        # Update payment totals
-        if is_supplier_payment:
-            payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocating
-            payment.unallocated_amount = payment.paid_amount - payment.total_allocated
-        else:
-            payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocating
-            payment.unallocated_amount = payment.amount - payment.total_allocated
-
-        return created_allocations
+            return created_allocations
 
     def auto_allocate(
         self,
@@ -262,38 +323,41 @@ class PaymentAllocationService:
             allocation_id: ID of the allocation to remove
             user_id: ID of user removing allocation
         """
-        allocation = self.db.query(PaymentAllocation).filter(
-            PaymentAllocation.id == allocation_id
-        ).first()
+        with self._transaction():
+            allocation = self.db.query(PaymentAllocation).filter(
+                PaymentAllocation.id == allocation_id
+            ).with_for_update().first()
 
-        if not allocation:
-            raise PaymentAllocationError("Allocation not found")
+            if not allocation:
+                raise PaymentAllocationError("Allocation not found")
 
-        # Restore document outstanding
-        total_settled = allocation.allocated_amount + allocation.discount_amount + allocation.write_off_amount
-        self._update_document_outstanding(
-            allocation.allocation_type.value,
-            allocation.document_id,
-            -total_settled,  # Negative to restore
-        )
+            total_settled = allocation.allocated_amount + allocation.discount_amount + allocation.write_off_amount
 
-        # Restore payment available
-        if allocation.supplier_payment_id:
-            payment = self.db.query(SupplierPayment).filter(
-                SupplierPayment.id == allocation.supplier_payment_id
-            ).first()
-            if payment:
-                payment.total_allocated -= allocation.allocated_amount
-                payment.unallocated_amount += allocation.allocated_amount
-        elif allocation.payment_id:
-            payment = self.db.query(Payment).filter(
-                Payment.id == allocation.payment_id
-            ).first()
-            if payment:
-                payment.total_allocated -= allocation.allocated_amount
-                payment.unallocated_amount += allocation.allocated_amount
+            doc = self._get_document_for_update(
+                allocation.allocation_type.value,
+                allocation.document_id,
+            )
+            if doc is None:
+                raise PaymentAllocationError("Document not found for allocation")
 
-        self.db.delete(allocation)
+            self._apply_document_settlement(
+                allocation.allocation_type.value,
+                doc,
+                -total_settled,
+            )
+
+            if allocation.supplier_payment_id:
+                payment = self._get_payment_for_update(allocation.supplier_payment_id, True)
+                if payment:
+                    payment.total_allocated -= allocation.allocated_amount
+                    payment.unallocated_amount += allocation.allocated_amount
+            elif allocation.payment_id:
+                payment = self._get_payment_for_update(allocation.payment_id, False)
+                if payment:
+                    payment.total_allocated -= allocation.allocated_amount
+                    payment.unallocated_amount += allocation.allocated_amount
+
+            self.db.delete(allocation)
 
     def get_outstanding_documents(
         self,
@@ -370,23 +434,10 @@ class PaymentAllocationService:
         doc_id: int,
     ) -> Optional[Decimal]:
         """Get the outstanding amount for a document."""
-        if doc_type == "invoice":
-            inv = self.db.query(Invoice).filter(Invoice.id == doc_id).first()
-            if inv:
-                return inv.balance if inv.balance else (inv.total_amount - inv.amount_paid)
-        elif doc_type == "bill":
-            bill = self.db.query(PurchaseInvoice).filter(PurchaseInvoice.id == doc_id).first()
-            if bill:
-                return bill.outstanding_amount or (bill.grand_total - bill.paid_amount)
-        elif doc_type == "credit_note":
-            cn = self.db.query(CreditNote).filter(CreditNote.id == doc_id).first()
-            if cn:
-                return cn.amount  # Credit notes are typically fully outstanding until applied
-        elif doc_type == "debit_note":
-            dn = self.db.query(DebitNote).filter(DebitNote.id == doc_id).first()
-            if dn:
-                return dn.amount_remaining or dn.total_amount
-        return None
+        doc = self._get_document_for_update(doc_type, doc_id)
+        if doc is None:
+            return None
+        return self._get_outstanding_from_doc(doc_type, doc)
 
     def _update_document_outstanding(
         self,
@@ -395,29 +446,10 @@ class PaymentAllocationService:
         amount_paid: Decimal,
     ) -> None:
         """Update the outstanding amount on a document."""
-        if doc_type == "invoice":
-            inv = self.db.query(Invoice).filter(Invoice.id == doc_id).first()
-            if inv:
-                inv.amount_paid = (inv.amount_paid or Decimal("0")) + amount_paid
-                inv.balance = inv.total_amount - inv.amount_paid
-                if inv.balance <= 0:
-                    inv.status = "paid"
-                elif inv.amount_paid > 0:
-                    inv.status = "partially_paid"
-        elif doc_type == "bill":
-            bill = self.db.query(PurchaseInvoice).filter(PurchaseInvoice.id == doc_id).first()
-            if bill:
-                bill.paid_amount = (bill.paid_amount or Decimal("0")) + amount_paid
-                bill.outstanding_amount = bill.grand_total - bill.paid_amount
-                if bill.outstanding_amount <= 0:
-                    bill.status = "paid"
-        elif doc_type == "debit_note":
-            dn = self.db.query(DebitNote).filter(DebitNote.id == doc_id).first()
-            if dn:
-                dn.amount_applied = (dn.amount_applied or Decimal("0")) + amount_paid
-                dn.amount_remaining = dn.total_amount - dn.amount_applied
-                if dn.amount_remaining <= 0:
-                    dn.status = "applied"
+        doc = self._get_document_for_update(doc_type, doc_id)
+        if doc is None:
+            return
+        self._apply_document_settlement(doc_type, doc, amount_paid)
 
     def _calculate_fx_gain_loss(
         self,

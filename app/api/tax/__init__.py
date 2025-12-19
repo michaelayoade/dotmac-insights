@@ -18,6 +18,7 @@ Key Features:
 
 from fastapi import APIRouter, Depends
 from app.api.tax.deps import require_tax_read
+from app.middleware.entitlements import require_nigeria_compliance
 
 from app.api.tax.vat import router as vat_router
 from app.api.tax.withholding import router as wht_router
@@ -31,7 +32,9 @@ from app.api.tax.settings import router as settings_router
 from app.api.tax.payroll_integration import router as payroll_tax_router
 
 # Apply a base read guard to all tax endpoints
-router = APIRouter(dependencies=[Depends(require_tax_read())])
+router = APIRouter(
+    dependencies=[Depends(require_tax_read()), Depends(require_nigeria_compliance())]
+)
 
 # Include all sub-routers
 router.include_router(vat_router)

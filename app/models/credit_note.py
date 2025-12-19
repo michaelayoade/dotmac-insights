@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
@@ -21,7 +21,7 @@ class CreditNoteStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class CreditNote(Base):
+class CreditNote(SoftDeleteMixin, Base):
     """Credit notes/adjustments issued to customers."""
 
     __tablename__ = "credit_notes"
@@ -34,7 +34,7 @@ class CreditNote(Base):
 
     # Links
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), index=True, nullable=True)
-    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), index=True, nullable=True)
+    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True, nullable=True)
 
     # Details
     credit_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)

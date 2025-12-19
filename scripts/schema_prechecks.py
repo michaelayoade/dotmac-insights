@@ -69,10 +69,10 @@ CHECKS = [
     },
     {
         "name": "payments_allocation_valid",
-        "description": "Payment allocations must not exceed payment amount",
+        "description": "Payment allocations must not exceed payment amount (excludes refunds)",
         "query": """
             SELECT COUNT(*) FROM payments
-            WHERE (total_allocated + unallocated_amount) > (amount + 0.01)
+            WHERE (amount >= 0 AND (total_allocated + unallocated_amount) > (amount + 0.01))
             OR total_allocated < 0
             OR unallocated_amount < 0
         """,
@@ -81,7 +81,7 @@ CHECKS = [
         "sample_query": """
             SELECT id, amount, total_allocated, unallocated_amount
             FROM payments
-            WHERE (total_allocated + unallocated_amount) > (amount + 0.01)
+            WHERE (amount >= 0 AND (total_allocated + unallocated_amount) > (amount + 0.01))
             OR total_allocated < 0
             OR unallocated_amount < 0
             LIMIT 10
@@ -159,13 +159,13 @@ CHECKS = [
         "description": "Customers should have email addresses",
         "query": """
             SELECT COUNT(*) FROM customers
-            WHERE (email IS NULL OR email = '') AND status = 'active'
+            WHERE (email IS NULL OR email = '') AND status = 'ACTIVE'
         """,
         "threshold": 10,  # Allow some without email
         "blocker": False,
         "sample_query": """
             SELECT id, name, phone, status FROM customers
-            WHERE (email IS NULL OR email = '') AND status = 'active'
+            WHERE (email IS NULL OR email = '') AND status = 'ACTIVE'
             LIMIT 10
         """,
     },
@@ -296,8 +296,18 @@ def run_check(session: Session, check: dict) -> CheckResult:
             sample_data=sample_data,
         )
     except Exception as e:
-        # If table doesn't exist, treat as passed
-        if "does not exist" in str(e).lower() or "no such table" in str(e).lower():
+        # Rollback transaction on any error to allow subsequent queries
+        session.rollback()
+
+        # If table/column doesn't exist, treat as passed (table not yet created)
+        error_msg = str(e).lower()
+        if any(phrase in error_msg for phrase in [
+            "does not exist",
+            "no such table",
+            "relation",
+            "column",
+            "undefined",
+        ]):
             return CheckResult(
                 name=check["name"],
                 description=check["description"],

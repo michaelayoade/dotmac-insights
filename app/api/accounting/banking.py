@@ -158,6 +158,169 @@ def get_bank_accounts(
 
 
 # =============================================================================
+# BANK RECONCILIATION
+# =============================================================================
+
+
+@router.get("/bank-accounts/{bank_account_id}/reconciliation-status", dependencies=[Depends(Require("accounting:read"))])
+async def get_bank_reconciliation_status(
+    bank_account_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get current reconciliation status for a bank account."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        return service.get_reconciliation_status(bank_account_id)
+    except ReconciliationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bank-accounts/{bank_account_id}/reconciliation/start", dependencies=[Depends(Require("books:write"))])
+async def start_bank_reconciliation(
+    bank_account_id: int,
+    from_date: str = Query(..., description="Statement start date (YYYY-MM-DD)"),
+    to_date: str = Query(..., description="Statement end date (YYYY-MM-DD)"),
+    statement_opening_balance: str = Query(..., description="Opening balance from bank statement"),
+    statement_closing_balance: str = Query(..., description="Closing balance from bank statement"),
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:write")),
+) -> Dict[str, Any]:
+    """Start a new bank reconciliation."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        reconciliation = service.start_reconciliation(
+            bank_account_id=bank_account_id,
+            from_date=parse_date(from_date, "from_date"),
+            to_date=parse_date(to_date, "to_date"),
+            statement_opening_balance=Decimal(statement_opening_balance),
+            statement_closing_balance=Decimal(statement_closing_balance),
+            user_id=user.id,
+        )
+        db.commit()
+
+        return {
+            "message": "Reconciliation started",
+            "reconciliation_id": reconciliation.id,
+            "bank_account": reconciliation.bank_account,
+            "from_date": reconciliation.from_date.isoformat(),
+            "to_date": reconciliation.to_date.isoformat(),
+            "statement_opening": float(reconciliation.bank_statement_opening_balance),
+            "statement_closing": float(reconciliation.bank_statement_closing_balance),
+            "gl_opening": float(reconciliation.account_opening_balance),
+        }
+    except (ReconciliationError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/bank-reconciliations/{reconciliation_id}/outstanding", dependencies=[Depends(Require("accounting:read"))])
+async def get_reconciliation_outstanding(
+    reconciliation_id: int,
+    bank_limit: int | None = Query(default=None, ge=1, le=500),
+    bank_offset: int = Query(default=0, ge=0),
+    gl_limit: int | None = Query(default=None, ge=1, le=500),
+    gl_offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get outstanding (unmatched) items for a reconciliation."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        return service.get_outstanding_items(
+            reconciliation_id,
+            bank_limit=bank_limit,
+            bank_offset=bank_offset,
+            gl_limit=gl_limit,
+            gl_offset=gl_offset,
+        )
+    except ReconciliationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bank-reconciliations/{reconciliation_id}/match", dependencies=[Depends(Require("books:write"))])
+async def match_bank_transaction(
+    reconciliation_id: int,
+    bank_transaction_id: int = Query(..., description="Bank transaction ID to match"),
+    gl_entry_ids: str = Query(..., description="Comma-separated GL entry IDs to match"),
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:write")),
+) -> Dict[str, Any]:
+    """Match a bank transaction to GL entries."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        entry_ids = [int(x.strip()) for x in gl_entry_ids.split(",")]
+        result = service.match_transaction(
+            bank_transaction_id=bank_transaction_id,
+            gl_entry_ids=entry_ids,
+            user_id=user.id,
+            reconciliation_id=reconciliation_id,
+        )
+        db.commit()
+        return result
+    except (ReconciliationError, ValueError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bank-reconciliations/{reconciliation_id}/auto-match", dependencies=[Depends(Require("books:write"))])
+async def auto_match_transactions(
+    reconciliation_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:write")),
+) -> Dict[str, Any]:
+    """Automatically match bank transactions to GL entries based on amount."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        result = service.auto_match(reconciliation_id, user.id)
+        db.commit()
+        return result
+    except ReconciliationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bank-reconciliations/{reconciliation_id}/complete", dependencies=[Depends(Require("books:write"))])
+async def complete_bank_reconciliation(
+    reconciliation_id: int,
+    adjustment_account: Optional[str] = Query(None, description="Account for difference adjustment"),
+    adjustment_remarks: Optional[str] = Query(None, description="Remarks for adjustment"),
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:write")),
+) -> Dict[str, Any]:
+    """Complete the bank reconciliation."""
+    from app.services.bank_reconciliation import BankReconciliationService, ReconciliationError
+
+    service = BankReconciliationService(db)
+
+    try:
+        result = service.complete_reconciliation(
+            reconciliation_id=reconciliation_id,
+            user_id=user.id,
+            adjustment_account=adjustment_account,
+            adjustment_remarks=adjustment_remarks,
+        )
+        db.commit()
+        return result
+    except ReconciliationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# =============================================================================
 # BANK TRANSACTIONS
 # =============================================================================
 

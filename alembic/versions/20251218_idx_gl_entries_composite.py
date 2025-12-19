@@ -5,7 +5,7 @@ Revises: 20251218_idx_je_posting
 Create Date: 2025-12-18
 
 Adds composite index on gl_entries for common query patterns.
-Uses CREATE INDEX CONCURRENTLY to avoid blocking writes.
+Uses CREATE INDEX CONCURRENTLY to avoid table locks.
 """
 from typing import Sequence, Union
 
@@ -19,13 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create composite index CONCURRENTLY."""
-    op.execute("COMMIT")
-    # Index for common GL queries: account + posting_date (string account column)
-    op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_gl_entries_account_posting
-        ON gl_entries (account, posting_date)
-    """)
+    """Create composite index CONCURRENTLY to avoid table locks."""
+    # Must run outside transaction for CONCURRENTLY
+    with op.get_context().autocommit_block():
+        # Index for common GL queries: account + posting_date (string account column)
+        op.execute("""
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_gl_entries_account_posting
+            ON gl_entries (account, posting_date)
+        """)
 
 
 def downgrade() -> None:

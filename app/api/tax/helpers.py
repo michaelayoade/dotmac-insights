@@ -814,10 +814,13 @@ def calculate_employee_paye(
     housing_allowance: Decimal = Decimal("0"),
     transport_allowance: Decimal = Decimal("0"),
     other_allowances: Decimal = Decimal("0"),
+    bonus: Decimal = Decimal("0"),
     pension_contribution: Optional[Decimal] = None,
     nhf_contribution: Optional[Decimal] = None,
+    life_assurance: Decimal = Decimal("0"),
     other_reliefs: Decimal = Decimal("0"),
-    months_in_period: int = 1
+    months_in_period: int = 1,
+    tax_date: Optional[date] = None,
 ) -> Dict:
     """
     Complete PAYE calculation for an employee.
@@ -827,16 +830,19 @@ def calculate_employee_paye(
         housing_allowance: Monthly housing allowance
         transport_allowance: Monthly transport allowance
         other_allowances: Other monthly allowances
+        bonus: Monthly bonus (taxable)
         pension_contribution: Optional custom pension (default 8% of basic + housing + transport)
         nhf_contribution: Optional custom NHF (default 2.5% of basic)
+        life_assurance: Monthly life assurance premium (deductible)
         other_reliefs: Other relief amounts
         months_in_period: Number of months (for annual projection)
+        tax_date: Date to determine applicable tax law
 
     Returns:
         Dictionary with complete PAYE breakdown
     """
     # Calculate gross income
-    monthly_gross = basic_salary + housing_allowance + transport_allowance + other_allowances
+    monthly_gross = basic_salary + housing_allowance + transport_allowance + other_allowances + bonus
     annual_gross = monthly_gross * 12
 
     # Calculate pension if not provided (8% of basic + housing + transport)
@@ -855,10 +861,10 @@ def calculate_employee_paye(
     # Annualize contributions
     annual_pension = pension_contribution * 12
     annual_nhf = nhf_contribution * 12
-    annual_other_reliefs = other_reliefs * 12
+    annual_other_reliefs = (other_reliefs + life_assurance) * 12
 
     # Calculate CRA
-    cra_fixed, cra_variable, total_cra = calculate_cra(annual_gross)
+    cra_fixed, cra_variable, total_cra = calculate_cra(annual_gross, tax_date)
 
     # Total reliefs
     total_reliefs = total_cra + annual_pension + annual_nhf + annual_other_reliefs
@@ -867,7 +873,7 @@ def calculate_employee_paye(
     annual_taxable = max(annual_gross - total_reliefs, Decimal("0"))
 
     # Calculate tax
-    annual_tax, bands_breakdown, effective_rate = calculate_paye(annual_taxable)
+    annual_tax, bands_breakdown, effective_rate = calculate_paye(annual_taxable, tax_date)
 
     # Monthly tax
     monthly_tax = (annual_tax / 12).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

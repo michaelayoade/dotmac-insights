@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: Optional[str] = None
 
+    # Notifications
+    notification_templates_path: str = "data/notification_templates.json"
+
     # OpenBao (secrets management)
     openbao_url: Optional[str] = None  # e.g., http://localhost:8200
     openbao_token: Optional[str] = None
@@ -73,6 +76,63 @@ class Settings(BaseSettings):
 
     # Environment
     environment: str = "development"  # development, staging, production
+
+    # Currency
+    # Default currency for Nigerian financial transactions.
+    # API schemas may use different defaults for international modules (e.g., tax_core uses USD).
+    default_currency: str = "NGN"
+    base_currency: str = "NGN"  # Functional currency for multi-currency conversion
+
+    # =====================================================================
+    # Platform Integration (Phase 5)
+    # =====================================================================
+
+    # Instance identity
+    platform_instance_id: Optional[str] = None
+    platform_tenant_id: Optional[str] = None
+    platform_api_url: Optional[str] = None
+    platform_api_key: Optional[str] = None
+
+    # Client resilience
+    platform_client_timeout_seconds: int = 10
+    platform_client_max_retries: int = 3
+    platform_client_retry_min_wait: int = 1
+    platform_client_retry_max_wait: int = 30
+    platform_client_circuit_breaker_threshold: int = 5
+    platform_client_circuit_breaker_timeout: int = 60
+    platform_response_cache_ttl_seconds: int = 300
+
+    # License validation
+    license_check_interval_seconds: int = 3600  # 1 hour
+    license_grace_period_hours: int = 72
+    license_cache_ttl_seconds: int = 3600
+    license_fail_open_on_startup: bool = True
+
+    # Feature flags bridge
+    feature_flags_refresh_interval_seconds: int = 300
+    feature_flags_cache_ttl_seconds: int = 300
+    feature_flags_platform_precedence: bool = True
+
+    # Usage reporting
+    usage_report_interval_seconds: int = 3600
+    usage_report_batch_size: int = 100
+    usage_report_retry_max_attempts: int = 5
+    usage_report_dlq_enabled: bool = True
+
+    # Health/heartbeat
+    heartbeat_interval_seconds: int = 300
+    heartbeat_timeout_seconds: int = 5
+    health_check_include_details: bool = True
+
+    # OTEL observability
+    otel_enabled: bool = False
+    otel_exporter_endpoint: Optional[str] = None
+    otel_service_name: str = "dotmac-insights"
+    otel_service_namespace: str = "dotmac"
+    otel_trace_sample_rate: float = 0.1  # 10% sampling default to avoid overhead
+
+    # Payroll
+    payroll_cache_ttl_seconds: int = 300
 
     @property
     def is_production(self) -> bool:

@@ -20,6 +20,7 @@ from app.api import (
     settings,
     inventory,
     projects,
+    entitlements,
 )
 from app.api import expenses
 from app.api.tax import router as tax_router
@@ -31,6 +32,9 @@ from app.api.inbox import router as inbox_router
 from app.api.contacts import router as contacts_router
 from app.api.performance import router as performance_router
 from app.api.omni import public_router as public_omni_router
+from app.api.platform import router as platform_router
+from app.api.payroll_config import router as payroll_config_router
+from app.api.tax_core import router as tax_core_router
 
 api_router = APIRouter()
 
@@ -79,6 +83,10 @@ api_router.include_router(integrations_router)  # Already has /integrations pref
 # System routers
 api_router.include_router(sync.router, prefix="/sync", tags=["sync"])
 api_router.include_router(admin.router)  # Already has /admin prefix
+api_router.include_router(platform_router)  # Already has /platform prefix
+api_router.include_router(entitlements.router)
+api_router.include_router(payroll_config_router)  # Generic payroll configuration
+api_router.include_router(tax_core_router)  # Generic tax configuration
 
 # Import routers
 api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix

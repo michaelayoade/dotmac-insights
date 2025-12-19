@@ -863,7 +863,7 @@ async def get_finance_dashboard(
     # Collections last 30 days
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     collections_30d_query = db.query(func.sum(Payment.amount)).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= thirty_days_ago
     )
     invoiced_30d_query = db.query(func.sum(Invoice.total_amount)).filter(
@@ -1121,6 +1121,55 @@ async def update_invoice(
     return _serialize_invoice(invoice, db)
 
 
+@router.post("/invoices/{invoice_id}/post", dependencies=[Depends(Require("billing:write"))])
+async def post_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("billing:write")),
+) -> Dict[str, Any]:
+    """Post invoice to GL - creates AR debit, revenue credit."""
+    from app.services.document_posting import DocumentPostingService, PostingError
+    from app.services.billing_outbound_sync import BillingOutboundSyncService
+    from app.api.accounting.helpers import invalidate_report_cache
+
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Check workflow/docstatus (only post draft invoices)
+    if invoice.docstatus != 0:
+        raise HTTPException(status_code=400, detail="Invoice already posted or cancelled")
+
+    posting_service = DocumentPostingService(db)
+    try:
+        # post_invoice requires (invoice_id, user_id, posting_date=None)
+        je = posting_service.post_invoice(invoice_id, user.id)
+        invoice.docstatus = 1
+        invoice.journal_entry_id = je.id
+        db.commit()
+        db.refresh(invoice)  # ensure returned data reflects DB state
+    except PostingError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        db.rollback()
+        raise  # let FastAPI handle unexpected errors
+
+    await invalidate_report_cache()
+
+    # Trigger outbound sync to ERPNext (if enabled via feature flag)
+    sync_service = BillingOutboundSyncService(db)
+    sync_service.sync_invoice_to_erpnext(invoice)
+    db.commit()  # persist sync log
+
+    return {
+        "message": "Invoice posted",
+        "invoice_id": invoice.id,
+        "journal_entry_id": je.id,
+        "docstatus": invoice.docstatus,
+    }
+
+
 @router.post("/payments", dependencies=[Depends(Require("sales:write"))])
 async def create_payment(
     payload: PaymentRequest,
@@ -1153,7 +1202,7 @@ async def create_payment(
     db.refresh(payment)
 
     # Emit payment received notification
-    if payment.status == PaymentStatus.COMPLETED:
+    if payment.status in {PaymentStatus.COMPLETED, PaymentStatus.POSTED}:
         customer = db.query(Customer).filter(Customer.id == payment.customer_id).first() if payment.customer_id else None
         invoice = db.query(Invoice).filter(Invoice.id == payment.invoice_id).first() if payment.invoice_id else None
         NotificationService(db).emit_event(
@@ -1266,22 +1315,17 @@ async def delete_quotation(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
-    """Delete or soft-delete a quotation."""
+    """Soft delete a quotation."""
     quote = db.query(Quotation).filter(Quotation.id == quotation_id).first()
     if not quote:
         raise HTTPException(status_code=404, detail="Quotation not found")
 
-    if soft or quote.erpnext_id:
-        quote.is_deleted = True
-        quote.deleted_at = datetime.utcnow()
-        quote.deleted_by_id = principal.id
-        quote.write_back_status = "pending"
-        db.commit()
-        return {"status": "disabled", "quotation_id": quotation_id}
-
-    db.delete(quote)
+    quote.is_deleted = True
+    quote.deleted_at = datetime.utcnow()
+    quote.deleted_by_id = principal.id
+    quote.write_back_status = "pending"
     db.commit()
-    return {"status": "deleted", "quotation_id": quotation_id}
+    return {"status": "disabled", "quotation_id": quotation_id}
 
 
 @router.patch("/orders/{order_id}", dependencies=[Depends(Require("sales:write"))])
@@ -1532,22 +1576,17 @@ async def delete_credit_note(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
-    """Delete or soft-delete a credit note."""
+    """Soft delete a credit note."""
     note = db.query(CreditNote).filter(CreditNote.id == credit_note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Credit note not found")
 
-    if soft or note.erpnext_id or note.splynx_id:
-        note.is_deleted = True
-        note.deleted_at = datetime.utcnow()
-        note.deleted_by_id = principal.id
-        note.write_back_status = "pending"
-        db.commit()
-        return {"status": "disabled", "credit_note_id": credit_note_id}
-
-    db.delete(note)
+    note.is_deleted = True
+    note.deleted_at = datetime.utcnow()
+    note.deleted_by_id = principal.id
+    note.write_back_status = "pending"
     db.commit()
-    return {"status": "deleted", "credit_note_id": credit_note_id}
+    return {"status": "disabled", "credit_note_id": credit_note_id}
 
 
 @router.post("/customers", dependencies=[Depends(Require("sales:write"))])
@@ -1915,7 +1954,7 @@ async def get_revenue_trend(
         func.min(Payment.payment_date).label("period_start"),
         func.max(Payment.payment_date).label("period_end"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -1971,7 +2010,7 @@ async def get_collections_analytics(
         func.count(Payment.id).label("count"),
         func.sum(Payment.amount).label("total"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -1999,7 +2038,7 @@ async def get_collections_analytics(
         )).label("late"),
         func.count(Payment.id).label("total"),
     ).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Invoice.due_date.isnot(None),
         Payment.payment_date.isnot(None),
         Payment.payment_date >= start_dt,
@@ -2015,7 +2054,7 @@ async def get_collections_analytics(
         func.date(Payment.payment_date).label("date"),
         func.sum(Payment.amount).label("total"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date >= start_dt,
         Payment.payment_date <= end_dt,
     )
@@ -2172,7 +2211,7 @@ async def get_payment_behavior_insights(
         Payment.customer_id,
         func.count(Payment.id).label("total_payments"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.customer_id.isnot(None),
     )
     if currency:
@@ -2194,7 +2233,7 @@ async def get_payment_behavior_insights(
     late_payments_query = db.query(
         func.avg(func.date_part("day", Payment.payment_date - Invoice.due_date)).label("avg_delay")
     ).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date > Invoice.due_date,
     )
     if currency:
@@ -2203,11 +2242,11 @@ async def get_payment_behavior_insights(
 
     # Late payments percentage
     late_count_query = db.query(func.count(Payment.id)).join(Invoice, Payment.invoice_id == Invoice.id).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date > Invoice.due_date,
     )
     total_payments_query = db.query(func.count(Payment.id)).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date.isnot(None),
     )
     if currency:

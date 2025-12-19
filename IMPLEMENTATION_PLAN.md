@@ -589,22 +589,29 @@ async def delete_customer(customer_id: int, db: AsyncSession):
 
 | Item | DRI | DoD |
 |------|-----|-----|
-| Add feature flag system | Backend Lead | `app/config/feature_flags.py` exists |
-| Add flags for contacts features | Backend Lead | Flags configurable via env |
+| Add feature flag system | Backend Lead | `app/feature_flags.py` exists ✅ |
+| Add flags for contacts features | Backend Lead | Flags configurable via env ✅ |
 
-**File**: `app/config/feature_flags.py`
+**File**: `app/feature_flags.py`
 
 ```python
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class FeatureFlags(BaseSettings):
     # Contacts
     CONTACTS_DUAL_WRITE_ENABLED: bool = False
     CONTACTS_OUTBOUND_SYNC_ENABLED: bool = False
+    CONTACTS_OUTBOUND_DRY_RUN: bool = True
     CONTACTS_RECONCILIATION_ENABLED: bool = False
 
-    # Billing (future)
-    BILLING_NATIVE_API_ENABLED: bool = False
+    # Tickets
+    TICKETS_DUAL_WRITE_ENABLED: bool = False
+    TICKETS_OUTBOUND_SYNC_ENABLED: bool = False
+    TICKETS_OUTBOUND_DRY_RUN: bool = True
+    TICKETS_RECONCILIATION_ENABLED: bool = False
+
+    # Data Management
+    SOFT_DELETE_ENABLED: bool = False
 
     class Config:
         env_prefix = "FF_"
@@ -858,3 +865,125 @@ Before proceeding to Phase 5 (Tickets), these metrics must be met for 1 week:
 | 7 | Outbound sync architecture | Billing stable |
 | 8 | Temporal/data hygiene | All domains stable |
 | 9 | Inventory/GL refactor | Full stability |
+
+---
+
+## Phase 6: UnifiedTicket Domain (IMPLEMENTED)
+
+**Status**: Complete
+**Goal**: Consolidate tickets from Ticket, Conversation, OmniConversation into a single UnifiedTicket model with dual-write, outbound sync, and reconciliation.
+
+### 6.1-6.4 Foundation (Complete)
+
+| Task | Files | Status |
+|------|-------|--------|
+| UnifiedTicket model | `app/models/unified_ticket.py` | ✅ |
+| Migration | `alembic/versions/20251218_add_unified_ticket.py` | ✅ |
+| Backfill script | `scripts/backfill_unified_tickets.py` | ✅ |
+| Feature flags | `app/feature_flags.py` (TICKETS_*) | ✅ |
+| Backlink columns | `alembic/versions/20251218_add_unified_ticket_backlinks.py` | ✅ |
+
+### 6.5-6.7 Sync Services (Complete)
+
+| Service | File | Description |
+|---------|------|-------------|
+| Dual-write | `app/services/legacy_ticket_sync.py` | Bi-directional sync UnifiedTicket ↔ legacy Ticket/Conversation |
+| Outbound sync | `app/services/ticket_outbound_sync.py` | Push to Splynx, ERPNext, Chatwoot with idempotency |
+| Reconciliation | `app/services/tickets_reconciliation.py` | Drift detection for all systems |
+
+### Feature Flags
+
+```python
+FF_TICKETS_DUAL_WRITE_ENABLED=false   # Sync to legacy tables
+FF_TICKETS_OUTBOUND_SYNC_ENABLED=false # Push to external systems
+FF_TICKETS_OUTBOUND_DRY_RUN=true      # Log only, no API calls
+FF_TICKETS_RECONCILIATION_ENABLED=false # Run drift detection
+```
+
+### Metrics Added
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `tickets_dual_write_success_total` | Counter | operation |
+| `tickets_dual_write_failures_total` | Counter | - |
+| `tickets_drift_pct` | Gauge | system |
+
+### RBAC Scopes
+
+Ticket API endpoints now accept both `tickets:read/write` and `support:read/write` for backward compatibility:
+
+```python
+ticket_read_dep = Depends(Require("tickets:read", "support:read"))
+ticket_write_dep = Depends(Require("tickets:write", "support:write"))
+```
+
+---
+
+## Ticket Burn-In Plan
+
+### Phase 1: Dual-Write (Staging)
+
+**Duration**: 48 hours minimum
+
+1. Enable `FF_TICKETS_DUAL_WRITE_ENABLED=true` in staging
+2. Monitor:
+   - `tickets_dual_write_success_total` / `tickets_dual_write_failures_total`
+   - Application logs for dual-write errors
+3. Success criteria:
+   - Dual-write success rate >99%
+   - No 500 errors on ticket endpoints
+   - Legacy table data matches unified data
+
+### Phase 2: Outbound Sync Dry-Run (Staging)
+
+**Duration**: 48 hours minimum
+
+1. Enable `FF_TICKETS_OUTBOUND_SYNC_ENABLED=true` (dry-run remains true)
+2. Monitor:
+   - Log entries for `[DRY-RUN] Would push ticket to...`
+   - Payload shapes and idempotency key generation
+3. Success criteria:
+   - All tickets generate valid payloads
+   - No errors in sync log processing
+
+### Phase 3: Outbound Sync Live (Staging)
+
+**Duration**: 48 hours minimum
+
+1. Disable dry-run: `FF_TICKETS_OUTBOUND_DRY_RUN=false`
+2. Monitor:
+   - `outbound_sync_total{entity_type="unified_ticket",status="success|failure"}`
+   - External system responses in `outbound_sync_log`
+3. Success criteria:
+   - Outbound sync success rate >98%
+   - External systems reflect ticket changes
+
+### Phase 4: Reconciliation (Staging)
+
+**Duration**: 24 hours
+
+1. Enable `FF_TICKETS_RECONCILIATION_ENABLED=true`
+2. Monitor:
+   - `tickets_drift_pct{system="*"}`
+   - Reconciliation job completion
+3. Success criteria:
+   - Drift <2% for all systems
+   - Reconciliation job runs without errors
+
+### Phase 5: Production Rollout
+
+Roll out flags one at a time with 24h soak between each:
+
+1. `FF_TICKETS_DUAL_WRITE_ENABLED=true`
+2. `FF_TICKETS_OUTBOUND_SYNC_ENABLED=true` (dry-run=true)
+3. `FF_TICKETS_OUTBOUND_DRY_RUN=false`
+4. `FF_TICKETS_RECONCILIATION_ENABLED=true`
+
+### Rollback Procedure
+
+If metrics degrade below thresholds:
+
+1. Disable offending flag immediately
+2. Check `outbound_sync_log` for failed operations
+3. Run reconciliation to detect drift
+4. Fix root cause before re-enabling

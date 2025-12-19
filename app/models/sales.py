@@ -6,7 +6,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
@@ -94,7 +94,7 @@ class QuotationStatus(enum.Enum):
     EXPIRED = "expired"
 
 
-class Quotation(Base):
+class Quotation(SoftDeleteMixin, Base):
     """Price quotations from ERPNext."""
 
     __tablename__ = "quotations"
@@ -202,6 +202,9 @@ class ERPNextLead(Base):
 
     # Conversion tracking
     converted: Mapped[bool] = mapped_column(default=False)
+    customer_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)

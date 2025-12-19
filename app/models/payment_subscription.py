@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.gateway_transaction import GatewayProvider
+from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
@@ -177,7 +178,7 @@ class PaymentSubscription(Base):
             return False
         if self.max_charges and self.successful_charges >= self.max_charges:
             return False
-        return datetime.utcnow() >= self.next_billing_date
+        return utc_now() >= self.next_billing_date
 
     @property
     def charges_remaining(self) -> Optional[int]:

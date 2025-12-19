@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
 from app.models.payment import Payment, PaymentStatus, PaymentMethod, PaymentSource
 from app.models.payment_allocation import PaymentAllocation
@@ -314,7 +314,7 @@ def update_ar_payment(
 def delete_ar_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a draft customer payment."""
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -329,7 +329,9 @@ def delete_ar_payment(
         PaymentAllocation.payment_id == payment_id
     ).delete()
 
-    db.delete(payment)
+    payment.is_deleted = True
+    payment.deleted_at = datetime.utcnow()
+    payment.deleted_by_id = principal.id
     db.commit()
 
     return {"message": "Payment deleted"}
@@ -405,6 +407,83 @@ def remove_payment_allocation(
         return {"message": "Allocation removed"}
     except PaymentAllocationError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# =============================================================================
+# POSTING
+# =============================================================================
+
+@router.post("/ar-payments/{payment_id}/post", dependencies=[Depends(Require("books:approve"))])
+async def post_ar_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:approve")),
+) -> Dict[str, Any]:
+    """Post AR payment to GL - creates bank debit, AR credit."""
+    from app.services.document_posting import DocumentPostingService, PostingError
+    from app.services.billing_outbound_sync import BillingOutboundSyncService
+    from .helpers import invalidate_report_cache
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Check workflow status (mirror AP pattern)
+    if payment.status != PaymentStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Can only post approved payments")
+
+    posting_service = DocumentPostingService(db)
+    try:
+        # post_payment requires (payment_id, user_id, posting_date=None)
+        je = posting_service.post_payment(payment_id, user.id)
+        payment.status = PaymentStatus.POSTED
+        payment.workflow_status = "posted"
+        db.commit()
+        db.refresh(payment)  # ensure returned data reflects DB state
+    except PostingError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        db.rollback()
+        raise  # let FastAPI handle unexpected errors
+
+    await invalidate_report_cache()
+
+    # Trigger outbound sync to ERPNext (if enabled via feature flag)
+    sync_service = BillingOutboundSyncService(db)
+    sync_service.sync_payment_to_erpnext(payment)
+    db.commit()  # persist sync log
+
+    return {
+        "message": "Payment posted",
+        "journal_entry_id": je.id,
+        "status": payment.status.value,
+    }
+
+
+@router.post("/ar-payments/{payment_id}/approve", dependencies=[Depends(Require("books:approve"))])
+def approve_ar_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("books:approve")),
+) -> Dict[str, Any]:
+    """Approve a pending AR payment for posting."""
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    if payment.status != PaymentStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Can only approve pending payments")
+
+    payment.status = PaymentStatus.APPROVED
+    payment.workflow_status = "approved"
+    db.commit()
+
+    return {
+        "message": "Payment approved",
+        "id": payment.id,
+        "status": payment.status.value,
+    }
 
 
 # =============================================================================

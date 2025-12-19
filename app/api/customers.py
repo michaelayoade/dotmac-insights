@@ -1052,7 +1052,7 @@ async def get_blocked_customers(
                 func.max(Payment.payment_date).label("last_payment_date"),
             ).filter(
                 Payment.customer_id.in_(customer_ids),
-                Payment.status == PaymentStatus.COMPLETED,
+                Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
             ).group_by(Payment.customer_id)
         }
 
@@ -1145,7 +1145,7 @@ async def get_customer(
     # which may not be in sync with actual payments)
     paid_from_payments = db.query(func.sum(Payment.amount)).filter(
         Payment.customer_id == customer_id,
-        Payment.status == PaymentStatus.COMPLETED
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED])
     ).scalar() or 0.0
 
     # Also get Invoice.amount_paid as a fallback/comparison
@@ -1580,7 +1580,7 @@ async def get_blocked_analytics(
             func.sum(Payment.amount).label("total_paid"),
             func.max(Payment.payment_date).label("last_payment"),
         )
-        .filter(Payment.status == PaymentStatus.COMPLETED)
+        .filter(Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]))
         .group_by(Payment.customer_id)
         .subquery()
     )
@@ -2612,7 +2612,7 @@ async def get_payment_timeliness(
         .outerjoin(Subscription, and_(Subscription.customer_id == Customer.id, Subscription.status == SubscriptionStatus.ACTIVE))
         .join(Invoice, Payment.invoice_id == Invoice.id)
         .filter(
-            Payment.status == PaymentStatus.COMPLETED,
+            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
             Payment.payment_date.isnot(None),
             Invoice.due_date.isnot(None),
             Payment.payment_date >= start_dt,

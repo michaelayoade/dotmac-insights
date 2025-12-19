@@ -222,6 +222,9 @@ npm run dev
 | Frontend | http://localhost:3000 | Next.js Dashboard |
 | Backend API | http://localhost:8000 | FastAPI Server |
 | API Docs | http://localhost:8000/docs | Swagger UI |
+| Health Check | http://localhost:8000/health | Service health status |
+| Metrics | http://localhost:8000/metrics | Prometheus metrics |
+| Platform Status | http://localhost:8000/api/platform/license | License & feature flags |
 
 ## Using Docker
 
@@ -275,6 +278,14 @@ docker-compose logs -f api
 - `GET /api/analytics/support/metrics` - Support metrics
 - `GET /api/analytics/invoices/aging` - Invoice aging report
 - `GET /api/analytics/customers/by-plan` - Distribution by plan
+
+### Platform Services
+
+- `GET /api/platform/license` - License validation status (valid, grace period, expired)
+- `GET /api/platform/feature-flags` - Current feature flag values with descriptions
+- `GET /api/platform/config` - System configuration overview (integrations, environment)
+- `GET /health` - Health check endpoint
+- `GET /metrics` - Prometheus metrics endpoint
 
 ## CLI Commands
 

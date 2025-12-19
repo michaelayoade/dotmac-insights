@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.expenses.schemas import ExpenseClaimCreate, ExpenseClaimRead
 from app.database import get_db
 from app.models.expense_management import ExpenseClaim
+from app.services.errors import ValidationError
 from app.services.expense_service import ExpenseService
 from app.services.expense_posting_service import ExpensePostingService
 from app.auth import get_current_principal, Principal, Require
@@ -56,7 +57,10 @@ async def create_claim(
     principal: Principal = Depends(get_current_principal),
 ):
     service = ExpenseService(db)
-    claim = service.create_claim(payload)
+    try:
+        claim = service.create_claim(payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return (
@@ -85,7 +89,10 @@ async def submit_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     service = ExpenseService(db)
-    claim = service.submit_claim(claim, user_id=principal.id, company_code=company_code)
+    try:
+        claim = service.submit_claim(claim, user_id=principal.id, company_code=company_code)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -108,7 +115,10 @@ async def approve_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     service = ExpenseService(db)
-    claim = service.approve_claim(claim, user_id=principal.id)
+    try:
+        claim = service.approve_claim(claim, user_id=principal.id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -135,7 +145,10 @@ async def reject_claim(
         raise HTTPException(status_code=400, detail="Rejection reason is required")
 
     service = ExpenseService(db)
-    claim = service.reject_claim(claim, user_id=principal.id, reason=reason)
+    try:
+        claim = service.reject_claim(claim, user_id=principal.id, reason=reason)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -162,7 +175,10 @@ async def return_claim(
         raise HTTPException(status_code=400, detail="Return reason is required")
 
     service = ExpenseService(db)
-    claim = service.return_claim(claim, reason=reason)
+    try:
+        claim = service.return_claim(claim, reason=reason)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -185,7 +201,10 @@ async def recall_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     service = ExpenseService(db)
-    claim = service.recall_claim(claim, user_id=principal.id)
+    try:
+        claim = service.recall_claim(claim, user_id=principal.id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -208,7 +227,10 @@ async def post_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     posting_service = ExpensePostingService(db)
-    posting_service.post_claim(claim, user_id=principal.id)
+    try:
+        posting_service.post_claim(claim, user_id=principal.id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim
@@ -235,7 +257,10 @@ async def reverse_claim(
         raise HTTPException(status_code=400, detail="Reversal reason is required")
 
     posting_service = ExpensePostingService(db)
-    posting_service.reverse_claim(claim, reason=reason, user_id=principal.id)
+    try:
+        posting_service.reverse_claim(claim, reason=reason, user_id=principal.id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     db.refresh(claim)
     return claim

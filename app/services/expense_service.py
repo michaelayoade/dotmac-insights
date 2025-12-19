@@ -5,7 +5,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.expense_management import (
@@ -17,6 +16,7 @@ from app.models.expense_management import (
 from app.models.employee import Employee
 from app.services.expense_policy_service import ExpensePolicyService, PolicyViolation
 from app.services.number_generator import NumberGenerator, FormatNotFoundError
+from app.services.errors import ValidationError
 from app.services.approval_engine import (
     ApprovalEngine,
     WorkflowNotFoundError,
@@ -42,7 +42,7 @@ class ExpenseService:
     def create_claim(self, payload) -> ExpenseClaim:
         """Create a draft claim with lines and calculated totals."""
         if not payload.lines:
-            raise HTTPException(status_code=400, detail="At least one line is required")
+            raise ValidationError("At least one line is required")
 
         employee = self._get_employee(payload.employee_id)
         claim = ExpenseClaim(
@@ -89,7 +89,7 @@ class ExpenseService:
                 )
                 self.policy_service.ensure_amount_within_limits(policy, line.claimed_amount)
             except PolicyViolation as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+                raise ValidationError(str(exc)) from exc
 
             base_amount = (line.claimed_amount or Decimal("0")) * (line.conversion_rate or Decimal("1"))
 
@@ -149,7 +149,7 @@ class ExpenseService:
     ) -> ExpenseClaim:
         """Submit claim for approval and assign claim number."""
         if claim.status not in {ExpenseClaimStatus.DRAFT, ExpenseClaimStatus.RECALLED, ExpenseClaimStatus.RETURNED}:
-            raise HTTPException(status_code=400, detail="Only draft/returned claims can be submitted")
+            raise ValidationError("Only draft/returned claims can be submitted")
 
         claim.status = ExpenseClaimStatus.PENDING_APPROVAL
         claim.docstatus = 1
@@ -183,7 +183,7 @@ class ExpenseService:
         try:
             approval = engine.approve_document("expense_claim", claim.id, user_id=user_id)
         except (ApprovalNotFoundError, UnauthorizedApprovalError, InvalidStateError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise ValidationError(str(exc)) from exc
 
         self._sync_status_from_approval(claim, approval)
         return claim
@@ -194,7 +194,7 @@ class ExpenseService:
         try:
             approval = engine.reject_document("expense_claim", claim.id, user_id=user_id, reason=reason)
         except (ApprovalNotFoundError, UnauthorizedApprovalError, InvalidStateError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise ValidationError(str(exc)) from exc
 
         self._sync_status_from_approval(claim, approval)
         claim.rejection_reason = reason
@@ -203,7 +203,7 @@ class ExpenseService:
     def return_claim(self, claim: ExpenseClaim, reason: str) -> ExpenseClaim:
         """Return a claim to drafter for edits."""
         if claim.status not in {ExpenseClaimStatus.PENDING_APPROVAL, ExpenseClaimStatus.REJECTED, ExpenseClaimStatus.RETURNED}:
-            raise HTTPException(status_code=400, detail="Only pending/rejected claims can be returned")
+            raise ValidationError("Only pending/rejected claims can be returned")
 
         claim.status = ExpenseClaimStatus.RETURNED
         claim.approval_status = "returned"
@@ -214,7 +214,7 @@ class ExpenseService:
     def recall_claim(self, claim: ExpenseClaim, user_id: int) -> ExpenseClaim:
         """Recall a pending claim before approval decision."""
         if claim.status not in {ExpenseClaimStatus.PENDING_APPROVAL, ExpenseClaimStatus.RETURNED}:
-            raise HTTPException(status_code=400, detail="Only pending/returned claims can be recalled")
+            raise ValidationError("Only pending/returned claims can be recalled")
 
         claim.status = ExpenseClaimStatus.RECALLED
         claim.approval_status = "recalled"

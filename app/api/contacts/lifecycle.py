@@ -3,6 +3,7 @@ Contact Lifecycle Management Endpoints
 
 Handles transitions: lead → prospect → customer → churned
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -17,6 +18,11 @@ from .schemas import (
 )
 from .contacts import _contact_to_response
 from app.auth import Require
+from app.feature_flags import feature_flags
+from app.services.legacy_customer_sync import LegacyCustomerSync
+from app.middleware.metrics import record_dual_write
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -147,6 +153,17 @@ async def convert_to_customer(contact_id: int, payload: ConvertToCustomerRequest
         else:
             contact.notes = f"[{datetime.utcnow().isoformat()}] Converted to customer: {payload.notes}"
 
+    # Dual-write: create/sync to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        try:
+            sync = LegacyCustomerSync(db)
+            sync.sync_to_customer(contact)
+            record_dual_write("status_change", True)
+            logger.info(f"Dual-write: converted contact {contact.id} synced to Customer table")
+        except Exception as e:
+            record_dual_write("status_change", False)
+            logger.error(f"Dual-write failed for convert_to_customer {contact.id}: {e}")
+
     db.commit()
     db.refresh(contact)
 
@@ -182,6 +199,17 @@ async def reactivate_churned_customer(contact_id: int, db: Session = Depends(get
     else:
         contact.notes = f"[{datetime.utcnow().isoformat()}] Reactivated"
 
+    # Dual-write: sync status change to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        try:
+            sync = LegacyCustomerSync(db)
+            sync.sync_to_customer(contact)
+            record_dual_write("status_change", True)
+            logger.info(f"Dual-write: reactivated contact {contact.id} synced to Customer table")
+        except Exception as e:
+            record_dual_write("status_change", False)
+            logger.error(f"Dual-write failed for reactivate {contact.id}: {e}")
+
     db.commit()
     db.refresh(contact)
 
@@ -216,6 +244,17 @@ async def mark_churned(contact_id: int, payload: MarkChurnedRequest, db: Session
             contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Churned: {payload.reason}. {payload.notes}"
         else:
             contact.notes = f"[{datetime.utcnow().isoformat()}] Churned: {payload.reason}. {payload.notes}"
+
+    # Dual-write: sync churned status to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        try:
+            sync = LegacyCustomerSync(db)
+            sync.sync_to_customer(contact)
+            record_dual_write("status_change", True)
+            logger.info(f"Dual-write: churned contact {contact.id} synced to Customer table")
+        except Exception as e:
+            record_dual_write("status_change", False)
+            logger.error(f"Dual-write failed for mark_churned {contact.id}: {e}")
 
     db.commit()
     db.refresh(contact)
@@ -300,6 +339,18 @@ async def suspend_contact(contact_id: int, reason: str = None, db: Session = Dep
         else:
             contact.notes = f"[{datetime.utcnow().isoformat()}] Suspended: {reason}"
 
+    # Dual-write: sync suspended status to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        if contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+            try:
+                sync = LegacyCustomerSync(db)
+                sync.sync_to_customer(contact)
+                record_dual_write("status_change", True)
+                logger.info(f"Dual-write: suspended contact {contact.id} synced to Customer table")
+            except Exception as e:
+                record_dual_write("status_change", False)
+                logger.error(f"Dual-write failed for suspend {contact.id}: {e}")
+
     db.commit()
     db.refresh(contact)
 
@@ -326,6 +377,18 @@ async def activate_contact(contact_id: int, db: Session = Depends(get_db)):
         contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Activated"
     else:
         contact.notes = f"[{datetime.utcnow().isoformat()}] Activated"
+
+    # Dual-write: sync activated status to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
+        if contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+            try:
+                sync = LegacyCustomerSync(db)
+                sync.sync_to_customer(contact)
+                record_dual_write("status_change", True)
+                logger.info(f"Dual-write: activated contact {contact.id} synced to Customer table")
+            except Exception as e:
+                record_dual_write("status_change", False)
+                logger.error(f"Dual-write failed for activate {contact.id}: {e}")
 
     db.commit()
     db.refresh(contact)
@@ -359,6 +422,17 @@ async def mark_do_not_contact(contact_id: int, reason: str = None, db: Session =
             contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Marked do-not-contact: {reason}"
         else:
             contact.notes = f"[{datetime.utcnow().isoformat()}] Marked do-not-contact: {reason}"
+
+    # Dual-write: sync status/opt-ins to Customer table
+    if feature_flags.CONTACTS_DUAL_WRITE_ENABLED and contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):
+        try:
+            sync = LegacyCustomerSync(db)
+            sync.sync_to_customer(contact)
+            record_dual_write("status_change", True)
+            logger.info(f"Dual-write: do-not-contact contact {contact.id} synced to Customer table")
+        except Exception as e:
+            record_dual_write("status_change", False)
+            logger.error(f"Dual-write failed for do-not-contact {contact.id}: {e}")
 
     db.commit()
     db.refresh(contact)

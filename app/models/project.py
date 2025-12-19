@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
@@ -139,7 +140,7 @@ class Project(Base):
     def is_overdue(self) -> bool:
         """Check if project is overdue."""
         if self.expected_end_date and self.status == ProjectStatus.OPEN:
-            return datetime.utcnow() > self.expected_end_date
+            return utc_now() > self.expected_end_date
         return False
 
 

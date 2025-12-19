@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List
 import enum
@@ -49,8 +50,8 @@ class Supplier(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<Supplier {self.supplier_name}>"
@@ -77,8 +78,8 @@ class ModeOfPayment(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<ModeOfPayment {self.mode_of_payment}>"
@@ -107,8 +108,8 @@ class CostCenter(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<CostCenter {self.cost_center_name}>"
@@ -133,8 +134,8 @@ class FiscalYear(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<FiscalYear {self.year}>"
@@ -162,8 +163,8 @@ class BankAccount(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<BankAccount {self.account_name} - {self.bank}>"
@@ -209,11 +210,46 @@ class JournalEntry(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    items: Mapped[List["JournalEntryItem"]] = relationship(
+        back_populates="journal_entry",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<JournalEntry {self.erpnext_id} - {self.total_debit}>"
+
+
+class JournalEntryItem(Base):
+    """Line items for journal entries."""
+
+    __tablename__ = "journal_entry_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    journal_entry_id: Mapped[int] = mapped_column(
+        ForeignKey("journal_entries.id"), nullable=False, index=True
+    )
+
+    account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    debit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    credit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    reference_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    reference_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    party_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    party: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    idx: Mapped[int] = mapped_column(default=0)
+
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+    journal_entry: Mapped["JournalEntry"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<JournalEntryItem {self.account} dr={self.debit} cr={self.credit}>"
 
 
 # ============= PURCHASE INVOICE =============
@@ -240,6 +276,9 @@ class PurchaseInvoice(Base):
 
     supplier: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     supplier_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    supplier_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Supplier info (denormalized)
@@ -280,8 +319,8 @@ class PurchaseInvoice(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Relationships
     lines: Mapped[List[BillLine]] = relationship(
@@ -323,7 +362,7 @@ class GLEntry(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     def __repr__(self) -> str:
         return f"<GLEntry {self.erpnext_id} - {self.account}>"
@@ -360,8 +399,8 @@ class Account(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<Account {self.account_name}>"
@@ -387,6 +426,9 @@ class BankTransaction(Base):
     date: Mapped[Optional[datetime]] = mapped_column(nullable=True, index=True)
     status: Mapped[BankTransactionStatus] = mapped_column(Enum(BankTransactionStatus), default=BankTransactionStatus.PENDING)
     bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    bank_account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("bank_accounts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Amounts (document currency)
@@ -435,11 +477,89 @@ class BankTransaction(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Relationships - splits for line-level allocation
     splits: Mapped[List["BankTransactionSplit"]] = relationship(back_populates="bank_transaction")
+    payments: Mapped[List["BankTransactionPayment"]] = relationship(
+        back_populates="bank_transaction",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"
+
+
+class BankTransactionPayment(Base):
+    """Link table for bank transaction allocations to payment entries."""
+
+    __tablename__ = "bank_transaction_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    bank_transaction_id: Mapped[int] = mapped_column(
+        ForeignKey("bank_transactions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    payment_document: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    payment_entry: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    allocated_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    idx: Mapped[int] = mapped_column(default=0)
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    bank_transaction: Mapped["BankTransaction"] = relationship(back_populates="payments")
+
+    def __repr__(self) -> str:
+        return f"<BankTransactionPayment {self.bank_transaction_id} {self.payment_entry}>"
+
+
+class BankReconciliationStatus(enum.Enum):
+    DRAFT = "DRAFT"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class BankReconciliation(Base):
+    """Bank reconciliation records."""
+
+    __tablename__ = "bank_reconciliations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
+
+    bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    from_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    to_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    bank_statement_opening_balance: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    bank_statement_closing_balance: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    account_opening_balance: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_credits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_debits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    status: Mapped[BankReconciliationStatus] = mapped_column(
+        Enum(BankReconciliationStatus),
+        default=BankReconciliationStatus.DRAFT,
+        index=True,
+    )
+    docstatus: Mapped[int] = mapped_column(default=0)
+
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    def __repr__(self) -> str:
+        return f"<BankReconciliation {self.bank_account} {self.from_date} - {self.to_date}>"

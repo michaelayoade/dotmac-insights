@@ -241,6 +241,9 @@ class PayrollEntry(Base):
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     exchange_rate: Mapped[Decimal] = mapped_column(default=Decimal("1"))
 
+    # Region for statutory calculations (ISO 3166-1 alpha-2, e.g., "NG", "KE")
+    region_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)
+
     # Payment
     payment_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -300,6 +303,9 @@ class SalarySlip(Base):
     # Organization
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="USD")
+
+    # Region for statutory calculations (ISO 3166-1 alpha-2, e.g., "NG", "KE")
+    region_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)
 
     # Payment days
     total_working_days: Mapped[Decimal] = mapped_column(default=Decimal("0"))

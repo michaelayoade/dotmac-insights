@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import String, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
+from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -62,8 +63,15 @@ class Employee(Base):
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Soft delete columns
+    is_deleted: Mapped[bool] = mapped_column(default=False, index=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Relationships
     tickets: Mapped[List[Ticket]] = relationship(

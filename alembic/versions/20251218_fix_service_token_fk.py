@@ -102,5 +102,15 @@ def downgrade() -> None:
         ["id"],
     )
 
-    # Note: created_by_id remains nullable since we can't
-    # safely make it NOT NULL without risking data loss
+    # Restore NOT NULL only when safe to do so.
+    conn = op.get_bind()
+    null_count = conn.execute(
+        sa.text("SELECT count(*) FROM service_tokens WHERE created_by_id IS NULL")
+    ).scalar() or 0
+    if null_count == 0:
+        op.alter_column(
+            "service_tokens",
+            "created_by_id",
+            existing_type=sa.Integer(),
+            nullable=False,
+        )

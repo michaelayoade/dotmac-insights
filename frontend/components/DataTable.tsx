@@ -177,7 +177,8 @@ export function DataTable<T = any>({
                     type="checkbox"
                     checked={allSelected}
                     onChange={(e) => handleToggleAll(e.target.checked)}
-                    className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric"
+                    aria-label="Select all rows"
+                    className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric focus-visible:ring-offset-2 focus-visible:ring-offset-slate-deep"
                   />
                 </th>
               )}
@@ -231,7 +232,8 @@ export function DataTable<T = any>({
                       type="checkbox"
                       checked={Boolean(selection[getRowKey(item, `row-${index}`)])}
                       onChange={(e) => handleToggleRow(getRowKey(item, `row-${index}`), e.target.checked)}
-                      className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric"
+                      aria-label={`Select row ${index + 1}`}
+                      className="h-4 w-4 rounded border border-slate-border bg-slate-elevated accent-teal-electric focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric focus-visible:ring-offset-2 focus-visible:ring-offset-slate-deep"
                     />
                   </td>
                 )}
@@ -331,7 +333,7 @@ export function Pagination({
           <button
             onClick={() => onPageChange(Math.max(0, offset - limit))}
             disabled={offset === 0}
-            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             Previous
           </button>
@@ -346,7 +348,7 @@ export function Pagination({
                 key={page}
                 onClick={() => onPageChange((page - 1) * limit)}
                 className={cn(
-                  'w-8 h-8 text-sm rounded-lg transition-colors',
+                  'w-8 h-8 text-sm rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric',
                   currentPage === page
                     ? 'bg-teal-electric/20 text-teal-electric border border-teal-electric/30'
                     : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
@@ -360,7 +362,7 @@ export function Pagination({
           <button
             onClick={() => onPageChange(offset + limit)}
             disabled={offset + limit >= total}
-            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             Next
           </button>

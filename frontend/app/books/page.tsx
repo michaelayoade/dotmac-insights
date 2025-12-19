@@ -50,12 +50,26 @@ import {
   Plus,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { CHART_COLORS as CHART_PALETTE, getChartColor } from '@/lib/design-tokens';
 
-// Chart color palette matching the teal/finance theme
-const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899'];
+// Chart colors from centralized design tokens
+const CHART_COLORS = [
+  'var(--color-teal-electric)',
+  'var(--color-blue-info)',
+  'var(--color-purple-accent)',
+  'var(--color-amber-warn)',
+  'var(--color-teal-glow)',
+  'var(--color-coral-alert)',
+];
+
+// Theme-aware tooltip styling using CSS variables
 const TOOLTIP_STYLE = {
-  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' },
-  labelStyle: { color: '#f8fafc' },
+  contentStyle: {
+    backgroundColor: 'var(--color-slate-card)',
+    border: '1px solid var(--color-slate-border)',
+    borderRadius: '8px',
+  },
+  labelStyle: { color: 'var(--color-text-primary)' },
 };
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {

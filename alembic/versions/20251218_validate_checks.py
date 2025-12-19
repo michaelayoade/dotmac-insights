@@ -60,7 +60,7 @@ def downgrade() -> None:
         ALTER TABLE payments
         ADD CONSTRAINT chk_payment_allocation_valid
         CHECK (
-            (total_allocated + unallocated_amount) <= (amount + 0.01)
+            (amount < 0 OR (total_allocated + unallocated_amount) <= (amount + 0.01))
             AND total_allocated >= 0
             AND unallocated_amount >= 0
         )
@@ -69,6 +69,10 @@ def downgrade() -> None:
     op.execute("""
         ALTER TABLE invoices
         ADD CONSTRAINT chk_invoice_positive
-        CHECK (grand_total >= 0 AND net_total >= 0)
+        CHECK (
+            amount >= 0
+            AND total_amount >= 0
+            AND (balance IS NULL OR balance >= 0)
+        )
         NOT VALID
     """)

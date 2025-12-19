@@ -24,6 +24,8 @@ celery_app = Celery(
     include=[
         "app.tasks.sync_tasks",
         "app.tasks.performance_tasks",
+        "app.tasks.contacts_tasks",
+        "app.tasks.platform_tasks",
     ],
 )
 
@@ -148,5 +150,33 @@ celery_app.conf.beat_schedule = {
     "performance-weekly-summaries": {
         "task": "performance.send_weekly_summaries",
         "schedule": crontab(hour=8, minute=30, day_of_week=1),  # Every Monday at 8:30 AM
+    },
+    # Contacts reconciliation - hourly
+    "contacts-reconciliation": {
+        "task": "app.tasks.contacts_tasks.run_contacts_reconciliation",
+        "schedule": crontab(minute=45),  # Every hour at :45
+    },
+    # Retry failed outbound syncs - every 10 minutes
+    "contacts-outbound-sync-retry": {
+        "task": "app.tasks.contacts_tasks.retry_failed_outbound_syncs",
+        "schedule": crontab(minute="*/10"),  # Every 10 minutes
+        "kwargs": {"max_retries": 5, "batch_size": 100},
+    },
+    # Platform integration tasks (only effective if platform configured)
+    "platform-validate-license": {
+        "task": "app.tasks.platform.validate_license",
+        "schedule": settings.license_check_interval_seconds,  # Default: hourly
+    },
+    "platform-refresh-feature-flags": {
+        "task": "app.tasks.platform.refresh_feature_flags",
+        "schedule": settings.feature_flags_refresh_interval_seconds,  # Default: 5 minutes
+    },
+    "platform-report-usage": {
+        "task": "app.tasks.platform.report_usage",
+        "schedule": settings.usage_report_interval_seconds,  # Default: hourly
+    },
+    "platform-send-heartbeat": {
+        "task": "app.tasks.platform.send_heartbeat",
+        "schedule": settings.heartbeat_interval_seconds,  # Default: 5 minutes
     },
 }

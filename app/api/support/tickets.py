@@ -30,6 +30,10 @@ from .helpers import (
 
 router = APIRouter()
 
+# Shared RBAC dependencies: accept either tickets:* or support:* scopes
+ticket_read_dep = Depends(Require("tickets:read", "support:read"))
+ticket_write_dep = Depends(Require("tickets:write", "support:write"))
+
 
 # =============================================================================
 # VALIDATION HELPERS
@@ -545,7 +549,7 @@ async def get_support_dashboard(
 # TICKET CRUD
 # =============================================================================
 
-@router.get("/tickets", dependencies=[Depends(Require("explorer:read"))])
+@router.get("/tickets", dependencies=[ticket_read_dep])
 def list_tickets(
     status: Optional[str] = None,
     priority: Optional[str] = None,
@@ -621,7 +625,7 @@ def list_tickets(
     }
 
 
-@router.get("/tickets/{ticket_id}", dependencies=[Depends(Require("explorer:read"))])
+@router.get("/tickets/{ticket_id}", dependencies=[ticket_read_dep])
 def get_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
@@ -718,7 +722,7 @@ def get_ticket(
     }
 
 
-@router.post("/tickets", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets", dependencies=[ticket_write_dep], status_code=201)
 def create_ticket(
     payload: TicketCreateRequest,
     db: Session = Depends(get_db),
@@ -768,7 +772,7 @@ def create_ticket(
     return {"id": ticket.id, "ticket_number": ticket.ticket_number}
 
 
-@router.patch("/tickets/{ticket_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}", dependencies=[ticket_write_dep])
 def update_ticket(
     ticket_id: int,
     payload: TicketUpdateRequest,
@@ -827,7 +831,7 @@ def update_ticket(
     return {"id": ticket.id, "ticket_number": ticket.ticket_number}
 
 
-@router.delete("/tickets/{ticket_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}", dependencies=[ticket_write_dep])
 def delete_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
@@ -850,7 +854,7 @@ def delete_ticket(
 # TICKET COMMENTS
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/comments", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets/{ticket_id}/comments", dependencies=[ticket_write_dep], status_code=201)
 def add_ticket_comment(
     ticket_id: int,
     payload: TicketCommentRequest,
@@ -878,7 +882,7 @@ def add_ticket_comment(
     return {"id": comment.id}
 
 
-@router.patch("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[ticket_write_dep])
 def update_ticket_comment(
     ticket_id: int,
     comment_id: int,
@@ -905,7 +909,7 @@ def update_ticket_comment(
     return {"id": comment.id}
 
 
-@router.delete("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[ticket_write_dep])
 def delete_ticket_comment(
     ticket_id: int,
     comment_id: int,
@@ -929,7 +933,7 @@ def delete_ticket_comment(
 # TICKET ACTIVITIES
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/activities", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets/{ticket_id}/activities", dependencies=[ticket_write_dep], status_code=201)
 def add_ticket_activity(
     ticket_id: int,
     payload: TicketActivityRequest,
@@ -957,7 +961,7 @@ def add_ticket_activity(
     return {"id": activity.id}
 
 
-@router.patch("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[ticket_write_dep])
 def update_ticket_activity(
     ticket_id: int,
     activity_id: int,
@@ -984,7 +988,7 @@ def update_ticket_activity(
     return {"id": activity.id}
 
 
-@router.delete("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[ticket_write_dep])
 def delete_ticket_activity(
     ticket_id: int,
     activity_id: int,
@@ -1008,7 +1012,7 @@ def delete_ticket_activity(
 # TICKET DEPENDENCIES
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/depends-on", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets/{ticket_id}/depends-on", dependencies=[ticket_write_dep], status_code=201)
 def add_ticket_dependency(
     ticket_id: int,
     payload: TicketDependencyRequest,
@@ -1038,7 +1042,7 @@ def add_ticket_dependency(
     return {"id": dependency.id}
 
 
-@router.patch("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[ticket_write_dep])
 def update_ticket_dependency(
     ticket_id: int,
     dependency_id: int,
@@ -1070,7 +1074,7 @@ def update_ticket_dependency(
     return {"id": dependency.id}
 
 
-@router.delete("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[ticket_write_dep])
 def delete_ticket_dependency(
     ticket_id: int,
     dependency_id: int,
@@ -1094,7 +1098,7 @@ def delete_ticket_dependency(
 # TICKET COMMUNICATIONS
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/communications", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets/{ticket_id}/communications", dependencies=[ticket_write_dep], status_code=201)
 def add_ticket_communication(
     ticket_id: int,
     payload: TicketCommunicationRequest,
@@ -1127,7 +1131,7 @@ def add_ticket_communication(
     return {"id": comm.id}
 
 
-@router.patch("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[ticket_write_dep])
 def update_ticket_communication(
     ticket_id: int,
     communication_id: int,
@@ -1158,7 +1162,7 @@ def update_ticket_communication(
     return {"id": comm.id}
 
 
-@router.delete("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[ticket_write_dep])
 def delete_ticket_communication(
     ticket_id: int,
     communication_id: int,
@@ -1182,7 +1186,7 @@ def delete_ticket_communication(
 # ASSIGNMENT & SLA
 # =============================================================================
 
-@router.put("/tickets/{ticket_id}/assignee", dependencies=[Depends(Require("support:write"))])
+@router.put("/tickets/{ticket_id}/assignee", dependencies=[ticket_write_dep])
 def assign_ticket(
     ticket_id: int,
     payload: TicketAssigneeRequest,
@@ -1240,7 +1244,7 @@ def assign_ticket(
     }
 
 
-@router.patch("/tickets/{ticket_id}/sla", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tickets/{ticket_id}/sla", dependencies=[ticket_write_dep])
 def update_ticket_sla(
     ticket_id: int,
     payload: TicketSLARequest,
@@ -1289,7 +1293,7 @@ def _serialize_tag(tag: TicketTag) -> Dict[str, Any]:
     }
 
 
-@router.get("/tags", dependencies=[Depends(Require("support:read"))])
+@router.get("/tags", dependencies=[ticket_read_dep])
 def list_tags(
     active_only: bool = True,
     search: Optional[str] = None,
@@ -1317,7 +1321,7 @@ def list_tags(
     }
 
 
-@router.get("/tags/{tag_id}", dependencies=[Depends(Require("support:read"))])
+@router.get("/tags/{tag_id}", dependencies=[ticket_read_dep])
 def get_tag(
     tag_id: int,
     db: Session = Depends(get_db),
@@ -1329,7 +1333,7 @@ def get_tag(
     return _serialize_tag(tag)
 
 
-@router.post("/tags", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tags", dependencies=[ticket_write_dep], status_code=201)
 def create_tag(
     payload: TagCreateRequest,
     db: Session = Depends(get_db),
@@ -1353,7 +1357,7 @@ def create_tag(
     return {"id": tag.id, "name": tag.name}
 
 
-@router.patch("/tags/{tag_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/tags/{tag_id}", dependencies=[ticket_write_dep])
 def update_tag(
     tag_id: int,
     payload: TagUpdateRequest,
@@ -1380,7 +1384,7 @@ def update_tag(
     return _serialize_tag(tag)
 
 
-@router.delete("/tags/{tag_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tags/{tag_id}", dependencies=[ticket_write_dep])
 def delete_tag(
     tag_id: int,
     db: Session = Depends(get_db),
@@ -1421,7 +1425,7 @@ def _serialize_custom_field(field: TicketCustomField) -> Dict[str, Any]:
     }
 
 
-@router.get("/custom-fields", dependencies=[Depends(Require("support:read"))])
+@router.get("/custom-fields", dependencies=[ticket_read_dep])
 def list_custom_fields(
     active_only: bool = True,
     show_in_create: Optional[bool] = None,
@@ -1448,7 +1452,7 @@ def list_custom_fields(
     }
 
 
-@router.get("/custom-fields/{field_id}", dependencies=[Depends(Require("support:read"))])
+@router.get("/custom-fields/{field_id}", dependencies=[ticket_read_dep])
 def get_custom_field(
     field_id: int,
     db: Session = Depends(get_db),
@@ -1460,7 +1464,7 @@ def get_custom_field(
     return _serialize_custom_field(field)
 
 
-@router.post("/custom-fields", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/custom-fields", dependencies=[ticket_write_dep], status_code=201)
 def create_custom_field(
     payload: CustomFieldCreateRequest,
     db: Session = Depends(get_db),
@@ -1498,7 +1502,7 @@ def create_custom_field(
     return {"id": field.id, "field_key": field.field_key}
 
 
-@router.patch("/custom-fields/{field_id}", dependencies=[Depends(Require("support:write"))])
+@router.patch("/custom-fields/{field_id}", dependencies=[ticket_write_dep])
 def update_custom_field(
     field_id: int,
     payload: CustomFieldUpdateRequest,
@@ -1527,7 +1531,7 @@ def update_custom_field(
     return _serialize_custom_field(field)
 
 
-@router.delete("/custom-fields/{field_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/custom-fields/{field_id}", dependencies=[ticket_write_dep])
 def delete_custom_field(
     field_id: int,
     db: Session = Depends(get_db),
@@ -1545,7 +1549,7 @@ def delete_custom_field(
 # TICKET TAGS MANAGEMENT
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/tags", dependencies=[Depends(Require("support:write"))])
+@router.post("/tickets/{ticket_id}/tags", dependencies=[ticket_write_dep])
 def add_ticket_tags(
     ticket_id: int,
     payload: TicketTagsRequest,
@@ -1576,7 +1580,7 @@ def add_ticket_tags(
     return {"id": ticket.id, "tags": ticket.tags}
 
 
-@router.delete("/tickets/{ticket_id}/tags/{tag_name}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/tags/{tag_name}", dependencies=[ticket_write_dep])
 def remove_ticket_tag(
     ticket_id: int,
     tag_name: str,
@@ -1608,7 +1612,7 @@ def remove_ticket_tag(
 # TICKET WATCHERS MANAGEMENT
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/watchers", dependencies=[Depends(Require("support:write"))])
+@router.post("/tickets/{ticket_id}/watchers", dependencies=[ticket_write_dep])
 def add_ticket_watchers(
     ticket_id: int,
     payload: TicketWatchersRequest,
@@ -1632,7 +1636,7 @@ def add_ticket_watchers(
     return {"id": ticket.id, "watchers": ticket.watchers}
 
 
-@router.delete("/tickets/{ticket_id}/watchers/{user_id}", dependencies=[Depends(Require("support:write"))])
+@router.delete("/tickets/{ticket_id}/watchers/{user_id}", dependencies=[ticket_write_dep])
 def remove_ticket_watcher(
     ticket_id: int,
     user_id: int,
@@ -1659,7 +1663,7 @@ def remove_ticket_watcher(
 # TICKET MERGE / SPLIT
 # =============================================================================
 
-@router.post("/tickets/{ticket_id}/merge", dependencies=[Depends(Require("support:write"))])
+@router.post("/tickets/{ticket_id}/merge", dependencies=[ticket_write_dep])
 def merge_tickets(
     ticket_id: int,
     payload: TicketMergeRequest,
@@ -1743,7 +1747,7 @@ def merge_tickets(
     }
 
 
-@router.post("/tickets/{ticket_id}/split", dependencies=[Depends(Require("support:write"))], status_code=201)
+@router.post("/tickets/{ticket_id}/split", dependencies=[ticket_write_dep], status_code=201)
 def split_ticket(
     ticket_id: int,
     payload: TicketSplitRequest,
@@ -1809,7 +1813,7 @@ def split_ticket(
     }
 
 
-@router.get("/tickets/{ticket_id}/sub-tickets", dependencies=[Depends(Require("explorer:read"))])
+@router.get("/tickets/{ticket_id}/sub-tickets", dependencies=[ticket_read_dep])
 def list_sub_tickets(
     ticket_id: int,
     db: Session = Depends(get_db),

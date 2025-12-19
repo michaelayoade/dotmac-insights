@@ -50,6 +50,29 @@ if PROMETHEUS_AVAILABLE:
         ['error_type']  # error_type: 401, 403
     )
 
+    # Dual-write metrics (legacy sync) - Contacts
+    CONTACTS_DUAL_WRITE_SUCCESS = Counter(
+        'contacts_dual_write_success_total',
+        'Successful dual-write operations to legacy Customer',
+        ['operation']  # operation: create, update, delete, status_change
+    )
+    CONTACTS_DUAL_WRITE_FAILURES = Counter(
+        'contacts_dual_write_failures_total',
+        'Failed dual-write operations to legacy Customer',
+        ['operation']  # operation: create, update, delete, status_change
+    )
+
+    # Dual-write metrics (legacy sync) - Tickets
+    TICKETS_DUAL_WRITE_SUCCESS = Counter(
+        'tickets_dual_write_success_total',
+        'Successful dual-write operations to legacy Ticket',
+        ['operation']  # operation: create, update, sync_from_legacy
+    )
+    TICKETS_DUAL_WRITE_FAILURES = Counter(
+        'tickets_dual_write_failures_total',
+        'Failed dual-write operations to legacy Ticket',
+    )
+
     # Outbound sync metrics
     OUTBOUND_SYNC_TOTAL = Counter(
         'outbound_sync_total',
@@ -62,6 +85,13 @@ if PROMETHEUS_AVAILABLE:
         'contacts_drift_pct',
         'Percentage of contacts with field mismatches',
         ['system']  # system: splynx, erpnext
+    )
+
+    # Tickets drift gauge (set by reconciliation job)
+    TICKETS_DRIFT_PCT = Gauge(
+        'tickets_drift_pct',
+        'Percentage of tickets with field mismatches',
+        ['system']  # system: splynx, erpnext, chatwoot, ticket_legacy
     )
 
     # Contacts query latency histogram
@@ -93,6 +123,10 @@ else:
             return self
         def inc(self, amount=1):
             pass
+        def get(self):
+            return 0
+        def get(self):
+            return 0
 
     class StubGauge:
         def labels(self, **kwargs):
@@ -108,8 +142,13 @@ else:
 
     WEBHOOK_AUTH_FAILURES = StubCounter()
     CONTACTS_AUTH_FAILURES = StubCounter()
+    CONTACTS_DUAL_WRITE_SUCCESS = StubCounter()
+    CONTACTS_DUAL_WRITE_FAILURES = StubCounter()
+    TICKETS_DUAL_WRITE_SUCCESS = StubCounter()
+    TICKETS_DUAL_WRITE_FAILURES = StubCounter()
     OUTBOUND_SYNC_TOTAL = StubCounter()
     CONTACTS_DRIFT_PCT = StubGauge()
+    TICKETS_DRIFT_PCT = StubGauge()
     CONTACTS_QUERY_LATENCY = StubHistogram()
     API_REQUEST_LATENCY = StubHistogram()
     API_REQUESTS_TOTAL = StubCounter()
@@ -167,6 +206,40 @@ def record_outbound_sync(entity_type: str, target: str, success: bool) -> None:
         logger.error("failed_to_record_metric", metric="outbound_sync_total", error=str(e))
 
 
+def record_dual_write(operation: str, success: bool) -> None:
+    """
+    Record dual-write outcomes to legacy Customer.
+
+    Args:
+        operation: Operation type (create, update, delete, status_change)
+        success: Whether the dual-write succeeded
+    """
+    try:
+        if success:
+            CONTACTS_DUAL_WRITE_SUCCESS.labels(operation=operation).inc()
+        else:
+            CONTACTS_DUAL_WRITE_FAILURES.labels(operation=operation).inc()
+    except Exception as e:
+        logger.error("failed_to_record_metric", metric="contacts_dual_write", error=str(e))
+
+
+def record_ticket_dual_write(operation: str, success: bool) -> None:
+    """
+    Record dual-write outcomes to legacy Ticket.
+
+    Args:
+        operation: Operation type (create, update, sync_from_legacy)
+        success: Whether the dual-write succeeded
+    """
+    try:
+        if success:
+            TICKETS_DUAL_WRITE_SUCCESS.labels(operation=operation).inc()
+        else:
+            TICKETS_DUAL_WRITE_FAILURES.inc()
+    except Exception as e:
+        logger.error("failed_to_record_metric", metric="tickets_dual_write", error=str(e))
+
+
 def set_contacts_drift(system: str, drift_pct: float) -> None:
     """
     Set contacts drift percentage for a system.
@@ -179,6 +252,20 @@ def set_contacts_drift(system: str, drift_pct: float) -> None:
         CONTACTS_DRIFT_PCT.labels(system=system).set(drift_pct)
     except Exception as e:
         logger.error("failed_to_record_metric", metric="contacts_drift_pct", error=str(e))
+
+
+def set_tickets_drift(system: str, drift_pct: float) -> None:
+    """
+    Set tickets drift percentage for a system.
+
+    Args:
+        system: External system (splynx, erpnext, chatwoot, ticket_legacy)
+        drift_pct: Percentage of tickets with mismatched fields (0-100)
+    """
+    try:
+        TICKETS_DRIFT_PCT.labels(system=system).set(drift_pct)
+    except Exception as e:
+        logger.error("failed_to_record_metric", metric="tickets_drift_pct", error=str(e))
 
 
 def observe_contacts_query_latency(endpoint: str, latency_seconds: float) -> None:

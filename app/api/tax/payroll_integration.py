@@ -408,41 +408,70 @@ def calculate_bulk_deductions(
     }
 
     for emp in data.employees:
+        emp_config = get_employment_type_config(db, emp.employment_type)
+        include_paye = emp.include_paye if emp.include_paye is not None else emp_config["paye_applicable"]
+        include_pension = emp.include_pension if emp.include_pension is not None else emp_config["pension_applicable"]
+        include_nhf = emp.include_nhf if emp.include_nhf is not None else emp_config["nhf_applicable"]
+        include_nhis = emp.include_nhis if emp.include_nhis is not None else emp_config["nhis_applicable"]
+        include_nsitf = emp_config["nsitf_applicable"]
+        include_itf = emp_config["itf_applicable"]
+
+        if include_pension and emp_config["pension_min_service_months"] > 0:
+            if emp.months_of_service is not None and emp.months_of_service < emp_config["pension_min_service_months"]:
+                include_pension = False
+
         result = calculate_all_statutory_deductions(
             basic_salary=emp.basic_salary,
             housing_allowance=emp.housing_allowance,
             transport_allowance=emp.transport_allowance,
             other_allowances=emp.other_allowances,
-            include_nhf=emp.include_nhf,
-            include_nhis=emp.include_nhis,
+            include_paye=include_paye,
+            include_pension=include_pension,
+            include_nhf=include_nhf,
+            include_nhis=include_nhis,
+            include_nsitf=include_nsitf,
+            include_itf=include_itf,
             tax_date=payroll_date,
         )
 
         # Build deductions for slip
-        deductions_for_slip = {
-            "PAYE": result["paye"]["monthly"],
-            "Pension - Employee": result["pension"]["employee_contribution"],
-        }
-        if result["nhf"]:
+        deductions_for_slip = {}
+        if include_paye and result["paye"]["monthly"] > Decimal("0"):
+            deductions_for_slip["PAYE"] = result["paye"]["monthly"]
+        if include_pension and result["pension"]["employee_contribution"] > Decimal("0"):
+            deductions_for_slip["Pension - Employee"] = result["pension"]["employee_contribution"]
+        if include_nhf and result["nhf"] and result["nhf"]["contribution"] > Decimal("0"):
             deductions_for_slip["NHF"] = result["nhf"]["contribution"]
-        if result["nhis"]:
+        if include_nhis and result["nhis"] and result["nhis"]["employee_contribution"] > Decimal("0"):
             deductions_for_slip["NHIS - Employee"] = result["nhis"]["employee_contribution"]
+
+        eligibility = EmploymentTypeEligibility(
+            employment_type=emp.employment_type,
+            paye_applicable=emp_config["paye_applicable"],
+            pension_applicable=emp_config["pension_applicable"],
+            nhf_applicable=emp_config["nhf_applicable"],
+            nhis_applicable=emp_config["nhis_applicable"],
+            nsitf_applicable=emp_config["nsitf_applicable"],
+            itf_applicable=emp_config["itf_applicable"],
+        )
 
         emp_response = StatutoryDeductionsResponse(
             employee_id=emp.employee_id,
             employee_name=emp.employee_name,
+            employment_type=emp.employment_type,
             gross_monthly=result["gross_monthly"],
             gross_annual=result["gross_annual"],
             is_paye_exempt=result["is_paye_exempt"],
             tax_law=result["tax_law"],
+            eligibility=eligibility,
             paye=PAYEBreakdown(**result["paye"]),
             reliefs=ReliefsBreakdown(**result["reliefs"]),
             pension=PensionBreakdown(**result["pension"]),
             nhf_contribution=result["nhf"]["contribution"] if result["nhf"] else None,
             nhis_employee=result["nhis"]["employee_contribution"] if result["nhis"] else None,
             nhis_employer=result["nhis"]["employer_contribution"] if result["nhis"] else None,
-            nsitf_employer=result["nsitf"]["employer_contribution"],
-            itf_monthly_provision=result["itf"]["monthly_provision"],
+            nsitf_employer=result["nsitf"]["employer_contribution"] if include_nsitf else Decimal("0"),
+            itf_monthly_provision=result["itf"]["monthly_provision"] if include_itf else Decimal("0"),
             totals=EmployeeDeductionsTotals(**result["totals"]),
             deductions_for_slip=deductions_for_slip,
         )

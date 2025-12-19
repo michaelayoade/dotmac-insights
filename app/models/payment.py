@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 class PaymentStatus(enum.Enum):
     PENDING = "pending"
+    APPROVED = "approved"
+    POSTED = "posted"
     COMPLETED = "completed"
     FAILED = "failed"
     REFUNDED = "refunded"
@@ -37,7 +39,7 @@ class PaymentSource(enum.Enum):
     INTERNAL = "internal"
 
 
-class Payment(Base):
+class Payment(SoftDeleteMixin, Base):
     """Payment records from all sources (AR - customer payments)."""
 
     __tablename__ = "payments"
@@ -52,13 +54,13 @@ class Payment(Base):
     source: Mapped[PaymentSource] = mapped_column(Enum(PaymentSource), nullable=False, index=True)
 
     # Links
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
-    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id"), nullable=True, index=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Payment details
     receipt_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     amount: Mapped[Decimal] = mapped_column(nullable=False)
-    currency: Mapped[str] = mapped_column(String(10), default="NGN")
+    currency: Mapped[str] = mapped_column(String(10), default="NGN")  # Uses settings.default_currency at app init
 
     # FX fields
     base_currency: Mapped[str] = mapped_column(String(10), default="NGN")

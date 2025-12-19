@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, List
 from app.database import Base
+from app.utils.datetime_utils import utc_now
 
 
 class User(Base):
@@ -299,7 +300,7 @@ class ServiceToken(Base):
             return False
 
         # Check expiration
-        if self.expires_at and datetime.utcnow() > self.expires_at:
+        if self.expires_at and utc_now() > self.expires_at:
             return False
 
         token_scopes = self.scope_list
@@ -322,7 +323,7 @@ class ServiceToken(Base):
         """Check if token is expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return utc_now() > self.expires_at
 
     @property
     def is_valid(self) -> bool:

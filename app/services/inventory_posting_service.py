@@ -7,6 +7,8 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
+from app.services.transaction_manager import transactional_session
+
 if TYPE_CHECKING:
     from app.models.inventory import StockEntry, StockLedgerEntry
     from app.models.accounting import JournalEntry
@@ -86,41 +88,42 @@ class InventoryPostingService:
         """
         from app.models.accounting import JournalEntry, JournalEntryType
 
-        inv_account = inventory_account or self.DEFAULT_INVENTORY_ACCOUNT
-        grni_account = contra_account or self.DEFAULT_GRNI_ACCOUNT
-        amount = stock_entry.total_incoming_value or Decimal("0")
+        with transactional_session(self.db):
+            inv_account = inventory_account or self.DEFAULT_INVENTORY_ACCOUNT
+            grni_account = contra_account or self.DEFAULT_GRNI_ACCOUNT
+            amount = stock_entry.total_incoming_value or Decimal("0")
 
-        journal_entry = JournalEntry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=stock_entry.posting_date or datetime.utcnow(),
-            company=stock_entry.company,
-            total_debit=amount,
-            total_credit=amount,
-            user_remark=f"Stock Receipt: {stock_entry.erpnext_id or stock_entry.id}",
-            docstatus=1,  # Submitted
-        )
-        self.db.add(journal_entry)
-        self.db.flush()
+            journal_entry = JournalEntry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                company=stock_entry.company,
+                total_debit=amount,
+                total_credit=amount,
+                user_remark=f"Stock Receipt: {stock_entry.erpnext_id or stock_entry.id}",
+                docstatus=1,  # Submitted
+            )
+            self.db.add(journal_entry)
+            self.db.flush()
 
-        # Create journal entry items
-        self._create_journal_entry_item(
-            journal_entry.id,
-            inv_account,
-            debit=amount,
-            credit=Decimal("0"),
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
-        self._create_journal_entry_item(
-            journal_entry.id,
-            grni_account,
-            debit=Decimal("0"),
-            credit=amount,
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
+            # Create journal entry items
+            self._create_journal_entry_item(
+                journal_entry.id,
+                inv_account,
+                debit=amount,
+                credit=Decimal("0"),
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
+            self._create_journal_entry_item(
+                journal_entry.id,
+                grni_account,
+                debit=Decimal("0"),
+                credit=amount,
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
 
-        return journal_entry
+            return journal_entry
 
     def _post_material_issue(
         self,
@@ -136,40 +139,41 @@ class InventoryPostingService:
         """
         from app.models.accounting import JournalEntry, JournalEntryType
 
-        inv_account = inventory_account or self.DEFAULT_INVENTORY_ACCOUNT
-        cogs_account = expense_account or self.DEFAULT_COGS_ACCOUNT
-        amount = stock_entry.total_outgoing_value or Decimal("0")
+        with transactional_session(self.db):
+            inv_account = inventory_account or self.DEFAULT_INVENTORY_ACCOUNT
+            cogs_account = expense_account or self.DEFAULT_COGS_ACCOUNT
+            amount = stock_entry.total_outgoing_value or Decimal("0")
 
-        journal_entry = JournalEntry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=stock_entry.posting_date or datetime.utcnow(),
-            company=stock_entry.company,
-            total_debit=amount,
-            total_credit=amount,
-            user_remark=f"Stock Issue: {stock_entry.erpnext_id or stock_entry.id}",
-            docstatus=1,
-        )
-        self.db.add(journal_entry)
-        self.db.flush()
+            journal_entry = JournalEntry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                company=stock_entry.company,
+                total_debit=amount,
+                total_credit=amount,
+                user_remark=f"Stock Issue: {stock_entry.erpnext_id or stock_entry.id}",
+                docstatus=1,
+            )
+            self.db.add(journal_entry)
+            self.db.flush()
 
-        self._create_journal_entry_item(
-            journal_entry.id,
-            cogs_account,
-            debit=amount,
-            credit=Decimal("0"),
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
-        self._create_journal_entry_item(
-            journal_entry.id,
-            inv_account,
-            debit=Decimal("0"),
-            credit=amount,
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
+            self._create_journal_entry_item(
+                journal_entry.id,
+                cogs_account,
+                debit=amount,
+                credit=Decimal("0"),
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
+            self._create_journal_entry_item(
+                journal_entry.id,
+                inv_account,
+                debit=Decimal("0"),
+                credit=amount,
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
 
-        return journal_entry
+            return journal_entry
 
     def _post_material_transfer(
         self,
@@ -186,47 +190,48 @@ class InventoryPostingService:
         """
         from app.models.accounting import JournalEntry, JournalEntryType
 
-        # For simplicity, assume all warehouses use same inventory account
-        # In a full implementation, would look up warehouse-specific accounts
-        source_account = self.DEFAULT_INVENTORY_ACCOUNT
-        target_account = self.DEFAULT_INVENTORY_ACCOUNT
+        with transactional_session(self.db):
+            # For simplicity, assume all warehouses use same inventory account
+            # In a full implementation, would look up warehouse-specific accounts
+            source_account = self.DEFAULT_INVENTORY_ACCOUNT
+            target_account = self.DEFAULT_INVENTORY_ACCOUNT
 
-        # If same account, no GL entry needed
-        if source_account == target_account:
-            return None
+            # If same account, no GL entry needed
+            if source_account == target_account:
+                return None
 
-        amount = stock_entry.total_amount or Decimal("0")
+            amount = stock_entry.total_amount or Decimal("0")
 
-        journal_entry = JournalEntry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=stock_entry.posting_date or datetime.utcnow(),
-            company=stock_entry.company,
-            total_debit=amount,
-            total_credit=amount,
-            user_remark=f"Stock Transfer: {stock_entry.from_warehouse} → {stock_entry.to_warehouse}",
-            docstatus=1,
-        )
-        self.db.add(journal_entry)
-        self.db.flush()
+            journal_entry = JournalEntry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                company=stock_entry.company,
+                total_debit=amount,
+                total_credit=amount,
+                user_remark=f"Stock Transfer: {stock_entry.from_warehouse} -> {stock_entry.to_warehouse}",
+                docstatus=1,
+            )
+            self.db.add(journal_entry)
+            self.db.flush()
 
-        self._create_journal_entry_item(
-            journal_entry.id,
-            target_account,
-            debit=amount,
-            credit=Decimal("0"),
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
-        self._create_journal_entry_item(
-            journal_entry.id,
-            source_account,
-            debit=Decimal("0"),
-            credit=amount,
-            reference_type="Stock Entry",
-            reference_name=str(stock_entry.id),
-        )
+            self._create_journal_entry_item(
+                journal_entry.id,
+                target_account,
+                debit=amount,
+                credit=Decimal("0"),
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
+            self._create_journal_entry_item(
+                journal_entry.id,
+                source_account,
+                debit=Decimal("0"),
+                credit=amount,
+                reference_type="Stock Entry",
+                reference_name=str(stock_entry.id),
+            )
 
-        return journal_entry
+            return journal_entry
 
     def _post_manufacture(
         self,
@@ -272,56 +277,57 @@ class InventoryPostingService:
         amount = abs(stock_entry.value_difference or stock_entry.total_amount or Decimal("0"))
         is_positive = (stock_entry.value_difference or stock_entry.total_amount or Decimal("0")) > 0
 
-        journal_entry = JournalEntry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=stock_entry.posting_date or datetime.utcnow(),
-            company=stock_entry.company,
-            total_debit=amount,
-            total_credit=amount,
-            user_remark=f"Stock Adjustment: {stock_entry.erpnext_id or stock_entry.id}",
-            docstatus=1,
-        )
-        self.db.add(journal_entry)
-        self.db.flush()
+        with transactional_session(self.db):
+            journal_entry = JournalEntry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                company=stock_entry.company,
+                total_debit=amount,
+                total_credit=amount,
+                user_remark=f"Stock Adjustment: {stock_entry.erpnext_id or stock_entry.id}",
+                docstatus=1,
+            )
+            self.db.add(journal_entry)
+            self.db.flush()
 
-        if is_positive:
-            # Increase in value: DR Inventory, CR Adjustment
-            self._create_journal_entry_item(
-                journal_entry.id,
-                self.DEFAULT_INVENTORY_ACCOUNT,
-                debit=amount,
-                credit=Decimal("0"),
-                reference_type="Stock Entry",
-                reference_name=str(stock_entry.id),
-            )
-            self._create_journal_entry_item(
-                journal_entry.id,
-                self.DEFAULT_STOCK_ADJUSTMENT_ACCOUNT,
-                debit=Decimal("0"),
-                credit=amount,
-                reference_type="Stock Entry",
-                reference_name=str(stock_entry.id),
-            )
-        else:
-            # Decrease in value: DR Adjustment, CR Inventory
-            self._create_journal_entry_item(
-                journal_entry.id,
-                self.DEFAULT_STOCK_ADJUSTMENT_ACCOUNT,
-                debit=amount,
-                credit=Decimal("0"),
-                reference_type="Stock Entry",
-                reference_name=str(stock_entry.id),
-            )
-            self._create_journal_entry_item(
-                journal_entry.id,
-                self.DEFAULT_INVENTORY_ACCOUNT,
-                debit=Decimal("0"),
-                credit=amount,
-                reference_type="Stock Entry",
-                reference_name=str(stock_entry.id),
-            )
+            if is_positive:
+                # Increase in value: DR Inventory, CR Adjustment
+                self._create_journal_entry_item(
+                    journal_entry.id,
+                    self.DEFAULT_INVENTORY_ACCOUNT,
+                    debit=amount,
+                    credit=Decimal("0"),
+                    reference_type="Stock Entry",
+                    reference_name=str(stock_entry.id),
+                )
+                self._create_journal_entry_item(
+                    journal_entry.id,
+                    self.DEFAULT_STOCK_ADJUSTMENT_ACCOUNT,
+                    debit=Decimal("0"),
+                    credit=amount,
+                    reference_type="Stock Entry",
+                    reference_name=str(stock_entry.id),
+                )
+            else:
+                # Decrease in value: DR Adjustment, CR Inventory
+                self._create_journal_entry_item(
+                    journal_entry.id,
+                    self.DEFAULT_STOCK_ADJUSTMENT_ACCOUNT,
+                    debit=amount,
+                    credit=Decimal("0"),
+                    reference_type="Stock Entry",
+                    reference_name=str(stock_entry.id),
+                )
+                self._create_journal_entry_item(
+                    journal_entry.id,
+                    self.DEFAULT_INVENTORY_ACCOUNT,
+                    debit=Decimal("0"),
+                    credit=amount,
+                    reference_type="Stock Entry",
+                    reference_name=str(stock_entry.id),
+                )
 
-        return journal_entry
+            return journal_entry
 
     def _create_journal_entry_item(
         self,
@@ -335,24 +341,17 @@ class InventoryPostingService:
         """Helper to create a journal entry line item."""
         # Note: This assumes a JournalEntryItem model exists
         # If not, we'd need to create it or use a different approach
-        from sqlalchemy import text
+        from app.models.accounting import JournalEntryItem
 
-        self.db.execute(
-            text("""
-                INSERT INTO journal_entry_items
-                (journal_entry_id, account, debit, credit, reference_type, reference_name, created_at)
-                VALUES (:je_id, :account, :debit, :credit, :ref_type, :ref_name, :created_at)
-            """),
-            {
-                "je_id": journal_entry_id,
-                "account": account,
-                "debit": debit,
-                "credit": credit,
-                "ref_type": reference_type,
-                "ref_name": reference_name,
-                "created_at": datetime.utcnow(),
-            }
+        item = JournalEntryItem(
+            journal_entry_id=journal_entry_id,
+            account=account,
+            debit=debit,
+            credit=credit,
+            reference_type=reference_type,
+            reference_name=reference_name,
         )
+        self.db.add(item)
 
     def reverse_posting(
         self,
@@ -366,35 +365,36 @@ class InventoryPostingService:
         """
         from app.models.accounting import JournalEntry, JournalEntryType
 
-        reversal = JournalEntry(
-            voucher_type=JournalEntryType.JOURNAL_ENTRY,
-            posting_date=datetime.utcnow(),
-            company=journal_entry.company,
-            total_debit=journal_entry.total_credit,
-            total_credit=journal_entry.total_debit,
-            user_remark=f"Reversal of {journal_entry.id}: {reason}",
-            docstatus=1,
-        )
-        self.db.add(reversal)
-        self.db.flush()
+        from app.models.accounting import JournalEntryItem
 
-        # Copy and reverse line items
-        from sqlalchemy import text
-        result = self.db.execute(
-            text("SELECT account, debit, credit, reference_type, reference_name FROM journal_entry_items WHERE journal_entry_id = :je_id"),
-            {"je_id": journal_entry.id}
-        )
-        for row in result:
-            self._create_journal_entry_item(
-                reversal.id,
-                row.account,
-                debit=row.credit,  # Swap
-                credit=row.debit,  # Swap
-                reference_type=row.reference_type,
-                reference_name=row.reference_name,
+        with transactional_session(self.db):
+            reversal = JournalEntry(
+                voucher_type=JournalEntryType.JOURNAL_ENTRY,
+                posting_date=datetime.utcnow(),
+                company=journal_entry.company,
+                total_debit=journal_entry.total_credit,
+                total_credit=journal_entry.total_debit,
+                user_remark=f"Reversal of {journal_entry.id}: {reason}",
+                docstatus=1,
             )
+            self.db.add(reversal)
+            self.db.flush()
 
-        return reversal
+            # Copy and reverse line items
+            items = self.db.query(JournalEntryItem).filter(
+                JournalEntryItem.journal_entry_id == journal_entry.id
+            ).all()
+            for item in items:
+                self._create_journal_entry_item(
+                    reversal.id,
+                    item.account,
+                    debit=item.credit,  # Swap
+                    credit=item.debit,  # Swap
+                    reference_type=item.reference_type,
+                    reference_name=item.reference_name,
+                )
+
+            return reversal
 
 
 class StockReceiptPostingService(InventoryPostingService):

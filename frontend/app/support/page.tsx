@@ -46,7 +46,15 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 
-const CHART_COLORS = ['#14b8a6', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#06b6d4'];
+// Chart colors from centralized design tokens (CSS variables for theme switching)
+const CHART_COLORS = [
+  'var(--color-teal-electric)',
+  'var(--color-amber-warn)',
+  'var(--color-purple-accent)',
+  'var(--color-coral-alert)',
+  'var(--color-teal-glow)',
+  'var(--color-cyan-accent)',
+];
 
 function MetricCard({
   label,

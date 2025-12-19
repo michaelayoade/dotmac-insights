@@ -7,14 +7,19 @@ Provides authentication fixtures for testing RBAC scopes:
 - unauthenticated_client: Client with no auth for testing 401s
 """
 import os
+import tempfile
 import pytest
+import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
-# Force SQLite for tests
-os.environ.setdefault("TEST_DATABASE_URL", "sqlite:///./test.db")
+# Force SQLite for tests (use per-session temp DB unless overridden)
+if "TEST_DATABASE_URL" not in os.environ:
+    temp_dir = tempfile.mkdtemp(prefix="dotmac-tests-")
+    os.environ["TEST_DATABASE_URL"] = f"sqlite:///{temp_dir}/test.db"
 
 from app.main import app as fastapi_app
 from app.auth import get_current_principal, Principal
+from app.database import Base, engine
 
 
 # =============================================================================
@@ -50,6 +55,22 @@ def base_client():
     """Base TestClient without any auth overrides."""
     with TestClient(fastapi_app) as client:
         yield client
+
+
+@pytest.fixture(autouse=True)
+def cleanup_db():
+    """Clear database rows after each test to avoid state leakage."""
+    yield
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.begin() as conn:
+        inspector = sa.inspect(conn)
+        existing_tables = set(inspector.get_table_names())
+        conn.execute(sa.text("PRAGMA foreign_keys=OFF"))
+        for table in reversed(Base.metadata.sorted_tables):
+            if table.name in existing_tables:
+                conn.execute(table.delete())
+        conn.execute(sa.text("PRAGMA foreign_keys=ON"))
 
 
 # =============================================================================

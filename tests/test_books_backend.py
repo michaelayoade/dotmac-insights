@@ -1,40 +1,11 @@
 
-import os
 import pytest
-from fastapi.testclient import TestClient
-
-# Force a lightweight SQLite DB for tests to avoid external Postgres dependency
-os.environ.setdefault("TEST_DATABASE_URL", "sqlite:///./test.db")
-
-from app.main import app as fastapi_app
-from app.auth import get_current_principal, Principal
 # Import all models to ensure partial database schema creation works
 import app.models  # noqa: F401
 import app.models.accounting_ext  # noqa: F401
 import app.models.payment_terms  # noqa: F401
 import app.models.auth  # noqa: F401
 import app.models.document_lines  # noqa: F401
-
-# Mock Principal
-mock_principal = Principal(
-    type="user",
-    id=1,
-    external_id="test_user",
-    email="test@example.com",
-    name="Test User",
-    is_superuser=True,
-    scopes={"*"},
-)
-
-async def override_get_current_principal():
-    return mock_principal
-
-@pytest.fixture
-def client():
-    fastapi_app.dependency_overrides[get_current_principal] = override_get_current_principal
-    with TestClient(fastapi_app) as c:
-        yield c
-    fastapi_app.dependency_overrides = {}
 
 class TestBooksAppEndpoints:
     """Comprehensive QA Test Suite for Books (Accounting) Application."""

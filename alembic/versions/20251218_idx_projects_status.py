@@ -5,7 +5,7 @@ Revises: 20251218_idx_bank_txn
 Create Date: 2025-12-18
 
 Adds index on projects.status for status filtering queries.
-Uses CREATE INDEX CONCURRENTLY to avoid blocking writes.
+Uses CREATE INDEX CONCURRENTLY to avoid table locks.
 """
 from typing import Sequence, Union
 
@@ -19,19 +19,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Create index CONCURRENTLY."""
-    op.execute("COMMIT")
-    # Index for status filtering
-    op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_projects_status
-        ON projects (status)
-    """)
-    # Index for customer projects
-    op.execute("""
-        CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_projects_customer
-        ON projects (customer_id)
-        WHERE customer_id IS NOT NULL
-    """)
+    """Create indexes CONCURRENTLY to avoid table locks."""
+    # Must run outside transaction for CONCURRENTLY
+    with op.get_context().autocommit_block():
+        # Index for status filtering
+        op.execute("""
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_projects_status
+            ON projects (status)
+        """)
+        # Index for customer projects
+        op.execute("""
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_projects_customer
+            ON projects (customer_id)
+            WHERE customer_id IS NOT NULL
+        """)
 
 
 def downgrade() -> None:

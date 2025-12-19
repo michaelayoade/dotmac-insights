@@ -208,7 +208,7 @@ async def get_revenue_summary(
         extract("month", Payment.payment_date).label("month"),
         func.sum(Payment.amount).label("total"),
     ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date.isnot(None),
         Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30),
     ).group_by(
@@ -260,7 +260,7 @@ async def get_revenue_trend(
         .filter(
             Payment.payment_date >= start_dt,
             Payment.payment_date <= end_dt,
-            Payment.status == PaymentStatus.COMPLETED,
+            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         )
         .group_by(
             extract("year", Payment.payment_date),

@@ -381,12 +381,35 @@ class UnifiedContactSummary(BaseModel):
 
 
 class UnifiedContactListResponse(BaseModel):
-    """Paginated list response."""
-    items: List[UnifiedContactSummary]
+    """Paginated list response.
+
+    Uses standardized pagination envelope: {data, total, limit, offset}
+    """
+    data: List[UnifiedContactSummary]
     total: int
-    page: int
-    page_size: int
-    total_pages: int
+    limit: int
+    offset: int
+
+    # Deprecated: kept for backward compatibility, will be removed in v2
+    @property
+    def items(self) -> List[UnifiedContactSummary]:
+        """Deprecated: use 'data' instead."""
+        return self.data
+
+    @property
+    def page(self) -> int:
+        """Deprecated: use offset/limit instead."""
+        return (self.offset // self.limit) + 1 if self.limit > 0 else 1
+
+    @property
+    def page_size(self) -> int:
+        """Deprecated: use 'limit' instead."""
+        return self.limit
+
+    @property
+    def total_pages(self) -> int:
+        """Deprecated: use total/limit instead."""
+        return (self.total + self.limit - 1) // self.limit if self.limit > 0 else 1
 
 
 class PersonContactResponse(BaseModel):

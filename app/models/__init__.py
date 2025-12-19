@@ -23,10 +23,14 @@ from app.models.accounting import (
     FiscalYear,
     BankAccount,
     JournalEntry,
+    JournalEntryItem,
     PurchaseInvoice,
     GLEntry,
     Account,
     BankTransaction,
+    BankTransactionPayment,
+    BankReconciliation,
+    BankReconciliationStatus,
 )
 from app.models.bank_transaction_split import BankTransactionSplit
 from app.models.document_lines import (
@@ -228,6 +232,54 @@ from app.models.performance import (
     PerformanceSnapshot,
     ScorecardInstanceStatus,
     OverrideReason,
+)
+from app.models.agent import Agent, Team, TeamMember
+from app.models.omni import (
+    OmniChannel,
+    OmniChannelType,
+    OmniConversation,
+    OmniParticipant,
+    OmniMessage,
+    OmniAttachment,
+    OmniWebhookEvent,
+    ConversationPriority,
+    ConversationStatus,
+    InboxRoutingRule,
+    InboxContact,
+)
+from app.models.outbound_sync import (
+    OutboundSyncLog,
+    SyncStatus,
+    SyncOperation,
+    TargetSystem,
+)
+from app.models.unified_ticket import (
+    UnifiedTicket,
+    TicketType,
+    TicketSource,
+    TicketStatus,
+    TicketPriority,
+    TicketChannel,
+)
+from app.models.payroll_config import (
+    PayrollRegion,
+    DeductionRule,
+    TaxBand,
+    CalcMethod,
+    DeductionType,
+    PayrollFrequency,
+    RuleApplicability,
+)
+from app.models.tax_config import (
+    TaxRegion,
+    GenericTaxCategory,
+    TaxRate,
+    TaxTransaction,
+    CompanyTaxSettings,
+    TaxCategoryType,
+    TaxTransactionType,
+    TaxFilingFrequency,
+    TaxTransactionStatus,
 )
 
 __all__ = [
@@ -454,4 +506,50 @@ __all__ = [
     "PerformanceSnapshot",
     "ScorecardInstanceStatus",
     "OverrideReason",
+    # Agent/Team models
+    "Agent",
+    "Team",
+    "TeamMember",
+    # Omni models
+    "OmniChannel",
+    "OmniChannelType",
+    "OmniConversation",
+    "OmniParticipant",
+    "OmniMessage",
+    "OmniAttachment",
+    "OmniWebhookEvent",
+    "ConversationPriority",
+    "ConversationStatus",
+    "InboxRoutingRule",
+    "InboxContact",
+    # Outbound sync models
+    "OutboundSyncLog",
+    "SyncStatus",
+    "SyncOperation",
+    "TargetSystem",
+    # Unified Ticket models
+    "UnifiedTicket",
+    "TicketType",
+    "TicketSource",
+    "TicketStatus",
+    "TicketPriority",
+    "TicketChannel",
+    # Generic Payroll Config models
+    "PayrollRegion",
+    "DeductionRule",
+    "TaxBand",
+    "CalcMethod",
+    "DeductionType",
+    "PayrollFrequency",
+    "RuleApplicability",
+    # Generic Tax Config models
+    "TaxRegion",
+    "GenericTaxCategory",
+    "TaxRate",
+    "TaxTransaction",
+    "CompanyTaxSettings",
+    "TaxCategoryType",
+    "TaxTransactionType",
+    "TaxFilingFrequency",
+    "TaxTransactionStatus",
 ]

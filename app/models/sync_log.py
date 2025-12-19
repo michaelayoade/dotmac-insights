@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional
 import enum
 from app.database import Base
+from app.utils.datetime_utils import utc_now
 
 
 class SyncStatus(enum.Enum):
@@ -59,7 +60,7 @@ class SyncLog(Base):
 
     def complete(self, status: SyncStatus = SyncStatus.COMPLETED) -> None:
         self.status = status
-        self.completed_at = datetime.utcnow()
+        self.completed_at = utc_now()
         if self.started_at:
             self.duration_seconds = int((self.completed_at - self.started_at).total_seconds())
 
