@@ -155,49 +155,49 @@ interface AuthFixtures {
  */
 export const test = base.extend<AuthFixtures>({
   // Pre-authenticated page with all scopes
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, useFixture) => {
     await setupAuth(page, ALL_SCOPES);
-    await use(page);
+    await useFixture(page);
   },
 
   // Helper to authenticate as admin
-  authAsAdmin: async ({ page }, use) => {
+  authAsAdmin: async ({ page }, useFixture) => {
     const fn = async () => {
       await setupAuth(page, TEST_USERS.admin.scopes);
     };
-    await use(fn);
+    await useFixture(fn);
   },
 
   // Helper to authenticate as readonly user
-  authAsReadonly: async ({ page }, use) => {
+  authAsReadonly: async ({ page }, useFixture) => {
     const fn = async () => {
       await setupAuth(page, TEST_USERS.readonly.scopes);
     };
-    await use(fn);
+    await useFixture(fn);
   },
 
   // Helper to authenticate as HR user
-  authAsHr: async ({ page }, use) => {
+  authAsHr: async ({ page }, useFixture) => {
     const fn = async () => {
       await setupAuth(page, TEST_USERS.hr.scopes);
     };
-    await use(fn);
+    await useFixture(fn);
   },
 
   // Helper to authenticate with specific scopes
-  authWithScopes: async ({ page }, use) => {
+  authWithScopes: async ({ page }, useFixture) => {
     const fn = async (scopes: Scope[]) => {
       await setupAuth(page, scopes);
     };
-    await use(fn);
+    await useFixture(fn);
   },
 
   // Helper to clear auth
-  clearAuth: async ({ page }, use) => {
+  clearAuth: async ({ page }, useFixture) => {
     const fn = async () => {
       await clearAuth(page);
     };
-    await use(fn);
+    await useFixture(fn);
   },
 });
 
