@@ -19,7 +19,11 @@ export type Scope =
   | 'admin:read'
   | 'admin:write'
   | 'hr:read'
-  | 'hr:write';
+  | 'hr:write'
+  | 'accounting:read'
+  | 'accounting:write'
+  | 'gateway:read'
+  | 'gateway:write';
 
 const ALL_SCOPES: Scope[] = [
   'customers:read',
@@ -32,6 +36,10 @@ const ALL_SCOPES: Scope[] = [
   'admin:write',
   'hr:read',
   'hr:write',
+  'accounting:read',
+  'accounting:write',
+  'gateway:read',
+  'gateway:write',
 ];
 
 // Test user configurations for different role scenarios
@@ -132,11 +140,7 @@ export async function expectAccessDenied(page: Page): Promise<void> {
  * Check if the page shows a login redirect or auth required state.
  */
 export async function expectAuthRequired(page: Page): Promise<void> {
-  // Could be a redirect to login or an inline auth prompt
-  const loginVisible = await page.getByText(/sign in|log in|authentication required/i).first().isVisible().catch(() => false);
-  const loginUrl = page.url().includes('/login') || page.url().includes('/auth');
-
-  expect(loginVisible || loginUrl).toBeTruthy();
+  await expect(page).toHaveURL(/\/login|\/auth/);
 }
 
 // Extended test fixture with authentication helpers

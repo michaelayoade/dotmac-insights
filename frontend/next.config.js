@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000'],
+    },
+  },
   async rewrites() {
     // Only enable API proxy in development - production uses direct API URLs
     if (process.env.NODE_ENV === 'development') {

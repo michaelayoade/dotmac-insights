@@ -8,7 +8,6 @@ import {
   X,
   ArrowRight,
   Clock,
-  Zap,
   FileText,
   Users,
   Contact2,
@@ -19,7 +18,6 @@ import {
   Landmark,
   Receipt,
   Hash,
-  Plus,
   LayoutDashboard,
   Briefcase,
   BookOpen,
@@ -42,15 +40,6 @@ import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut';
 // TYPES
 // =============================================================================
 
-interface QuickAction {
-  id: string;
-  label: string;
-  description: string;
-  href: string;
-  icon: React.ElementType;
-  category: 'create' | 'navigate';
-}
-
 interface RecentItem {
   id: string;
   title: string;
@@ -62,15 +51,6 @@ interface RecentItem {
 // =============================================================================
 // CONSTANTS
 // =============================================================================
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'create-invoice', label: 'Create Invoice', description: 'New sales invoice', href: '/sales/invoices/new', icon: FileText, category: 'create' },
-  { id: 'new-ticket', label: 'New Support Ticket', description: 'Create support ticket', href: '/support/tickets/new', icon: Ticket, category: 'create' },
-  { id: 'add-contact', label: 'Add Contact', description: 'New contact', href: '/contacts/new', icon: Contact2, category: 'create' },
-  { id: 'new-order', label: 'New Service Order', description: 'Field service order', href: '/field-service/orders/new', icon: ClipboardList, category: 'create' },
-  { id: 'new-project', label: 'Create Project', description: 'New project', href: '/projects/new', icon: FolderKanban, category: 'create' },
-  { id: 'new-po', label: 'New Purchase Order', description: 'Create PO', href: '/purchasing/orders/new', icon: ShoppingCart, category: 'create' },
-];
 
 const RECENT_STORAGE_KEY = 'dotmac_command_palette_recent';
 const MAX_RECENT_ITEMS = 5;
@@ -152,18 +132,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   // Build flat list of all items for keyboard navigation
   const allItems = useMemo(() => {
-    const items: Array<{ id: string; type: 'recent' | 'action' | 'module' | 'result'; data: unknown; href: string }> = [];
+    const items: Array<{ id: string; type: 'recent' | 'module' | 'result'; data: unknown; href: string }> = [];
 
-    // If no search query, show recent + quick actions + modules
+    // If no search query, show recent + modules
     if (!query || query.length < 2) {
       // Recent items
       recentItems.forEach((item) => {
         items.push({ id: `recent-${item.id}`, type: 'recent', data: item, href: item.href });
-      });
-
-      // Quick actions
-      QUICK_ACTIONS.forEach((action) => {
-        items.push({ id: `action-${action.id}`, type: 'action', data: action, href: action.href });
       });
 
       // Modules
@@ -174,15 +149,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       // Search results
       searchResults.forEach((result) => {
         items.push({ id: `result-${result.id}`, type: 'result', data: result, href: result.href });
-      });
-
-      // Filter quick actions by query
-      QUICK_ACTIONS.filter(
-        (a) =>
-          a.label.toLowerCase().includes(query.toLowerCase()) ||
-          a.description.toLowerCase().includes(query.toLowerCase())
-      ).forEach((action) => {
-        items.push({ id: `action-${action.id}`, type: 'action', data: action, href: action.href });
       });
     }
 
@@ -207,16 +173,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         href,
         type: 'module',
       });
-    } else if (data && typeof data === 'object' && 'label' in data) {
-      const action = data as { id: string; label: string };
-      addRecentItem({
-        id: action.id,
-        title: action.label,
-        href,
-        type: 'action',
-      });
     }
-
     onClose();
     router.push(href);
   }, [onClose, router]);
@@ -255,7 +212,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   if (!isOpen) return null;
 
   const showRecent = recentItems.length > 0 && (!query || query.length < 2);
-  const showQuickActions = !query || query.length < 2;
   const showModules = !query || query.length < 2;
   const showSearchResults = query && query.length >= 2 && searchResults.length > 0;
 
@@ -322,44 +278,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       <Clock className="w-4 h-4 text-slate-muted" />
                       <span className="flex-1 truncate">{item.title}</span>
                       <ArrowRight className={cn('w-4 h-4', isSelected ? 'text-teal-400' : 'text-slate-muted')} />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Quick actions */}
-            {showQuickActions && (
-              <div className="mb-4">
-                <div className="px-3 py-2 text-xs font-semibold text-slate-muted uppercase tracking-wide flex items-center gap-2">
-                  <Zap className="w-3.5 h-3.5" />
-                  Quick Actions
-                </div>
-                {QUICK_ACTIONS.map((action) => {
-                  itemIndex++;
-                  const isSelected = selectedIndex === itemIndex;
-                  const Icon = action.icon;
-                  return (
-                    <button
-                      key={action.id}
-                      data-selected={isSelected}
-                      onClick={() => handleSelect(action.href, action)}
-                      className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
-                        isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-white hover:bg-slate-elevated'
-                      )}
-                    >
-                      <div className={cn(
-                        'w-8 h-8 rounded-lg flex items-center justify-center',
-                        isSelected ? 'bg-teal-500/30' : 'bg-slate-elevated'
-                      )}>
-                        <Icon className={cn('w-4 h-4', isSelected ? 'text-teal-400' : 'text-slate-muted')} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{action.label}</p>
-                        <p className="text-xs text-slate-muted truncate">{action.description}</p>
-                      </div>
-                      <Plus className={cn('w-4 h-4', isSelected ? 'text-teal-400' : 'text-slate-muted')} />
                     </button>
                   );
                 })}

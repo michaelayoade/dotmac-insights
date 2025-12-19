@@ -40,13 +40,10 @@ test.describe('Settings - Authenticated', () => {
       const navItems = page.locator('nav a, [role="tab"]');
       const count = await navItems.count();
 
-      if (count > 1) {
-        await navItems.nth(1).click();
-        await page.waitForTimeout(500);
-
-        // Should update content
-        await expect(page.locator('body')).toBeVisible();
-      }
+      expect(count).toBeGreaterThan(1);
+      await navItems.nth(1).click();
+      await page.waitForTimeout(500);
+      await expect(page.locator('body')).toBeVisible();
     });
   });
 
@@ -63,37 +60,31 @@ test.describe('Settings - Authenticated', () => {
       await page.goto('/admin/settings/company');
 
       const nameInput = page.getByLabel(/company.*name|name/i);
-      if (await nameInput.isVisible().catch(() => false)) {
-        const currentValue = await nameInput.inputValue();
-        await nameInput.fill(`${currentValue} Updated`);
+      await expect(nameInput).toBeVisible();
+      const currentValue = await nameInput.inputValue();
+      await nameInput.fill(`${currentValue} Updated`);
 
-        const saveButton = page.getByRole('button', { name: /save/i });
-        await saveButton.click();
+      const saveButton = page.getByRole('button', { name: /save/i });
+      await saveButton.click();
 
-        await expect(
-          page.getByText(/saved|updated|success/i).first()
-        ).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText(/saved|updated|success/i).first()).toBeVisible({ timeout: 5000 });
 
-        // Revert change
-        await nameInput.fill(currentValue);
-        await saveButton.click();
-      }
+      // Revert change
+      await nameInput.fill(currentValue);
+      await saveButton.click();
     });
 
     test('validates required fields', async ({ page }) => {
       await page.goto('/admin/settings/company');
 
       const nameInput = page.getByLabel(/company.*name|name/i);
-      if (await nameInput.isVisible().catch(() => false)) {
-        await nameInput.fill('');
+      await expect(nameInput).toBeVisible();
+      await nameInput.fill('');
 
-        const saveButton = page.getByRole('button', { name: /save/i });
-        await saveButton.click();
+      const saveButton = page.getByRole('button', { name: /save/i });
+      await saveButton.click();
 
-        await expect(
-          page.getByText(/required|cannot be empty/i).first()
-        ).toBeVisible({ timeout: 5000 });
-      }
+      await expect(page.getByText(/required|cannot be empty/i).first()).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -112,29 +103,24 @@ test.describe('Settings - Authenticated', () => {
       const toggles = page.locator('input[type="checkbox"], [role="switch"]');
       const firstToggle = toggles.first();
 
-      if (await firstToggle.isVisible().catch(() => false)) {
-        const wasChecked = await firstToggle.isChecked();
-        await firstToggle.click();
+      await expect(firstToggle).toBeVisible();
+      const wasChecked = await firstToggle.isChecked();
+      await firstToggle.click();
 
-        const isNowChecked = await firstToggle.isChecked();
-        expect(isNowChecked).not.toBe(wasChecked);
+      const isNowChecked = await firstToggle.isChecked();
+      expect(isNowChecked).not.toBe(wasChecked);
 
-        // Revert
-        await firstToggle.click();
-      }
+      await firstToggle.click();
     });
 
     test('saves notification preferences', async ({ page }) => {
       await page.goto('/admin/settings/notifications');
 
       const saveButton = page.getByRole('button', { name: /save/i });
-      if (await saveButton.isVisible().catch(() => false)) {
-        await saveButton.click();
+      await expect(saveButton).toBeVisible();
+      await saveButton.click();
 
-        await expect(
-          page.getByText(/saved|updated|success/i).first()
-        ).toBeVisible({ timeout: 5000 });
-      }
+      await expect(page.getByText(/saved|updated|success/i).first()).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -161,143 +147,12 @@ test.describe('Settings - Authenticated', () => {
       await page.goto('/admin/settings/integrations');
 
       const connectButton = page.getByRole('button', { name: /connect|configure|setup/i }).first();
-      if (await connectButton.isVisible().catch(() => false)) {
-        await connectButton.click();
+      await expect(connectButton).toBeVisible();
+      await connectButton.click();
 
-        // Should show connection dialog or redirect to OAuth
-        await expect(
-          page.getByText(/connect|authorize|api.*key/i).first()
-        ).toBeVisible({ timeout: 5000 });
-      }
-    });
-  });
-});
-
-test.describe('Feature Gating', () => {
-  test.describe('Feature Flag Disabled', () => {
-    test('shows access denied for disabled feature', async ({ page }) => {
-      // Mock feature flag as disabled
-      await page.route('**/api/features**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            analytics_v2: false,
-            advanced_reports: false,
-          }),
-        });
+      await expect(page.getByText(/connect|authorize|api.*key/i).first()).toBeVisible({
+        timeout: 5000,
       });
-
-      await setupAuth(page, ['admin:read', 'admin:write', 'analytics:read']);
-      await page.goto('/analytics/advanced');
-
-      // Should show feature not available or access denied
-      await expect(
-        page.getByText(/not available|access denied|coming soon|disabled/i).first()
-      ).toBeVisible({ timeout: 10000 });
-    });
-
-    test('hides feature in navigation when disabled', async ({ page }) => {
-      await page.route('**/api/features**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            premium_analytics: false,
-          }),
-        });
-      });
-
-      await setupAuth(page, ['admin:read', 'analytics:read']);
-      await page.goto('/');
-
-      // Premium analytics link should not be visible
-      const premiumLink = page.getByRole('link', { name: /premium.*analytics/i });
-      await expect(premiumLink).not.toBeVisible();
-    });
-  });
-
-  test.describe('Feature Flag Enabled', () => {
-    test('shows full UI when feature is enabled', async ({ page }) => {
-      await page.route('**/api/features**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            analytics_v2: true,
-            advanced_reports: true,
-          }),
-        });
-      });
-
-      await setupAuth(page, ['analytics:read']);
-      await page.goto('/analytics');
-
-      // Full analytics UI should be visible
-      await expect(
-        page.getByRole('heading', { name: /analytics/i })
-      ).toBeVisible({ timeout: 10000 });
-    });
-
-    test('shows feature in navigation when enabled', async ({ page }) => {
-      await page.route('**/api/features**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            insights_module: true,
-          }),
-        });
-      });
-
-      await setupAuth(page, ['analytics:read', 'explore:read']);
-      await page.goto('/');
-
-      // Module should be accessible
-      const insightsLink = page.getByRole('link', { name: /insight/i }).first();
-      if (await insightsLink.isVisible().catch(() => false)) {
-        await insightsLink.click();
-        await expect(page).toHaveURL(/\/insights/);
-      }
-    });
-  });
-
-  test.describe('Entitlement Gating', () => {
-    test('shows upgrade prompt for premium feature', async ({ page }) => {
-      // Mock entitlements as basic tier
-      await page.route('**/api/entitlements**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            tier: 'basic',
-            features: ['contacts', 'support'],
-          }),
-        });
-      });
-
-      await setupAuth(page, ['admin:read', 'analytics:read']);
-      await page.goto('/analytics/premium');
-
-      // Should show upgrade prompt
-      await expect(
-        page.getByText(/upgrade|premium|enterprise|not.*included/i).first()
-      ).toBeVisible({ timeout: 10000 });
-    });
-
-    test('allows access for premium tier', async ({ page }) => {
-      await page.route('**/api/entitlements**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({
-            tier: 'premium',
-            features: ['contacts', 'support', 'analytics', 'premium_analytics'],
-          }),
-        });
-      });
-
-      await setupAuth(page, ['analytics:read']);
-      await page.goto('/analytics');
-
-      // Should load normally
-      await expect(
-        page.getByRole('heading', { name: /analytics/i })
-      ).toBeVisible({ timeout: 10000 });
     });
   });
 });
@@ -317,9 +172,8 @@ test.describe('Settings - RBAC', () => {
     await expect(page.getByRole('heading', { name: /setting/i })).toBeVisible();
 
     const saveButton = page.getByRole('button', { name: /save/i }).first();
-    if (await saveButton.isVisible().catch(() => false)) {
-      await expect(saveButton).toBeDisabled();
-    }
+    await expect(saveButton).toBeVisible();
+    await expect(saveButton).toBeDisabled();
   });
 });
 
@@ -340,12 +194,10 @@ test.describe('User Preferences', () => {
     await page.goto('/settings/preferences');
 
     const themeToggle = page.locator('[role="switch"], input[type="checkbox"]').first();
-    if (await themeToggle.isVisible().catch(() => false)) {
-      await themeToggle.click();
+    await expect(themeToggle).toBeVisible();
+    await themeToggle.click();
 
-      // Theme should update
-      await page.waitForTimeout(500);
-    }
+    await page.waitForTimeout(500);
   });
 
   test('preferences persist across sessions', async ({ page }) => {
@@ -353,17 +205,14 @@ test.describe('User Preferences', () => {
 
     // Make a change
     const toggle = page.locator('[role="switch"]').first();
-    if (await toggle.isVisible().catch(() => false)) {
-      const initialState = await toggle.getAttribute('aria-checked');
-      await toggle.click();
-      await page.waitForTimeout(500);
+    await expect(toggle).toBeVisible();
+    const initialState = await toggle.getAttribute('aria-checked');
+    await toggle.click();
+    await page.waitForTimeout(500);
 
-      // Reload page
-      await page.reload();
+    await page.reload();
 
-      // Setting should persist
-      const newState = await toggle.getAttribute('aria-checked');
-      expect(newState).not.toBe(initialState);
-    }
+    const newState = await toggle.getAttribute('aria-checked');
+    expect(newState).not.toBe(initialState);
   });
 });

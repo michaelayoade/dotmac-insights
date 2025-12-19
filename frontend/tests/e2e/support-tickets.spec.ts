@@ -35,10 +35,9 @@ test.describe('Support Tickets - Authenticated', () => {
 
       // Find status filter
       const statusFilter = page.locator('select').filter({ hasText: /status|all/i }).first();
-      if (await statusFilter.isVisible().catch(() => false)) {
-        await statusFilter.selectOption({ label: /open/i });
-        await page.waitForTimeout(500);
-      }
+      await expect(statusFilter).toBeVisible();
+      await statusFilter.selectOption({ label: /open/i });
+      await page.waitForTimeout(500);
 
       // Table should still be visible
       await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
@@ -49,10 +48,9 @@ test.describe('Support Tickets - Authenticated', () => {
 
       // Find priority filter
       const priorityFilter = page.locator('select').filter({ hasText: /priority|all/i }).first();
-      if (await priorityFilter.isVisible().catch(() => false)) {
-        await priorityFilter.selectOption({ label: /high|urgent/i });
-        await page.waitForTimeout(500);
-      }
+      await expect(priorityFilter).toBeVisible();
+      await priorityFilter.selectOption({ label: /high|urgent/i });
+      await page.waitForTimeout(500);
 
       // Table should still be visible
       await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
@@ -62,23 +60,23 @@ test.describe('Support Tickets - Authenticated', () => {
       await page.goto('/support/tickets');
 
       // Wait for data to load
-      await page.waitForSelector('table tbody tr, [role="row"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('table tbody tr, [role="row"]', { timeout: 10000 });
 
-      // Check for count display
-      const countVisible = await page.getByText(/showing|total|results/i).first().isVisible().catch(() => false);
-
-      // Pagination may not appear with few records - that's ok
-      expect(true).toBe(true);
+      await expect(page.getByText(/showing|total|results/i).first()).toBeVisible();
+      await expect(
+        page
+          .locator('[aria-label*="page"], button:has-text("Next"), button:has-text("Previous")')
+          .first()
+      ).toBeVisible();
     });
 
     test('search filters tickets', async ({ page }) => {
       await page.goto('/support/tickets');
 
       const searchInput = page.getByPlaceholder(/search/i);
-      if (await searchInput.isVisible().catch(() => false)) {
-        await searchInput.fill('test');
-        await page.waitForTimeout(500);
-      }
+      await expect(searchInput).toBeVisible();
+      await searchInput.fill('test');
+      await page.waitForTimeout(500);
 
       // Table should update
       await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
@@ -89,12 +87,11 @@ test.describe('Support Tickets - Authenticated', () => {
 
       // Wait for tickets to load
       const ticketRow = page.locator('table tbody tr, [role="row"]').first();
-      await ticketRow.waitFor({ timeout: 10000 }).catch(() => null);
+      await ticketRow.waitFor({ timeout: 10000 });
 
-      if (await ticketRow.isVisible().catch(() => false)) {
-        await ticketRow.click();
-        await page.waitForURL(/\/support\/tickets\/\d+/, { timeout: 5000 });
-      }
+      await expect(ticketRow).toBeVisible();
+      await ticketRow.click();
+      await page.waitForURL(/\/support\/tickets\/\d+/, { timeout: 5000 });
     });
   });
 
@@ -120,21 +117,17 @@ test.describe('Support Tickets - Authenticated', () => {
 
       // Find status dropdown or button
       const statusControl = page.locator('select, button').filter({ hasText: /status|open|pending/i }).first();
-      if (await statusControl.isVisible().catch(() => false)) {
-        await statusControl.click();
+      await expect(statusControl).toBeVisible();
+      await statusControl.click();
 
-        // Select a new status
-        const resolvedOption = page.getByRole('option', { name: /resolved|closed/i }).or(
-          page.getByText(/resolved|closed/i)
-        );
-        if (await resolvedOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await resolvedOption.click();
+      const resolvedOption = page.getByRole('option', { name: /resolved|closed/i }).or(
+        page.getByText(/resolved|closed/i)
+      );
+      await expect(resolvedOption).toBeVisible({ timeout: 2000 });
+      await resolvedOption.click();
 
-          // Verify status updated
-          await page.waitForTimeout(500);
-          await expect(page.getByText(/resolved|closed/i).first()).toBeVisible();
-        }
-      }
+      await page.waitForTimeout(500);
+      await expect(page.getByText(/resolved|closed/i).first()).toBeVisible();
     });
 
     test('add resolution updates ticket', async ({ page, request }) => {
@@ -148,15 +141,13 @@ test.describe('Support Tickets - Authenticated', () => {
       const resolutionInput = page.getByLabel(/resolution|notes/i).or(
         page.getByPlaceholder(/resolution|notes/i)
       );
-      if (await resolutionInput.isVisible().catch(() => false)) {
-        await resolutionInput.fill('Issue resolved via E2E test');
+      await expect(resolutionInput).toBeVisible();
+      await resolutionInput.fill('Issue resolved via E2E test');
 
-        const saveButton = page.getByRole('button', { name: /save|update|submit/i });
-        await saveButton.click();
+      const saveButton = page.getByRole('button', { name: /save|update|submit/i });
+      await saveButton.click();
 
-        // Should show success or updated state
-        await page.waitForTimeout(500);
-      }
+      await expect(page.getByText(/saved|updated|success/i).first()).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -187,19 +178,14 @@ test.describe('Support Tickets - Authenticated', () => {
 
       // Select priority
       const prioritySelect = page.getByLabel(/priority/i);
-      if (await prioritySelect.isVisible().catch(() => false)) {
-        await prioritySelect.selectOption({ label: /medium/i });
-      }
+      await expect(prioritySelect).toBeVisible();
+      await prioritySelect.selectOption({ label: /medium/i });
 
       await page.getByRole('button', { name: /create|save|submit/i }).click();
 
       // Should redirect to ticket detail or list
-      await page.waitForURL(/\/support\/tickets/, { timeout: 10000 });
-
-      // Verify ticket was created
-      if (page.url().includes('/tickets/')) {
-        await expect(page.getByText(subject)).toBeVisible();
-      }
+      await page.waitForURL(/\/support\/tickets\/\d+/, { timeout: 10000 });
+      await expect(page.getByText(subject)).toBeVisible();
     });
   });
 
@@ -208,29 +194,21 @@ test.describe('Support Tickets - Authenticated', () => {
       await page.goto('/inbox');
 
       // Wait for conversations to load
-      await page.waitForSelector('[role="listbox"], [role="list"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('[role="listbox"], [role="list"]', { timeout: 10000 });
 
-      // Select a conversation if any exist
       const conversation = page.locator('[role="option"], [role="listitem"]').first();
-      if (await conversation.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await conversation.click();
+      await expect(conversation).toBeVisible({ timeout: 5000 });
+      await conversation.click();
 
-        // Find the create ticket action
-        const moreButton = page.getByRole('button', { name: /more|actions/i });
-        if (await moreButton.isVisible().catch(() => false)) {
-          await moreButton.click();
+      const moreButton = page.getByRole('button', { name: /more|actions/i });
+      await expect(moreButton).toBeVisible();
+      await moreButton.click();
 
-          const createTicketOption = page.getByRole('button', { name: /create.*ticket/i });
-          if (await createTicketOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await createTicketOption.click();
+      const createTicketOption = page.getByRole('button', { name: /create.*ticket/i });
+      await expect(createTicketOption).toBeVisible({ timeout: 2000 });
+      await createTicketOption.click();
 
-            // Should show success toast
-            await expect(
-              page.getByText(/ticket created/i)
-            ).toBeVisible({ timeout: 5000 });
-          }
-        }
-      }
+      await expect(page.getByText(/ticket created/i)).toBeVisible({ timeout: 5000 });
     });
   });
 });
@@ -251,17 +229,13 @@ test.describe('Support Settings', () => {
     await page.goto('/support/settings');
 
     const triggerSelect = page.locator('select').filter({ hasText: /trigger/i }).first();
-    if (await triggerSelect.isVisible().catch(() => false)) {
-      await triggerSelect.selectOption({ index: 1 });
+    await expect(triggerSelect).toBeVisible();
+    await triggerSelect.selectOption({ index: 1 });
 
-      const saveButton = page.getByRole('button', { name: /save/i });
-      await saveButton.click();
+    const saveButton = page.getByRole('button', { name: /save/i });
+    await saveButton.click();
 
-      // Should show success feedback
-      await expect(
-        page.getByText(/saved|updated|success/i).first()
-      ).toBeVisible({ timeout: 5000 });
-    }
+    await expect(page.getByText(/saved|updated|success/i).first()).toBeVisible({ timeout: 5000 });
   });
 });
 

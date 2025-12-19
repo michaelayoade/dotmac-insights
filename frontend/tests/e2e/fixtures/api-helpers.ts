@@ -181,6 +181,60 @@ export async function createTestWebhook(
 }
 
 /**
+ * Create a test bank transaction via API.
+ */
+export async function createTestBankTransaction(
+  request: APIRequestContext,
+  data: Partial<{
+    date: string;
+    bank_account: string;
+    deposit: number;
+    withdrawal: number;
+    currency: string;
+    description: string;
+    reference_number: string;
+    transaction_type: string;
+    payee_name: string;
+    payee_account: string;
+  }> = {}
+): Promise<{ id: number; date: string; amount: number }> {
+  const response = await request.post(`${API_BASE}/api/v1/accounting/bank-transactions`, {
+    headers: getAuthHeaders(['books:write']),
+    data: {
+      date: data.date || new Date().toISOString().split('T')[0],
+      bank_account: data.bank_account || 'E2E Test Account',
+      deposit: data.deposit ?? 1000,
+      withdrawal: data.withdrawal ?? 0,
+      currency: data.currency || 'NGN',
+      description: data.description || `E2E Bank Transaction ${Date.now()}`,
+      reference_number: data.reference_number || `E2E-${Date.now()}`,
+      transaction_type: data.transaction_type || 'credit',
+      payee_name: data.payee_name || 'E2E Payee',
+      payee_account: data.payee_account || '0000000000',
+      splits: [],
+    },
+  });
+
+  if (!response.ok()) {
+    throw new Error(`Failed to create test bank transaction: ${response.status()}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a test bank transaction via API.
+ */
+export async function deleteTestBankTransaction(
+  request: APIRequestContext,
+  transactionId: number
+): Promise<void> {
+  await request.delete(`${API_BASE}/api/v1/accounting/bank-transactions/${transactionId}`, {
+    headers: getAuthHeaders(['books:write']),
+  });
+}
+
+/**
  * Clean up test data by deleting resources created during tests.
  * Uses soft patterns that don't fail if resources don't exist.
  */

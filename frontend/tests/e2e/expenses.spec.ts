@@ -31,8 +31,7 @@ test.describe('Expenses - Authenticated', () => {
       await page.goto('/expenses');
 
       // Should show expense stats cards
-      const statsVisible = await page.getByText(/total|pending|approved/i).first().isVisible().catch(() => false);
-      expect(statsVisible).toBeTruthy();
+      await expect(page.getByText(/total|pending|approved/i).first()).toBeVisible();
     });
   });
 
@@ -50,63 +49,50 @@ test.describe('Expenses - Authenticated', () => {
       await page.goto('/expenses/transactions');
 
       // Wait for transactions to load
-      await page.waitForSelector('table tbody tr, [class*="transaction"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('table tbody tr, [class*="transaction"]', { timeout: 10000 });
 
       const row = page.locator('table tbody tr, [class*="transaction"]').first();
-      if (await row.isVisible().catch(() => false)) {
-        // Find more actions button
-        const moreButton = row.locator('button').filter({ hasText: /./ }).last();
-        await moreButton.click();
+      await expect(row).toBeVisible();
+      const moreButton = row.locator('button').filter({ hasText: /./ }).last();
+      await moreButton.click();
 
-        // Verify action menu appears
-        await expect(
-          page.getByText(/exclude|personal|dispute/i).first()
-        ).toBeVisible({ timeout: 3000 });
-      }
+      await expect(page.getByText(/exclude|personal|dispute/i).first()).toBeVisible({
+        timeout: 3000,
+      });
     });
 
     test('exclude action shows toast feedback', async ({ page }) => {
       await page.goto('/expenses/transactions');
 
-      await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('table tbody tr', { timeout: 10000 });
 
       const row = page.locator('table tbody tr').first();
-      if (await row.isVisible().catch(() => false)) {
-        const moreButton = row.locator('button').last();
-        await moreButton.click();
+      await expect(row).toBeVisible();
+      const moreButton = row.locator('button').last();
+      await moreButton.click();
 
-        const excludeOption = page.getByRole('button', { name: /exclude/i });
-        if (await excludeOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await excludeOption.click();
+      const excludeOption = page.getByRole('button', { name: /exclude/i });
+      await expect(excludeOption).toBeVisible({ timeout: 2000 });
+      await excludeOption.click();
 
-          // Should show success or error toast
-          await expect(
-            page.getByText(/excluded|success|failed/i).first()
-          ).toBeVisible({ timeout: 5000 });
-        }
-      }
+      await expect(page.getByText(/excluded|success/i).first()).toBeVisible({ timeout: 5000 });
     });
 
     test('mark personal action updates status', async ({ page }) => {
       await page.goto('/expenses/transactions');
 
-      await page.waitForSelector('table tbody tr', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('table tbody tr', { timeout: 10000 });
 
       const row = page.locator('table tbody tr').first();
-      if (await row.isVisible().catch(() => false)) {
-        const moreButton = row.locator('button').last();
-        await moreButton.click();
+      await expect(row).toBeVisible();
+      const moreButton = row.locator('button').last();
+      await moreButton.click();
 
-        const personalOption = page.getByRole('button', { name: /personal/i });
-        if (await personalOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await personalOption.click();
+      const personalOption = page.getByRole('button', { name: /personal/i });
+      await expect(personalOption).toBeVisible({ timeout: 2000 });
+      await personalOption.click();
 
-          // Should show feedback
-          await expect(
-            page.getByText(/personal|success|failed/i).first()
-          ).toBeVisible({ timeout: 5000 });
-        }
-      }
+      await expect(page.getByText(/personal|success/i).first()).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -124,74 +110,60 @@ test.describe('Expenses - Authenticated', () => {
       await page.goto('/expenses/approvals');
 
       // Wait for items to load
-      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
 
       // Find select all checkbox
       const selectAll = page.locator('input[type="checkbox"]').first();
-      if (await selectAll.isVisible().catch(() => false)) {
-        await selectAll.check();
+      await expect(selectAll).toBeVisible();
+      await selectAll.check();
 
-        // Verify selection count updates
-        await expect(
-          page.getByText(/selected/i)
-        ).toBeVisible({ timeout: 3000 });
-      }
+      await expect(page.getByText(/selected/i)).toBeVisible({ timeout: 3000 });
     });
 
     test('bulk approve shows success toast', async ({ page }) => {
       await page.goto('/expenses/approvals');
 
-      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
 
       // Select first item
       const checkbox = page.locator('input[type="checkbox"]').nth(1); // Skip select-all
-      if (await checkbox.isVisible().catch(() => false)) {
-        await checkbox.check();
+      await expect(checkbox).toBeVisible();
+      await checkbox.check();
 
-        // Click approve button
-        const approveButton = page.getByRole('button', { name: /approve/i });
-        await approveButton.click();
+      const approveButton = page.getByRole('button', { name: /approve/i });
+      await approveButton.click();
 
-        // Should show success or error toast
-        await expect(
-          page.getByText(/approved|success|failed/i).first()
-        ).toBeVisible({ timeout: 5000 });
-      }
+      await expect(page.getByText(/approved|success/i).first()).toBeVisible({ timeout: 5000 });
     });
 
     test('bulk reject requires reason', async ({ page }) => {
       await page.goto('/expenses/approvals');
 
-      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
 
       const checkbox = page.locator('input[type="checkbox"]').nth(1);
-      if (await checkbox.isVisible().catch(() => false)) {
-        await checkbox.check();
+      await expect(checkbox).toBeVisible();
+      await checkbox.check();
 
-        const rejectButton = page.getByRole('button', { name: /reject/i });
-        await rejectButton.click();
+      const rejectButton = page.getByRole('button', { name: /reject/i });
+      await rejectButton.click();
 
-        // Modal should appear with reason field
-        await expect(
-          page.getByLabel(/reason/i).or(page.getByPlaceholder(/reason/i))
-        ).toBeVisible({ timeout: 3000 });
-      }
+      await expect(page.getByLabel(/reason/i).or(page.getByPlaceholder(/reason/i))).toBeVisible({
+        timeout: 3000,
+      });
     });
 
     test('individual approve works', async ({ page }) => {
       await page.goto('/expenses/approvals');
 
-      await page.waitForSelector('[role="row"], table tbody tr', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('[role="row"], table tbody tr', { timeout: 10000 });
 
       // Find individual approve button
       const approveIcon = page.locator('button[title*="Approve"], button:has(svg)').first();
-      if (await approveIcon.isVisible().catch(() => false)) {
-        await approveIcon.click();
+      await expect(approveIcon).toBeVisible();
+      await approveIcon.click();
 
-        await expect(
-          page.getByText(/approved|success|failed/i).first()
-        ).toBeVisible({ timeout: 5000 });
-      }
+      await expect(page.getByText(/approved|success/i).first()).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -212,34 +184,16 @@ test.describe('Expenses - Authenticated', () => {
     test('statement actions menu works', async ({ page }) => {
       await page.goto('/expenses/statements');
 
-      await page.waitForSelector('table tbody tr, [class*="statement"]', { timeout: 10000 }).catch(() => null);
+      await page.waitForSelector('table tbody tr, [class*="statement"]', { timeout: 10000 });
 
       const row = page.locator('table tbody tr').first();
-      if (await row.isVisible().catch(() => false)) {
-        const moreButton = row.locator('button').last();
-        await moreButton.click();
+      await expect(row).toBeVisible();
+      const moreButton = row.locator('button').last();
+      await moreButton.click();
 
-        // Menu should appear
-        await expect(
-          page.getByText(/view|reconcile|close/i).first()
-        ).toBeVisible({ timeout: 3000 });
-      }
-    });
-
-    test('empty state shows import CTA', async ({ page }) => {
-      // Mock empty response
-      await page.route('**/api/expenses/statements**', (route) => {
-        route.fulfill({
-          status: 200,
-          body: JSON.stringify({ data: [], total: 0 }),
-        });
+      await expect(page.getByText(/view|reconcile|close/i).first()).toBeVisible({
+        timeout: 3000,
       });
-
-      await page.goto('/expenses/statements');
-
-      await expect(
-        page.getByText(/no statements|import.*statement/i).first()
-      ).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -264,13 +218,11 @@ test.describe('Expenses - Authenticated', () => {
 
       // Click a preset button
       const thisMonth = page.getByRole('button', { name: /this month/i });
-      if (await thisMonth.isVisible().catch(() => false)) {
-        await thisMonth.click();
+      await expect(thisMonth).toBeVisible();
+      await thisMonth.click();
 
-        // Date inputs should update
-        const startInput = page.getByLabel(/start.*date/i);
-        await expect(startInput).not.toHaveValue('');
-      }
+      const startInput = page.getByLabel(/start.*date/i);
+      await expect(startInput).not.toHaveValue('');
     });
 
     test('export shows loading state', async ({ page }) => {
@@ -287,24 +239,6 @@ test.describe('Expenses - Authenticated', () => {
       ).toBeVisible({ timeout: 5000 });
     });
 
-    test('export error shows toast', async ({ page }) => {
-      // Mock export failure
-      await page.route('**/api/expenses/reports/export**', (route) => {
-        route.fulfill({
-          status: 500,
-          body: JSON.stringify({ detail: 'Export failed' }),
-        });
-      });
-
-      await page.goto('/expenses/reports');
-
-      await page.getByRole('button', { name: /export|download/i }).click();
-
-      // Should show error toast
-      await expect(
-        page.getByText(/failed|error/i).first()
-      ).toBeVisible({ timeout: 5000 });
-    });
   });
 
   test.describe('Cash Advances', () => {

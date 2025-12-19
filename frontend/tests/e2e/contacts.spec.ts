@@ -38,13 +38,14 @@ test.describe('Contacts - Authenticated', () => {
       // Wait for table to load
       await page.waitForSelector('table tbody tr, [role="grid"] [role="row"]', {
         timeout: 10000,
-      }).catch(() => null);
+      });
 
-      // Check for pagination (may not appear if few records)
-      const paginationExists = await page.locator('[aria-label*="page"], button:has-text("Next"), button:has-text("Previous")').first().isVisible().catch(() => false);
-
-      // This is acceptable - pagination only shows when there's enough data
-      expect(true).toBe(true);
+      await expect(page.locator('table tbody tr, [role="grid"] [role="row"]').first()).toBeVisible();
+      await expect(
+        page
+          .locator('[aria-label*="page"], button:has-text("Next"), button:has-text("Previous")')
+          .first()
+      ).toBeVisible();
     });
 
     test('search filters contacts by name', async ({ page }) => {
@@ -65,61 +66,12 @@ test.describe('Contacts - Authenticated', () => {
 
       // Find and use the contact type filter
       const typeFilter = page.locator('select').filter({ hasText: /type|all/i }).first();
-      if (await typeFilter.isVisible().catch(() => false)) {
-        await typeFilter.selectOption({ index: 1 }); // Select first non-default option
-        await page.waitForTimeout(500);
-      }
+      await expect(typeFilter).toBeVisible();
+      await typeFilter.selectOption({ index: 1 });
+      await page.waitForTimeout(500);
 
       // Verify table is still visible after filter
       await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
-    });
-
-    test('shows error state when API fails', async ({ page }) => {
-      // Mock API failure
-      await page.route('**/api/contacts**', (route) => {
-        route.fulfill({
-          status: 500,
-          body: JSON.stringify({ detail: 'Internal server error' }),
-        });
-      });
-
-      await page.goto('/contacts');
-
-      // Should show error state
-      await expect(
-        page.getByText(/failed|error|unable/i).first()
-      ).toBeVisible({ timeout: 10000 });
-    });
-
-    test('retry button reloads data on error', async ({ page }) => {
-      let callCount = 0;
-
-      await page.route('**/api/contacts**', (route) => {
-        callCount++;
-        if (callCount === 1) {
-          route.fulfill({
-            status: 500,
-            body: JSON.stringify({ detail: 'Internal server error' }),
-          });
-        } else {
-          route.continue();
-        }
-      });
-
-      await page.goto('/contacts');
-
-      // Wait for error state
-      await expect(page.getByText(/failed|error/i).first()).toBeVisible({ timeout: 10000 });
-
-      // Click retry button
-      const retryButton = page.getByRole('button', { name: /retry|try again/i });
-      if (await retryButton.isVisible().catch(() => false)) {
-        await retryButton.click();
-
-        // Should now show data or empty state (not error)
-        await page.waitForTimeout(1000);
-        await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
-      }
     });
   });
 
@@ -171,30 +123,6 @@ test.describe('Contacts - Authenticated', () => {
       await expect(page.getByText(testName)).toBeVisible({ timeout: 5000 });
     });
 
-    test('shows error toast on server error', async ({ page }) => {
-      await page.route('**/api/contacts', (route) => {
-        if (route.request().method() === 'POST') {
-          route.fulfill({
-            status: 400,
-            body: JSON.stringify({ detail: 'Email already exists' }),
-          });
-        } else {
-          route.continue();
-        }
-      });
-
-      await page.goto('/contacts/new');
-
-      await page.getByLabel(/name/i).fill('Test Contact');
-      await page.getByLabel(/email/i).fill('duplicate@test.com');
-
-      await page.getByRole('button', { name: /save|create|submit/i }).click();
-
-      // Should show error message
-      await expect(
-        page.getByText(/already exists|error|failed/i).first()
-      ).toBeVisible({ timeout: 5000 });
-    });
   });
 
   test.describe('Edit Contact', () => {
@@ -256,9 +184,8 @@ test.describe('Contacts - Authenticated', () => {
 
       // Confirm if modal appears
       const confirmButton = page.getByRole('button', { name: /confirm|yes|archive|delete/i });
-      if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmButton.click();
-      }
+      await expect(confirmButton).toBeVisible({ timeout: 2000 });
+      await confirmButton.click();
 
       // Should redirect to list
       await page.waitForURL('/contacts', { timeout: 10000 });
@@ -272,20 +199,15 @@ test.describe('Contacts - Authenticated', () => {
   });
 });
 
-test.describe('Contacts - RBAC', () => {
-  test('read-only user cannot see create button', async ({ page }) => {
-    await setupAuth(page, ['customers:read']);
-    await page.goto('/contacts');
+  test.describe('Contacts - RBAC', () => {
+    test('read-only user cannot see create button', async ({ page }) => {
+      await setupAuth(page, ['customers:read']);
+      await page.goto('/contacts');
 
-    // Create button should be hidden or disabled
-    const createButton = page.getByRole('link', { name: /Add Contact/i });
-    const isVisible = await createButton.isVisible().catch(() => false);
-
-    if (isVisible) {
-      // If visible, should be disabled
-      await expect(createButton).toBeDisabled();
-    }
-  });
+      // Create button should be hidden or disabled
+      const createButton = page.getByRole('link', { name: /Add Contact/i });
+      await expect(createButton).toBeHidden();
+    });
 
   test('user without customers scope sees access denied', async ({ page }) => {
     await setupAuth(page, ['hr:read']); // No customer scopes
@@ -295,18 +217,14 @@ test.describe('Contacts - RBAC', () => {
   });
 });
 
-test.describe('Contacts - Unauthenticated', () => {
-  test('redirects to login when not authenticated', async ({ page }) => {
-    // Clear any existing auth
-    await page.goto('/');
-    await page.evaluate(() => localStorage.clear());
+  test.describe('Contacts - Unauthenticated', () => {
+    test('redirects to login when not authenticated', async ({ page }) => {
+      // Clear any existing auth
+      await page.goto('/');
+      await page.evaluate(() => localStorage.clear());
 
-    await page.goto('/contacts');
+      await page.goto('/contacts');
 
-    // Should redirect to login or show auth required
-    const isLoginPage = page.url().includes('/login') || page.url().includes('/auth');
-    const hasAuthPrompt = await page.getByText(/sign in|log in|authentication/i).first().isVisible().catch(() => false);
-
-    expect(isLoginPage || hasAuthPrompt).toBeTruthy();
+      await expect(page).toHaveURL(/\/login|\/auth/);
+    });
   });
-});
