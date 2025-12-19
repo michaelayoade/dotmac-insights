@@ -17,9 +17,6 @@ interface EnvConfig {
   API_URL: string;
   INTERNAL_API_URL: string;
 
-  // Auth (dev only)
-  SERVICE_TOKEN: string | null;
-
   // Features
   CHAT_WIDGET_KEY: string | null;
 
@@ -67,9 +64,6 @@ function parseEnv(): EnvConfig {
     console.error('NEXT_PUBLIC_API_URL is required in production');
   }
 
-  // Service token: only available in development
-  const serviceToken = isDevelopment ? getEnvVar('NEXT_PUBLIC_SERVICE_TOKEN') ?? null : null;
-
   // Optional feature configs
   const chatWidgetKey = getEnvVar('NEXT_PUBLIC_CHAT_WIDGET_KEY') ?? null;
   const buildId = getEnvVar('NEXT_PUBLIC_BUILD_ID') ?? null;
@@ -81,7 +75,6 @@ function parseEnv(): EnvConfig {
     IS_TEST: isTest,
     API_URL: apiUrl || '',
     INTERNAL_API_URL: internalApiUrl || '',
-    SERVICE_TOKEN: serviceToken,
     CHAT_WIDGET_KEY: chatWidgetKey,
     BUILD_ID: buildId,
   };
@@ -126,14 +119,6 @@ export const env = {
   },
 
   /**
-   * Get service token (dev only)
-   * Returns null in production for safety
-   */
-  get serviceToken() {
-    return getEnv().SERVICE_TOKEN;
-  },
-
-  /**
    * Check if we're running on the client side
    */
   get isClient() {
@@ -155,15 +140,9 @@ export const env = {
 export function validateEnv(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const config = getEnv();
-  const rawServiceToken = getEnvVar('NEXT_PUBLIC_SERVICE_TOKEN');
-
   if (config.IS_PRODUCTION) {
     if (!config.API_URL) {
       errors.push('NEXT_PUBLIC_API_URL is required in production');
-    }
-
-    if (rawServiceToken) {
-      errors.push('NEXT_PUBLIC_SERVICE_TOKEN should not be set in production');
     }
   }
 

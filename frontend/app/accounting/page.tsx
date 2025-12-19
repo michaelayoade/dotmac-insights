@@ -11,6 +11,7 @@ import {
   useAccountingDashboard,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { DashboardShell } from '@/components/ui/DashboardShell';
 import {
   DollarSign,
   TrendingUp,
@@ -21,8 +22,6 @@ import {
   PiggyBank,
   Scale,
   ArrowUpRight,
-  ArrowDownRight,
-  AlertTriangle,
   Loader2,
   Activity,
   BookOpen,
@@ -111,9 +110,9 @@ function RatioCard({ title, value, description, status }: RatioCardProps) {
 
 export default function AccountingDashboardPage() {
   // Fetch data from multiple endpoints
-  const { data: dashboard, isLoading: dashboardLoading } = useAccountingDashboard();
-  const { data: balanceSheet, isLoading: bsLoading } = useAccountingBalanceSheet();
-  const { data: incomeStatement, isLoading: isLoading } = useAccountingIncomeStatement();
+  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: retryDashboard } = useAccountingDashboard();
+  const { data: balanceSheet, isLoading: bsLoading, error: bsError, mutate: retryBs } = useAccountingBalanceSheet();
+  const { data: incomeStatement, isLoading: isLoading, error: isError, mutate: retryIs } = useAccountingIncomeStatement();
   const { data: suppliers } = useAccountingSuppliers({ limit: 1 });
   const { data: bankAccounts } = useAccountingBankAccounts();
   const { data: ledger } = useAccountingGeneralLedger({ limit: 1 });
@@ -121,6 +120,12 @@ export default function AccountingDashboardPage() {
   const { data: fiscalYears } = useAccountingFiscalYears();
 
   const loading = bsLoading || isLoading || dashboardLoading;
+  const error = dashboardError || bsError || isError;
+  const handleRetry = () => {
+    retryDashboard();
+    retryBs();
+    retryIs();
+  };
 
   // Extract key metrics with dashboard as primary source and statements as fallback
   const totalAssets = dashboard?.summary?.total_assets ?? balanceSheet?.assets?.total ?? 0;
@@ -163,6 +168,13 @@ export default function AccountingDashboardPage() {
   const fiscalYearCount = fiscalYears?.total || 0;
 
   return (
+    <DashboardShell
+      isLoading={loading && !dashboard && !balanceSheet}
+      error={error}
+      onRetry={handleRetry}
+      loadingMessage="Loading accounting data..."
+      errorMessage="Failed to load accounting data"
+    >
     <div className="space-y-6">
       {/* Key Financial Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -356,5 +368,6 @@ export default function AccountingDashboardPage() {
         </div>
       )}
     </div>
+    </DashboardShell>
   );
 }

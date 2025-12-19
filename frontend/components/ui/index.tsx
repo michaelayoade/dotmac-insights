@@ -52,10 +52,10 @@ export function PageHeader({
             <div
               className={cn(
                 'w-10 h-10 rounded-xl flex items-center justify-center',
-                iconClassName || 'bg-teal-500/10 border border-teal-500/30'
+                iconClassName || 'bg-teal-electric/10 border border-teal-electric/30'
               )}
             >
-              <Icon className="w-5 h-5 text-teal-400" />
+              <Icon className="w-5 h-5 text-teal-electric" />
             </div>
           )}
           <div>
@@ -112,7 +112,7 @@ export function EmptyState({
           action.href ? (
             <Link
               href={action.href}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -120,7 +120,7 @@ export function EmptyState({
           ) : (
             <button
               onClick={action.onClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -155,8 +155,8 @@ export function ErrorState({
       )}
     >
       <div className="flex flex-col items-center justify-center text-center">
-        <AlertTriangle className="w-12 h-12 mb-3 text-rose-400" />
-        <p className="text-sm text-rose-400 mb-4">{message}</p>
+        <AlertTriangle className="w-12 h-12 mb-3 text-coral-alert" />
+        <p className="text-sm text-coral-alert mb-4">{message}</p>
         {onRetry && (
           <button
             onClick={onRetry}
@@ -348,11 +348,11 @@ export function Button({
 }: ButtonProps) {
   const variants = {
     primary:
-      'bg-gradient-to-r from-teal-500 to-teal-400 text-slate-900 hover:shadow-lg hover:shadow-teal-500/25',
+      'bg-gradient-to-r from-teal-electric to-teal-glow text-white hover:shadow-lg hover:shadow-teal-electric/25',
     secondary:
       'bg-slate-elevated border border-slate-border text-white hover:bg-slate-border',
     danger:
-      'bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25',
+      'bg-coral-alert/15 border border-coral-alert/30 text-coral-alert hover:bg-coral-alert/25',
     ghost: 'text-slate-muted hover:text-white hover:bg-slate-elevated',
   };
 
@@ -424,7 +424,7 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-slate-card border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+        className="w-full bg-slate-card border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
       />
     </div>
   );
@@ -462,7 +462,7 @@ export function Select({
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}
       className={cn(
-        'bg-slate-card border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50 appearance-none cursor-pointer',
+        'bg-slate-card border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 appearance-none cursor-pointer',
         'bg-[url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%2364748b\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")] bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat pr-10',
         className
       )}
@@ -529,7 +529,7 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
                 className={cn(
                   'px-1.5 py-0.5 rounded text-xs',
                   isActive
-                    ? 'bg-teal-500/20 text-teal-400'
+                    ? 'bg-teal-electric/20 text-teal-electric'
                     : 'bg-slate-border text-slate-muted'
                 )}
               >

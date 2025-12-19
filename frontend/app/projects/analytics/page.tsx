@@ -43,24 +43,28 @@ import {
   Activity,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { CHART_COLORS } from '@/lib/design-tokens';
 
-// Chart color palette
-const CHART_COLORS = ['#2dd4bf', '#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ec4899', '#ef4444', '#6366f1'];
+const CHART_PALETTE = CHART_COLORS.palette;
 const STATUS_COLORS: Record<string, string> = {
-  open: '#3b82f6',
-  completed: '#10b981',
-  on_hold: '#f59e0b',
-  cancelled: '#ef4444',
+  open: CHART_COLORS.info,
+  completed: CHART_COLORS.success,
+  on_hold: CHART_COLORS.warning,
+  cancelled: CHART_COLORS.danger,
 };
 const PRIORITY_COLORS: Record<string, string> = {
-  high: '#ef4444',
-  medium: '#f59e0b',
-  low: '#6b7280',
+  high: CHART_COLORS.danger,
+  medium: CHART_COLORS.warning,
+  low: CHART_COLORS.axis,
 };
 
 const TOOLTIP_STYLE = {
-  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' },
-  labelStyle: { color: '#f8fafc' },
+  contentStyle: {
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
+    borderRadius: '8px',
+  },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
 };
 
 function formatCurrency(value: number | undefined | null): string {
@@ -196,7 +200,7 @@ export default function ProjectsAnalyticsPage() {
     return Object.entries(dashboard.by_priority).map(([key, value]) => ({
       name: key.charAt(0).toUpperCase() + key.slice(1),
       value: value as number,
-      color: PRIORITY_COLORS[key] || CHART_COLORS[0],
+      color: PRIORITY_COLORS[key] || CHART_PALETTE[0],
     })).filter(d => d.value > 0);
   }, [dashboard]);
 
@@ -206,7 +210,7 @@ export default function ProjectsAnalyticsPage() {
     return taskDistribution.by_status.map((item: any) => ({
       name: item.status?.charAt(0).toUpperCase() + item.status?.slice(1) || 'Unknown',
       count: item.count || 0,
-      fill: STATUS_COLORS[item.status] || CHART_COLORS[0],
+      fill: STATUS_COLORS[item.status] || CHART_PALETTE[0],
     }));
   }, [taskDistribution]);
 
@@ -216,7 +220,7 @@ export default function ProjectsAnalyticsPage() {
     return taskDistribution.by_priority.map((item: any) => ({
       name: item.priority?.charAt(0).toUpperCase() + item.priority?.slice(1) || 'Unknown',
       count: item.count || 0,
-      fill: PRIORITY_COLORS[item.priority] || CHART_COLORS[0],
+      fill: PRIORITY_COLORS[item.priority] || CHART_PALETTE[0],
     }));
   }, [taskDistribution]);
 
@@ -396,9 +400,9 @@ export default function ProjectsAnalyticsPage() {
           {priorityData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={priorityData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} width={70} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
+                <XAxis type="number" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} width={70} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Bar dataKey="value" name="Projects" radius={[0, 4, 4, 0]}>
                   {priorityData.map((entry, index) => (
@@ -422,9 +426,9 @@ export default function ProjectsAnalyticsPage() {
           {trendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="period" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
+                <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Legend
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
@@ -435,16 +439,16 @@ export default function ProjectsAnalyticsPage() {
                   type="monotone"
                   dataKey="created"
                   name="Created"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
+                  stroke={CHART_COLORS.info}
+                  fill={CHART_COLORS.info}
                   fillOpacity={0.3}
                 />
                 <Area
                   type="monotone"
                   dataKey="completed"
                   name="Completed"
-                  stroke="#10b981"
-                  fill="#10b981"
+                  stroke={CHART_COLORS.success}
+                  fill={CHART_COLORS.success}
                   fillOpacity={0.3}
                 />
               </AreaChart>
@@ -461,9 +465,9 @@ export default function ProjectsAnalyticsPage() {
           {taskStatusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={taskStatusData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
+                <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Bar dataKey="count" name="Tasks" radius={[4, 4, 0, 0]}>
                   {taskStatusData.map((entry: { fill: string }, index: number) => (
@@ -487,9 +491,9 @@ export default function ProjectsAnalyticsPage() {
           {assigneeData.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={assigneeData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 10 }} width={80} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
+                <XAxis type="number" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} width={80} />
                 <Tooltip
                   {...TOOLTIP_STYLE}
                   formatter={(value: any, name: string) => [
@@ -502,8 +506,8 @@ export default function ProjectsAnalyticsPage() {
                   iconType="circle"
                   iconSize={8}
                 />
-                <Bar dataKey="total" name="Total" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completed" name="Completed" fill="#10b981" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="total" name="Total" fill={CHART_COLORS.info} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="completed" name="Completed" fill={CHART_COLORS.success} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -518,17 +522,17 @@ export default function ProjectsAnalyticsPage() {
           {deptData.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={deptData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" stroke="#64748b" tick={{ fontSize: 10 }} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
+                <XAxis type="number" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} width={100} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Legend
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
                   iconType="circle"
                   iconSize={8}
                 />
-                <Bar dataKey="projects" name="Projects" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="tasks" name="Tasks" fill="#2dd4bf" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="projects" name="Projects" fill={CHART_COLORS.palette[2]} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="tasks" name="Tasks" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

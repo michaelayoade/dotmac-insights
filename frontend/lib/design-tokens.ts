@@ -187,9 +187,13 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
   pending: 'warning',
   processing: 'warning',
   partial: 'warning',
+  partially_paid: 'warning',
   review: 'warning',
   expiring: 'warning',
   degraded: 'warning',
+  suspended: 'warning',
+  open: 'warning',
+  inactive: 'warning',
 
   // Danger states
   failed: 'danger',
@@ -199,14 +203,16 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
   offline: 'danger',
   critical: 'danger',
   rejected: 'danger',
+  blocked: 'danger',
+  unpaid: 'danger',
 
   // Info states
   draft: 'info',
   new: 'info',
   scheduled: 'info',
+  started: 'info',
 
   // Default fallback
-  inactive: 'default',
   unknown: 'default',
 };
 
@@ -214,8 +220,9 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
  * Get variant for a status string
  */
 export function getStatusVariant(status: string): Variant {
-  const normalized = status.toLowerCase().replace(/[_-]/g, '');
-  return STATUS_VARIANT_MAP[normalized] ?? 'default';
+  const key = status.toLowerCase();
+  const normalized = key.replace(/[_-]/g, '');
+  return STATUS_VARIANT_MAP[key] ?? STATUS_VARIANT_MAP[normalized] ?? 'default';
 }
 
 // =============================================================================

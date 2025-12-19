@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExpenseSummaryReport, useExpenseReportExports } from '@/hooks/useExpenses';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { ExpenseSummaryReport } from '@/lib/expenses.types';
 
 type ReportType = 'claims' | 'advances' | 'transactions';
@@ -53,6 +54,7 @@ function getDefaultDateRange() {
 }
 
 export default function ExpenseReportsPage() {
+  const { handleError } = useErrorHandler();
   const defaultRange = getDefaultDateRange();
   const [startDate, setStartDate] = useState(defaultRange.start);
   const [endDate, setEndDate] = useState(defaultRange.end);
@@ -87,8 +89,7 @@ export default function ExpenseReportsPage() {
         await exportTransactions({ ...params, format: selectedFormat === 'pdf' ? 'csv' : selectedFormat });
       }
     } catch (err) {
-      console.error('Export failed:', err);
-      alert('Export failed. Please try again.');
+      handleError(err, 'Export failed');
     } finally {
       setExporting(false);
     }

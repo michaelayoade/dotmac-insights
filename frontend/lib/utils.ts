@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { getStatusVariant } from '@/lib/design-tokens';
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -87,49 +88,7 @@ export function formatRelativeTime(dateString: string | null | undefined): strin
  * @see lib/design-tokens.ts for the canonical STATUS_VARIANT_MAP
  */
 export function getStatusColor(status: string): string {
-  const statusMap: Record<string, string> = {
-    // Success states
-    active: 'success',
-    completed: 'success',
-    paid: 'success',
-    approved: 'success',
-    online: 'success',
-    connected: 'success',
-    healthy: 'success',
-    resolved: 'success',
-
-    // Warning states
-    pending: 'warning',
-    processing: 'warning',
-    partial: 'warning',
-    partially_paid: 'warning',
-    review: 'warning',
-    expiring: 'warning',
-    degraded: 'warning',
-    suspended: 'warning',
-    open: 'warning',
-    inactive: 'warning',
-
-    // Danger states
-    failed: 'danger',
-    error: 'danger',
-    cancelled: 'danger',
-    overdue: 'danger',
-    offline: 'danger',
-    critical: 'danger',
-    rejected: 'danger',
-    blocked: 'danger',
-    unpaid: 'danger',
-
-    // Info states
-    draft: 'info',
-    new: 'info',
-    scheduled: 'info',
-    started: 'info',
-  };
-
-  const normalized = status.toLowerCase().replace(/[_-]/g, '');
-  return statusMap[status.toLowerCase()] ?? statusMap[normalized] ?? 'default';
+  return getStatusVariant(status);
 }
 
 export function getInitials(name: string): string {

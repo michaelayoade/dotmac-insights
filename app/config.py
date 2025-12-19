@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     jwks_url: str = ""  # e.g., "https://auth.example.com/.well-known/jwks.json"
     jwt_audience: Optional[str] = None  # Optional audience claim validation
     jwks_cache_ttl: int = 3600  # Seconds to cache JWKS keys (1 hour default)
+    # Test-only JWT secret for E2E runs (HS256)
+    e2e_jwt_secret: Optional[str] = None
+    e2e_auth_enabled: bool = False
 
     # Service token settings
     service_token_hash_rounds: int = 12  # bcrypt rounds for hashing service tokens
@@ -164,6 +167,8 @@ if os.getenv("PYTEST_CURRENT_TEST"):
 # Validate JWT auth in production
 if settings.is_production and not settings.jwks_url:
     raise ValueError("JWKS_URL must be set in production environment for JWT authentication")
+if settings.is_production and (settings.e2e_jwt_secret or settings.e2e_auth_enabled):
+    raise ValueError("E2E auth must not be enabled in production")
 
 # Production safety checks
 if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):

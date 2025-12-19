@@ -29,6 +29,7 @@ import {
 } from '@/hooks/useApi';
 import type { HrPayrollPayoutRequest } from '@/lib/api';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import { CHART_COLORS } from '@/lib/design-tokens';
 import {
   Banknote,
   Briefcase,
@@ -55,7 +56,14 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-const CHART_COLORS = ['#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
+    borderRadius: '8px',
+  },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
+};
 
 function MetricCard({
   label,
@@ -297,8 +305,8 @@ export default function HrPayrollPage() {
   // Payroll breakdown for pie chart
   const payrollBreakdown = useMemo(() => {
     return [
-      { name: 'Net Pay', value: payroll30d.net_total || payrollSummary.totalNet, color: '#10b981' },
-      { name: 'Deductions', value: payroll30d.deduction_total || payrollSummary.totalDeductions, color: '#f59e0b' },
+      { name: 'Net Pay', value: payroll30d.net_total || payrollSummary.totalNet, color: CHART_COLORS.success },
+      { name: 'Deductions', value: payroll30d.deduction_total || payrollSummary.totalDeductions, color: CHART_COLORS.warning },
     ].filter(d => d.value > 0);
   }, [payroll30d, payrollSummary]);
 
@@ -308,8 +316,8 @@ export default function HrPayrollPage() {
     const earnings = components.filter((c: any) => c.type === 'earning').length;
     const deductions = components.filter((c: any) => c.type === 'deduction').length;
     return [
-      { name: 'Earnings', value: earnings, color: '#10b981' },
-      { name: 'Deductions', value: deductions, color: '#f59e0b' },
+      { name: 'Earnings', value: earnings, color: CHART_COLORS.success },
+      { name: 'Deductions', value: deductions, color: CHART_COLORS.warning },
     ];
   }, [componentList.items]);
 
@@ -324,7 +332,7 @@ export default function HrPayrollPage() {
     return Object.entries(statusCounts).map(([status, count], idx) => ({
       name: status.charAt(0).toUpperCase() + status.slice(1),
       value: count,
-      color: status === 'paid' ? '#10b981' : status === 'submitted' ? '#8b5cf6' : status === 'void' ? '#ef4444' : '#f59e0b',
+      color: status === 'paid' ? CHART_COLORS.success : status === 'submitted' ? CHART_COLORS.info : status === 'void' ? CHART_COLORS.danger : CHART_COLORS.warning,
     }));
   }, [salarySlipList.items]);
 
@@ -516,7 +524,7 @@ export default function HrPayrollPage() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                  {...TOOLTIP_STYLE}
                   formatter={(value: number) => formatCurrency(value, 'NGN', { maximumFractionDigits: 0 })}
                 />
                 <Legend

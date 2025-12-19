@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useExpenseClaims, useExpenseMutations, useCashAdvances, useCashAdvanceMutations } from '@/hooks/useExpenses';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { ExpenseClaim, CashAdvance } from '@/lib/expenses.types';
 
 type ItemType = 'claim' | 'advance';
@@ -67,6 +68,7 @@ export default function ApprovalsPage() {
 
   const { approveClaim, rejectClaim } = useExpenseMutations();
   const { approveAdvance, rejectAdvance } = useCashAdvanceMutations();
+  const { handleError } = useErrorHandler();
 
   const isLoading = claimsLoading || advancesLoading;
 
@@ -157,8 +159,7 @@ export default function ApprovalsPage() {
       await Promise.all(promises);
       setSelectedItems(new Set());
     } catch (err) {
-      console.error('Bulk approve failed:', err);
-      alert('Some approvals failed. Please try again.');
+      handleError(err, 'Some approvals failed');
     } finally {
       setProcessing(false);
     }
@@ -187,8 +188,7 @@ export default function ApprovalsPage() {
       setShowRejectModal(false);
       setRejectReason('');
     } catch (err) {
-      console.error('Bulk reject failed:', err);
-      alert('Some rejections failed. Please try again.');
+      handleError(err, 'Some rejections failed');
     } finally {
       setProcessing(false);
     }
@@ -203,8 +203,7 @@ export default function ApprovalsPage() {
         await approveAdvance(item.id);
       }
     } catch (err) {
-      console.error('Approve failed:', err);
-      alert('Approval failed. Please try again.');
+      handleError(err, 'Approval failed');
     } finally {
       setProcessing(false);
     }

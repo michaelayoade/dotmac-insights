@@ -50,26 +50,16 @@ import {
   Plus,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-import { CHART_COLORS as CHART_PALETTE, getChartColor } from '@/lib/design-tokens';
-
-// Chart colors from centralized design tokens
-const CHART_COLORS = [
-  'var(--color-teal-electric)',
-  'var(--color-blue-info)',
-  'var(--color-purple-accent)',
-  'var(--color-amber-warn)',
-  'var(--color-teal-glow)',
-  'var(--color-coral-alert)',
-];
+import { CHART_COLORS } from '@/lib/design-tokens';
 
 // Theme-aware tooltip styling using CSS variables
 const TOOLTIP_STYLE = {
   contentStyle: {
-    backgroundColor: 'var(--color-slate-card)',
-    border: '1px solid var(--color-slate-border)',
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
     borderRadius: '8px',
   },
-  labelStyle: { color: 'var(--color-text-primary)' },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
 };
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
@@ -252,9 +242,9 @@ export default function AccountingDashboardPage() {
   // Chart data: Balance sheet composition - useMemo MUST be called unconditionally (before any returns)
   const balanceSheetData = useMemo(() => {
     return [
-      { name: 'Assets', value: totalAssets, color: '#3b82f6' },
-      { name: 'Liabilities', value: totalLiabilities, color: '#ef4444' },
-      { name: 'Equity', value: totalEquity, color: '#10b981' },
+      { name: 'Assets', value: totalAssets, color: CHART_COLORS.info },
+      { name: 'Liabilities', value: totalLiabilities, color: CHART_COLORS.danger },
+      { name: 'Equity', value: totalEquity, color: CHART_COLORS.success },
     ].filter(item => item.value > 0);
   }, [totalAssets, totalLiabilities, totalEquity]);
 
@@ -266,12 +256,12 @@ export default function AccountingDashboardPage() {
     const otherInc = incomeStatement?.other_income?.total || 0;
 
     return [
-      { name: 'Revenue', amount: totalRevenue, fill: '#10b981' },
-      { name: 'COGS', amount: cogs, fill: '#f59e0b' },
-      { name: 'Operating', amount: opex, fill: '#8b5cf6' },
-      { name: 'Other Exp', amount: otherExp, fill: '#ef4444' },
-      { name: 'Other Inc', amount: otherInc, fill: '#2dd4bf' },
-      { name: 'Net Income', amount: netIncome, fill: netIncome >= 0 ? '#10b981' : '#ef4444' },
+      { name: 'Revenue', amount: totalRevenue, fill: CHART_COLORS.success },
+      { name: 'COGS', amount: cogs, fill: CHART_COLORS.warning },
+      { name: 'Operating', amount: opex, fill: CHART_COLORS.palette[2] },
+      { name: 'Other Exp', amount: otherExp, fill: CHART_COLORS.danger },
+      { name: 'Other Inc', amount: otherInc, fill: CHART_COLORS.primaryLight },
+      { name: 'Net Income', amount: netIncome, fill: netIncome >= 0 ? CHART_COLORS.success : CHART_COLORS.danger },
     ];
   }, [incomeStatement, totalRevenue, netIncome]);
 
@@ -302,9 +292,9 @@ export default function AccountingDashboardPage() {
   const cashFlowData = useMemo(() => {
     if (!cashFlow) return [];
     return [
-      { name: 'Operating', value: cashFlow.operating_activities?.net || 0, fill: '#10b981' },
-      { name: 'Investing', value: cashFlow.investing_activities?.net || 0, fill: '#3b82f6' },
-      { name: 'Financing', value: cashFlow.financing_activities?.net || 0, fill: '#8b5cf6' },
+      { name: 'Operating', value: cashFlow.operating_activities?.net || 0, fill: CHART_COLORS.success },
+      { name: 'Investing', value: cashFlow.investing_activities?.net || 0, fill: CHART_COLORS.info },
+      { name: 'Financing', value: cashFlow.financing_activities?.net || 0, fill: CHART_COLORS.palette[2] },
     ];
   }, [cashFlow]);
 
@@ -463,17 +453,17 @@ export default function AccountingDashboardPage() {
           {revenueExpenseData.some(d => d.amount > 0) ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={revenueExpenseData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
                 <XAxis
                   type="number"
-                  stroke="#64748b"
+                  stroke={CHART_COLORS.axis}
                   tick={{ fontSize: 10 }}
                   tickFormatter={(v) => formatCompactCurrency(v)}
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  stroke="#64748b"
+                  stroke={CHART_COLORS.axis}
                   tick={{ fontSize: 11 }}
                   width={70}
                 />
@@ -502,28 +492,28 @@ export default function AccountingDashboardPage() {
         <ChartCard title="Receivables vs Payables" subtitle="Outstanding amounts" icon={DollarSign}>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={arApData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+              <XAxis dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
+              <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
               <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
-              <Bar dataKey="AR" name="Receivables" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="AP" name="Payables" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="AR" name="Receivables" fill={CHART_COLORS.info} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="AP" name="Payables" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-3 flex items-center justify-between text-xs">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="w-2 h-2 rounded-full bg-blue-info" />
                 <span className="text-slate-muted">AR: {formatCurrency(arOutstanding || accountsReceivable)}</span>
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="w-2 h-2 rounded-full bg-amber-warn" />
                 <span className="text-slate-muted">AP: {formatCurrency(apOutstanding)}</span>
               </span>
             </div>
             <span className={cn(
               'font-semibold',
-              (arOutstanding || accountsReceivable) > apOutstanding ? 'text-blue-400' : 'text-amber-400'
+              (arOutstanding || accountsReceivable) > apOutstanding ? 'text-blue-info' : 'text-amber-warn'
             )}>
               Net: {formatCurrency((arOutstanding || accountsReceivable) - apOutstanding)}
             </span>
@@ -536,9 +526,9 @@ export default function AccountingDashboardPage() {
             <>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 11 }} />
-                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                  <XAxis dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
+                  <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
                   <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
                     {cashFlowData.map((entry, index) => (
@@ -551,7 +541,7 @@ export default function AccountingDashboardPage() {
                 <span className="text-slate-muted">Net Change in Cash</span>
                 <span className={cn(
                   'font-bold',
-                  (cashFlow?.net_change_in_cash || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  (cashFlow?.net_change_in_cash || 0) >= 0 ? 'text-teal-electric' : 'text-coral-alert'
                 )}>
                   {formatCurrency(cashFlow?.net_change_in_cash || 0)}
                 </span>

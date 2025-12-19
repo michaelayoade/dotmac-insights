@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FileSpreadsheet, Plus, MoreVertical, CheckCircle, Lock, Unlock, Trash2, Eye } from 'lucide-react';
 import { useCorporateCardStatements, useStatementMutations, useCorporateCards } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { CorporateCardStatement, StatementStatus } from '@/lib/expenses.types';
 
 const STATUS_CONFIG: Record<StatementStatus, { bg: string; text: string; label: string }> = {
@@ -128,6 +129,7 @@ function StatementRow({
 }
 
 export default function StatementsPage() {
+  const { handleError, handleInfo } = useErrorHandler();
   const [cardFilter, setCardFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
@@ -155,8 +157,7 @@ export default function StatementsPage() {
         }
       }
     } catch (error) {
-      console.error('Action failed:', error);
-      alert('Action failed. Please try again.');
+      handleError(error, 'Action failed');
     }
   };
 
@@ -240,7 +241,7 @@ export default function StatementsPage() {
             <p className="text-white font-semibold">No statements found</p>
             <p className="text-slate-muted text-sm mt-1">Import a statement to get started</p>
             <button
-              onClick={() => alert('Statement import wizard coming soon')}
+              onClick={() => handleInfo('Statement import wizard coming soon')}
               className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-sky-500 text-white font-semibold hover:bg-sky-400 transition-colors"
             >
               <Plus className="w-4 h-4" />

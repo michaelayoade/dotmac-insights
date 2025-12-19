@@ -258,9 +258,9 @@ export function getModulesRequiringScope(scope: Scope): ModuleDefinition[] {
  * Check if a module is accessible based on user scopes
  */
 export function isModuleAccessible(moduleKey: string, userScopes: Scope[]): boolean {
-  const module = getModule(moduleKey);
-  if (!module) return false;
-  if (!module.requiredScopes || module.requiredScopes.length === 0) return true;
+  const moduleDef = getModule(moduleKey);
+  if (!moduleDef) return false;
+  if (!moduleDef.requiredScopes || moduleDef.requiredScopes.length === 0) return true;
   if (userScopes.includes('*')) return true;
-  return module.requiredScopes.some((scope) => userScopes.includes(scope));
+  return moduleDef.requiredScopes.some((scope) => userScopes.includes(scope));
 }

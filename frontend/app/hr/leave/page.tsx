@@ -26,6 +26,7 @@ import {
   useHrAnalyticsLeaveTrend,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
+import { CHART_COLORS } from '@/lib/design-tokens';
 import {
   CalendarClock,
   FileSpreadsheet,
@@ -48,7 +49,15 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-const CHART_COLORS = ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4', '#84cc16', '#f43f5e'];
+const CHART_PALETTE = CHART_COLORS.palette;
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
+    borderRadius: '8px',
+  },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
+};
 
 function MetricCard({
   label,
@@ -185,7 +194,7 @@ export default function HrLeavePage() {
     return types.slice(0, 6).map((type: any, idx: number) => ({
       name: type.leave_type || type.name || 'Unknown',
       value: 1,
-      color: CHART_COLORS[idx % CHART_COLORS.length],
+      color: CHART_PALETTE[idx % CHART_PALETTE.length],
       isLWP: type.is_lwp,
       carryForward: type.is_carry_forward,
     }));
@@ -219,7 +228,7 @@ export default function HrLeavePage() {
     return Object.entries(statusCounts).map(([status, count], idx) => ({
       name: status.charAt(0).toUpperCase() + status.slice(1),
       value: count,
-      color: status === 'approved' ? '#10b981' : status === 'rejected' ? '#ef4444' : '#f59e0b',
+      color: status === 'approved' ? CHART_COLORS.success : status === 'rejected' ? CHART_COLORS.danger : CHART_COLORS.warning,
     }));
   }, [applicationList.items]);
 
@@ -359,14 +368,11 @@ export default function HrLeavePage() {
           {trendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="month" stroke="#64748b" tick={{ fontSize: 12 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f8fafc' }}
-                />
-                <Bar dataKey="applications" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Applications" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="month" stroke={CHART_COLORS.axis} tick={{ fontSize: 12 }} />
+                <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 12 }} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="applications" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} name="Applications" />
               </BarChart>
             </ResponsiveContainer>
           ) : (

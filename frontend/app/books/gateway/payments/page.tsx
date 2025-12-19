@@ -6,6 +6,7 @@ import { useGatewayPayments, useGatewayMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, CreditCard, RefreshCw, Eye, RotateCcw } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -63,6 +64,7 @@ export default function GatewayPaymentsPage() {
   });
 
   const { verifyPayment, refundPayment } = useGatewayMutations();
+  const { handleError, handleSuccess } = useErrorHandler();
 
   const handleVerify = async (reference: string) => {
     try {
@@ -70,8 +72,9 @@ export default function GatewayPaymentsPage() {
       mutate();
       setShowVerifyModal(false);
       setSelectedPayment(null);
+      handleSuccess('Payment verified successfully');
     } catch (err: any) {
-      alert(`Verification failed: ${err.message}`);
+      handleError(err, 'Verification failed');
     }
   };
 
@@ -81,8 +84,9 @@ export default function GatewayPaymentsPage() {
       mutate();
       setShowRefundModal(false);
       setSelectedPayment(null);
+      handleSuccess('Refund processed successfully');
     } catch (err: any) {
-      alert(`Refund failed: ${err.message}`);
+      handleError(err, 'Refund failed');
     }
   };
 

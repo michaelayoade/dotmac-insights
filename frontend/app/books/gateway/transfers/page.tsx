@@ -7,6 +7,7 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, Banknote, RefreshCw, Plus, Eye, Send } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { paymentsApi } from '@/lib/api';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -66,13 +67,15 @@ export default function GatewayTransfersPage() {
   });
 
   const { initiateTransfer, verifyTransfer, payPayrollTransfers } = useGatewayMutations();
+  const { handleError, handleSuccess } = useErrorHandler();
 
   const handleVerify = async (reference: string) => {
     try {
       await verifyTransfer(reference);
       mutate();
+      handleSuccess('Transfer verified successfully');
     } catch (err: any) {
-      alert(`Verification failed: ${err.message}`);
+      handleError(err, 'Verification failed');
     }
   };
 

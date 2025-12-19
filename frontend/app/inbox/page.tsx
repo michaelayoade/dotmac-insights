@@ -41,6 +41,7 @@ import type {
 } from '@/lib/inbox.types';
 import { ErrorState, SearchInput, StatGrid } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 // Channel icons and colors
 const CHANNEL_ICONS: Record<ChannelType, React.ElementType> = {
@@ -174,6 +175,7 @@ export default function InboxPage() {
   } = useInboxAnalyticsSummary({ days: 1 });
 
   const mutations = useInboxConversationMutations();
+  const { handleError, handleSuccess } = useErrorHandler();
 
   const conversations = conversationsData?.data;
 
@@ -209,7 +211,7 @@ export default function InboxPage() {
       setReplyText('');
       await refreshConversations();
     } catch (error) {
-      console.error('Failed to send message:', error);
+      handleError(error, 'Failed to send message');
     } finally {
       setIsSending(false);
     }
@@ -221,7 +223,7 @@ export default function InboxPage() {
     try {
       await mutations.starConversation(selectedConversation.id, !selectedConversation.is_starred);
     } catch (error) {
-      console.error('Failed to toggle star:', error);
+      handleError(error, 'Failed to toggle star');
     }
   };
 
@@ -230,11 +232,10 @@ export default function InboxPage() {
     if (!selectedConversation) return;
     try {
       const result = await mutations.createTicket(selectedConversation.id);
-      alert(`Ticket created: #${result.ticket_id}`);
+      handleSuccess(`Ticket created: #${result.ticket_id}`);
       setShowActions(false);
     } catch (error) {
-      console.error('Failed to create ticket:', error);
-      alert('Failed to create ticket');
+      handleError(error, 'Failed to create ticket');
     }
   };
 
@@ -243,11 +244,10 @@ export default function InboxPage() {
     if (!selectedConversation) return;
     try {
       const result = await mutations.createLead(selectedConversation.id);
-      alert(`Lead created: #${result.lead_id}`);
+      handleSuccess(`Lead created: #${result.lead_id}`);
       setShowActions(false);
     } catch (error) {
-      console.error('Failed to create lead:', error);
-      alert('Failed to create lead');
+      handleError(error, 'Failed to create lead');
     }
   };
 
@@ -260,7 +260,7 @@ export default function InboxPage() {
       setShowActions(false);
       await refreshConversations();
     } catch (error) {
-      console.error('Failed to archive:', error);
+      handleError(error, 'Failed to archive conversation');
     }
   };
 

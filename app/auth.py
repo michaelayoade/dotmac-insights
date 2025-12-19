@@ -52,6 +52,7 @@ class JWTClaims(BaseModel):
     exp: Optional[int] = None
     iat: Optional[int] = None
     jti: Optional[str] = None
+    scopes: Optional[List[str]] = None
 
 
 class Principal(BaseModel):
@@ -160,6 +161,18 @@ async def verify_jwt(token: str) -> JWTClaims:
     Raises:
         HTTPException: If token is invalid, expired, or verification fails
     """
+    if settings.e2e_jwt_secret and settings.e2e_auth_enabled and settings.environment == "test":
+        try:
+            payload = jwt.decode(
+                token,
+                settings.e2e_jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_exp": True, "verify_aud": False, "verify_iss": False},
+            )
+            return JWTClaims(**payload)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid JWT token")
+
     if not settings.jwks_url:
         raise HTTPException(
             status_code=500,
@@ -421,14 +434,20 @@ async def get_current_principal(
             if not user.is_active:
                 raise HTTPException(status_code=403, detail="User account is disabled")
 
+            principal_scopes = user.all_permissions
+            is_superuser = user.is_superuser
+            if settings.e2e_jwt_secret and settings.e2e_auth_enabled and settings.environment == "test":
+                principal_scopes = set(claims.scopes or [])
+                is_superuser = False
+
             return Principal(
                 type="user",
                 id=user.id,
                 external_id=user.external_id,
                 email=user.email,
                 name=user.name,
-                is_superuser=user.is_superuser,
-                scopes=user.all_permissions,
+                is_superuser=is_superuser,
+                scopes=principal_scopes,
                 raw_claims=claims.model_dump(),
             )
 

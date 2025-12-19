@@ -7,6 +7,7 @@ import { DataTable } from '@/components/DataTable';
 import { AlertTriangle, Building2, RefreshCw, Unlink, Eye, Link as LinkIcon, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { paymentsApi } from '@/lib/api';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '-';
@@ -61,6 +62,7 @@ export default function OpenBankingConnectionsPage() {
   });
 
   const { unlinkOpenBankingAccount } = useGatewayMutations();
+  const { handleError, handleSuccess } = useErrorHandler();
 
   const handleUnlink = async (accountId: number) => {
     try {
@@ -68,8 +70,9 @@ export default function OpenBankingConnectionsPage() {
       mutate();
       setShowUnlinkModal(false);
       setSelectedConnection(null);
+      handleSuccess('Account unlinked successfully');
     } catch (err: any) {
-      alert(`Unlink failed: ${err.message}`);
+      handleError(err, 'Failed to unlink account');
     }
   };
 

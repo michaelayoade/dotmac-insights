@@ -25,8 +25,7 @@ export interface SWRStatusResult {
  * if (error) return <ErrorDisplay error={error} onRetry={retry} />;
  */
 export function useSWRStatus(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...responses: SWRResponse<any, any>[]
+  ...responses: SWRResponse<unknown, unknown>[]
 ): SWRStatusResult {
   const isLoading = responses.some((r) => r.isLoading);
   const error = responses.find((r) => r.error)?.error as Error | undefined;

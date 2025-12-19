@@ -4,12 +4,22 @@ import Link from 'next/link';
 import { TrendingUp, FileText, Calculator, CreditCard } from 'lucide-react';
 import { useReportsRevenueSummary, useReportsExpensesSummary, useReportsProfitabilityMargins, useReportsCashPositionSummary } from '@/hooks/useApi';
 import { formatCurrency } from '@/lib/utils';
+import { DashboardShell } from '@/components/ui/DashboardShell';
 
 export default function ReportsOverviewPage() {
   const revenue = useReportsRevenueSummary();
   const expenses = useReportsExpensesSummary();
   const profitability = useReportsProfitabilityMargins();
   const cash = useReportsCashPositionSummary();
+
+  const isLoading = revenue.isLoading && expenses.isLoading && profitability.isLoading && cash.isLoading;
+  const error = revenue.error || expenses.error || profitability.error || cash.error;
+  const handleRetry = () => {
+    revenue.mutate();
+    expenses.mutate();
+    profitability.mutate();
+    cash.mutate();
+  };
 
   const cards = [
     {
@@ -47,6 +57,13 @@ export default function ReportsOverviewPage() {
   ];
 
   return (
+    <DashboardShell
+      isLoading={isLoading}
+      error={error}
+      onRetry={handleRetry}
+      loadingMessage="Loading reports data..."
+      errorMessage="Failed to load reports data"
+    >
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <TrendingUp className="w-5 h-5 text-teal-electric" />
@@ -115,5 +132,6 @@ export default function ReportsOverviewPage() {
         </Link>
       </div>
     </div>
+    </DashboardShell>
   );
 }

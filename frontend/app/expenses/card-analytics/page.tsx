@@ -45,20 +45,23 @@ import {
   useCardStatementSummary,
 } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
+import { CHART_COLORS } from '@/lib/design-tokens';
 
-// Chart styling constants
-const CHART_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
 const STATUS_COLORS: Record<string, string> = {
-  matched: '#10b981',
-  unmatched: '#f59e0b',
-  imported: '#64748b',
-  disputed: '#ef4444',
-  excluded: '#475569',
-  personal: '#8b5cf6',
+  matched: CHART_COLORS.success,
+  unmatched: CHART_COLORS.warning,
+  imported: CHART_COLORS.axis,
+  disputed: CHART_COLORS.danger,
+  excluded: CHART_COLORS.grid,
+  personal: CHART_COLORS.palette[2],
 };
 const TOOLTIP_STYLE = {
-  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' },
-  labelStyle: { color: '#f8fafc' },
+  contentStyle: {
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
+    borderRadius: '8px',
+  },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
 };
 
 // =============================================================================
@@ -127,12 +130,12 @@ function ReconciliationGauge({ rate }: { rate: number }) {
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (rate / 100) * circumference;
-  const color = rate >= 80 ? '#10B981' : rate >= 50 ? '#F59E0B' : '#EF4444';
+  const color = rate >= 80 ? CHART_COLORS.success : rate >= 50 ? CHART_COLORS.warning : CHART_COLORS.danger;
 
   return (
     <div className="relative w-28 h-28 mx-auto">
       <svg className="w-full h-full -rotate-90">
-        <circle cx="56" cy="56" r={radius} fill="none" stroke="#1e293b" strokeWidth="8" />
+        <circle cx="56" cy="56" r={radius} fill="none" stroke={CHART_COLORS.grid} strokeWidth="8" />
         <circle
           cx="56"
           cy="56"
@@ -193,7 +196,7 @@ export default function CardAnalyticsPage() {
   const pieData = statusBreakdown?.by_status.map((item) => ({
     name: item.status,
     value: item.count,
-    color: STATUS_COLORS[item.status] || '#64748b',
+    color: STATUS_COLORS[item.status] || CHART_COLORS.axis,
   })) || [];
 
   return (
@@ -326,20 +329,20 @@ export default function CardAnalyticsPage() {
               <LineChart data={reconciliationTrend}>
                 <defs>
                   <linearGradient id="reconGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.success} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="period" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} />
+                <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} domain={[0, 100]} />
                 <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `${value.toFixed(1)}%`} />
                 <Line
                   type="monotone"
                   dataKey="reconciliation_rate"
-                  stroke="#10b981"
+                  stroke={CHART_COLORS.success}
                   strokeWidth={2}
-                  dot={{ fill: '#10b981', r: 4 }}
+                  dot={{ fill: CHART_COLORS.success, r: 4 }}
                   name="Rate"
                 />
               </LineChart>
@@ -389,17 +392,17 @@ export default function CardAnalyticsPage() {
               <AreaChart data={spendTrend}>
                 <defs>
                   <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.palette[2]} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.palette[2]} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="matchedGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.success} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="period" stroke="#64748b" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="period" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
+                <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                 <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => value.toLocaleString()} />
                 <Legend
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
@@ -409,7 +412,7 @@ export default function CardAnalyticsPage() {
                 <Area
                   type="monotone"
                   dataKey="total_spend"
-                  stroke="#8b5cf6"
+                  stroke={CHART_COLORS.palette[2]}
                   strokeWidth={2}
                   fill="url(#spendGradient)"
                   name="Total Spend"
@@ -417,7 +420,7 @@ export default function CardAnalyticsPage() {
                 <Area
                   type="monotone"
                   dataKey="matched_spend"
-                  stroke="#10b981"
+                  stroke={CHART_COLORS.success}
                   strokeWidth={2}
                   fill="url(#matchedGradient)"
                   name="Matched"
@@ -447,18 +450,18 @@ export default function CardAnalyticsPage() {
             <>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={topMerchants.merchants.slice(0, 6)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
+                  <XAxis type="number" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                   <YAxis
                     type="category"
                     dataKey="merchant"
-                    stroke="#64748b"
+                    stroke={CHART_COLORS.axis}
                     tick={{ fontSize: 10 }}
                     width={100}
                     tickFormatter={(value) => (value || 'Unknown').substring(0, 15)}
                   />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => value.toLocaleString()} />
-                  <Bar dataKey="total_spend" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Spend" />
+                  <Bar dataKey="total_spend" fill={CHART_COLORS.palette[2]} radius={[0, 4, 4, 0]} name="Spend" />
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -481,18 +484,18 @@ export default function CardAnalyticsPage() {
             <>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={categoryData.categories.slice(0, 6)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
+                  <XAxis type="number" stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
                   <YAxis
                     type="category"
                     dataKey="category_name"
-                    stroke="#64748b"
+                    stroke={CHART_COLORS.axis}
                     tick={{ fontSize: 10 }}
                     width={100}
                     tickFormatter={(value) => (value || 'Other').substring(0, 15)}
                   />
                   <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => value.toLocaleString()} />
-                  <Bar dataKey="total_spend" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Spend" />
+                  <Bar dataKey="total_spend" fill={CHART_COLORS.warning} radius={[0, 4, 4, 0]} name="Spend" />
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-3 grid grid-cols-2 gap-2">

@@ -84,7 +84,7 @@ const config: Config = {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'grid-pattern': 'linear-gradient(to right, #2d3a4f 1px, transparent 1px), linear-gradient(to bottom, #2d3a4f 1px, transparent 1px)',
+        'grid-pattern': 'linear-gradient(to right, var(--color-slate-border) 1px, transparent 1px), linear-gradient(to bottom, var(--color-slate-border) 1px, transparent 1px)',
       },
     },
   },

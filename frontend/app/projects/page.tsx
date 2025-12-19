@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useProjects, useProjectsDashboard } from '@/hooks/useApi';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Filter,
   Plus,
@@ -17,7 +18,6 @@ import {
   XCircle,
   TrendingUp,
   ListTodo,
-  Target,
   Calendar,
   BarChart3,
   ArrowRight,
@@ -154,7 +154,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState<string>('');
   const offset = (page - 1) * pageSize;
 
-  const { data, isLoading, error } = useProjects({
+  const { data, isLoading, error, mutate: retryProjects } = useProjects({
     status: status || undefined,
     priority: (priority || undefined) as any,
     department: department || undefined,
@@ -164,7 +164,12 @@ export default function ProjectsPage() {
     offset,
   });
 
-  const { data: dashboard, isLoading: dashboardLoading } = useProjectsDashboard();
+  const { data: dashboard, isLoading: dashboardLoading, mutate: retryDashboard } = useProjectsDashboard();
+
+  const handleRetry = () => {
+    retryProjects();
+    retryDashboard();
+  };
 
   const projects = data?.data || [];
   const total = data?.total || 0;
@@ -477,10 +482,11 @@ export default function ProjectsPage() {
 
       {/* Projects Table */}
       {error ? (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" />
-          <span>Failed to load projects. Please check your connection and try again.</span>
-        </div>
+        <ErrorDisplay
+          message="Failed to load projects. Please check your connection and try again."
+          error={error}
+          onRetry={handleRetry}
+        />
       ) : (
         <DataTable
           columns={columns}

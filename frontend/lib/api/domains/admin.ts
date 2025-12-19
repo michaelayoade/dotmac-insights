@@ -212,10 +212,6 @@ function getAccessToken(): string {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('dotmac_access_token');
     if (token) return token;
-    const isDev = process.env.NODE_ENV === 'development';
-    if (isDev && process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
-      return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
-    }
   }
   return '';
 }

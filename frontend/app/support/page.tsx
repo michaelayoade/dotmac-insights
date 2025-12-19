@@ -45,16 +45,17 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { CHART_COLORS } from '@/lib/design-tokens';
 
-// Chart colors from centralized design tokens (CSS variables for theme switching)
-const CHART_COLORS = [
-  'var(--color-teal-electric)',
-  'var(--color-amber-warn)',
-  'var(--color-purple-accent)',
-  'var(--color-coral-alert)',
-  'var(--color-teal-glow)',
-  'var(--color-cyan-accent)',
-];
+const CHART_PALETTE = CHART_COLORS.palette;
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: CHART_COLORS.tooltip.bg,
+    border: `1px solid ${CHART_COLORS.tooltip.border}`,
+    borderRadius: '8px',
+  },
+  labelStyle: { color: CHART_COLORS.tooltip.text },
+};
 
 function MetricCard({
   label,
@@ -135,12 +136,12 @@ function SlaGauge({ attainment }: { attainment: number }) {
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (attainment / 100) * circumference;
-  const color = attainment >= 90 ? '#10B981' : attainment >= 70 ? '#F59E0B' : '#EF4444';
+  const color = attainment >= 90 ? CHART_COLORS.success : attainment >= 70 ? CHART_COLORS.warning : CHART_COLORS.danger;
 
   return (
     <div className="relative w-32 h-32 mx-auto">
       <svg className="w-full h-full -rotate-90">
-        <circle cx="64" cy="64" r={radius} fill="none" stroke="#1e293b" strokeWidth="10" />
+        <circle cx="64" cy="64" r={radius} fill="none" stroke={CHART_COLORS.grid} strokeWidth="10" />
         <circle
           cx="64"
           cy="64"
@@ -204,7 +205,7 @@ export default function SupportDashboardPage() {
     return categoryBreakdown.by_ticket_type.slice(0, 5).map((c: any, idx: number) => ({
       name: c.type || 'Other',
       value: c.count,
-      color: CHART_COLORS[idx % CHART_COLORS.length],
+      color: CHART_PALETTE[idx % CHART_PALETTE.length],
     }));
   }, [categoryBreakdown]);
 
@@ -342,23 +343,20 @@ export default function SupportDashboardPage() {
               <AreaChart data={volumeChartData}>
                 <defs>
                   <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#14b8a6" stopOpacity={0} />
+                    <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="resolvedGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="0%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={CHART_COLORS.success} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f1f5f9' }}
-                />
-                <Area type="monotone" dataKey="total" stroke="#14b8a6" fill="url(#totalGradient)" strokeWidth={2} name="Total" />
-                <Area type="monotone" dataKey="resolved" stroke="#10b981" fill="url(#resolvedGradient)" strokeWidth={2} name="Resolved" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
+                <XAxis dataKey="period" tick={{ fill: CHART_COLORS.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: CHART_COLORS.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Area type="monotone" dataKey="total" stroke={CHART_COLORS.primary} fill="url(#totalGradient)" strokeWidth={2} name="Total" />
+                <Area type="monotone" dataKey="resolved" stroke={CHART_COLORS.success} fill="url(#resolvedGradient)" strokeWidth={2} name="Resolved" />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -391,9 +389,7 @@ export default function SupportDashboardPage() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
-                />
+                <Tooltip {...TOOLTIP_STYLE} />
                 <Legend
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
                   iconType="circle"

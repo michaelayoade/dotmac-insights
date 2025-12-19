@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -189,38 +189,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     return items;
   }, [query, searchResults, recentItems]);
 
-  // Arrow key navigation
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && allItems[selectedIndex]) {
-        e.preventDefault();
-        const item = allItems[selectedIndex];
-        handleSelect(item.href, item.data);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, allItems]);
-
-  // Scroll selected item into view
-  useEffect(() => {
-    if (!listRef.current) return;
-    const selected = listRef.current.querySelector('[data-selected="true"]');
-    if (selected) {
-      selected.scrollIntoView({ block: 'nearest' });
-    }
-  }, [selectedIndex]);
-
-  const handleSelect = (href: string, data: unknown) => {
+  const handleSelect = useCallback((href: string, data: unknown) => {
     // Add to recent items
     if (data && typeof data === 'object' && 'title' in data) {
       const item = data as { id: string; title: string; type?: string };
@@ -250,7 +219,38 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
     onClose();
     router.push(href);
-  };
+  }, [onClose, router]);
+
+  // Arrow key navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && allItems[selectedIndex]) {
+        e.preventDefault();
+        const item = allItems[selectedIndex];
+        handleSelect(item.href, item.data);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [allItems, handleSelect, isOpen, selectedIndex]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const selected = listRef.current.querySelector('[data-selected="true"]');
+    if (selected) {
+      selected.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex]);
 
   if (!isOpen) return null;
 

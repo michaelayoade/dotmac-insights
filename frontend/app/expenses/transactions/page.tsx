@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Receipt, Filter, MoreVertical, Link2, Unlink, AlertTriangle, XCircle, User, Check } from 'lucide-react';
 import { useCorporateCardTransactions, useTransactionMutations, useCorporateCards } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { CorporateCardTransaction, CardTransactionStatus } from '@/lib/expenses.types';
 
 const STATUS_CONFIG: Record<CardTransactionStatus, { bg: string; text: string; label: string }> = {
@@ -131,6 +132,7 @@ function TransactionRow({
 export default function TransactionsPage() {
   const searchParams = useSearchParams();
   const initialCardId = searchParams.get('card_id');
+  const { handleError } = useErrorHandler();
 
   const [cardFilter, setCardFilter] = useState<string>(initialCardId || '');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -166,8 +168,7 @@ export default function TransactionsPage() {
         }
       }
     } catch (error) {
-      console.error('Action failed:', error);
-      alert('Action failed. Please try again.');
+      handleError(error, 'Action failed');
     }
   };
 

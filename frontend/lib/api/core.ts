@@ -99,17 +99,10 @@ function getAccessToken(): string {
     const token = localStorage.getItem('dotmac_access_token');
     if (token) return token;
 
-    // Fallback: use service token if available
-    if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
-      return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
-    }
     return '';
   }
-  // Server-side fallback for SSR
-  if (process.env.NEXT_PUBLIC_SERVICE_TOKEN) {
-    return process.env.NEXT_PUBLIC_SERVICE_TOKEN;
-  }
-  return '';
+  // Server-side fallback for SSR (must never be exposed to the browser)
+  return process.env.INTERNAL_SERVICE_TOKEN || '';
 }
 
 export interface FetchOptions extends RequestInit {
@@ -136,7 +129,13 @@ export class ApiError extends Error {
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { params, ...fetchOptions } = options;
 
-  let url = `${API_BASE}/api${endpoint}`;
+  const base = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
+  const normalizedEndpoint = endpoint.startsWith('http')
+    ? endpoint
+    : endpoint.startsWith('/api')
+      ? endpoint
+      : `/api${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  let url = endpoint.startsWith('http') ? endpoint : `${base}${normalizedEndpoint}`;
 
   if (params) {
     const searchParams = new URLSearchParams();
@@ -197,7 +196,15 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     throw new ApiError(response.status, errorMessage);
   }
 
-  return response.json();
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+  return (await response.text()) as unknown as T;
 }
 
 /**

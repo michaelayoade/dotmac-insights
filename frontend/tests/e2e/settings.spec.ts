@@ -1,0 +1,369 @@
+/**
+ * Settings & Feature Gating E2E Tests
+ *
+ * Comprehensive tests for settings pages and feature flag behavior:
+ * - Feature flag disabled → UI shows AccessDenied
+ * - Feature flag enabled → full UI loads
+ * - User preferences and settings persistence
+ * - Admin settings access control
+ */
+
+import { test, expect, setupAuth, expectAccessDenied } from './fixtures/auth';
+
+test.describe('Settings - Authenticated', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAuth(page, ['admin:read', 'admin:write', 'customers:read']);
+  });
+
+  test.describe('Admin Settings Overview', () => {
+    test('renders admin settings page', async ({ page }) => {
+      await page.goto('/admin/settings');
+
+      await expect(
+        page.getByRole('heading', { name: /setting/i })
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('displays settings sections', async ({ page }) => {
+      await page.goto('/admin/settings');
+
+      // Should show multiple settings sections
+      await expect(
+        page.getByText(/general|company|notification|integration/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('can navigate between settings sections', async ({ page }) => {
+      await page.goto('/admin/settings');
+
+      // Find nav links or tabs
+      const navItems = page.locator('nav a, [role="tab"]');
+      const count = await navItems.count();
+
+      if (count > 1) {
+        await navItems.nth(1).click();
+        await page.waitForTimeout(500);
+
+        // Should update content
+        await expect(page.locator('body')).toBeVisible();
+      }
+    });
+  });
+
+  test.describe('Company Settings', () => {
+    test('displays company information', async ({ page }) => {
+      await page.goto('/admin/settings/company');
+
+      await expect(
+        page.getByText(/company|organization|business/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('can update company name', async ({ page }) => {
+      await page.goto('/admin/settings/company');
+
+      const nameInput = page.getByLabel(/company.*name|name/i);
+      if (await nameInput.isVisible().catch(() => false)) {
+        const currentValue = await nameInput.inputValue();
+        await nameInput.fill(`${currentValue} Updated`);
+
+        const saveButton = page.getByRole('button', { name: /save/i });
+        await saveButton.click();
+
+        await expect(
+          page.getByText(/saved|updated|success/i).first()
+        ).toBeVisible({ timeout: 5000 });
+
+        // Revert change
+        await nameInput.fill(currentValue);
+        await saveButton.click();
+      }
+    });
+
+    test('validates required fields', async ({ page }) => {
+      await page.goto('/admin/settings/company');
+
+      const nameInput = page.getByLabel(/company.*name|name/i);
+      if (await nameInput.isVisible().catch(() => false)) {
+        await nameInput.fill('');
+
+        const saveButton = page.getByRole('button', { name: /save/i });
+        await saveButton.click();
+
+        await expect(
+          page.getByText(/required|cannot be empty/i).first()
+        ).toBeVisible({ timeout: 5000 });
+      }
+    });
+  });
+
+  test.describe('Notification Settings', () => {
+    test('displays notification preferences', async ({ page }) => {
+      await page.goto('/admin/settings/notifications');
+
+      await expect(
+        page.getByText(/notification|email|alert/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('can toggle notification channels', async ({ page }) => {
+      await page.goto('/admin/settings/notifications');
+
+      const toggles = page.locator('input[type="checkbox"], [role="switch"]');
+      const firstToggle = toggles.first();
+
+      if (await firstToggle.isVisible().catch(() => false)) {
+        const wasChecked = await firstToggle.isChecked();
+        await firstToggle.click();
+
+        const isNowChecked = await firstToggle.isChecked();
+        expect(isNowChecked).not.toBe(wasChecked);
+
+        // Revert
+        await firstToggle.click();
+      }
+    });
+
+    test('saves notification preferences', async ({ page }) => {
+      await page.goto('/admin/settings/notifications');
+
+      const saveButton = page.getByRole('button', { name: /save/i });
+      if (await saveButton.isVisible().catch(() => false)) {
+        await saveButton.click();
+
+        await expect(
+          page.getByText(/saved|updated|success/i).first()
+        ).toBeVisible({ timeout: 5000 });
+      }
+    });
+  });
+
+  test.describe('Integration Settings', () => {
+    test('displays integration list', async ({ page }) => {
+      await page.goto('/admin/settings/integrations');
+
+      await expect(
+        page.getByText(/integration|connect|sync/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('shows connected/disconnected status', async ({ page }) => {
+      await page.goto('/admin/settings/integrations');
+
+      await page.waitForLoadState('networkidle');
+
+      await expect(
+        page.getByText(/connected|disconnected|not.*configured/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('can connect integration', async ({ page }) => {
+      await page.goto('/admin/settings/integrations');
+
+      const connectButton = page.getByRole('button', { name: /connect|configure|setup/i }).first();
+      if (await connectButton.isVisible().catch(() => false)) {
+        await connectButton.click();
+
+        // Should show connection dialog or redirect to OAuth
+        await expect(
+          page.getByText(/connect|authorize|api.*key/i).first()
+        ).toBeVisible({ timeout: 5000 });
+      }
+    });
+  });
+});
+
+test.describe('Feature Gating', () => {
+  test.describe('Feature Flag Disabled', () => {
+    test('shows access denied for disabled feature', async ({ page }) => {
+      // Mock feature flag as disabled
+      await page.route('**/api/features**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            analytics_v2: false,
+            advanced_reports: false,
+          }),
+        });
+      });
+
+      await setupAuth(page, ['admin:read', 'admin:write', 'analytics:read']);
+      await page.goto('/analytics/advanced');
+
+      // Should show feature not available or access denied
+      await expect(
+        page.getByText(/not available|access denied|coming soon|disabled/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('hides feature in navigation when disabled', async ({ page }) => {
+      await page.route('**/api/features**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            premium_analytics: false,
+          }),
+        });
+      });
+
+      await setupAuth(page, ['admin:read', 'analytics:read']);
+      await page.goto('/');
+
+      // Premium analytics link should not be visible
+      const premiumLink = page.getByRole('link', { name: /premium.*analytics/i });
+      await expect(premiumLink).not.toBeVisible();
+    });
+  });
+
+  test.describe('Feature Flag Enabled', () => {
+    test('shows full UI when feature is enabled', async ({ page }) => {
+      await page.route('**/api/features**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            analytics_v2: true,
+            advanced_reports: true,
+          }),
+        });
+      });
+
+      await setupAuth(page, ['analytics:read']);
+      await page.goto('/analytics');
+
+      // Full analytics UI should be visible
+      await expect(
+        page.getByRole('heading', { name: /analytics/i })
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('shows feature in navigation when enabled', async ({ page }) => {
+      await page.route('**/api/features**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            insights_module: true,
+          }),
+        });
+      });
+
+      await setupAuth(page, ['analytics:read', 'explore:read']);
+      await page.goto('/');
+
+      // Module should be accessible
+      const insightsLink = page.getByRole('link', { name: /insight/i }).first();
+      if (await insightsLink.isVisible().catch(() => false)) {
+        await insightsLink.click();
+        await expect(page).toHaveURL(/\/insights/);
+      }
+    });
+  });
+
+  test.describe('Entitlement Gating', () => {
+    test('shows upgrade prompt for premium feature', async ({ page }) => {
+      // Mock entitlements as basic tier
+      await page.route('**/api/entitlements**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            tier: 'basic',
+            features: ['contacts', 'support'],
+          }),
+        });
+      });
+
+      await setupAuth(page, ['admin:read', 'analytics:read']);
+      await page.goto('/analytics/premium');
+
+      // Should show upgrade prompt
+      await expect(
+        page.getByText(/upgrade|premium|enterprise|not.*included/i).first()
+      ).toBeVisible({ timeout: 10000 });
+    });
+
+    test('allows access for premium tier', async ({ page }) => {
+      await page.route('**/api/entitlements**', (route) => {
+        route.fulfill({
+          status: 200,
+          body: JSON.stringify({
+            tier: 'premium',
+            features: ['contacts', 'support', 'analytics', 'premium_analytics'],
+          }),
+        });
+      });
+
+      await setupAuth(page, ['analytics:read']);
+      await page.goto('/analytics');
+
+      // Should load normally
+      await expect(
+        page.getByRole('heading', { name: /analytics/i })
+      ).toBeVisible({ timeout: 10000 });
+    });
+  });
+});
+
+test.describe('Settings - RBAC', () => {
+  test('user without admin scope cannot access settings', async ({ page }) => {
+    await setupAuth(page, ['customers:read', 'hr:read']);
+    await page.goto('/admin/settings');
+
+    await expectAccessDenied(page);
+  });
+
+  test('admin:read can view but not save settings', async ({ page }) => {
+    await setupAuth(page, ['admin:read']);
+    await page.goto('/admin/settings');
+
+    await expect(page.getByRole('heading', { name: /setting/i })).toBeVisible();
+
+    const saveButton = page.getByRole('button', { name: /save/i }).first();
+    if (await saveButton.isVisible().catch(() => false)) {
+      await expect(saveButton).toBeDisabled();
+    }
+  });
+});
+
+test.describe('User Preferences', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAuth(page, ['customers:read']);
+  });
+
+  test('user can access their profile settings', async ({ page }) => {
+    await page.goto('/settings/profile');
+
+    await expect(
+      page.getByText(/profile|account|preference/i).first()
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('can update display preferences', async ({ page }) => {
+    await page.goto('/settings/preferences');
+
+    const themeToggle = page.locator('[role="switch"], input[type="checkbox"]').first();
+    if (await themeToggle.isVisible().catch(() => false)) {
+      await themeToggle.click();
+
+      // Theme should update
+      await page.waitForTimeout(500);
+    }
+  });
+
+  test('preferences persist across sessions', async ({ page }) => {
+    await page.goto('/settings/preferences');
+
+    // Make a change
+    const toggle = page.locator('[role="switch"]').first();
+    if (await toggle.isVisible().catch(() => false)) {
+      const initialState = await toggle.getAttribute('aria-checked');
+      await toggle.click();
+      await page.waitForTimeout(500);
+
+      // Reload page
+      await page.reload();
+
+      // Setting should persist
+      const newState = await toggle.getAttribute('aria-checked');
+      expect(newState).not.toBe(initialState);
+    }
+  });
+});

@@ -115,7 +115,7 @@ function DashboardLoadingState({
         className
       )}
     >
-      <div className="w-10 h-10 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mb-4" />
+      <div className="w-10 h-10 border-2 border-teal-electric border-t-transparent rounded-full animate-spin mb-4" />
       <p className="text-sm text-slate-muted">{message}</p>
     </div>
   );
@@ -173,21 +173,21 @@ function DashboardErrorState({
         className={cn(
           'max-w-md w-full rounded-xl border p-6',
           isAuthError
-            ? 'bg-amber-500/10 border-amber-500/30'
-            : 'bg-rose-500/10 border-rose-500/30'
+            ? 'bg-amber-warn/10 border-amber-warn/30'
+            : 'bg-coral-alert/10 border-coral-alert/30'
         )}
       >
         <div className="flex items-start gap-4">
           <div
             className={cn(
               'p-3 rounded-lg',
-              isAuthError ? 'bg-amber-500/20' : 'bg-rose-500/20'
+              isAuthError ? 'bg-amber-warn/20' : 'bg-coral-alert/20'
             )}
           >
             <Icon
               className={cn(
                 'w-6 h-6',
-                isAuthError ? 'text-amber-400' : 'text-rose-400'
+                isAuthError ? 'text-amber-warn' : 'text-coral-alert'
               )}
             />
           </div>
@@ -195,7 +195,7 @@ function DashboardErrorState({
             <h3
               className={cn(
                 'font-semibold text-lg',
-                isAuthError ? 'text-amber-400' : 'text-rose-400'
+                isAuthError ? 'text-amber-warn' : 'text-coral-alert'
               )}
             >
               {title}
@@ -264,14 +264,14 @@ function DashboardEmptyState({
           action.href ? (
             <Link
               href={action.href}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-400 text-slate-900 font-medium rounded-lg hover:shadow-lg hover:shadow-teal-500/25 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-white font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {action.label}
             </Link>
           ) : (
             <button
               onClick={action.onClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-400 text-slate-900 font-medium rounded-lg hover:shadow-lg hover:shadow-teal-500/25 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-white font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {action.label}
             </button>
