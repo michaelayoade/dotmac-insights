@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, date
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator, Field, conlist
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
@@ -194,6 +194,11 @@ class TicketBaseRequest(BaseModel):
     customer_name: Optional[str] = None
     region: Optional[str] = None
     base_station: Optional[str] = None
+    tags: Optional[List[str]] = None
+    watchers: Optional[List[int]] = None
+    custom_fields: Optional[dict] = None
+    merged_into_id: Optional[int] = None
+    parent_ticket_id: Optional[int] = None
 
     @validator("status")
     def _validate_status(cls, value: Optional[str]) -> Optional[str]:
@@ -404,15 +409,17 @@ class CustomFieldUpdateRequest(BaseModel):
 # --- Ticket Tag/Watcher/Merge Models ---
 
 class TicketTagsRequest(BaseModel):
-    tags: List[str] = Field(..., min_items=1)
+    tags: conlist(str, min_length=1)
 
 
 class TicketWatchersRequest(BaseModel):
-    user_ids: List[int] = Field(..., min_items=1)
+    user_ids: conlist(int, min_length=1)
 
 
 class TicketMergeRequest(BaseModel):
-    source_ticket_ids: List[int] = Field(..., min_items=1, description="IDs of tickets to merge into this ticket")
+    source_ticket_ids: conlist(int, min_length=1) = Field(
+        ..., description="IDs of tickets to merge into this ticket"
+    )
     close_source_tickets: bool = True
 
 
@@ -1523,7 +1530,7 @@ def update_custom_field(
             setattr(field, attr, value)
 
     if payload.options is not None:
-        field.options = [{"value": o.value, "label": o.label} for o in payload.options]
+        field.options = cast(Any, [{"value": o.value, "label": o.label} for o in payload.options])
 
     field.updated_at = datetime.utcnow()
     db.commit()

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -68,7 +68,7 @@ class SendMessageRequest(BaseModel):
 
 def serialize_conversation(conv: OmniConversation, include_messages: bool = False) -> Dict[str, Any]:
     """Serialize a conversation to JSON."""
-    result = {
+    result: Dict[str, Any] = {
         "id": conv.id,
         "channel_id": conv.channel_id,
         "channel_type": conv.channel.type if conv.channel else None,
@@ -292,7 +292,7 @@ async def update_conversation(
         conv.is_starred = payload.is_starred
 
     if payload.tags is not None:
-        conv.tags = payload.tags
+        conv.tags = cast(Any, payload.tags)
 
     db.commit()
     db.refresh(conv)
@@ -460,7 +460,7 @@ async def create_ticket_from_conversation(
     return {
         "success": True,
         "ticket_id": ticket.id,
-        "ticket_number": ticket.local_ticket_number,
+        "ticket_number": ticket.ticket_number,
         "conversation_id": conversation_id,
     }
 

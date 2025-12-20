@@ -147,6 +147,8 @@ class DocumentPostingService:
                 raise PostingError("Bill is already posted")
 
             posting_dt = posting_date or bill.posting_date
+            if not posting_dt:
+                raise PostingError("Posting date is required")
             self._validate_fiscal_period(posting_dt)
 
             entries = []
@@ -222,18 +224,21 @@ class DocumentPostingService:
             posting_dt = posting_date or payment.payment_date
             self._validate_fiscal_period(posting_dt)
 
+            # Get company from linked invoice if available
+            company = payment.invoice.company if payment.invoice else None
+
             entries = []
 
             # Debit Bank
             entries.append({
-                "account": self._get_bank_account(payment),
+                "account": self._get_bank_account_for_payment(payment, company),
                 "debit": payment.amount,
                 "credit": Decimal("0"),
             })
 
             # Credit AR
             entries.append({
-                "account": self._get_ar_account(None, company=payment.company),
+                "account": self._get_ar_account(None, company=company),
                 "party_type": "Customer",
                 "party": str(payment.customer_id),
                 "debit": Decimal("0"),
@@ -245,7 +250,7 @@ class DocumentPostingService:
                 posting_date=posting_dt,
                 entries=entries,
                 user_remark=f"Payment {payment.receipt_number}",
-                company=payment.company,
+                company=company,
             )
 
             payment.docstatus = 1
@@ -283,7 +288,11 @@ class DocumentPostingService:
             if payment.docstatus == 1:
                 raise PostingError("Payment is already posted")
 
-            posting_dt = posting_date or payment.posting_date
+            posting_dt = posting_date
+            if not posting_dt:
+                # Convert date to datetime for posting
+                pd = payment.posting_date
+                posting_dt = datetime(pd.year, pd.month, pd.day)
             self._validate_fiscal_period(posting_dt)
 
             entries = []
@@ -348,6 +357,8 @@ class DocumentPostingService:
                 raise PostingError("Credit note is already posted")
 
             posting_dt = posting_date or cn.issue_date or cn.posting_date
+            if not posting_dt:
+                raise PostingError("Posting date is required")
             self._validate_fiscal_period(posting_dt)
 
             entries = []
@@ -530,9 +541,9 @@ class DocumentPostingService:
         """Get the tax asset account (input VAT)."""
         return self.account_resolver.resolve_tax_asset_account(None)
 
-    def _get_bank_account(self, payment: Payment) -> str:
+    def _get_bank_account_for_payment(self, payment: Payment, company: Optional[str] = None) -> str:
         """Get the bank account for a payment."""
-        return self.account_resolver.resolve_bank_account(payment.company)
+        return self.account_resolver.resolve_bank_account(company)
 
     def _get_bank_account_for_supplier(self, payment: SupplierPayment) -> str:
         """Get the bank account for a supplier payment."""

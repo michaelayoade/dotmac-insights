@@ -110,8 +110,7 @@ class BillingOutboundSyncService:
             self.db.flush()
             record_outbound_sync(
                 entity_type="invoice",
-                target_system="erpnext",
-                operation=operation,
+                target="erpnext",
                 success=True,
             )
 
@@ -121,8 +120,7 @@ class BillingOutboundSyncService:
             self.db.flush()
             record_outbound_sync(
                 entity_type="invoice",
-                target_system="erpnext",
-                operation=operation,
+                target="erpnext",
                 success=False,
             )
 
@@ -187,8 +185,7 @@ class BillingOutboundSyncService:
             self.db.flush()
             record_outbound_sync(
                 entity_type="payment",
-                target_system="erpnext",
-                operation=operation,
+                target="erpnext",
                 success=True,
             )
 
@@ -198,8 +195,7 @@ class BillingOutboundSyncService:
             self.db.flush()
             record_outbound_sync(
                 entity_type="payment",
-                target_system="erpnext",
-                operation=operation,
+                target="erpnext",
                 success=False,
             )
 

@@ -132,8 +132,8 @@ async def get_pipeline_view(db: Session = Depends(get_db)):
     ).order_by(OpportunityStage.sequence).all()
 
     stage_responses = []
-    total_value = 0
-    weighted_value = 0
+    total_value = 0.0
+    weighted_value = 0.0
 
     for stage in stages:
         count = db.query(func.count(Opportunity.id)).filter(
@@ -212,7 +212,7 @@ async def get_kanban_view(
         opportunities = query.order_by(Opportunity.expected_close_date.asc().nullslast()).all()
 
         opp_list = []
-        stage_value = 0
+        stage_value = 0.0
         for opp in opportunities:
             opp_list.append({
                 "id": opp.id,

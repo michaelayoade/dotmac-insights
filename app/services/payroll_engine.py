@@ -219,7 +219,7 @@ class DeductionCalculator:
         """Calculate the base amount for a percentage calculation."""
         if not rule.base_components:
             # Default to sum of all components
-            return sum(salary_components.values())
+            return sum(salary_components.values(), Decimal("0"))
 
         base = Decimal("0")
         base_patterns = [c.lower() for c in rule.base_components]
@@ -387,7 +387,7 @@ class DeductionCalculator:
 
         # Calculate based on method
         if rule.calc_method == CalcMethod.FLAT:
-            amount = self.calculate_flat(rule, sum(salary_components.values()))
+            amount = self.calculate_flat(rule, sum(salary_components.values(), Decimal("0")))
             calc_details = {"method": "flat", "flat_amount": str(rule.flat_amount)}
 
         elif rule.calc_method == CalcMethod.PERCENTAGE:
@@ -405,7 +405,7 @@ class DeductionCalculator:
             calc_details = {
                 "method": "progressive",
                 "base": str(base),
-                "annualized": True,
+                "annualized": str(True),
             }
         else:
             amount = Decimal("0")
@@ -461,7 +461,7 @@ class PayrollBuilder:
         if calc_date is None:
             calc_date = date.today()
 
-        gross_pay = sum(salary_components.values())
+        gross_pay = sum(salary_components.values(), Decimal("0"))
         employee_deductions: List[DeductionResult] = []
         employer_contributions: List[DeductionResult] = []
 
@@ -527,8 +527,8 @@ class PayrollBuilder:
                     calc_details=employee_details,
                 ))
 
-        total_employee = sum(d.amount for d in employee_deductions)
-        total_employer = sum(d.amount for d in employer_contributions)
+        total_employee = sum((d.amount for d in employee_deductions), Decimal("0"))
+        total_employer = sum((d.amount for d in employer_contributions), Decimal("0"))
         net_pay = gross_pay - total_employee
 
         return PayrollDeductionsResult(

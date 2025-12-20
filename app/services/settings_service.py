@@ -73,9 +73,9 @@ class SettingsCache:
             try:
                 cached = await self.redis.get(f"settings:{group}")
                 if cached:
-                    data = json.loads(cached)
-                    self._local[group] = (data, time.time() + self.TTL)
-                    return data
+                    cached_data: dict = json.loads(cached)
+                    self._local[group] = (cached_data, time.time() + self.TTL)
+                    return cached_data
             except Exception as e:
                 logger.warning("redis_cache_get_error", group=group, error=str(e))
 

@@ -55,7 +55,8 @@ import { formatCurrency, formatNumber, formatPercent, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-import { RefreshCw } from 'lucide-react';
+import { DashboardShell, PageHeader } from '@/components/ui';
+import { RefreshCw, BarChart3 } from 'lucide-react';
 
 type TimeRange = 6 | 12 | 24;
 type ActiveTab = 'revenue' | 'sales' | 'support' | 'collections' | 'operations';
@@ -149,20 +150,6 @@ export default function AnalyticsPage() {
     return <AccessDenied />;
   }
 
-  if (isDataLoading) {
-    return <LoadingState />;
-  }
-
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load analytics data. Please try again."
-        error={firstError}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   const currency = overview?.revenue?.currency || 'NGN';
   const latestExpense = expenseTrend?.[expenseTrend.length - 1]?.total || 0;
   const uptime = networkStatus?.summary.uptime_percent || 0;
@@ -196,56 +183,69 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-white">Analytics</h1>
-          <p className="text-slate-muted mt-1">
-            Business intelligence and performance metrics
-          </p>
-        </div>
-        {/* Filters */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Date Range Picker */}
-          <DateRangePicker
-            value={dateRange}
-            onChange={(range) =>
-              setFilters((prev) => ({
-                ...prev,
-                startDate: range.startDate ? range.startDate.toISOString() : null,
-                endDate: range.endDate ? range.endDate.toISOString() : null,
-              }))
-            }
+    <DashboardShell
+      isLoading={isDataLoading}
+      error={firstError}
+      onRetry={retryAll}
+      softError={true}
+      loadingMessage="Loading analytics data..."
+      errorMessage="Failed to load analytics data"
+    >
+      <div className="space-y-8">
+        {firstError && (
+          <ErrorDisplay
+            message="Failed to load analytics data. Please try again."
+            error={firstError}
+            onRetry={retryAll}
           />
+        )}
+        {/* Header */}
+        <PageHeader
+          title="Analytics"
+          subtitle="Business intelligence and performance metrics"
+          icon={BarChart3}
+          actions={
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Date Range Picker */}
+              <DateRangePicker
+                value={dateRange}
+                onChange={(range) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    startDate: range.startDate ? range.startDate.toISOString() : null,
+                    endDate: range.endDate ? range.endDate.toISOString() : null,
+                  }))
+                }
+              />
 
-          {/* Time Range Selector */}
-          <div className="flex items-center gap-2 bg-slate-elevated rounded-lg p-1">
-            {([6, 12, 24] as TimeRange[]).map((range) => (
+              {/* Time Range Selector */}
+              <div className="flex items-center gap-2 bg-slate-elevated rounded-lg p-1">
+                {([6, 12, 24] as TimeRange[]).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setFilters((prev) => ({ ...prev, timeRange: range }))}
+                    className={cn(
+                      'px-4 py-2 text-sm font-medium rounded-md transition-all',
+                      timeRange === range
+                        ? 'bg-teal-electric/20 text-teal-electric'
+                        : 'text-slate-muted hover:text-white'
+                    )}
+                  >
+                    {range}M
+                  </button>
+                ))}
+              </div>
+
               <button
-                key={range}
-                onClick={() => setFilters((prev) => ({ ...prev, timeRange: range }))}
-                className={cn(
-                  'px-4 py-2 text-sm font-medium rounded-md transition-all',
-                  timeRange === range
-                    ? 'bg-teal-electric/20 text-teal-electric'
-                    : 'text-slate-muted hover:text-white'
-                )}
+                onClick={retryAll}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
               >
-                {range}M
+                <RefreshCw className="w-4 h-4" />
+                Refresh data
               </button>
-            ))}
-          </div>
-
-          <button
-            onClick={retryAll}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh data
-          </button>
-        </div>
-      </div>
+            </div>
+          }
+        />
 
       {/* Key Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -1137,6 +1137,7 @@ export default function AnalyticsPage() {
           </div>
         </Card>
       )}
-    </div>
+      </div>
+    </DashboardShell>
   );
 }

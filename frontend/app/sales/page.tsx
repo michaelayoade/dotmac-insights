@@ -211,16 +211,6 @@ export default function SalesDashboardPage() {
     return <LoadingState />;
   }
 
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load sales dashboard data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   const collectionRate = dashboard?.collections?.collection_rate ?? 0;
   const outstandingTotal = dashboard?.outstanding?.total ?? 0;
   const overdueTotal = dashboard?.outstanding?.overdue ?? 0;
@@ -229,6 +219,13 @@ export default function SalesDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {firstError && (
+        <ErrorDisplay
+          message="Failed to load sales dashboard data."
+          error={firstError as Error}
+          onRetry={retryAll}
+        />
+      )}
       <PageHeader
         title="Sales Dashboard"
         subtitle="CRM pipeline, revenue metrics, and financial performance"

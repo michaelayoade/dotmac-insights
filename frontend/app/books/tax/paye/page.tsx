@@ -98,22 +98,19 @@ export default function PAYEPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load PAYE calculations."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   // Calculate summary stats
   const totalPAYE = data?.calculations?.reduce((sum: number, c: any) => sum + c.paye_amount, 0) || 0;
   const employeeCount = data?.calculations?.length || 0;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load PAYE calculations."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link

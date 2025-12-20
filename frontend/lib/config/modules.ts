@@ -20,6 +20,7 @@ import {
   Package,
   Landmark,
   Contact2,
+  Database,
 } from 'lucide-react';
 import type { AccentColor } from './colors';
 
@@ -32,6 +33,7 @@ export type Scope =
   | 'analytics:write'
   | 'admin:read'
   | 'admin:write'
+  | 'explore:read'
   | '*';
 
 export interface ModuleDefinition {
@@ -185,6 +187,16 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'cyan',
     requiredScopes: ['analytics:read'],
     category: 'finance',
+  },
+  {
+    key: 'explorer',
+    name: 'Data Explorer',
+    description: 'Browse data models, query records, and export reports.',
+    href: '/explorer',
+    icon: Database,
+    accentColor: 'slate',
+    requiredScopes: ['explore:read'],
+    category: 'admin',
   },
   // Admin
   {

@@ -27,6 +27,7 @@ from app.models.accounting import (
     GLEntry,
 )
 from app.models.payment import Payment
+from app.models.accounting_ext import AuditAction
 from app.services.audit_logger import AuditLogger, serialize_for_audit
 from app.services.transaction_manager import transactional_session
 
@@ -196,8 +197,8 @@ class BankReconciliationService:
         return {
             "reconciliation_id": reconciliation.id,
             "bank_account": reconciliation.bank_account,
-            "from_date": reconciliation.from_date.isoformat(),
-            "to_date": reconciliation.to_date.isoformat(),
+            "from_date": reconciliation.from_date.isoformat() if reconciliation.from_date else None,
+            "to_date": reconciliation.to_date.isoformat() if reconciliation.to_date else None,
             "unmatched_bank_transactions": [
                 {
                     "id": t.id,
@@ -219,7 +220,7 @@ class BankReconciliationService:
                     "debit": float(e.debit or 0),
                     "credit": float(e.credit or 0),
                     "party": e.party,
-                    "remarks": e.remarks,
+                    "remarks": getattr(e, "remarks", None),
                 }
                 for e in unmatched_gl
             ],
@@ -284,6 +285,8 @@ class BankReconciliationService:
                 raise ReconciliationError("One or more GL entries not found")
 
             if reconciliation is not None:
+                if reconciliation.from_date is None or reconciliation.to_date is None:
+                    raise ReconciliationError("Reconciliation date range is missing")
                 txn_date = self._normalize_date(bank_txn.date)
                 if txn_date is None:
                     raise ReconciliationError("Bank transaction date is missing")
@@ -334,7 +337,7 @@ class BankReconciliationService:
             self.audit_logger.log(
                 doctype="bank_transaction",
                 document_id=bank_txn.id,
-                action="reconcile",
+                action=AuditAction.UPDATE,
                 user_id=user_id,
                 document_name=bank_txn.reference_number or str(bank_txn.id),
                 new_values={"status": "reconciled", "matched_entries": gl_entry_ids},
@@ -442,6 +445,9 @@ class BankReconciliationService:
             if reconciliation.status == BankReconciliationStatus.COMPLETED:
                 raise ReconciliationError("Reconciliation is already completed")
 
+            if reconciliation.bank_account is None or reconciliation.to_date is None:
+                raise ReconciliationError("Reconciliation is missing bank account or end date")
+
             # Calculate final balances
             outstanding = self.get_outstanding_items(reconciliation_id)
 
@@ -468,7 +474,7 @@ class BankReconciliationService:
             self.audit_logger.log(
                 doctype="bank_reconciliation",
                 document_id=reconciliation.id,
-                action="complete",
+                action=AuditAction.CLOSE,
                 user_id=user_id,
                 document_name=f"{reconciliation.bank_account}",
                 new_values={
@@ -562,7 +568,7 @@ class BankReconciliationService:
             self.audit_logger.log(
                 doctype="bank_transaction",
                 document_id=0,
-                action="import",
+                action=AuditAction.CREATE,
                 user_id=user_id,
                 document_name=bank_account.account_name,
                 new_values={"imported_count": len(imported)},
@@ -611,7 +617,7 @@ class BankReconciliationService:
             "unreconciled_transactions": unreconciled_count,
             "last_reconciliation": {
                 "id": latest.id,
-                "to_date": latest.to_date.isoformat(),
+                "to_date": latest.to_date.isoformat() if latest.to_date else None,
                 "status": latest.status.value,
                 "closing_balance": float(latest.bank_statement_closing_balance),
             } if latest else None,

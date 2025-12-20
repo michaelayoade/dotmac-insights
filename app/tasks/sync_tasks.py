@@ -522,6 +522,81 @@ def sync_erpnext_extended_accounting(self, full_sync: bool = False):
         raise self.retry(exc=e)
 
 
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_erpnext_sales(self, full_sync: bool = False):
+    """Sync ERPNext sales data (Customer Groups, Territories, Items, Leads, Quotations, Sales Orders)."""
+    task_name = "sync_erpnext_sales"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name, timeout=1800):
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                run_async(sync_client.sync_sales_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_erpnext_hr(self, full_sync: bool = False):
+    """Sync ERPNext HR data (Departments, Designations, Users, HD Teams)."""
+    task_name = "sync_erpnext_hr"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name, timeout=1800):
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                run_async(sync_client.sync_hr_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_erpnext_items(self, full_sync: bool = False):
+    """Sync ERPNext inventory items."""
+    task_name = "sync_erpnext_items"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name, timeout=900):
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                run_async(sync_client.sync_items_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
 # Chatwoot Tasks
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def sync_chatwoot_all(self, full_sync: bool = False):

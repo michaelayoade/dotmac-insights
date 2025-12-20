@@ -39,9 +39,10 @@ class ValidationResponse(BaseModel):
 
 def _resolve_safe_path(raw_path: str) -> Path:
     """Ensure requested path stays under the configured import root."""
-    if not settings.data_import_base_dir:
+    base_dir = getattr(settings, "data_import_base_dir", None)
+    if not base_dir:
         raise HTTPException(status_code=500, detail="Data import base directory is not configured")
-    base = Path(settings.data_import_base_dir).expanduser().resolve()
+    base = Path(base_dir).expanduser().resolve()
     candidate = Path(raw_path).expanduser().resolve()
     try:
         candidate.relative_to(base)
@@ -71,10 +72,11 @@ def list_domains() -> Dict[str, List[str]]:
 async def validate_csv(
     file: UploadFile = File(...),
     domain: str = Form(...),
+    db: Session = Depends(get_db),
 ) -> ValidationResponse:
     """Dry-run CSV validation without writing to the database."""
     domain = _validate_domain(domain)
-    if not file.filename.endswith(".csv"):
+    if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
     content = await file.read()
@@ -83,7 +85,7 @@ async def validate_csv(
     if not rows:
         raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows")
 
-    service = DataImportService(db=None)  # Validation only; no DB writes
+    service = DataImportService(db)  # Validation only; no DB writes
     errors = service.validate_rows(domain, rows)
     if errors:
         return ValidationResponse(valid=False, message=f"Found {len(errors)} error(s); showing first {len(errors)}.", errors=errors)
@@ -99,7 +101,7 @@ async def upload_csv(
 ) -> ImportResponse:
     """Upload and import a CSV file for a supported domain."""
     domain = _validate_domain(domain)
-    if not file.filename.endswith(".csv"):
+    if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
     content = await file.read()

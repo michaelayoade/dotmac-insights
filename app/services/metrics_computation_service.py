@@ -9,7 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, Dict, Any, List, Tuple
 
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, false
 from sqlalchemy.orm import Session
 
 from app.models.performance import (
@@ -28,8 +28,8 @@ from app.models.performance import (
     KRAResult,
     KPIBinding,
 )
-from app.models.ticket import Ticket
-from app.models.field_service import ServiceOrder
+from app.models.ticket import Ticket, TicketStatus
+from app.models.field_service import ServiceOrder, ServiceOrderStatus
 from app.models.crm import Opportunity, Activity, OpportunityStatus, ActivityStatus
 from app.models.project import Project, ProjectStatus
 from app.models.task import Task, TaskStatus
@@ -261,9 +261,27 @@ class MetricsComputationService:
             # Count numerator (tickets meeting criteria)
             numer_query = base_query
             if numerator_filter.get('sla_met'):
-                numer_query = numer_query.filter(Ticket.sla_met == True)
+                sla_met_column = getattr(Ticket, "sla_met", None)
+                if sla_met_column is not None:
+                    numer_query = numer_query.filter(sla_met_column.is_(True))
+                else:
+                    numer_query = numer_query.filter(
+                        and_(
+                            Ticket.resolution_by.isnot(None),
+                            Ticket.resolution_date.isnot(None),
+                            Ticket.resolution_date <= Ticket.resolution_by,
+                        )
+                    )
             if numerator_filter.get('reopened'):
-                numer_query = numer_query.filter(Ticket.reopened == True)
+                reopened_column = getattr(Ticket, "reopened", None)
+                if reopened_column is not None:
+                    numer_query = numer_query.filter(reopened_column.is_(True))
+                else:
+                    reopened_status = getattr(TicketStatus, "REOPENED", None)
+                    if reopened_status is not None:
+                        numer_query = numer_query.filter(Ticket.status == reopened_status)
+                    else:
+                        numer_query = numer_query.filter(false())
             numerator = numer_query.count()
 
             return Decimal(str((numerator / denominator) * 100)).quantize(Decimal("0.01"))
@@ -327,9 +345,17 @@ class MetricsComputationService:
             if numerator_filter.get('status'):
                 numer_query = numer_query.filter(ServiceOrder.status == numerator_filter['status'])
             if numerator_filter.get('first_time_fix'):
-                numer_query = numer_query.filter(ServiceOrder.first_time_fix == True)
+                first_time_fix_column = getattr(ServiceOrder, "first_time_fix", None)
+                if first_time_fix_column is not None:
+                    numer_query = numer_query.filter(first_time_fix_column.is_(True))
+                else:
+                    numer_query = numer_query.filter(ServiceOrder.status == ServiceOrderStatus.COMPLETED)
             if numerator_filter.get('arrived_on_time'):
-                numer_query = numer_query.filter(ServiceOrder.arrived_on_time == True)
+                arrived_on_time_column = getattr(ServiceOrder, "arrived_on_time", None)
+                if arrived_on_time_column is not None:
+                    numer_query = numer_query.filter(arrived_on_time_column.is_(True))
+                else:
+                    numer_query = numer_query.filter(false())
             numerator = numer_query.count()
 
             return Decimal(str((numerator / denominator) * 100)).quantize(Decimal("0.01"))
@@ -853,7 +879,7 @@ class MetricsComputationService:
             ])
         ).all()
 
-        results = {
+        results: Dict[str, Any] = {
             "total": len(scorecards),
             "computed": 0,
             "failed": 0,

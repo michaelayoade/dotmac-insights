@@ -37,16 +37,6 @@ export default function TaxDashboardPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load tax dashboard."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const taxCards = [
     {
       title: 'VAT',
@@ -96,6 +86,13 @@ export default function TaxDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load tax dashboard."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BadgePercent className="w-5 h-5 text-teal-electric" />

@@ -16,7 +16,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Dict
 
 from sqlalchemy.orm import Session
 
@@ -310,7 +310,7 @@ class TicketOutboundSyncService:
                 target_system=system,
                 operation=operation,
                 idempotency_key=idempotency_key,
-                payload_hash=None,  # Will be computed during processing
+                payload_hash="",  # Will be computed during processing
             )
             self.db.add(log)
             logs.append(log)
@@ -441,7 +441,7 @@ class TicketOutboundSyncService:
         }
         priority = priority_map.get(ticket.priority, None)
 
-        payload = {
+        payload: Dict[str, Any] = {
             "status": status,
             "priority": priority,
             # Chatwoot custom attributes for subject/category
@@ -551,7 +551,7 @@ class TicketOutboundSyncService:
                 data = response.json()
                 new_name = data.get("data", {}).get("name")
                 logger.info(f"Created ERPNext {doctype} {new_name} for ticket {ticket.id}")
-                return new_name
+                return str(new_name) if new_name is not None else None
 
     def _push_to_chatwoot(self, ticket: UnifiedTicket, payload: dict) -> Optional[int]:
         """

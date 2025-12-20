@@ -75,20 +75,17 @@ export default function PurchasingAPAgingPage() {
     return colors[index] || colors[colors.length - 1];
   };
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load AP aging data</p>
-        <p className="text-slate-muted text-sm mt-1">
-          {error instanceof Error ? error.message : 'Unknown error'}
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load AP aging data</p>
+          <p className="text-slate-muted text-sm mt-1">
+            {error instanceof Error ? error.message : 'Unknown error'}
+          </p>
+        </div>
+      )}
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">

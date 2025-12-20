@@ -30,16 +30,6 @@ export default function AnomaliesPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load anomalies"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const getSeverityColor = (severity: string): string => {
     switch (severity.toLowerCase()) {
       case 'critical': return 'red';
@@ -51,6 +41,13 @@ export default function AnomaliesPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load anomalies"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-card rounded-lg border border-slate-border p-4">

@@ -30,7 +30,7 @@ from app.models.omni import (
     OmniWebhookEvent,
     OmniAttachment,
 )
-from app.models.agent import Agent, Team
+from app.models.agent import Agent, Team, TeamMember
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -293,8 +293,7 @@ async def ingest_webhook(
         if not _verify_signature(channel.webhook_secret, body, x_signature):
             logger.warning(
                 "omni_webhook_signature_invalid",
-                channel=channel_name,
-                has_signature=bool(x_signature),
+                extra={"channel": channel_name, "has_signature": bool(x_signature)},
             )
             increment_webhook_auth_failure("omni", "invalid_signature")
             raise HTTPException(status_code=401, detail="Invalid signature")
@@ -303,8 +302,10 @@ async def ingest_webhook(
         if settings.is_production:
             logger.error(
                 "omni_webhook_secret_missing",
-                channel=channel_name,
-                message="Webhook secret not configured in production - rejecting webhook",
+                extra={
+                    "channel": channel_name,
+                    "detail": "Webhook secret not configured in production - rejecting webhook",
+                },
             )
             increment_webhook_auth_failure("omni", "no_secret")
             raise HTTPException(
@@ -313,8 +314,10 @@ async def ingest_webhook(
             )
         logger.warning(
             "omni_webhook_secret_missing_dev",
-            channel=channel_name,
-            message="Webhook secret not configured, skipping verification (dev mode)",
+            extra={
+                "channel": channel_name,
+                "detail": "Webhook secret not configured, skipping verification (dev mode)",
+            },
         )
 
     provider_event_id = payload_json.get("id") or payload_json.get("event_id") or payload_json.get("message_id")
@@ -534,7 +537,7 @@ async def get_channel(
         OmniWebhookEvent.channel_id == channel_id,
         OmniWebhookEvent.processed == True
     ).scalar()
-    last_event = db.query(func.max(OmniWebhookEvent.created_at)).filter(
+    last_event = db.query(func.max(OmniWebhookEvent.received_at)).filter(
         OmniWebhookEvent.channel_id == channel_id
     ).scalar()
 
@@ -577,7 +580,7 @@ async def list_channel_webhook_events(
         query = query.filter(OmniWebhookEvent.processed == processed)
 
     total = query.count()
-    events = query.order_by(OmniWebhookEvent.created_at.desc()).offset(offset).limit(limit).all()
+    events = query.order_by(OmniWebhookEvent.received_at.desc()).offset(offset).limit(limit).all()
 
     return {
         "channel_id": channel_id,
@@ -591,7 +594,7 @@ async def list_channel_webhook_events(
                 "provider_event_id": e.provider_event_id,
                 "processed": e.processed,
                 "headers": e.headers,
-                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "created_at": e.received_at.isoformat() if e.received_at else None,
             }
             for e in events
         ],
@@ -623,7 +626,7 @@ async def get_channel_webhook_event(
         "processed": event.processed,
         "payload": event.payload,
         "headers": event.headers,
-        "created_at": event.created_at.isoformat() if event.created_at else None,
+        "created_at": event.received_at.isoformat() if event.received_at else None,
     }
 
 
@@ -649,26 +652,26 @@ async def get_channel_stats(
     # Overall stats
     total = db.query(func.count(OmniWebhookEvent.id)).filter(
         OmniWebhookEvent.channel_id == channel_id,
-        OmniWebhookEvent.created_at >= cutoff,
+        OmniWebhookEvent.received_at >= cutoff,
     ).scalar()
 
     processed = db.query(func.count(OmniWebhookEvent.id)).filter(
         OmniWebhookEvent.channel_id == channel_id,
-        OmniWebhookEvent.created_at >= cutoff,
+        OmniWebhookEvent.received_at >= cutoff,
         OmniWebhookEvent.processed == True,
     ).scalar()
 
     # Daily breakdown
     daily_query = db.query(
-        cast(OmniWebhookEvent.created_at, Date).label("date"),
+        cast(OmniWebhookEvent.received_at, Date).label("date"),
         func.count(OmniWebhookEvent.id).label("count"),
     ).filter(
         OmniWebhookEvent.channel_id == channel_id,
-        OmniWebhookEvent.created_at >= cutoff,
+        OmniWebhookEvent.received_at >= cutoff,
     ).group_by(
-        cast(OmniWebhookEvent.created_at, Date)
+        cast(OmniWebhookEvent.received_at, Date)
     ).order_by(
-        cast(OmniWebhookEvent.created_at, Date)
+        cast(OmniWebhookEvent.received_at, Date)
     ).all()
 
     daily_data = [{"date": str(row.date), "count": row.count} for row in daily_query]

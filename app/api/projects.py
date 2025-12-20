@@ -84,7 +84,7 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(ProjectCreate):
-    project_name: Optional[str] = None  # Allow changing the name
+    project_name: Optional[str] = None  # type: ignore[assignment]  # Allow changing the name
 
 
 class TaskDependencyPayload(BaseModel):
@@ -132,7 +132,7 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(TaskCreate):
-    subject: Optional[str] = None  # Allow updating subject
+    subject: Optional[str] = None  # type: ignore[assignment]  # Allow updating subject
 
 
 # =============================================================================
@@ -368,8 +368,8 @@ async def get_project(
         if emp:
             manager = {
                 "id": emp.id,
-                "name": emp.employee_name,
-                "email": emp.company_email,
+                "name": emp.name,
+                "email": emp.email,
             }
 
     # Build users list (team members)
@@ -381,7 +381,7 @@ async def get_project(
             "email": u.email,
             "project_status": u.project_status,
         }
-        for u in sorted(project.users, key=lambda x: x.idx)
+        for u in sorted(project.users, key=lambda x: x.idx or 0)
     ]
 
     # Build tasks list

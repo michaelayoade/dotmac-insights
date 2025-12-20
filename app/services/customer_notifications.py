@@ -608,7 +608,7 @@ class CustomerNotificationService:
             elif notification.channel == CustomerNotificationChannel.IN_APP:
                 # In-app notifications are stored and retrieved by the frontend
                 notification.status = CustomerNotificationStatus.DELIVERED
-                notification.sent_at = datetime.utcnow()
+                notification.delivered_at = datetime.utcnow()
                 return
 
             # Process result
@@ -616,7 +616,7 @@ class CustomerNotificationService:
                 notification.attempt_count += 1
                 if result.success:
                     notification.status = CustomerNotificationStatus.SENT
-                    notification.sent_at = datetime.utcnow()
+                    notification.delivered_at = datetime.utcnow()
                     notification.external_id = result.external_id
                     logger.info(f"Notification {notification.id} sent via {result.provider}")
                 else:
@@ -705,7 +705,7 @@ class CustomerNotificationService:
         """Notify customer that a technician has been assigned."""
         technician_name = "A technician"
         if service_order.technician:
-            technician_name = service_order.technician.employee_name or "A technician"
+            technician_name = service_order.technician.name or "A technician"
 
         scheduled_time = "TBD"
         if service_order.scheduled_start_time:
@@ -732,7 +732,7 @@ class CustomerNotificationService:
         """Notify customer that technician is on the way."""
         technician_name = "Your technician"
         if service_order.technician:
-            technician_name = service_order.technician.employee_name or "Your technician"
+            technician_name = service_order.technician.name or "Your technician"
 
         return self.notify_customer(
             customer_id=service_order.customer_id,
@@ -750,7 +750,7 @@ class CustomerNotificationService:
         """Notify customer that technician has arrived."""
         technician_name = "Your technician"
         if service_order.technician:
-            technician_name = service_order.technician.employee_name or "Your technician"
+            technician_name = service_order.technician.name or "Your technician"
 
         arrival_time = service_order.arrival_time or datetime.utcnow()
 
@@ -769,7 +769,7 @@ class CustomerNotificationService:
         """Notify customer that service work has started."""
         technician_name = "Our technician"
         if service_order.technician:
-            technician_name = service_order.technician.employee_name or "Our technician"
+            technician_name = service_order.technician.name or "Our technician"
 
         start_time = service_order.actual_start_time or datetime.utcnow()
         estimated_duration = f"{float(service_order.estimated_duration_hours)} hours"
@@ -834,6 +834,8 @@ class CustomerNotificationService:
 
     def notify_ticket_created(self, ticket: Ticket) -> List[CustomerNotification]:
         """Notify customer that their ticket was created."""
+        if not ticket.customer_id:
+            return []
         return self.notify_customer(
             customer_id=ticket.customer_id,
             notification_type=CustomerNotificationType.TICKET_CREATED,
@@ -851,6 +853,8 @@ class CustomerNotificationService:
         notes: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer of ticket status update."""
+        if not ticket.customer_id:
+            return []
         return self.notify_customer(
             customer_id=ticket.customer_id,
             notification_type=CustomerNotificationType.TICKET_UPDATED,
@@ -868,6 +872,8 @@ class CustomerNotificationService:
         reply: str
     ) -> List[CustomerNotification]:
         """Notify customer of new reply on their ticket."""
+        if not ticket.customer_id:
+            return []
         return self.notify_customer(
             customer_id=ticket.customer_id,
             notification_type=CustomerNotificationType.TICKET_REPLY,
@@ -885,6 +891,8 @@ class CustomerNotificationService:
         resolution: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer that their ticket was resolved."""
+        if not ticket.customer_id:
+            return []
         return self.notify_customer(
             customer_id=ticket.customer_id,
             notification_type=CustomerNotificationType.TICKET_RESOLVED,
@@ -907,7 +915,7 @@ class CustomerNotificationService:
 
         manager_name = "Our team"
         if project.project_manager:
-            manager_name = project.project_manager.employee_name or "Our team"
+            manager_name = project.project_manager.name or "Our team"
 
         return self.notify_customer(
             customer_id=project.customer_id,
@@ -969,16 +977,18 @@ class CustomerNotificationService:
 
     def notify_invoice_generated(self, invoice: Invoice) -> List[CustomerNotification]:
         """Notify customer of new invoice."""
-        amount = f"₦{float(invoice.grand_total):,.2f}" if invoice.grand_total else "₦0.00"
+        if not invoice.customer_id:
+            return []
+        amount = f"₦{float(invoice.total_amount):,.2f}" if invoice.total_amount else "₦0.00"
 
         return self.notify_customer(
             customer_id=invoice.customer_id,
             notification_type=CustomerNotificationType.INVOICE_GENERATED,
             data={
-                "invoice_number": invoice.name or str(invoice.id),
+                "invoice_number": invoice.invoice_number or str(invoice.id),
                 "amount": amount,
                 "due_date": invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else "Upon receipt",
-                "description": invoice.remarks or "",
+                "description": invoice.description or "",
             },
             invoice_id=invoice.id,
         )
@@ -1009,13 +1019,15 @@ class CustomerNotificationService:
         days_until_due: int
     ) -> List[CustomerNotification]:
         """Notify customer of upcoming payment due."""
-        amount = f"₦{float(invoice.outstanding_amount):,.2f}" if invoice.outstanding_amount else "₦0.00"
+        if not invoice.customer_id:
+            return []
+        amount = f"₦{float(invoice.balance):,.2f}" if invoice.balance else "₦0.00"
 
         return self.notify_customer(
             customer_id=invoice.customer_id,
             notification_type=CustomerNotificationType.PAYMENT_DUE,
             data={
-                "invoice_number": invoice.name or str(invoice.id),
+                "invoice_number": invoice.invoice_number or str(invoice.id),
                 "amount": amount,
                 "due_date": invoice.due_date.strftime("%B %d, %Y") if invoice.due_date else "Now",
                 "days_until_due": days_until_due,

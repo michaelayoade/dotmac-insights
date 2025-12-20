@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require
 from app.database import get_db
+from app.models.accounting_ext import AuditAction
 
 from .helpers import parse_date, paginate
 
@@ -665,7 +666,7 @@ def file_tax_period(
     audit.log(
         doctype="tax_filing_period",
         document_id=period.id,
-        action="file",
+        action=AuditAction.UPDATE,
         user_id=user.id,
         document_name=f"{period.tax_type.value} {period.period_name}",
         old_values={"status": old_status},
@@ -732,7 +733,7 @@ def record_tax_payment(
     audit.log(
         doctype="tax_payment",
         document_id=payment.id,
-        action="create",
+        action=AuditAction.CREATE,
         user_id=user.id,
         document_name=f"{period.tax_type.value} {period.period_name}",
         new_values={"amount": amount, "payment_reference": payment_reference},

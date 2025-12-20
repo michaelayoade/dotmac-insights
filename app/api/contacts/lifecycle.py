@@ -4,6 +4,7 @@ Contact Lifecycle Management Endpoints
 Handles transitions: lead → prospect → customer → churned
 """
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -323,7 +324,7 @@ async def unassign_owner(contact_id: int, db: Session = Depends(get_db)):
     response_model=UnifiedContactResponse,
     dependencies=[Depends(Require("contacts:write"))],
 )
-async def suspend_contact(contact_id: int, reason: str = None, db: Session = Depends(get_db)):
+async def suspend_contact(contact_id: int, reason: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Suspend a contact (e.g., for non-payment).
     """
@@ -401,7 +402,7 @@ async def activate_contact(contact_id: int, db: Session = Depends(get_db)):
     response_model=UnifiedContactResponse,
     dependencies=[Depends(Require("contacts:write"))],
 )
-async def mark_do_not_contact(contact_id: int, reason: str = None, db: Session = Depends(get_db)):
+async def mark_do_not_contact(contact_id: int, reason: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Mark a contact as do-not-contact.
 
@@ -450,12 +451,12 @@ async def mark_do_not_contact(contact_id: int, reason: str = None, db: Session =
 )
 async def update_communication_preferences(
     contact_id: int,
-    email_opt_in: bool = None,
-    sms_opt_in: bool = None,
-    whatsapp_opt_in: bool = None,
-    phone_opt_in: bool = None,
-    preferred_language: str = None,
-    preferred_channel: str = None,
+    email_opt_in: Optional[bool] = None,
+    sms_opt_in: Optional[bool] = None,
+    whatsapp_opt_in: Optional[bool] = None,
+    phone_opt_in: Optional[bool] = None,
+    preferred_language: Optional[str] = None,
+    preferred_channel: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """

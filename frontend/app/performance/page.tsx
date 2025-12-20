@@ -49,35 +49,41 @@ export default function PerformanceDashboardPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load performance dashboard"
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   if (!data) {
     return (
-      <div className="text-center py-16 text-slate-400">
-        <Award className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <h2 className="text-xl font-semibold text-white mb-2">No Active Period</h2>
-        <p className="mb-6">Create an evaluation period to get started with performance management.</p>
-        <Link
-          href="/performance/periods/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 transition-colors"
-        >
-          <Calendar className="w-4 h-4" />
-          Create Period
-        </Link>
+      <div className="space-y-6">
+        {error && (
+          <ErrorDisplay
+            message="Failed to load performance dashboard"
+            error={error as Error}
+            onRetry={() => mutate()}
+          />
+        )}
+        <div className="text-center py-16 text-slate-400">
+          <Award className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <h2 className="text-xl font-semibold text-white mb-2">No Active Period</h2>
+          <p className="mb-6">Create an evaluation period to get started with performance management.</p>
+          <Link
+            href="/performance/periods/new"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 transition-colors"
+          >
+            <Calendar className="w-4 h-4" />
+            Create Period
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load performance dashboard"
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Active Period Banner */}
       {data.active_period && (
         <div className="bg-gradient-to-r from-violet-500/20 to-purple-500/20 border border-violet-500/30 rounded-xl p-4">

@@ -5,7 +5,7 @@ import csv
 import io
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -141,23 +141,23 @@ def export_claims_report(
     base_filename = filename or f"expense_claims_{datetime.now().strftime('%Y%m%d')}"
 
     if format == "csv":
-        content = _claims_to_csv(data, include_lines)
+        csv_content = _claims_to_csv(data, include_lines)
         return StreamingResponse(
-            iter([content]),
+            iter([csv_content]),
             media_type="text/csv",
             headers=_export_headers(base_filename, "csv"),
         )
     elif format == "excel":
-        content = _claims_to_excel(data, include_lines)
+        excel_content = _claims_to_excel(data, include_lines)
         return StreamingResponse(
-            iter([content]),
+            iter([excel_content]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers=_export_headers(base_filename, "xlsx"),
         )
     else:  # pdf
-        content = _claims_to_pdf(data, include_lines)
+        pdf_content = _claims_to_pdf(data, include_lines)
         return StreamingResponse(
-            iter([content]),
+            iter([pdf_content]),
             media_type="application/pdf",
             headers=_export_headers(base_filename, "pdf"),
         )
@@ -169,13 +169,13 @@ def _build_claims_report_data(claims: List[ExpenseClaim], include_lines: bool, s
     total_claimed = Decimal("0")
     total_approved = Decimal("0")
 
-    status_counts = {}
+    status_counts: Dict[str, int] = {}
 
     for claim in claims:
         status_key = claim.status.value if claim.status else "unknown"
         status_counts[status_key] = status_counts.get(status_key, 0) + 1
         total_claimed += claim.total_claimed_amount or Decimal("0")
-        total_approved += claim.approved_amount or Decimal("0")
+        total_approved += claim.total_sanctioned_amount or Decimal("0")
 
         row = {
             "claim_number": claim.claim_number or str(claim.id),
@@ -185,7 +185,7 @@ def _build_claims_report_data(claims: List[ExpenseClaim], include_lines: bool, s
             "status": status_key,
             "currency": claim.currency,
             "total_claimed": float(claim.total_claimed_amount or 0),
-            "approved_amount": float(claim.approved_amount or 0),
+            "approved_amount": float(claim.total_sanctioned_amount or 0),
             "line_count": len(claim.lines) if claim.lines else 0,
             "submitted_at": _format_date(claim.submitted_at),
             "approved_at": _format_date(claim.approved_at),
@@ -197,9 +197,9 @@ def _build_claims_report_data(claims: List[ExpenseClaim], include_lines: bool, s
                     "category": line.category.name if line.category else "Uncategorized",
                     "description": line.description or "",
                     "expense_date": _format_date(line.expense_date),
-                    "amount": float(line.amount or 0),
+                    "amount": float(line.claimed_amount or 0),
                     "currency": line.currency,
-                    "receipt_attached": bool(line.receipt_url),
+                    "receipt_attached": bool(line.has_receipt),
                 }
                 for line in claim.lines
             ]
@@ -477,7 +477,7 @@ def _claims_to_pdf(data: Dict[str, Any], include_lines: bool) -> bytes:
 
     css = _get_pdf_css()
     html = HTML(string=html_content)
-    return html.write_pdf(stylesheets=[CSS(string=css)])
+    return cast(bytes, html.write_pdf(stylesheets=[CSS(string=css)]))
 
 
 # =============================================================================
@@ -524,23 +524,23 @@ def export_advances_report(
     base_filename = filename or f"cash_advances_{datetime.now().strftime('%Y%m%d')}"
 
     if format == "csv":
-        content = _advances_to_csv(data)
+        csv_content = _advances_to_csv(data)
         return StreamingResponse(
-            iter([content]),
+            iter([csv_content]),
             media_type="text/csv",
             headers=_export_headers(base_filename, "csv"),
         )
     elif format == "excel":
-        content = _advances_to_excel(data)
+        excel_content = _advances_to_excel(data)
         return StreamingResponse(
-            iter([content]),
+            iter([excel_content]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers=_export_headers(base_filename, "xlsx"),
         )
     else:  # pdf
-        content = _advances_to_pdf(data)
+        pdf_content = _advances_to_pdf(data)
         return StreamingResponse(
-            iter([content]),
+            iter([pdf_content]),
             media_type="application/pdf",
             headers=_export_headers(base_filename, "pdf"),
         )
@@ -554,7 +554,7 @@ def _build_advances_report_data(advances: List[CashAdvance], start_date: Optiona
     total_settled = Decimal("0")
     total_outstanding = Decimal("0")
 
-    status_counts = {}
+    status_counts: Dict[str, int] = {}
 
     for adv in advances:
         status_key = adv.status.value if adv.status else "unknown"
@@ -562,20 +562,20 @@ def _build_advances_report_data(advances: List[CashAdvance], start_date: Optiona
         total_requested += adv.requested_amount or Decimal("0")
         total_disbursed += adv.disbursed_amount or Decimal("0")
         total_settled += adv.settled_amount or Decimal("0")
-        total_outstanding += adv.outstanding_balance or Decimal("0")
+        total_outstanding += adv.outstanding_amount or Decimal("0")
 
         rows.append({
             "advance_number": adv.advance_number or str(adv.id),
             "employee_id": adv.employee_id,
             "purpose": adv.purpose,
             "request_date": _format_date(adv.request_date),
-            "required_date": _format_date(adv.required_date),
+            "required_date": _format_date(adv.required_by_date),
             "status": status_key,
             "currency": adv.currency,
             "requested_amount": float(adv.requested_amount or 0),
             "disbursed_amount": float(adv.disbursed_amount or 0),
             "settled_amount": float(adv.settled_amount or 0),
-            "outstanding_balance": float(adv.outstanding_balance or 0),
+            "outstanding_balance": float(adv.outstanding_amount or 0),
             "disbursed_at": _format_date(adv.disbursed_at),
         })
 
@@ -754,7 +754,7 @@ def _advances_to_pdf(data: Dict[str, Any]) -> bytes:
 
     css = _get_pdf_css()
     html = HTML(string=html_content)
-    return html.write_pdf(stylesheets=[CSS(string=css)])
+    return cast(bytes, html.write_pdf(stylesheets=[CSS(string=css)]))
 
 
 # =============================================================================
@@ -780,52 +780,60 @@ def get_expense_summary_report(
         advances_query = advances_query.filter(CashAdvance.request_date <= end_date)
 
     # Aggregate claims
-    claims_agg = db.query(
+    claims_agg_query = db.query(
         func.count(ExpenseClaim.id).label("count"),
         func.sum(ExpenseClaim.total_claimed_amount).label("total_claimed"),
-        func.sum(ExpenseClaim.approved_amount).label("total_approved"),
-    ).filter(
-        ExpenseClaim.claim_date >= start_date if start_date else True,
-        ExpenseClaim.claim_date <= end_date if end_date else True,
-    ).first()
+        func.sum(ExpenseClaim.total_sanctioned_amount).label("total_approved"),
+    )
+    if start_date:
+        claims_agg_query = claims_agg_query.filter(ExpenseClaim.claim_date >= start_date)
+    if end_date:
+        claims_agg_query = claims_agg_query.filter(ExpenseClaim.claim_date <= end_date)
+    claims_agg = claims_agg_query.first()
 
     # Aggregate advances
-    advances_agg = db.query(
+    advances_agg_query = db.query(
         func.count(CashAdvance.id).label("count"),
         func.sum(CashAdvance.requested_amount).label("total_requested"),
         func.sum(CashAdvance.disbursed_amount).label("total_disbursed"),
-        func.sum(CashAdvance.outstanding_balance).label("total_outstanding"),
-    ).filter(
-        CashAdvance.request_date >= start_date if start_date else True,
-        CashAdvance.request_date <= end_date if end_date else True,
-    ).first()
+        func.sum(CashAdvance.outstanding_amount).label("total_outstanding"),
+    )
+    if start_date:
+        advances_agg_query = advances_agg_query.filter(CashAdvance.request_date >= start_date)
+    if end_date:
+        advances_agg_query = advances_agg_query.filter(CashAdvance.request_date <= end_date)
+    advances_agg = advances_agg_query.first()
 
     # Status breakdown for claims
-    claims_by_status = db.query(
+    claims_by_status_query = db.query(
         ExpenseClaim.status,
         func.count(ExpenseClaim.id).label("count"),
         func.sum(ExpenseClaim.total_claimed_amount).label("amount"),
-    ).filter(
-        ExpenseClaim.claim_date >= start_date if start_date else True,
-        ExpenseClaim.claim_date <= end_date if end_date else True,
-    ).group_by(ExpenseClaim.status).all()
+    )
+    if start_date:
+        claims_by_status_query = claims_by_status_query.filter(ExpenseClaim.claim_date >= start_date)
+    if end_date:
+        claims_by_status_query = claims_by_status_query.filter(ExpenseClaim.claim_date <= end_date)
+    claims_by_status = claims_by_status_query.group_by(ExpenseClaim.status).all()
 
     # Top expense categories
-    top_categories = db.query(
+    top_categories_query = db.query(
         ExpenseCategory.name,
         func.count(ExpenseClaimLine.id).label("count"),
-        func.sum(ExpenseClaimLine.amount).label("total"),
+        func.sum(ExpenseClaimLine.claimed_amount).label("total"),
     ).join(
         ExpenseClaimLine, ExpenseClaimLine.category_id == ExpenseCategory.id
     ).join(
         ExpenseClaim, ExpenseClaimLine.expense_claim_id == ExpenseClaim.id
-    ).filter(
-        ExpenseClaim.claim_date >= start_date if start_date else True,
-        ExpenseClaim.claim_date <= end_date if end_date else True,
-    ).group_by(
+    )
+    if start_date:
+        top_categories_query = top_categories_query.filter(ExpenseClaim.claim_date >= start_date)
+    if end_date:
+        top_categories_query = top_categories_query.filter(ExpenseClaim.claim_date <= end_date)
+    top_categories = top_categories_query.group_by(
         ExpenseCategory.name
     ).order_by(
-        func.sum(ExpenseClaimLine.amount).desc()
+        func.sum(ExpenseClaimLine.claimed_amount).desc()
     ).limit(10).all()
 
     return {
@@ -893,12 +901,12 @@ def export_transactions_report(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid status")
 
-    transactions = query.limit(5000).all()  # Limit for performance
+    transaction_rows = query.limit(5000).all()  # Limit for performance
 
     # Get card names
     card_map = {c.id: c.card_name for c in db.query(CorporateCard).all()}
 
-    data = {
+    data: Dict[str, Any] = {
         "report_title": "Card Transactions Report",
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "period": {"start": start_date or "All time", "end": end_date or "Present"},
@@ -913,11 +921,13 @@ def export_transactions_report(
                 "status": t.status.value if t.status else "unknown",
                 "reference": t.transaction_reference or "",
             }
-            for t in transactions
+            for t in transaction_rows
         ],
     }
 
     base_filename = filename or f"card_transactions_{datetime.now().strftime('%Y%m%d')}"
+
+    transaction_items = cast(List[Dict[str, Any]], data["transactions"])
 
     if format == "csv":
         output = io.StringIO()
@@ -926,7 +936,7 @@ def export_transactions_report(
         writer.writerow([f"Generated: {data['generated_at']}"])
         writer.writerow([])
         writer.writerow(["Card", "Date", "Merchant", "Description", "Amount", "Currency", "Status", "Reference"])
-        for t in data["transactions"]:
+        for t in transaction_items:
             writer.writerow([
                 t["card_name"], t["transaction_date"], t["merchant"], t["description"],
                 _format_number(t["amount"]), t["currency"], t["status"], t["reference"]
@@ -948,7 +958,7 @@ def export_transactions_report(
         for col, h in enumerate(headers, 1):
             ws.cell(row=4, column=col, value=h).font = Font(bold=True)
 
-        for i, t in enumerate(data["transactions"], 5):
+        for i, t in enumerate(transaction_items, 5):
             ws.cell(row=i, column=1, value=t["card_name"])
             ws.cell(row=i, column=2, value=t["transaction_date"])
             ws.cell(row=i, column=3, value=t["merchant"])
@@ -963,10 +973,10 @@ def export_transactions_report(
         ws.column_dimensions["C"].width = 25
         ws.column_dimensions["D"].width = 30
 
-        output = io.BytesIO()
-        wb.save(output)
+        output_bytes = io.BytesIO()
+        wb.save(output_bytes)
         return StreamingResponse(
-            iter([output.getvalue()]),
+            iter([output_bytes.getvalue()]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers=_export_headers(base_filename, "xlsx"),
         )

@@ -401,7 +401,7 @@ class WebhookProcessor:
         if transaction:
             transaction.status = GatewayTransactionStatus.SUCCESS
             transaction.provider_reference = str(event_data.get("id", ""))
-            transaction.paid_at = datetime.utcnow()
+            transaction.completed_at = datetime.utcnow()
 
             # Update fees if provided
             if provider == PaymentProvider.PAYSTACK:

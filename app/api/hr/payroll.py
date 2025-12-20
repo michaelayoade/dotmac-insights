@@ -1044,7 +1044,19 @@ def export_salary_slips(
     if company:
         query = query.filter(SalarySlip.company.ilike(f"%{company}%"))
 
-    rows = [["id", "employee", "employee_name", "posting_date", "start_date", "end_date", "gross_pay", "total_deduction", "net_pay", "status", "company"]]
+    rows: List[List[Any]] = [[
+        "id",
+        "employee",
+        "employee_name",
+        "posting_date",
+        "start_date",
+        "end_date",
+        "gross_pay",
+        "total_deduction",
+        "net_pay",
+        "status",
+        "company",
+    ]]
     for s in query.order_by(SalarySlip.posting_date.desc()).all():
         rows.append([
             s.id,
@@ -1207,7 +1219,7 @@ def create_salary_slip(
         "gross_pay", "total_deduction", "net_pay", "rounded_total"
     ]
 
-    slip_data = {
+    slip_data: Dict[str, Any] = {
         "employee": payload.employee,
         "employee_id": payload.employee_id,
         "employee_name": payload.employee_name,
@@ -1485,13 +1497,13 @@ def generate_payroll_slips(
 
     for assignment in assignments:
         # Check if slip already exists for this employee and period
-        existing = db.query(SalarySlip).filter(
+        existing_slip = db.query(SalarySlip).filter(
             SalarySlip.employee_id == assignment.employee_id,
             SalarySlip.start_date == entry.start_date,
             SalarySlip.end_date == entry.end_date,
         ).first()
 
-        if existing:
+        if existing_slip:
             skipped.append({
                 "employee_id": assignment.employee_id,
                 "employee": assignment.employee,
@@ -1909,7 +1921,7 @@ async def initiate_payroll_payouts(
         .filter(SalarySlip.id.in_(slip_ids))
         .all()
     )
-    slip_map = {s.id: s for s in slips}
+    slip_map: Dict[int, SalarySlip] = {s.id: s for s in slips}
 
     missing = [sid for sid in slip_ids if sid not in slip_map]
     if missing:
@@ -1985,7 +1997,10 @@ async def initiate_payroll_payouts(
 
         response_items = []
         for transfer_request, result in zip(transfer_requests, results):
-            slip_id = transfer_request.metadata.get("salary_slip_id")
+            metadata = transfer_request.metadata or {}
+            slip_id = metadata.get("salary_slip_id")
+            if slip_id is None or not isinstance(slip_id, int):
+                raise HTTPException(status_code=400, detail="Transfer metadata missing salary slip id")
             slip = slip_map[slip_id]
 
             transfer_record = Transfer(
@@ -2185,7 +2200,7 @@ def export_payroll_register(
         "Period Start", "Period End", "Gross Pay", "Total Deduction", "Net Pay",
         "Status", "Payment Reference", "Paid At", "Company"
     ]
-    rows = [headers]
+    rows: List[List[Any]] = [headers]
 
     for slip in slips:
         rows.append([

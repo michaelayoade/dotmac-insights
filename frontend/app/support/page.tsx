@@ -214,16 +214,6 @@ export default function SupportDashboardPage() {
     return <LoadingState />;
   }
 
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load support dashboard data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   const teams = teamsData?.teams || [];
   const agents = agentsData?.agents || [];
 
@@ -234,6 +224,13 @@ export default function SupportDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {firstError && (
+        <ErrorDisplay
+          message="Failed to load support dashboard data."
+          error={firstError as Error}
+          onRetry={retryAll}
+        />
+      )}
       {/* Header */}
       <div className="bg-gradient-to-br from-teal-500/10 via-amber-500/5 to-slate-card border border-teal-500/20 rounded-2xl p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">

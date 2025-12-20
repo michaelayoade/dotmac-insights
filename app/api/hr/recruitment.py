@@ -428,7 +428,7 @@ async def export_job_applicants(
     rows = [["id", "applicant_name", "email_id", "phone_number", "job_title", "status", "source", "company"]]
     for a in query.order_by(JobApplicant.created_at.desc()).all():
         rows.append([
-            a.id,
+            str(a.id),
             a.applicant_name,
             a.email_id or "",
             a.phone_number or "",

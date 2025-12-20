@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -181,7 +181,7 @@ async def update_routing_rule(
         rule.description = payload.description
 
     if payload.conditions is not None:
-        rule.conditions = [c.model_dump() for c in payload.conditions]
+        rule.conditions = cast(Any, [c.model_dump() for c in payload.conditions])
 
     if payload.action_type is not None:
         rule.action_type = payload.action_type

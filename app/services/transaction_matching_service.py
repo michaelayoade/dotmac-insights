@@ -191,7 +191,7 @@ class TransactionMatchingService:
 
                 if txn:
                     txn.expense_claim_line_id = candidate.expense_claim_line_id
-                    txn.match_confidence = candidate.confidence
+                    txn.match_confidence = Decimal(str(candidate.confidence))
                     txn.status = CardTransactionStatus.MATCHED
 
             matched_txns.add(candidate.transaction_id)
@@ -264,11 +264,11 @@ class TransactionMatchingService:
             ExpenseClaimLine.claimed_amount >= amount_min,
             ExpenseClaimLine.claimed_amount <= amount_max,
         ).options(
-            joinedload(ExpenseClaimLine.claim)
+            joinedload(ExpenseClaimLine.expense_claim)
         ).all()
 
         for line in lines:
-            claim = line.claim
+            claim = line.expense_claim
 
             # Check if line already matched
             existing_match = self.db.query(CorporateCardTransaction).filter(

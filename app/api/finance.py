@@ -253,7 +253,7 @@ async def list_invoices(
     }
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
-    sort_column = sort_map.get(sort_by or "invoice_date")
+    sort_column = sort_map[sort_by or "invoice_date"]
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -430,7 +430,7 @@ async def list_payments(
     }
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
-    sort_column = sort_map.get(sort_by or "payment_date")
+    sort_column = sort_map[sort_by or "payment_date"]
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -565,7 +565,7 @@ async def list_credit_notes(
     }
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
-    sort_column = sort_map.get(sort_by or "issue_date")
+    sort_column = sort_map[sort_by or "issue_date"]
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -706,7 +706,7 @@ async def get_collections_analytics(
     if currency:
         by_method = by_method.filter(Payment.currency == currency)
 
-    by_method = by_method.group_by(Payment.payment_method).all()
+    by_method_rows = by_method.group_by(Payment.payment_method).all()
 
     # Payment timing analysis (early/on-time/late)
     days_diff = func.date_part("day", Invoice.due_date - Payment.payment_date)
@@ -765,7 +765,7 @@ async def get_collections_analytics(
                 "count": row.count,
                 "total": float(row.total or 0),
             }
-            for row in by_method
+            for row in by_method_rows
         ],
         "payment_timing": {
             "early": int(timing.early or 0) if timing else 0,
@@ -894,7 +894,7 @@ async def get_payment_behavior_insights(
     """Analyze customer payment behavior patterns."""
     currency = _resolve_currency_or_raise(db, Payment.currency, currency)
     # Get customers with payment history
-    customer_payments = db.query(
+    customer_payments_query = db.query(
         Payment.customer_id,
         func.count(Payment.id).label("total_payments"),
     ).filter(
@@ -902,8 +902,8 @@ async def get_payment_behavior_insights(
         Payment.customer_id.isnot(None),
     )
     if currency:
-        customer_payments = customer_payments.filter(Payment.currency == currency)
-    customer_payments = customer_payments.group_by(Payment.customer_id).subquery()
+        customer_payments_query = customer_payments_query.filter(Payment.currency == currency)
+    customer_payments = customer_payments_query.group_by(Payment.customer_id).subquery()
 
     # Count customers by payment frequency
     customers_with_payments = db.query(func.count(customer_payments.c.customer_id)).scalar() or 0

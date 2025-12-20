@@ -139,7 +139,7 @@ from app.models.inventory import (
     # Phase 4: Transfers
     TransferRequest,
     TransferRequestItem,
-    TransferStatus,
+    TransferStatus as InventoryTransferStatus,
     # Phase 4: Batch/Serial
     Batch,
     SerialNumber,
@@ -280,6 +280,34 @@ from app.models.tax_config import (
     TaxTransactionType,
     TaxFilingFrequency,
     TaxTransactionStatus,
+)
+from app.models.payment_terms import (
+    PaymentTermsTemplate,
+    PaymentTermsSchedule,
+)
+from app.models.support_csat import (
+    CSATSurvey,
+    CSATResponse,
+    SurveyTrigger,
+    SurveyType,
+)
+from app.models.tax import (
+    TaxCode,
+    TaxType,
+    RoundingMethod,
+    TaxCategory,
+    SalesTaxTemplate,
+    SalesTaxTemplateDetail,
+    PurchaseTaxTemplate,
+    PurchaseTaxTemplateDetail,
+    ItemTaxTemplate,
+    ItemTaxTemplateDetail,
+    TaxWithholdingCategory,
+    TaxRule,
+    TaxFilingStatus,
+    TaxFilingType,
+    TaxFilingPeriod,
+    TaxPayment,
 )
 
 __all__ = [
@@ -552,4 +580,29 @@ __all__ = [
     "TaxTransactionType",
     "TaxFilingFrequency",
     "TaxTransactionStatus",
+    # Payment Terms models
+    "PaymentTermsTemplate",
+    "PaymentTermsSchedule",
+    # CSAT models
+    "CSATSurvey",
+    "CSATResponse",
+    "SurveyTrigger",
+    "SurveyType",
+    # Tax models
+    "TaxCode",
+    "TaxType",
+    "RoundingMethod",
+    "TaxCategory",
+    "SalesTaxTemplate",
+    "SalesTaxTemplateDetail",
+    "PurchaseTaxTemplate",
+    "PurchaseTaxTemplateDetail",
+    "ItemTaxTemplate",
+    "ItemTaxTemplateDetail",
+    "TaxWithholdingCategory",
+    "TaxRule",
+    "TaxFilingStatus",
+    "TaxFilingType",
+    "TaxFilingPeriod",
+    "TaxPayment",
 ]

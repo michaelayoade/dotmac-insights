@@ -23,6 +23,11 @@ from app.models.support_settings import (
 router = APIRouter(prefix="/support/settings", tags=["support-settings"])
 
 
+def _apply_updates(target: Any, updates: Dict[str, Any]) -> None:
+    for field, value in updates.items():
+        setattr(target, field, value)
+
+
 # =============================================================================
 # SCHEMAS
 # =============================================================================
@@ -576,10 +581,15 @@ def update_escalation_policy(policy_id: int, data: EscalationPolicyCreate, db: S
     if not policy:
         raise HTTPException(status_code=404, detail="Escalation policy not found")
 
-    policy.name = data.name
-    policy.description = data.description
-    policy.conditions = data.conditions
-    policy.priority = data.priority
+    _apply_updates(
+        policy,
+        {
+            "name": data.name,
+            "description": data.description,
+            "conditions": data.conditions,
+            "priority": data.priority,
+        },
+    )
 
     # Delete existing levels and recreate
     db.query(EscalationLevel).filter(EscalationLevel.policy_id == policy_id).delete()
@@ -613,7 +623,7 @@ def delete_escalation_policy(policy_id: int, db: Session = Depends(get_db)):
     if not policy:
         raise HTTPException(status_code=404, detail="Escalation policy not found")
 
-    policy.is_active = False
+    _apply_updates(policy, {"is_active": False})
     db.commit()
     return {"message": "Escalation policy deactivated"}
 
@@ -680,15 +690,20 @@ def update_support_queue(queue_id: int, data: SupportQueueCreate, db: Session = 
     if queue.queue_type == "SYSTEM":
         raise HTTPException(status_code=400, detail="Cannot modify system queues")
 
-    queue.name = data.name
-    queue.description = data.description
-    queue.filters = data.filters
-    queue.sort_by = data.sort_by
-    queue.sort_direction = data.sort_direction
-    queue.is_public = data.is_public
-    queue.display_order = data.display_order
-    queue.icon = data.icon
-    queue.color = data.color
+    _apply_updates(
+        queue,
+        {
+            "name": data.name,
+            "description": data.description,
+            "filters": data.filters,
+            "sort_by": data.sort_by,
+            "sort_direction": data.sort_direction,
+            "is_public": data.is_public,
+            "display_order": data.display_order,
+            "icon": data.icon,
+            "color": data.color,
+        },
+    )
 
     db.commit()
     db.refresh(queue)
@@ -704,7 +719,7 @@ def delete_support_queue(queue_id: int, db: Session = Depends(get_db)):
     if queue.queue_type == "SYSTEM":
         raise HTTPException(status_code=400, detail="Cannot delete system queues")
 
-    queue.is_active = False
+    _apply_updates(queue, {"is_active": False})
     db.commit()
     return {"message": "Queue deactivated"}
 
@@ -775,19 +790,24 @@ def update_ticket_field(field_id: int, data: TicketFieldConfigCreate, db: Sessio
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
-    field.field_name = data.field_name
-    field.field_type = data.field_type
-    field.options = data.options
-    field.is_required = data.is_required
-    field.min_length = data.min_length
-    field.max_length = data.max_length
-    field.validation_regex = data.validation_regex
-    field.default_value = data.default_value
-    field.display_order = data.display_order
-    field.show_in_list = data.show_in_list
-    field.show_in_create_form = data.show_in_create_form
-    field.show_in_customer_portal = data.show_in_customer_portal
-    field.applies_to_types = data.applies_to_types
+    _apply_updates(
+        field,
+        {
+            "field_name": data.field_name,
+            "field_type": data.field_type,
+            "options": data.options,
+            "is_required": data.is_required,
+            "min_length": data.min_length,
+            "max_length": data.max_length,
+            "validation_regex": data.validation_regex,
+            "default_value": data.default_value,
+            "display_order": data.display_order,
+            "show_in_list": data.show_in_list,
+            "show_in_create_form": data.show_in_create_form,
+            "show_in_customer_portal": data.show_in_customer_portal,
+            "applies_to_types": data.applies_to_types,
+        },
+    )
 
     db.commit()
     db.refresh(field)
@@ -801,7 +821,7 @@ def delete_ticket_field(field_id: int, db: Session = Depends(get_db)):
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
-    field.is_active = False
+    _apply_updates(field, {"is_active": False})
     db.commit()
     return {"message": "Field deactivated"}
 
@@ -858,11 +878,16 @@ def update_email_template(template_id: int, data: EmailTemplateCreate, db: Sessi
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    template.name = data.name
-    template.template_type = data.template_type
-    template.subject = data.subject
-    template.body_html = data.body_html
-    template.body_text = data.body_text
+    _apply_updates(
+        template,
+        {
+            "name": data.name,
+            "template_type": data.template_type,
+            "subject": data.subject,
+            "body_html": data.body_html,
+            "body_text": data.body_text,
+        },
+    )
 
     db.commit()
     db.refresh(template)
@@ -876,6 +901,6 @@ def delete_email_template(template_id: int, db: Session = Depends(get_db)):
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    template.is_active = False
+    _apply_updates(template, {"is_active": False})
     db.commit()
     return {"message": "Template deactivated"}

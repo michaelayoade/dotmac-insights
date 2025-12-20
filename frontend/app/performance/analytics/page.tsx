@@ -46,18 +46,15 @@ export default function AnalyticsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load analytics"
-        error={error as Error}
-        onRetry={() => mutateTrends()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load analytics"
+          error={error as Error}
+          onRetry={() => mutateTrends()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

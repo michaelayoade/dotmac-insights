@@ -45,7 +45,7 @@ async def get_reconciliation_status(db: Session = Depends(get_db)):
     """
     Get the current reconciliation status and feature flag states.
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, Interval
     from app.models.outbound_sync import OutboundSyncLog, SyncStatus
     from app.models.unified_contact import UnifiedContact, ContactType
 
@@ -67,7 +67,7 @@ async def get_reconciliation_status(db: Session = Depends(get_db)):
     successful_syncs_24h = db.execute(
         select(func.count(OutboundSyncLog.id)).where(
             OutboundSyncLog.status == SyncStatus.SUCCESS.value,
-            OutboundSyncLog.completed_at >= func.now() - func.cast(text("interval '24 hours'"), func.interval())
+            OutboundSyncLog.completed_at >= func.now() - func.cast(text("interval '24 hours'"), Interval)
         )
     ).scalar() or 0
 

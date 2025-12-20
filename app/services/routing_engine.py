@@ -5,7 +5,7 @@ Handles automatic ticket assignment based on routing rules and strategies.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TypedDict
 
 import structlog
 from sqlalchemy.orm import Session
@@ -16,6 +16,14 @@ from app.models.agent import Agent, Team, TeamMember
 from app.models.ticket import Ticket, TicketStatus
 
 logger = structlog.get_logger()
+
+
+class WorkloadEntry(TypedDict):
+    agent: Agent
+    name: str
+    capacity: int
+    load: int
+    utilization: float
 
 
 class RoutingEngine:
@@ -89,7 +97,9 @@ class RoutingEngine:
         # Perform assignment
         ticket.assigned_to = selected.display_name or selected.email
         if rule.team_id:
-            ticket.team_id = rule.team_id
+            team = self.db.query(Team).filter(Team.id == rule.team_id).first()
+            if team:
+                ticket.resolution_team = team.name
         ticket.updated_at = datetime.utcnow()
         self.db.commit()
 
@@ -128,7 +138,8 @@ class RoutingEngine:
         ).order_by(RoutingRule.priority).all()
 
         for rule in rules:
-            if self._evaluate_conditions(rule.conditions, ticket):
+            conditions = rule.conditions if isinstance(rule.conditions, list) else None
+            if self._evaluate_conditions(conditions, ticket):
                 logger.debug(
                     "routing_rule_matched",
                     ticket_id=ticket.id,
@@ -141,7 +152,7 @@ class RoutingEngine:
 
     def _evaluate_conditions(
         self,
-        conditions: Optional[List[dict]],
+        conditions: Optional[List[Dict[str, Any]]],
         ticket: Ticket,
     ) -> bool:
         """Evaluate if ticket matches rule conditions."""
@@ -154,7 +165,7 @@ class RoutingEngine:
             value = condition.get("value")
 
             ticket_value = getattr(ticket, field, None)
-            if hasattr(ticket_value, "value"):
+            if ticket_value is not None and hasattr(ticket_value, "value"):
                 ticket_value = ticket_value.value
 
             if not self._check_condition(ticket_value, operator, value):
@@ -285,11 +296,14 @@ class RoutingEngine:
             return selected
 
         # Find next agent in rotation
-        try:
-            last_idx = agent_ids.index(state.last_agent_id)
-            next_idx = (last_idx + 1) % len(agents)
-        except ValueError:
+        if state.last_agent_id is None:
             next_idx = 0
+        else:
+            try:
+                last_idx = agent_ids.index(state.last_agent_id)
+                next_idx = (last_idx + 1) % len(agents)
+            except ValueError:
+                next_idx = 0
 
         selected = agents[next_idx]
         state.last_agent_id = selected.id
@@ -302,15 +316,15 @@ class RoutingEngine:
         if not agents:
             return None
 
-        ticket_counts = {}
+        ticket_counts: Dict[int, int] = {}
         for agent in agents:
             name = agent.display_name or agent.email
             count = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
                 Ticket.status.in_([
                     TicketStatus.OPEN,
-                    TicketStatus.IN_PROGRESS,
-                    TicketStatus.PENDING
+                    TicketStatus.REPLIED,
+                    TicketStatus.ON_HOLD
                 ])
             ).scalar() or 0
             ticket_counts[agent.id] = count
@@ -333,10 +347,10 @@ class RoutingEngine:
         region = (ticket.region or "").lower()
 
         best_match = None
-        best_score = -1
+        best_score = -1.0
 
         for agent in agents:
-            score = 0
+            score = 0.0
             skills = agent.skills or {}
             domains = agent.domains or {}
 
@@ -358,7 +372,7 @@ class RoutingEngine:
                     score += 1
 
             # Consider routing weight
-            score += agent.routing_weight * 0.1
+            score += float(agent.routing_weight) * 0.1
 
             if score > best_score:
                 best_score = score
@@ -382,8 +396,8 @@ class RoutingEngine:
                 Ticket.assigned_to == name,
                 Ticket.status.in_([
                     TicketStatus.OPEN,
-                    TicketStatus.IN_PROGRESS,
-                    TicketStatus.PENDING
+                    TicketStatus.REPLIED,
+                    TicketStatus.ON_HOLD
                 ])
             ).scalar() or 0
 
@@ -422,7 +436,7 @@ class RoutingEngine:
 
         total_capacity = 0
         total_load = 0
-        agent_data = []
+        agent_data: List[Dict[str, Any]] = []
 
         for agent in agents:
             capacity = agent.capacity or 10
@@ -432,8 +446,8 @@ class RoutingEngine:
                 Ticket.assigned_to == name,
                 Ticket.status.in_([
                     TicketStatus.OPEN,
-                    TicketStatus.IN_PROGRESS,
-                    TicketStatus.PENDING
+                    TicketStatus.REPLIED,
+                    TicketStatus.ON_HOLD
                 ])
             ).scalar() or 0
 
@@ -494,7 +508,7 @@ class RoutingEngine:
             }
 
         # Calculate current workloads
-        workloads = {}
+        workloads: Dict[int, WorkloadEntry] = {}
         for agent in agents:
             name = agent.display_name or agent.email
             capacity = agent.capacity or 10
@@ -503,8 +517,8 @@ class RoutingEngine:
                 Ticket.assigned_to == name,
                 Ticket.status.in_([
                     TicketStatus.OPEN,
-                    TicketStatus.IN_PROGRESS,
-                    TicketStatus.PENDING
+                    TicketStatus.REPLIED,
+                    TicketStatus.ON_HOLD
                 ])
             ).scalar() or 0
 
@@ -519,10 +533,10 @@ class RoutingEngine:
         # Calculate target utilization
         total_load = sum(w["load"] for w in workloads.values())
         total_capacity = sum(w["capacity"] for w in workloads.values())
-        avg_utilization = total_load / total_capacity if total_capacity > 0 else 0
+        avg_utilization = total_load / total_capacity if total_capacity > 0 else 0.0
 
         rebalanced = 0
-        moves = []
+        moves: List[Dict[str, Any]] = []
 
         # Find overloaded agents and move tickets
         for agent_id, data in sorted(
@@ -548,7 +562,7 @@ class RoutingEngine:
 
             for ticket in tickets:
                 # Find best underloaded agent
-                target_agent = None
+                target_agent: Optional[WorkloadEntry] = None
                 lowest_util = float('inf')
 
                 for tid, tdata in workloads.items():
@@ -615,7 +629,7 @@ class RoutingEngine:
         """
         return self.db.query(Ticket).filter(
             Ticket.assigned_to.is_(None),
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).order_by(Ticket.created_at).limit(limit).all()
 
     def auto_assign_batch(self, limit: int = 50) -> Dict[str, Any]:
@@ -629,24 +643,29 @@ class RoutingEngine:
         """
         tickets = self.find_unassigned_tickets(limit)
 
-        results = {
-            "processed": len(tickets),
-            "assigned": 0,
-            "failed": 0,
-            "details": [],
-        }
+        processed = len(tickets)
+        assigned = 0
+        failed = 0
+        details: List[Dict[str, Any]] = []
 
         for ticket in tickets:
             result = self.auto_assign(ticket)
             if result.get("assigned"):
-                results["assigned"] += 1
+                assigned += 1
             else:
-                results["failed"] += 1
+                failed += 1
 
-            results["details"].append({
+            details.append({
                 "ticket_id": ticket.id,
                 **result,
             })
+
+        results = {
+            "processed": processed,
+            "assigned": assigned,
+            "failed": failed,
+            "details": details,
+        }
 
         logger.info(
             "batch_auto_assign_completed",

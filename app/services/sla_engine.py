@@ -34,6 +34,7 @@ class SLAEngine:
         self.db = db
         self._calendar_cache: Dict[int, BusinessCalendar] = {}
         self._holiday_cache: Dict[int, List[date]] = {}
+        self._recurring_holiday_cache: Dict[int, List[Tuple[int, int]]] = {}
 
     def get_applicable_policy(self, ticket: Ticket) -> Optional[SLAPolicy]:
         """Find the SLA policy that applies to a ticket.
@@ -86,7 +87,7 @@ class SLAEngine:
             value = condition.get("value")
 
             ticket_value = getattr(ticket, field, None)
-            if hasattr(ticket_value, "value"):
+            if ticket_value is not None and hasattr(ticket_value, "value"):
                 ticket_value = ticket_value.value
 
             if not self._evaluate_condition(ticket_value, operator, value):
@@ -183,6 +184,26 @@ class SLAEngine:
         # Calculate with business hours
         return self._add_business_hours(start_time, float(target_hours), calendar)
 
+    def _get_holidays(
+        self,
+        calendar: BusinessCalendar,
+    ) -> Tuple[List[date], List[Tuple[int, int]]]:
+        """Return non-recurring and recurring holiday sets for a calendar."""
+        if calendar.id not in self._holiday_cache:
+            holiday_rows = self.db.query(BusinessCalendarHoliday).filter(
+                BusinessCalendarHoliday.calendar_id == calendar.id
+            ).all()
+            self._holiday_cache[calendar.id] = [
+                h.holiday_date for h in holiday_rows if not h.is_recurring
+            ]
+            self._recurring_holiday_cache[calendar.id] = [
+                (h.holiday_date.month, h.holiday_date.day)
+                for h in holiday_rows
+                if h.is_recurring
+            ]
+
+        return self._holiday_cache[calendar.id], self._recurring_holiday_cache[calendar.id]
+
     def _add_business_hours(
         self,
         start_time: datetime,
@@ -190,14 +211,7 @@ class SLAEngine:
         calendar: BusinessCalendar,
     ) -> datetime:
         """Add business hours to a datetime, accounting for schedule and holidays."""
-        # Cache holidays for this calendar
-        if calendar.id not in self._holiday_cache:
-            holidays = self.db.query(BusinessCalendarHoliday).filter(
-                BusinessCalendarHoliday.calendar_id == calendar.id
-            ).all()
-            self._holiday_cache[calendar.id] = [h.holiday_date for h in holidays]
-
-        holidays = self._holiday_cache[calendar.id]
+        holiday_dates, recurring_holidays = self._get_holidays(calendar)
         schedule = calendar.schedule or {}
         day_map = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -214,21 +228,9 @@ class SLAEngine:
             current_date = current.date()
 
             # Check if holiday
-            if current_date in holidays:
+            if current_date in holiday_dates or (current_date.month, current_date.day) in recurring_holidays:
                 current = datetime.combine(current_date + timedelta(days=1), time(0, 0))
                 continue
-
-            # Check recurring holidays
-            for holiday in holidays:
-                h = self.db.query(BusinessCalendarHoliday).filter(
-                    BusinessCalendarHoliday.holiday_date == holiday,
-                    BusinessCalendarHoliday.calendar_id == calendar.id
-                ).first()
-                if h and h.is_recurring:
-                    if (current_date.month == holiday.month and
-                        current_date.day == holiday.day):
-                        current = datetime.combine(current_date + timedelta(days=1), time(0, 0))
-                        continue
 
             # Get schedule for this day
             day_name = day_map[current.weekday()]
@@ -310,13 +312,7 @@ class SLAEngine:
         calendar: BusinessCalendar,
     ) -> float:
         """Count business hours between two datetimes."""
-        if calendar.id not in self._holiday_cache:
-            holidays = self.db.query(BusinessCalendarHoliday).filter(
-                BusinessCalendarHoliday.calendar_id == calendar.id
-            ).all()
-            self._holiday_cache[calendar.id] = [h.holiday_date for h in holidays]
-
-        holidays = self._holiday_cache[calendar.id]
+        holiday_dates, recurring_holidays = self._get_holidays(calendar)
         schedule = calendar.schedule or {}
         day_map = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
@@ -327,7 +323,7 @@ class SLAEngine:
             current_date = current.date()
 
             # Check if holiday
-            if current_date in holidays:
+            if current_date in holiday_dates or (current_date.month, current_date.day) in recurring_holidays:
                 current = datetime.combine(current_date + timedelta(days=1), time(0, 0))
                 continue
 
@@ -380,10 +376,11 @@ class SLAEngine:
         calendar = policy.calendar
         start_time = ticket.opening_date or ticket.created_at or datetime.utcnow()
 
-        updates = {
+        targets_set: List[Dict[str, Any]] = []
+        updates: Dict[str, Any] = {
             "policy_id": policy.id,
             "policy_name": policy.name,
-            "targets_set": [],
+            "targets_set": targets_set,
         }
 
         # Set first response target
@@ -397,7 +394,7 @@ class SLAEngine:
                 calendar,
             )
             ticket.response_by = response_by
-            updates["targets_set"].append({
+            targets_set.append({
                 "type": "first_response",
                 "target_hours": float(first_response_target.target_hours),
                 "deadline": response_by.isoformat(),
@@ -414,7 +411,7 @@ class SLAEngine:
                 calendar,
             )
             ticket.resolution_by = resolution_by
-            updates["targets_set"].append({
+            targets_set.append({
                 "type": "resolution",
                 "target_hours": float(resolution_target.target_hours),
                 "deadline": resolution_by.isoformat(),
@@ -427,7 +424,7 @@ class SLAEngine:
             "sla_applied_to_ticket",
             ticket_id=ticket.id,
             policy_id=policy.id,
-            targets=len(updates["targets_set"]),
+            targets=len(targets_set),
         )
 
         return updates
@@ -442,7 +439,7 @@ class SLAEngine:
         policy = self.get_applicable_policy(ticket)
         calendar = policy.calendar if policy else None
 
-        status = {
+        status: Dict[str, Any] = {
             "ticket_id": ticket.id,
             "policy_id": policy.id if policy else None,
             "first_response": None,
@@ -451,19 +448,19 @@ class SLAEngine:
 
         # First response status
         if ticket.response_by:
-            if ticket.first_response_at:
+            if ticket.first_responded_on:
                 # Already responded
                 elapsed = self.calculate_elapsed_business_hours(
                     ticket.opening_date or ticket.created_at,
-                    ticket.first_response_at,
+                    ticket.first_responded_on,
                     calendar,
                 )
                 status["first_response"] = {
                     "status": "completed",
-                    "responded_at": ticket.first_response_at.isoformat(),
+                    "responded_at": ticket.first_responded_on.isoformat(),
                     "deadline": ticket.response_by.isoformat(),
                     "elapsed_hours": round(elapsed, 2),
-                    "breached": ticket.first_response_at > ticket.response_by,
+                    "breached": ticket.first_responded_on > ticket.response_by,
                 }
             else:
                 # Not yet responded
@@ -519,7 +516,7 @@ class SLAEngine:
 
         # Find tickets with approaching first response deadline
         response_warnings = self.db.query(Ticket).filter(
-            Ticket.first_response_at.is_(None),
+            Ticket.first_responded_on.is_(None),
             Ticket.response_by.isnot(None),
             Ticket.response_by > now,
             Ticket.response_by <= warning_threshold,
@@ -554,7 +551,7 @@ class SLAEngine:
 
         # First response breaches
         response_breaches = self.db.query(Ticket).filter(
-            Ticket.first_response_at.is_(None),
+            Ticket.first_responded_on.is_(None),
             Ticket.response_by.isnot(None),
             Ticket.response_by < now,
         ).all()

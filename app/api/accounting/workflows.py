@@ -312,7 +312,7 @@ def update_workflow(
     """
     from app.services.approval_engine import ApprovalEngine, WorkflowNotFoundError
 
-    updates = {}
+    updates: Dict[str, Any] = {}
     if workflow_name is not None:
         updates["workflow_name"] = workflow_name
     if description is not None:
@@ -844,7 +844,7 @@ def update_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    updates = {}
+    updates: Dict[str, Any] = {}
     if account_name is not None:
         updates["account_name"] = account_name
     if account_number is not None:

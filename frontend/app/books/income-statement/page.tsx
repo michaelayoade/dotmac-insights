@@ -177,16 +177,6 @@ export default function IncomeStatementPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load income statement."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   // Extract IFRS structure data
   const currency = data?.currency || 'NGN';
   const revenue = data?.revenue || { accounts: [], total: 0 };
@@ -215,6 +205,13 @@ export default function IncomeStatementPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load income statement."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">

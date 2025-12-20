@@ -204,7 +204,7 @@ class LegacyCustomerSync:
         customer.signup_date = unified.signup_date
         customer.activation_date = unified.activation_date
         customer.cancellation_date = unified.cancellation_date
-        customer.contract_end_date = unified.contract_end_date
+        customer.contract_end_date = datetime.combine(unified.contract_end_date, datetime.min.time()) if unified.contract_end_date else None
         customer.conversion_date = unified.conversion_date
         customer.blocking_date = unified.blocking_date
         customer.days_until_blocking = unified.days_until_blocking

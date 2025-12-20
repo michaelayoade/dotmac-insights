@@ -1,5 +1,5 @@
 /**
- * Core API utilities - fetch functions, auth, and URL building
+ * Core API utilities - fetch functions, auth, URL building, timeout, retry, and logging
  */
 
 // Use an internal URL for server-side calls (inside the Docker network) and the public
@@ -9,6 +9,145 @@ export const API_BASE =
   typeof window === 'undefined'
     ? process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || ''
     : process.env.NEXT_PUBLIC_API_URL || '';
+
+// ============================================================================
+// TIMEOUT & RETRY CONFIGURATION
+// ============================================================================
+
+/** Default request timeout in milliseconds (10 seconds) */
+export const DEFAULT_TIMEOUT = 10000;
+
+/** Default retry configuration */
+export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxAttempts: 3,
+  baseDelayMs: 2000,
+  maxDelayMs: 8000,
+  retryOn5xx: true,
+  retryOnNetworkError: true,
+};
+
+export interface RetryConfig {
+  /** Maximum number of retry attempts (default: 3) */
+  maxAttempts: number;
+  /** Base delay in milliseconds for exponential backoff (default: 2000) */
+  baseDelayMs: number;
+  /** Maximum delay cap in milliseconds (default: 8000) */
+  maxDelayMs: number;
+  /** Whether to retry on 5xx server errors (default: true) */
+  retryOn5xx: boolean;
+  /** Whether to retry on network errors (default: true) */
+  retryOnNetworkError: boolean;
+}
+
+// ============================================================================
+// STRUCTURED LOGGING
+// ============================================================================
+
+export interface ApiLog {
+  timestamp: string;
+  type: 'request' | 'response' | 'error' | 'retry';
+  method: string;
+  url: string;
+  status?: number;
+  durationMs?: number;
+  error?: string;
+  retryAttempt?: number;
+  maxAttempts?: number;
+}
+
+type ApiLogHandler = (log: ApiLog) => void;
+
+let apiLogHandler: ApiLogHandler | null = null;
+
+/**
+ * Register a custom log handler for API requests.
+ * Useful for integrating with error tracking services like Sentry.
+ */
+export function onApiLog(handler: ApiLogHandler): () => void {
+  apiLogHandler = handler;
+  return () => {
+    apiLogHandler = null;
+  };
+}
+
+// ============================================================================
+// PII REDACTION
+// ============================================================================
+
+/** Query parameters that may contain PII and should be redacted in logs */
+const SENSITIVE_PARAMS = [
+  'token',
+  'access_token',
+  'refresh_token',
+  'api_key',
+  'apikey',
+  'key',
+  'secret',
+  'password',
+  'pwd',
+  'auth',
+  'authorization',
+  'email',
+  'phone',
+  'ssn',
+  'credit_card',
+  'card_number',
+];
+
+/**
+ * Redact sensitive query parameters from a URL for safe logging
+ */
+function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const redactedParams = new URLSearchParams();
+
+    parsed.searchParams.forEach((value, key) => {
+      const lowerKey = key.toLowerCase();
+      const isSensitive = SENSITIVE_PARAMS.some(
+        (param) => lowerKey.includes(param) || lowerKey === param
+      );
+      redactedParams.set(key, isSensitive ? '[REDACTED]' : value);
+    });
+
+    parsed.search = redactedParams.toString() ? `?${redactedParams.toString()}` : '';
+    return parsed.toString();
+  } catch {
+    // If URL parsing fails, return as-is (relative URLs, etc.)
+    return url;
+  }
+}
+
+function logApi(log: Omit<ApiLog, 'timestamp'>): void {
+  const fullLog: ApiLog = {
+    ...log,
+    timestamp: new Date().toISOString(),
+  };
+
+  // Redact sensitive information from URLs before logging
+  const safeUrl = redactUrl(log.url);
+
+  // Always log to console in a structured format
+  const prefix = `[API ${log.type.toUpperCase()}]`;
+  const details = `${log.method} ${safeUrl}`;
+
+  if (log.type === 'error') {
+    console.error(prefix, details, log.error, log.retryAttempt ? `(attempt ${log.retryAttempt})` : '');
+  } else if (log.type === 'retry') {
+    console.warn(prefix, details, `Retry ${log.retryAttempt}/${log.maxAttempts}`, log.error);
+  } else if (log.type === 'response') {
+    console.debug(prefix, details, `${log.status} in ${log.durationMs}ms`);
+  }
+
+  // Call custom handler if registered
+  if (apiLogHandler) {
+    apiLogHandler(fullLog);
+  }
+}
+
+// ============================================================================
+// URL BUILDING
+// ============================================================================
 
 /**
  * Build a full API URL with query parameters
@@ -48,7 +187,10 @@ export function buildQueryString(
   return queryString ? `?${queryString}` : '';
 }
 
-// Auth event types for global handling
+// ============================================================================
+// AUTHENTICATION
+// ============================================================================
+
 export type AuthEventType = 'unauthorized' | 'forbidden' | 'token_expired';
 export type AuthEventHandler = (event: AuthEventType, message?: string) => void;
 
@@ -95,19 +237,17 @@ export function hasAuthToken(): boolean {
 
 function getAccessToken(): string {
   if (typeof window !== 'undefined') {
-    // Client-side: first check for stored user token
     const token = localStorage.getItem('dotmac_access_token');
     if (token) return token;
-
-    return '';
+    // Fallback to env token for development (NEXT_PUBLIC_ exposes to browser)
+    return process.env.NEXT_PUBLIC_DEV_TOKEN || '';
   }
-  // Server-side fallback for SSR (must never be exposed to the browser)
   return process.env.INTERNAL_SERVICE_TOKEN || '';
 }
 
-export interface FetchOptions extends RequestInit {
-  params?: Record<string, unknown>;
-}
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
 
 /**
  * API Error class for handling HTTP errors
@@ -120,15 +260,114 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+
+  /** Check if this error should trigger a retry */
+  get isRetryable(): boolean {
+    // Retry on server errors (5xx) or network errors (status 0)
+    return this.status === 0 || this.status >= 500;
+  }
+}
+
+// ============================================================================
+// FETCH OPTIONS
+// ============================================================================
+
+export interface FetchOptions extends RequestInit {
+  params?: Record<string, unknown>;
+  /** Request timeout in milliseconds (default: 10000) */
+  timeout?: number;
+  /** Retry configuration, or false to disable retries. By default, only GET requests retry. */
+  retry?: Partial<RetryConfig> | false | true;
+}
+
+// ============================================================================
+// TIMEOUT HANDLING
+// ============================================================================
+
+/**
+ * Fetch with timeout support using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeout?: number }
+): Promise<Response> {
+  const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(0, `Request timeout after ${timeout}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ============================================================================
+// RETRY LOGIC
+// ============================================================================
+
+/**
+ * Calculate delay for exponential backoff
+ */
+function calculateBackoff(attempt: number, config: RetryConfig): number {
+  const delay = config.baseDelayMs * Math.pow(2, attempt - 1);
+  return Math.min(delay, config.maxDelayMs);
 }
 
 /**
+ * Sleep for a given duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if an error should trigger a retry
+ */
+function shouldRetry(error: unknown, config: RetryConfig): boolean {
+  if (error instanceof ApiError) {
+    // Don't retry auth errors
+    if (error.status === 401 || error.status === 403) {
+      return false;
+    }
+    // Retry 5xx if configured
+    if (error.status >= 500 && config.retryOn5xx) {
+      return true;
+    }
+    // Retry network errors if configured
+    if (error.status === 0 && config.retryOnNetworkError) {
+      return true;
+    }
+  }
+  // Network errors that aren't ApiError
+  if (error instanceof TypeError && config.retryOnNetworkError) {
+    return true;
+  }
+  return false;
+}
+
+// ============================================================================
+// CORE FETCH FUNCTION
+// ============================================================================
+
+/**
  * Core fetch function for API calls.
- * Handles authentication, error handling, and JSON parsing.
+ * Handles authentication, timeout, retry, error handling, and JSON parsing.
  */
 export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  const { params, timeout = DEFAULT_TIMEOUT, retry, ...fetchOptions } = options;
 
+  // Build URL
   const base = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
   const normalizedEndpoint = endpoint.startsWith('http')
     ? endpoint
@@ -151,60 +390,157 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   }
 
   const accessToken = getAccessToken();
+  const method = fetchOptions.method || 'GET';
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...fetchOptions,
-      // Don't include credentials for cross-origin requests with Bearer token
-      // CORS with credentials: 'include' requires specific origin header, not wildcard '*'
-      credentials: accessToken ? 'omit' : 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        ...fetchOptions.headers,
-      },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to reach the API';
-    throw new ApiError(0, `Network error: ${message}`);
+  // Determine if this is an idempotent request (safe to retry)
+  const isIdempotent = ['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
+
+  // Merge retry config - only retry idempotent methods by default
+  // Non-idempotent methods (POST, PUT, PATCH, DELETE) require explicit opt-in
+  let retryConfig: RetryConfig | null;
+  if (retry === false) {
+    retryConfig = null;
+  } else if (retry === true) {
+    // Explicit opt-in to retry, even for mutations
+    retryConfig = { ...DEFAULT_RETRY_CONFIG };
+  } else if (typeof retry === 'object') {
+    // Custom retry config provided
+    retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retry };
+  } else if (isIdempotent) {
+    // Default: only retry idempotent methods
+    retryConfig = { ...DEFAULT_RETRY_CONFIG };
+  } else {
+    // Default: don't retry mutations
+    retryConfig = null;
   }
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    const errorMessage = error.detail || `HTTP ${response.status}`;
+  const maxAttempts = retryConfig ? retryConfig.maxAttempts : 1;
 
-    // Handle authentication errors globally
-    if (response.status === 401) {
-      clearAuthToken();
-      if (authEventHandler) {
-        authEventHandler('unauthorized', errorMessage);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const startTime = Date.now();
+
+    try {
+      const response = await fetchWithTimeout(url, {
+        ...fetchOptions,
+        timeout,
+        credentials: accessToken ? 'omit' : 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...fetchOptions.headers,
+        },
+      });
+
+      const durationMs = Date.now() - startTime;
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        const errorMessage = errorBody.detail || `HTTP ${response.status}`;
+
+        // Handle authentication errors globally
+        if (response.status === 401) {
+          clearAuthToken();
+          if (authEventHandler) {
+            authEventHandler('unauthorized', errorMessage);
+          }
+          logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+          throw new ApiError(response.status, 'Authentication required. Please sign in.');
+        }
+
+        if (response.status === 403) {
+          if (authEventHandler) {
+            authEventHandler('forbidden', errorMessage);
+          }
+          logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+          throw new ApiError(
+            response.status,
+            'Access denied. You do not have permission to access this resource.'
+          );
+        }
+
+        const apiError = new ApiError(response.status, errorMessage);
+
+        // Check if we should retry
+        if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
+          const backoff = calculateBackoff(attempt, retryConfig);
+          logApi({
+            type: 'retry',
+            method,
+            url,
+            status: response.status,
+            error: errorMessage,
+            retryAttempt: attempt,
+            maxAttempts,
+            durationMs,
+          });
+          await sleep(backoff);
+          continue;
+        }
+
+        logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+        throw apiError;
       }
-      throw new ApiError(response.status, 'Authentication required. Please sign in.');
-    }
 
-    if (response.status === 403) {
-      if (authEventHandler) {
-        authEventHandler('forbidden', errorMessage);
+      // Success
+      logApi({ type: 'response', method, url, status: response.status, durationMs });
+
+      if (response.status === 204) {
+        return null as T;
       }
-      throw new ApiError(
-        response.status,
-        'Access denied. You do not have permission to access this resource.'
-      );
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return response.json();
+      }
+      return (await response.text()) as unknown as T;
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // If it's already an ApiError, check if we should retry
+      if (error instanceof ApiError) {
+        if (retryConfig && attempt < maxAttempts && shouldRetry(error, retryConfig)) {
+          const backoff = calculateBackoff(attempt, retryConfig);
+          logApi({
+            type: 'retry',
+            method,
+            url,
+            error: errorMessage,
+            retryAttempt: attempt,
+            maxAttempts,
+            durationMs,
+          });
+          await sleep(backoff);
+          continue;
+        }
+        throw error;
+      }
+
+      // Network error
+      const apiError = new ApiError(0, `Network error: ${errorMessage}`);
+
+      if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
+        const backoff = calculateBackoff(attempt, retryConfig);
+        logApi({
+          type: 'retry',
+          method,
+          url,
+          error: errorMessage,
+          retryAttempt: attempt,
+          maxAttempts,
+          durationMs,
+        });
+        await sleep(backoff);
+        continue;
+      }
+
+      logApi({ type: 'error', method, url, error: errorMessage, durationMs });
+      throw apiError;
     }
-
-    throw new ApiError(response.status, errorMessage);
   }
 
-  if (response.status === 204) {
-    return null as T;
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return response.json();
-  }
-  return (await response.text()) as unknown as T;
+  // Should never reach here, but TypeScript needs this
+  throw new ApiError(0, 'Max retry attempts exceeded');
 }
 
 /**
@@ -227,50 +563,134 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
  * Fetch API with FormData support for file uploads.
  * Does not set Content-Type header - browser sets it with boundary for multipart/form-data.
  */
-export async function fetchApiFormData<T>(endpoint: string, formData: FormData): Promise<T> {
+export async function fetchApiFormData<T>(
+  endpoint: string,
+  formData: FormData,
+  options: { timeout?: number; retry?: Partial<RetryConfig> | false | true } = {}
+): Promise<T> {
+  const { timeout = DEFAULT_TIMEOUT, retry } = options;
   const url = `${API_BASE}/api${endpoint}`;
   const accessToken = getAccessToken();
+  const method = 'POST';
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      credentials: accessToken ? 'omit' : 'include',
-      headers: {
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        // Note: Do NOT set Content-Type for FormData - browser sets it with boundary
-      },
-      body: formData,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to reach the API';
-    throw new ApiError(0, `Network error: ${message}`);
+  // File uploads are POST (not idempotent) - require explicit opt-in to retry
+  let retryConfig: RetryConfig | null;
+  if (retry === true) {
+    retryConfig = { ...DEFAULT_RETRY_CONFIG };
+  } else if (typeof retry === 'object') {
+    retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retry };
+  } else {
+    retryConfig = null;
+  }
+  const maxAttempts = retryConfig ? retryConfig.maxAttempts : 1;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const startTime = Date.now();
+
+    try {
+      const response = await fetchWithTimeout(url, {
+        method,
+        timeout,
+        credentials: accessToken ? 'omit' : 'include',
+        headers: {
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: formData,
+      });
+
+      const durationMs = Date.now() - startTime;
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        const errorMessage = errorBody.detail || `HTTP ${response.status}`;
+
+        if (response.status === 401) {
+          clearAuthToken();
+          if (authEventHandler) {
+            authEventHandler('unauthorized', errorMessage);
+          }
+          logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+          throw new ApiError(response.status, 'Authentication required. Please sign in.');
+        }
+
+        if (response.status === 403) {
+          if (authEventHandler) {
+            authEventHandler('forbidden', errorMessage);
+          }
+          logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+          throw new ApiError(
+            response.status,
+            'Access denied. You do not have permission to access this resource.'
+          );
+        }
+
+        const apiError = new ApiError(response.status, errorMessage);
+
+        if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
+          const backoff = calculateBackoff(attempt, retryConfig);
+          logApi({
+            type: 'retry',
+            method,
+            url,
+            status: response.status,
+            error: errorMessage,
+            retryAttempt: attempt,
+            maxAttempts,
+            durationMs,
+          });
+          await sleep(backoff);
+          continue;
+        }
+
+        logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
+        throw apiError;
+      }
+
+      logApi({ type: 'response', method, url, status: response.status, durationMs });
+      return response.json();
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (error instanceof ApiError) {
+        if (retryConfig && attempt < maxAttempts && shouldRetry(error, retryConfig)) {
+          const backoff = calculateBackoff(attempt, retryConfig);
+          logApi({
+            type: 'retry',
+            method,
+            url,
+            error: errorMessage,
+            retryAttempt: attempt,
+            maxAttempts,
+            durationMs,
+          });
+          await sleep(backoff);
+          continue;
+        }
+        throw error;
+      }
+
+      const apiError = new ApiError(0, `Network error: ${errorMessage}`);
+
+      if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
+        const backoff = calculateBackoff(attempt, retryConfig);
+        logApi({
+          type: 'retry',
+          method,
+          url,
+          error: errorMessage,
+          retryAttempt: attempt,
+          maxAttempts,
+          durationMs,
+        });
+        await sleep(backoff);
+        continue;
+      }
+
+      logApi({ type: 'error', method, url, error: errorMessage, durationMs });
+      throw apiError;
+    }
   }
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    const errorMessage = error.detail || `HTTP ${response.status}`;
-
-    if (response.status === 401) {
-      clearAuthToken();
-      if (authEventHandler) {
-        authEventHandler('unauthorized', errorMessage);
-      }
-      throw new ApiError(response.status, 'Authentication required. Please sign in.');
-    }
-
-    if (response.status === 403) {
-      if (authEventHandler) {
-        authEventHandler('forbidden', errorMessage);
-      }
-      throw new ApiError(
-        response.status,
-        'Access denied. You do not have permission to access this resource.'
-      );
-    }
-
-    throw new ApiError(response.status, errorMessage);
-  }
-
-  return response.json();
+  throw new ApiError(0, 'Max retry attempts exceeded');
 }

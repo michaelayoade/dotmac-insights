@@ -5,7 +5,13 @@ const tseslint = require('typescript-eslint');
 
 module.exports = [
   {
-    ignores: ['.next/**', 'node_modules/**', 'eslint.config.js'],
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'eslint.config.js',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   ...tseslint.configs.recommended,
   {
@@ -20,6 +26,7 @@ module.exports = [
       ...nextPlugin.configs['core-web-vitals'].rules,
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-expressions': ['error', { allowShortCircuit: true }],
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
     },

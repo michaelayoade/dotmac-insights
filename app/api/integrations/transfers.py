@@ -119,7 +119,7 @@ def generate_transfer_reference() -> str:
 
 @router.get("/", response_model=TransferListResponse)
 async def list_transfers(
-    status: Optional[str] = None,
+    status_filter: Optional[str] = None,
     provider: Optional[str] = None,
     transfer_type: Optional[str] = None,
     limit: int = 50,
@@ -129,9 +129,9 @@ async def list_transfers(
     """List transfers with optional filters."""
     query = select(Transfer)
 
-    if status:
+    if status_filter:
         try:
-            status_enum = TransferStatus(status)
+            status_enum = TransferStatus(status_filter)
             query = query.where(Transfer.status == status_enum)
         except ValueError:
             raise HTTPException(
@@ -389,14 +389,14 @@ async def pay_pending_payroll_transfers(
         }
 
         for req_item, result in zip(transfer_requests, results):
-            t = next((x for x in transfers if x.reference == result.reference), None)
-            if not t:
+            matched_transfer = next((x for x in transfers if x.reference == result.reference), None)
+            if not matched_transfer:
                 continue
-            t.provider = provider_enum
-            t.provider_reference = result.provider_reference
-            t.status = status_map.get(result.status.value, TransferStatus.PENDING)
-            t.fee = result.fee
-            t.raw_response = result.raw_response
+            matched_transfer.provider = provider_enum
+            matched_transfer.provider_reference = result.provider_reference
+            matched_transfer.status = status_map.get(result.status.value, TransferStatus.PENDING)
+            matched_transfer.fee = result.fee
+            matched_transfer.raw_response = result.raw_response
 
         await db.commit()
 
@@ -647,8 +647,8 @@ async def get_transfer(
 
 
 @router.get("/")
-async def list_transfers(
-    status: Optional[str] = None,
+async def list_transfers_basic(
+    status_filter: Optional[str] = None,
     transfer_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
@@ -657,8 +657,8 @@ async def list_transfers(
     """List transfers with optional filters."""
     query = select(Transfer)
 
-    if status:
-        query = query.where(Transfer.status == status)
+    if status_filter:
+        query = query.where(Transfer.status == status_filter)
     if transfer_type:
         query = query.where(Transfer.transfer_type == transfer_type)
 

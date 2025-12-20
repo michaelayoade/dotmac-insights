@@ -41,23 +41,20 @@ export default function OverviewPage() {
     return <LoadingState />;
   }
 
-  if (hasError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load insights overview"
-        error={errorCompleteness || errorAvailability || errorAnomalies || errorFinancial}
-        onRetry={() => {
-          mutateCompleteness();
-          mutateAvailability();
-          mutateAnomalies();
-          mutateFinancial();
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {hasError && (
+        <ErrorDisplay
+          message="Failed to load insights overview"
+          error={errorCompleteness || errorAvailability || errorAnomalies || errorFinancial}
+          onRetry={() => {
+            mutateCompleteness();
+            mutateAvailability();
+            mutateAnomalies();
+            mutateFinancial();
+          }}
+        />
+      )}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard

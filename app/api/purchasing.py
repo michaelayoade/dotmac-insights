@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, extract
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TypedDict
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
@@ -20,6 +20,12 @@ from app.models.accounting import (
 )
 
 router = APIRouter()
+
+
+class AgingBucket(TypedDict):
+    count: int
+    total: float | Decimal
+    invoices: List[Dict[str, Any]]
 
 
 def _parse_date(value: Optional[str], field_name: str) -> Optional[date]:
@@ -123,6 +129,12 @@ async def get_purchasing_dashboard(
         Supplier.disabled == False
     ).scalar() or 0
 
+    due_count = 0
+    due_total = Decimal("0")
+    if due_this_week is not None:
+        due_count = int(due_this_week[0] or 0)
+        due_total = Decimal(due_this_week[1] or 0)
+
     return {
         "as_of_date": cutoff.isoformat(),
         "total_outstanding": float(total_outstanding),
@@ -131,8 +143,8 @@ async def get_purchasing_dashboard(
         "supplier_count": supplier_count,
         "status_breakdown": status_breakdown,
         "due_this_week": {
-            "count": due_this_week[0] or 0,
-            "total": float(due_this_week[1] or 0),
+            "count": due_count,
+            "total": float(due_total),
         },
         "top_suppliers": [
             {
@@ -256,14 +268,14 @@ async def get_bill_detail(
         "posting_date": bill.posting_date.isoformat() if bill.posting_date else None,
         "due_date": bill.due_date.isoformat() if bill.due_date else None,
         "grand_total": float(bill.grand_total),
-        "net_total": float(bill.net_total) if bill.net_total else None,
-        "total_taxes_and_charges": float(bill.total_taxes_and_charges) if bill.total_taxes_and_charges else 0,
+        "net_total": float(bill.grand_total - bill.tax_amount) if bill.tax_amount else float(bill.grand_total),
+        "total_taxes_and_charges": float(bill.tax_amount or 0),
         "outstanding_amount": float(bill.outstanding_amount),
         "status": bill.status.value if bill.status else None,
         "currency": bill.currency,
         "company": bill.company,
-        "cost_center": bill.cost_center,
-        "remarks": bill.remarks,
+        "cost_center": getattr(bill, "cost_center", None),
+        "remarks": getattr(bill, "remarks", None),
         "is_overdue": bill.due_date.date() < date.today() if bill.due_date else False,
         "gl_entries": [
             {
@@ -453,7 +465,7 @@ async def get_debit_notes(
 ) -> Dict[str, Any]:
     """Get debit notes (returns/credits from suppliers)."""
     query = db.query(PurchaseInvoice).filter(
-        PurchaseInvoice.is_return == True,
+        PurchaseInvoice.status == PurchaseInvoiceStatus.RETURN,
     )
 
     if supplier:
@@ -485,7 +497,7 @@ async def get_debit_notes(
                 "posting_date": n.posting_date.isoformat() if n.posting_date else None,
                 "grand_total": float(n.grand_total),
                 "status": n.status.value if n.status else None,
-                "return_against": n.return_against,
+        "return_against": getattr(n, "return_against", None),
             }
             for n in notes
         ],
@@ -500,7 +512,7 @@ async def get_debit_note_detail(
     """Get debit note details."""
     note = db.query(PurchaseInvoice).filter(
         PurchaseInvoice.id == note_id,
-        PurchaseInvoice.is_return == True,
+        PurchaseInvoice.status == PurchaseInvoiceStatus.RETURN,
     ).first()
 
     if not note:
@@ -508,9 +520,9 @@ async def get_debit_note_detail(
 
     # Get original invoice if this is a return
     original_invoice = None
-    if note.return_against:
+    if getattr(note, "return_against", None):
         original = db.query(PurchaseInvoice).filter(
-            PurchaseInvoice.erpnext_id == note.return_against
+            PurchaseInvoice.erpnext_id == getattr(note, "return_against", None)
         ).first()
         if original:
             original_invoice = {
@@ -527,9 +539,9 @@ async def get_debit_note_detail(
         "posting_date": note.posting_date.isoformat() if note.posting_date else None,
         "grand_total": float(note.grand_total),
         "status": note.status.value if note.status else None,
-        "return_against": note.return_against,
+        "return_against": getattr(note, "return_against", None),
         "original_invoice": original_invoice,
-        "remarks": note.remarks,
+        "remarks": getattr(note, "remarks", None),
     }
 
 
@@ -678,7 +690,7 @@ async def get_supplier_detail(
         "email": supplier.email_id,
         "mobile": supplier.mobile_no,
         "tax_id": supplier.tax_id,
-        "pan": supplier.pan,
+        "pan": getattr(supplier, "pan", None),
         "total_purchases": total_purchases,
         "total_outstanding": total_outstanding,
         "bill_count": len(bills),
@@ -773,7 +785,7 @@ async def get_expense_types(
         Account.root_type == AccountType.EXPENSE,
         Account.disabled == False,
     ).all()
-    expense_account_map = {a.erpnext_id: a for a in expense_accounts}
+    expense_account_map: Dict[Optional[str], Account] = {a.erpnext_id: a for a in expense_accounts}
     expense_account_ids = list(expense_account_map.keys())
 
     query = db.query(
@@ -802,12 +814,13 @@ async def get_expense_types(
         "expense_types": [
             {
                 "account": r.account,
-                "account_name": expense_account_map.get(r.account, {}).account_name if expense_account_map.get(r.account) else r.account,
+                "account_name": (expense_account.account_name if expense_account else r.account),
                 "total": float(r.total_debit),
                 "entry_count": r.entry_count,
                 "percentage": round(float(r.total_debit) / total_expenses * 100, 1) if total_expenses > 0 else 0,
             }
             for r in results
+            for expense_account in [expense_account_map.get(r.account)]
         ],
     }
 
@@ -877,7 +890,7 @@ async def get_ap_aging(
     invoices = query.all()
 
     # Age buckets
-    buckets = {
+    buckets: Dict[str, AgingBucket] = {
         "current": {"count": 0, "total": Decimal("0"), "invoices": []},
         "1_30": {"count": 0, "total": Decimal("0"), "invoices": []},
         "31_60": {"count": 0, "total": Decimal("0"), "invoices": []},
@@ -900,9 +913,10 @@ async def get_ap_aging(
         else:
             bucket = "over_90"
 
-        buckets[bucket]["count"] += 1
-        buckets[bucket]["total"] += inv.outstanding_amount
-        buckets[bucket]["invoices"].append({
+        bucket_data = buckets[bucket]
+        bucket_data["count"] += 1
+        bucket_data["total"] += float(inv.outstanding_amount or 0)
+        bucket_data["invoices"].append({
             "id": inv.id,
             "invoice_no": inv.erpnext_id,
             "supplier": inv.supplier_name or inv.supplier,
@@ -914,8 +928,8 @@ async def get_ap_aging(
         })
 
     # Convert totals to float
-    for bucket in buckets.values():
-        bucket["total"] = float(bucket["total"])
+    for bucket_data in buckets.values():
+        bucket_data["total"] = float(bucket_data["total"])
 
     total_payable = sum(b["total"] for b in buckets.values())
 
@@ -943,7 +957,7 @@ async def get_purchases_by_supplier(
         func.sum(PurchaseInvoice.grand_total).label("total_purchases"),
         func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
     ).filter(
-        PurchaseInvoice.is_return == False,
+        PurchaseInvoice.status != PurchaseInvoiceStatus.RETURN,
     )
 
     if start_date:

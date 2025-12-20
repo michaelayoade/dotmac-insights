@@ -357,14 +357,14 @@ def export_leave_allocations(
     rows = [["id", "employee", "employee_id", "leave_type", "from_date", "to_date", "total_leaves_allocated", "unused_leaves", "status", "company"]]
     for a in query.order_by(LeaveAllocation.from_date.desc()).all():
         rows.append([
-            a.id,
+            str(a.id),
             a.employee,
-            a.employee_id,
+            str(a.employee_id) if a.employee_id is not None else "",
             a.leave_type,
             a.from_date.isoformat() if a.from_date else "",
             a.to_date.isoformat() if a.to_date else "",
-            float(a.total_leaves_allocated or 0),
-            float(a.unused_leaves or 0),
+            str(float(a.total_leaves_allocated or 0)),
+            str(float(a.unused_leaves or 0)),
             a.status.value if a.status else "",
             a.company or "",
         ])
@@ -591,6 +591,13 @@ def bulk_create_leave_allocations(
     for employee_id in payload.employee_ids:
         for detail in policy.details:
             # Check for existing allocation
+            if detail.leave_type_id is None:
+                skipped.append({
+                    "employee_id": employee_id,
+                    "leave_type": detail.leave_type,
+                    "reason": "Missing leave_type_id in policy detail",
+                })
+                continue
             overlap = check_allocation_overlap(
                 db,
                 employee_id,
@@ -810,13 +817,13 @@ def export_leave_applications(
     rows = [["id", "employee", "employee_id", "leave_type", "from_date", "to_date", "total_leave_days", "status", "company"]]
     for a in query.order_by(LeaveApplication.from_date.desc()).all():
         rows.append([
-            a.id,
+            str(a.id),
             a.employee,
-            a.employee_id,
+            str(a.employee_id) if a.employee_id is not None else "",
             a.leave_type,
             a.from_date.isoformat() if a.from_date else "",
             a.to_date.isoformat() if a.to_date else "",
-            float(a.total_leave_days or 0),
+            str(float(a.total_leave_days or 0)),
             a.status.value if a.status else "",
             a.company or "",
         ])

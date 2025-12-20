@@ -17,7 +17,7 @@ import hmac
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 
 import httpx
 from tenacity import (
@@ -144,7 +144,7 @@ class PaystackClient(BasePaymentGateway):
                 params=params,
             )
 
-            result = response.json()
+            result: Dict[str, Any] = response.json()
 
             if response.status_code >= 500:
                 raise ProviderUnavailableError(
@@ -360,7 +360,7 @@ class PaystackClient(BasePaymentGateway):
         # First get the transaction
         verification = await self.verify_payment(reference)
 
-        payload = {
+        payload: Dict[str, Any] = {
             "transaction": verification.provider_reference,
         }
 
@@ -369,7 +369,8 @@ class PaystackClient(BasePaymentGateway):
 
         try:
             result = await self._request("POST", "/refund", data=payload)
-            return result.get("data", {})
+            data = result.get("data", {})
+            return data if isinstance(data, dict) else {}
         except PaymentError:
             raise
         except Exception as e:
@@ -397,7 +398,7 @@ class PaystackClient(BasePaymentGateway):
         try:
             result = await self._request("POST", "/transferrecipient", data=payload)
             data = result.get("data", {})
-            return data["recipient_code"]
+            return cast(str, data["recipient_code"])
         except PaymentError:
             raise
         except Exception as e:
@@ -722,7 +723,8 @@ class PaystackClient(BasePaymentGateway):
         """Get bank transfer payment page details."""
         try:
             result = await self._request("GET", "/dedicated_account")
-            return result.get("data", {})
+            data = result.get("data", {})
+            return data if isinstance(data, dict) else {}
         except Exception as e:
             logger.error(f"Failed to get bank transfer details: {e}")
             return {}

@@ -15,7 +15,7 @@ The reconciliation job should be scheduled via Celery Beat to run periodically
 """
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 class FieldMismatch:
     """Represents a field mismatch between UnifiedContact and external system."""
     field_name: str
-    unified_value: any
-    external_value: any
+    unified_value: Any
+    external_value: Any
 
 
 @dataclass
@@ -373,7 +373,7 @@ class ContactsReconciliationService:
 
         return mismatches
 
-    def _normalize_value(self, value: any) -> any:
+    def _normalize_value(self, value: Any) -> Any:
         """Normalize value for comparison (handle None, whitespace, etc.)."""
         if value is None:
             return None

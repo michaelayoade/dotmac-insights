@@ -69,8 +69,11 @@ class DataImportService:
     """Connector-driven import service."""
 
     def __init__(self, db: Optional[Session], batch_size: Optional[int] = None, max_errors: int = 100):
-        self.db = db
-        self.batch_size = batch_size or settings.data_import_batch_size or 1000
+        if db is None:
+            raise ValueError("db session is required")
+        self.db: Session = db
+        default_batch_size = getattr(settings, "data_import_batch_size", None)
+        self.batch_size = batch_size or default_batch_size or 1000
         self.max_errors = max_errors
         self.reset_stats()
 

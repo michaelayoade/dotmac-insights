@@ -501,7 +501,7 @@ def seed_default_formats(db: Session) -> None:
     # Check if any formats exist
     count = db.execute(
         select(func.count(DocumentNumberFormat.id))
-    ).scalar()
+    ).scalar() or 0
 
     if count > 0:
         return  # Already has formats
@@ -542,7 +542,7 @@ def seed_default_currencies(db: Session) -> None:
 
     count = db.execute(
         select(func.count(CurrencySettings.id))
-    ).scalar()
+    ).scalar() or 0
 
     if count > 0:
         return
@@ -645,7 +645,7 @@ def seed_default_settings(db: Session) -> None:
 
     count = db.execute(
         select(func.count(BooksSettings.id))
-    ).scalar()
+    ).scalar() or 0
 
     if count > 0:
         return

@@ -473,7 +473,7 @@ class PerformanceService:
 
         # Calculate stats
         scored = [sc for sc in scorecards if sc.total_weighted_score is not None]
-        scores = [float(sc.total_weighted_score) for sc in scored]
+        scores = [float(sc.total_weighted_score) for sc in scored if sc.total_weighted_score is not None]
 
         status_counts = {
             "pending": 0,
@@ -512,7 +512,7 @@ class PerformanceService:
             })
 
         # Sort by score descending
-        team_details.sort(key=lambda x: x["score"] or 0, reverse=True)
+        team_details.sort(key=lambda x: x["score"] or 0, reverse=True)  # type: ignore[arg-type, return-value]
 
         return {
             "success": True,
@@ -581,7 +581,7 @@ class PerformanceService:
 
         Useful for visualizing team structures with scores.
         """
-        def build_tree(emp_id: int, depth: int = 0) -> Dict[str, Any]:
+        def build_tree(emp_id: int, depth: int = 0) -> Optional[Dict[str, Any]]:
             emp = self.db.query(Employee).filter(Employee.id == emp_id).first()
             if not emp:
                 return None
@@ -592,7 +592,7 @@ class PerformanceService:
                 EmployeeScorecardInstance.evaluation_period_id == period_id
             ).first()
 
-            node = {
+            node: Dict[str, Any] = {
                 "employee_id": emp.id,
                 "name": emp.name,
                 "designation": emp.designation,
@@ -622,7 +622,7 @@ class PerformanceService:
 
             return node
 
-        return build_tree(root_manager_id)
+        return build_tree(root_manager_id) or {}
 
     def get_department_ranking(
         self,
@@ -680,7 +680,7 @@ class PerformanceService:
         if not policy:
             return []
 
-        score_bands = policy.score_bands or []
+        score_bands: List[Dict[str, Any]] = policy.score_bands or []
 
         # Get finalized scorecards
         scorecards = self.db.query(EmployeeScorecardInstance).filter(

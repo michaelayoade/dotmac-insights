@@ -5,7 +5,7 @@ like scorecard generation, review requests, approvals, and scheduled reports.
 """
 import logging
 from datetime import datetime, date, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
@@ -35,7 +35,7 @@ class PerformanceNotificationService:
         """Resolve a user_id for an employee via direct link or email lookup."""
         if not employee:
             return None
-        user_id = getattr(employee, "user_id", None)
+        user_id = cast(Optional[int], getattr(employee, "user_id", None))
         if user_id:
             return user_id
         if employee.email:
@@ -155,7 +155,7 @@ class PerformanceNotificationService:
         self,
         scorecard: EmployeeScorecardInstance,
         period: EvaluationPeriod,
-        reviewer: User,
+        reviewer: Optional[User],
     ) -> Dict[str, Any]:
         """Notify employee that their scorecard has been approved."""
         employee = self.db.query(Employee).filter(Employee.id == scorecard.employee_id).first()
@@ -361,9 +361,13 @@ class PerformanceNotificationService:
         finalized_count = len([s for s in scorecards if s.status == 'finalized'])
 
         avg_score = None
-        scored = [s for s in scorecards if s.total_weighted_score]
-        if scored:
-            avg_score = sum(float(s.total_weighted_score) for s in scored) / len(scored)
+        scores = [
+            float(s.total_weighted_score)
+            for s in scorecards
+            if s.total_weighted_score is not None
+        ]
+        if scores:
+            avg_score = sum(scores) / len(scores)
 
         payload = {
             "period_id": period.id,
@@ -437,9 +441,10 @@ class PerformanceNotificationService:
                 if manager_user_id:
                     manager_counts[manager_user_id] = manager_counts.get(manager_user_id, 0) + 1
 
-        results = {
+        errors: List[Dict[str, Any]] = []
+        results: Dict[str, Any] = {
             "managers_notified": 0,
-            "errors": [],
+            "errors": errors,
         }
 
         for manager_id, count in manager_counts.items():

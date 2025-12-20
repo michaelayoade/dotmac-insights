@@ -153,8 +153,8 @@ class FailedSyncRecord(Base):
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<FailedSyncRecord {self.source.value}:{self.entity_type} id={self.external_id}>"

@@ -98,14 +98,16 @@ class PaymentAllocationService:
         return None
 
     def _get_outstanding_from_doc(self, doc_type: str, doc) -> Optional[Decimal]:
+        if doc is None:
+            return None
         if doc_type == "invoice":
-            return doc.balance if doc.balance is not None else (doc.total_amount - doc.amount_paid)
+            return Decimal(doc.balance) if doc.balance is not None else Decimal(doc.total_amount - doc.amount_paid)
         if doc_type == "bill":
-            return doc.outstanding_amount or (doc.grand_total - doc.paid_amount)
+            return Decimal(doc.outstanding_amount) if doc.outstanding_amount else Decimal(doc.grand_total - doc.paid_amount)
         if doc_type == "credit_note":
-            return doc.amount
+            return Decimal(doc.amount)
         if doc_type == "debit_note":
-            return doc.amount_remaining or doc.total_amount
+            return Decimal(doc.amount_remaining) if doc.amount_remaining else Decimal(doc.total_amount)
         return None
 
     def _apply_document_settlement(
@@ -259,16 +261,20 @@ class PaymentAllocationService:
             List of created PaymentAllocation records
         """
         # Get payment and party
+        payment: Optional[Payment | SupplierPayment] = None
+        party_type: Literal["customer", "supplier"]
         if is_supplier_payment:
             payment = self.db.query(SupplierPayment).filter(
                 SupplierPayment.id == payment_id
             ).first()
-            party_id = payment.supplier_id if payment else None
             party_type = "supplier"
         else:
             payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
-            party_id = payment.customer_id if payment else None
             party_type = "customer"
+
+        party_id = None
+        if payment:
+            party_id = payment.supplier_id if is_supplier_payment else payment.customer_id
 
         if not payment or not party_id:
             raise PaymentAllocationError("Payment not found or no party linked")
@@ -404,14 +410,14 @@ class PaymentAllocationService:
 
         elif party_type == "supplier":
             # Get outstanding bills
-            query = self.db.query(PurchaseInvoice).filter(
+            bill_query = self.db.query(PurchaseInvoice).filter(
                 PurchaseInvoice.supplier == str(party_id),  # supplier is string reference
                 PurchaseInvoice.status.notin_(["paid", "cancelled"]),
             )
             if currency:
-                query = query.filter(PurchaseInvoice.currency == currency)
+                bill_query = bill_query.filter(PurchaseInvoice.currency == currency)
 
-            for bill in query.order_by(PurchaseInvoice.posting_date).all():
+            for bill in bill_query.order_by(PurchaseInvoice.posting_date).all():
                 outstanding = bill.outstanding_amount or (bill.grand_total - bill.paid_amount)
                 if outstanding > 0:
                     docs.append(OutstandingDocument(

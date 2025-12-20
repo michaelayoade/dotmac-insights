@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { DashboardShell } from '@/components/ui/DashboardShell';
+import { ErrorDisplay } from '@/components/insights/shared';
 import {
   DollarSign,
   TrendingUp,
@@ -174,39 +175,47 @@ export default function AccountingDashboardPage() {
       onRetry={handleRetry}
       loadingMessage="Loading accounting data..."
       errorMessage="Failed to load accounting data"
+      softError
     >
-    <div className="space-y-6">
-      {/* Key Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Assets"
-          value={formatCurrency(totalAssets)}
-          icon={Building2}
-          colorClass="text-blue-400"
-          loading={loading}
-        />
-        <MetricCard
-          title="Total Liabilities"
-          value={formatCurrency(totalLiabilities)}
-          icon={CreditCard}
-          colorClass="text-red-400"
-          loading={loading}
-        />
-        <MetricCard
-          title="Total Equity"
-          value={formatCurrency(totalEquity)}
-          icon={PiggyBank}
-          colorClass="text-green-400"
-          loading={loading}
-        />
-        <MetricCard
-          title="Net Income (YTD)"
-          value={formatCurrency(netIncome)}
-          icon={TrendingUp}
-          colorClass="text-teal-electric"
-          loading={loading}
-        />
-      </div>
+      <div className="space-y-6">
+        {error && (
+          <ErrorDisplay
+            message="Failed to load accounting data."
+            error={error as Error}
+            onRetry={handleRetry}
+          />
+        )}
+        {/* Key Financial Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Total Assets"
+            value={formatCurrency(totalAssets)}
+            icon={Building2}
+            colorClass="text-blue-400"
+            loading={loading}
+          />
+          <MetricCard
+            title="Total Liabilities"
+            value={formatCurrency(totalLiabilities)}
+            icon={CreditCard}
+            colorClass="text-red-400"
+            loading={loading}
+          />
+          <MetricCard
+            title="Total Equity"
+            value={formatCurrency(totalEquity)}
+            icon={PiggyBank}
+            colorClass="text-green-400"
+            loading={loading}
+          />
+          <MetricCard
+            title="Net Income (YTD)"
+            value={formatCurrency(netIncome)}
+            icon={TrendingUp}
+            colorClass="text-teal-electric"
+            loading={loading}
+          />
+        </div>
 
       {/* Cash & Receivables */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -122,30 +122,38 @@ def build_scorecard_response(
     period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == scorecard.evaluation_period_id).first()
     template = db.query(ScorecardTemplate).filter(ScorecardTemplate.id == scorecard.template_id).first()
 
-    base_data = {
-        "id": scorecard.id,
-        "employee_id": scorecard.employee_id,
-        "employee_name": employee.employee_name if employee else None,
-        "employee_code": employee.erpnext_id if employee else None,
-        "department": employee.department if employee else None,
-        "designation": employee.designation if employee else None,
-        "evaluation_period_id": scorecard.evaluation_period_id,
-        "period_code": period.code if period else "",
-        "period_name": period.name if period else "",
-        "template_id": scorecard.template_id,
-        "template_name": template.name if template else "",
-        "status": scorecard.status.value if isinstance(scorecard.status, ScorecardInstanceStatus) else scorecard.status,
-        "total_weighted_score": float(scorecard.total_weighted_score) if scorecard.total_weighted_score else None,
-        "final_rating": scorecard.final_rating,
-        "reviewed_by_id": scorecard.reviewed_by_id,
-        "reviewed_at": scorecard.reviewed_at,
-        "finalized_at": scorecard.finalized_at,
-        "created_at": scorecard.created_at,
-        "updated_at": scorecard.updated_at,
-    }
+    employee_name = employee.name if employee else None
+    employee_code = employee.erpnext_id if employee else None
+    department = employee.department if employee else None
+    designation = employee.designation if employee else None
+    period_code = period.code if period else ""
+    period_name = period.name if period else ""
+    template_name = template.name if template else ""
+    status = scorecard.status.value if isinstance(scorecard.status, ScorecardInstanceStatus) else scorecard.status
+    total_weighted_score = float(scorecard.total_weighted_score) if scorecard.total_weighted_score else None
 
     if not include_results:
-        return ScorecardResponse(**base_data)
+        return ScorecardResponse(
+            id=scorecard.id,
+            employee_id=scorecard.employee_id,
+            employee_name=employee_name,
+            employee_code=employee_code,
+            department=department,
+            designation=designation,
+            evaluation_period_id=scorecard.evaluation_period_id,
+            period_code=period_code,
+            period_name=period_name,
+            template_id=scorecard.template_id,
+            template_name=template_name,
+            status=status,
+            total_weighted_score=total_weighted_score,
+            final_rating=scorecard.final_rating,
+            reviewed_by_id=scorecard.reviewed_by_id,
+            reviewed_at=scorecard.reviewed_at,
+            finalized_at=scorecard.finalized_at,
+            created_at=scorecard.created_at,
+            updated_at=scorecard.updated_at,
+        )
 
     # Get KRA results with nested KPI results
     kra_results_data = []
@@ -190,7 +198,28 @@ def build_scorecard_response(
             kpi_results=kpi_results_data,
         ))
 
-    return ScorecardDetailResponse(**base_data, kra_results=kra_results_data)
+    return ScorecardDetailResponse(
+        id=scorecard.id,
+        employee_id=scorecard.employee_id,
+        employee_name=employee_name,
+        employee_code=employee_code,
+        department=department,
+        designation=designation,
+        evaluation_period_id=scorecard.evaluation_period_id,
+        period_code=period_code,
+        period_name=period_name,
+        template_id=scorecard.template_id,
+        template_name=template_name,
+        status=status,
+        total_weighted_score=total_weighted_score,
+        final_rating=scorecard.final_rating,
+        reviewed_by_id=scorecard.reviewed_by_id,
+        reviewed_at=scorecard.reviewed_at,
+        finalized_at=scorecard.finalized_at,
+        created_at=scorecard.created_at,
+        updated_at=scorecard.updated_at,
+        kra_results=kra_results_data,
+    )
 
 
 # ============= ENDPOINTS =============
@@ -401,10 +430,11 @@ async def submit_scorecard(scorecard_id: int, db: Session = Depends(get_db)):
     employee = db.query(Employee).filter(Employee.id == scorecard.employee_id).first()
     if period and employee and employee.reports_to:
         # Find manager by name
-        manager = db.query(Employee).filter(Employee.employee_name == employee.reports_to).first()
-        if manager and manager.user_id:
-            notification_service = PerformanceNotificationService(db)
-            notification_service.notify_review_requested(scorecard, period, manager.user_id)
+        manager = db.query(Employee).filter(Employee.name == employee.reports_to).first()
+        notification_service = PerformanceNotificationService(db)
+        manager_user_id = notification_service._get_user_id_for_employee(manager)
+        if manager_user_id:
+            notification_service.notify_review_requested(scorecard, period, manager_user_id)
 
     return {"success": True, "message": "Scorecard submitted for review", "status": "in_review"}
 

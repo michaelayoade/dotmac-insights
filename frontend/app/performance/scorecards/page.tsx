@@ -143,18 +143,15 @@ export default function ScorecardsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load scorecards"
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load scorecards"
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -161,18 +161,15 @@ export default function GeneralLedgerPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load general ledger."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load general ledger."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Summary */}
       {!!(entries ?? []).length && (
         <div className="flex flex-wrap gap-3">

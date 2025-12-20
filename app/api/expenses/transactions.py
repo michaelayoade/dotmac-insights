@@ -491,7 +491,7 @@ async def auto_match_single_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     txn.expense_claim_line_id = best.expense_claim_line_id
-    txn.match_confidence = best.confidence
+    txn.match_confidence = Decimal(str(best.confidence))
     txn.status = CardTransactionStatus.MATCHED
 
     db.commit()

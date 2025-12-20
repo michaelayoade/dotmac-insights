@@ -82,7 +82,7 @@ class TemplateListResponse(BaseModel):
 # ============= HELPERS =============
 def build_template_response(template: ScorecardTemplate, db: Session) -> TemplateResponse:
     items = []
-    total_weightage = 0
+    total_weightage = 0.0
 
     for item in sorted(template.items, key=lambda x: x.idx):
         kra = db.query(KRADefinition).filter(KRADefinition.id == item.kra_id).first()

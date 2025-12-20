@@ -13,12 +13,12 @@ Enable via configuration:
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from typing import Optional
 
 from app.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _instrumented = False
 
@@ -100,9 +100,10 @@ def _setup_exporter(provider) -> None:
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+        endpoint = settings.otel_exporter_endpoint or ""
         exporter = OTLPSpanExporter(
-            endpoint=settings.otel_exporter_endpoint,
-            insecure=not settings.otel_exporter_endpoint.startswith("https"),
+            endpoint=endpoint,
+            insecure=not endpoint.startswith("https"),
         )
         provider.add_span_processor(BatchSpanProcessor(exporter))
         logger.info("otel_exporter_configured", endpoint=settings.otel_exporter_endpoint)

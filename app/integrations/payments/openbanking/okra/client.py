@@ -15,7 +15,7 @@ import hmac
 import logging
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 
 import httpx
 from tenacity import (
@@ -137,7 +137,7 @@ class OkraClient(BaseOpenBankingProvider):
             if response.status_code >= 400 or result.get("status") == "error":
                 self._handle_error_response(result, response.status_code)
 
-            return result
+            return result if isinstance(result, dict) else {}
 
         except httpx.TimeoutException:
             logger.error(f"Okra request timeout: {method} {endpoint}")
@@ -226,7 +226,7 @@ class OkraClient(BaseOpenBankingProvider):
                 data={"id": code},
             )
             data = result.get("data", {})
-            return data.get("_id", code)
+            return cast(str, data.get("_id", code))
         except OpenBankingError:
             raise
         except Exception as e:
@@ -457,7 +457,7 @@ class OkraClient(BaseOpenBankingProvider):
                 "/accounts/reauth",
                 data={"account_id": account_id},
             )
-            return result.get("data", {}).get("reauth_url", "")
+            return cast(str, result.get("data", {}).get("reauth_url", ""))
         except OpenBankingError:
             raise
         except Exception as e:
@@ -495,7 +495,8 @@ class OkraClient(BaseOpenBankingProvider):
                 "/income/getByAccount",
                 data={"account_id": account_id},
             )
-            return result.get("data", {})
+            data = result.get("data", {})
+            return data if isinstance(data, dict) else {}
         except Exception as e:
             logger.error(f"Failed to get income data: {e}")
             return {}

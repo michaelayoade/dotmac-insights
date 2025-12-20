@@ -110,16 +110,6 @@ export default function CashFlowPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load cash flow statement."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const currency = data?.currency || 'NGN';
   const openingCash = data?.opening_cash || 0;
   const closingCash = data?.closing_cash || 0;
@@ -168,6 +158,13 @@ export default function CashFlowPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load cash flow statement."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">

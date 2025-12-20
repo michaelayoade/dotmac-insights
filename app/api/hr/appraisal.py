@@ -342,14 +342,14 @@ async def export_appraisals(
     rows = [["id", "employee", "employee_name", "start_date", "end_date", "status", "total_score", "final_score", "company"]]
     for a in query.order_by(Appraisal.start_date.desc()).all():
         rows.append([
-            a.id,
+            str(a.id),
             a.employee,
             a.employee_name or "",
             a.start_date.isoformat() if a.start_date else "",
             a.end_date.isoformat() if a.end_date else "",
             a.status.value if a.status else "",
-            float(a.total_score or 0),
-            float(a.final_score or 0),
+            str(float(a.total_score or 0)),
+            str(float(a.final_score or 0)),
             a.company or "",
         ])
     return csv_response(rows, "appraisals.csv")

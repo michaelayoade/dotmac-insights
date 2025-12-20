@@ -157,17 +157,14 @@ export default function OpenBankingConnectionsPage() {
     },
   ];
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load connections</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load connections</p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Building2 className="w-5 h-5 text-teal-electric" />
@@ -201,6 +198,7 @@ export default function OpenBankingConnectionsPage() {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           className="input-field"
+          data-testid="gateway-connections-status-filter"
         >
           <option value="">All Status</option>
           <option value="connected">Connected</option>
@@ -212,6 +210,7 @@ export default function OpenBankingConnectionsPage() {
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
           className="input-field"
+          data-testid="gateway-connections-provider-filter"
         >
           <option value="">All Providers</option>
           <option value="mono">Mono</option>

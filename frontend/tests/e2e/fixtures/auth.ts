@@ -22,6 +22,10 @@ export type Scope =
   | 'hr:write'
   | 'accounting:read'
   | 'accounting:write'
+  | 'payments:read'
+  | 'payments:write'
+  | 'openbanking:read'
+  | 'openbanking:write'
   | 'gateway:read'
   | 'gateway:write';
 
@@ -38,6 +42,10 @@ const ALL_SCOPES: Scope[] = [
   'hr:write',
   'accounting:read',
   'accounting:write',
+  'payments:read',
+  'payments:write',
+  'openbanking:read',
+  'openbanking:write',
   'gateway:read',
   'gateway:write',
 ];

@@ -232,7 +232,7 @@ async def verify_payment(
         )
         transaction.provider_reference = verification.provider_reference
         transaction.fees = verification.fees
-        transaction.paid_at = verification.paid_at
+        transaction.completed_at = verification.paid_at
 
         if verification.authorization:
             transaction.extra_data = transaction.extra_data or {}
@@ -288,7 +288,7 @@ async def get_payment(
         "status": transaction.status.value,
         "customer_email": transaction.customer_email,
         "fees": transaction.fees,
-        "paid_at": transaction.paid_at.isoformat() if transaction.paid_at else None,
+        "paid_at": transaction.completed_at.isoformat() if transaction.completed_at else None,
         "created_at": transaction.created_at.isoformat(),
         "extra_data": transaction.extra_data,
     }
@@ -296,8 +296,8 @@ async def get_payment(
 
 @router.get("/", dependencies=[Depends(Require("payments:read"))])
 async def list_payments(
-    status: Optional[str] = None,
-    provider: Optional[str] = None,
+    status_filter: Optional[str] = Query(None, alias="status"),
+    provider_filter: Optional[str] = Query(None, alias="provider"),
     customer_id: Optional[int] = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -308,18 +308,18 @@ async def list_payments(
         GatewayTransaction.transaction_type == GatewayTransactionType.PAYMENT
     )
 
-    if status:
+    if status_filter:
         try:
-            status_enum = GatewayTransactionStatus(status)
+            status_enum = GatewayTransactionStatus(status_filter)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status filter",
             )
         query = query.where(GatewayTransaction.status == status_enum)
-    if provider:
+    if provider_filter:
         try:
-            provider_enum = GatewayProvider(provider)
+            provider_enum = GatewayProvider(provider_filter)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

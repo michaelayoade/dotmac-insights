@@ -147,7 +147,7 @@ def get_sales_funnel(
     ).count()
 
     # Leads by qualification
-    qualification_counts = db.query(
+    qualification_query = db.query(
         UnifiedContact.lead_qualification,
         func.count(UnifiedContact.id).label("count"),
     ).filter(
@@ -155,12 +155,16 @@ def get_sales_funnel(
         UnifiedContact.created_at >= period_start
     )
     if owner_id:
-        qualification_counts = qualification_counts.filter(UnifiedContact.owner_id == owner_id)
-    qualification_counts = qualification_counts.group_by(UnifiedContact.lead_qualification).all()
+        qualification_query = qualification_query.filter(UnifiedContact.owner_id == owner_id)
+    qualification_rows = qualification_query.group_by(UnifiedContact.lead_qualification).all()
 
     qual_map = {
-        (q.lead_qualification.value if q.lead_qualification else "unqualified"): q.count
-        for q in qualification_counts
+        (
+            row._mapping["lead_qualification"].value
+            if row._mapping["lead_qualification"]
+            else "unqualified"
+        ): int(row._mapping["count"])
+        for row in qualification_rows
     }
 
     # Prospects qualified in period
@@ -218,14 +222,14 @@ def get_contacts_by_category(db: Session = Depends(get_db)):
         UnifiedContact.category, UnifiedContact.contact_type
     ).all()
 
-    by_category = {}
+    by_category: Dict[str, Dict[str, Any]] = {}
     for r in results:
-        cat = r.category.value
+        cat = r._mapping["category"].value
         if cat not in by_category:
             by_category[cat] = {"total": 0, "mrr": 0, "by_type": {}}
-        by_category[cat]["total"] += r.count
-        by_category[cat]["mrr"] += float(r.mrr or 0)
-        by_category[cat]["by_type"][r.contact_type.value] = r.count
+        by_category[cat]["total"] += int(r._mapping["count"])
+        by_category[cat]["mrr"] += float(r._mapping["mrr"] or 0)
+        by_category[cat]["by_type"][r._mapping["contact_type"].value] = int(r._mapping["count"])
 
     return {"by_category": by_category}
 

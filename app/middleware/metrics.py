@@ -19,10 +19,11 @@ Usage:
 Metrics are exposed at /metrics endpoint when configured.
 """
 
-import logging
 from contextlib import contextmanager
 from time import time
 from typing import Optional
+
+import structlog
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
@@ -30,7 +31,7 @@ try:
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # =============================================================================
 # PROMETHEUS METRICS DEFINITIONS
@@ -123,8 +124,6 @@ else:
             return self
         def inc(self, amount=1):
             pass
-        def get(self):
-            return 0
         def get(self):
             return 0
 

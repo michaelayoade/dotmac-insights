@@ -56,18 +56,15 @@ export default function SegmentsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load customer segments"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load customer segments"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       <SummaryCard
         title="Total Customers"
         value={totalCustomers.toLocaleString()}

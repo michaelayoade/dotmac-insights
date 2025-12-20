@@ -147,16 +147,6 @@ export default function PurchasingDashboardPage() {
     return <LoadingState />;
   }
 
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load purchasing dashboard data."
-        error={firstError as Error}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   const loading = dashboardLoading;
 
   // Extract key metrics
@@ -183,6 +173,13 @@ export default function PurchasingDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {firstError && (
+        <ErrorDisplay
+          message="Failed to load purchasing dashboard data."
+          error={firstError as Error}
+          onRetry={retryAll}
+        />
+      )}
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard

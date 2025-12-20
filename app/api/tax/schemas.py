@@ -381,6 +381,20 @@ class CITAssessmentResponse(TaxBaseSchema):
         from_attributes = True
 
 
+class CITMinimumTaxComputation(BaseModel):
+    rate: Decimal
+    gross_turnover: Decimal
+    minimum_tax: Decimal
+    is_applicable: bool
+
+
+class CITPaymentStatus(BaseModel):
+    amount_paid: Decimal
+    balance_due: Decimal
+    due_date: date
+    is_filed: bool
+
+
 class CITComputationResponse(BaseModel):
     """CIT computation breakdown."""
     fiscal_year: str
@@ -392,9 +406,9 @@ class CITComputationResponse(BaseModel):
     assessable_profit: Decimal
     cit_computation: Dict[str, Decimal]
     tet_computation: Dict[str, Decimal]
-    minimum_tax_computation: Dict[str, Decimal]
+    minimum_tax_computation: CITMinimumTaxComputation
     total_tax_liability: Decimal
-    payment_status: Dict[str, Decimal]
+    payment_status: CITPaymentStatus
 
 
 # ============= FILING SCHEMAS =============

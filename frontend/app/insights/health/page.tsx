@@ -23,16 +23,6 @@ export default function HealthPage() {
     return <AccessDenied />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load customer health data"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const pb = data?.payment_behavior;
   const si = data?.support_intensity;
   const ci = data?.churn_indicators;
@@ -40,6 +30,13 @@ export default function HealthPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load customer health data"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-card rounded-lg border border-slate-border p-4">

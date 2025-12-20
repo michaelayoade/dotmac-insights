@@ -174,7 +174,7 @@ def preview_directory(
             detail=f"Directory not found: {directory_path}"
         )
 
-    files_found = {
+    files_found: dict[str, list[str]] = {
         "bank_files": [],
         "income_files": [],
         "expense_files": [],
@@ -232,7 +232,7 @@ async def upload_csv_file(
     The file should be a CSV file exported from Zoho Books with columns:
     date, account_name, transaction_details, transaction_id, debit, credit, etc.
     """
-    if not file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(
             status_code=400,
             detail="File must be a CSV file"
@@ -304,7 +304,7 @@ async def upload_multiple_csv_files(
     total_stats = {"created": 0, "updated": 0, "errors": 0}
 
     for file in files:
-        if not file.filename.endswith('.csv'):
+        if not file.filename or not file.filename.endswith(".csv"):
             logger.warning("Skipping non-CSV file", filename=file.filename)
             continue
 

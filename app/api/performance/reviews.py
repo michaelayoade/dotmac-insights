@@ -166,7 +166,7 @@ async def get_review_queue(
         items.append(ReviewQueueItem(
             scorecard_id=sc.id,
             employee_id=sc.employee_id,
-            employee_name=employee.employee_name if employee else "Unknown",
+            employee_name=employee.name if employee else "Unknown",
             department=employee.department if employee else None,
             designation=employee.designation if employee else None,
             period_name=period.name if period else "",

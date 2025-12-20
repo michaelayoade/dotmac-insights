@@ -77,21 +77,6 @@ export default function CustomerInsightsPage() {
     return <AccessDenied />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load customer insights"
-        error={error}
-        onRetry={() => {
-          mutateSegments();
-          mutateHealth();
-          mutateCompleteness();
-          mutatePlanChanges();
-        }}
-      />
-    );
-  }
-
   const tabs: Array<{ key: InsightsTab; label: string }> = [
     { key: 'segments', label: 'Segments' },
     { key: 'health', label: 'Health' },
@@ -112,6 +97,18 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load customer insights"
+          error={error}
+          onRetry={() => {
+            mutateSegments();
+            mutateHealth();
+            mutateCompleteness();
+            mutatePlanChanges();
+          }}
+        />
+      )}
       {/* Sub-tabs */}
       <div className="flex gap-2 border-b border-slate-border pb-2">
         {tabs.map((tab) => (

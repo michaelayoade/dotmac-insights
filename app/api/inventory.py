@@ -261,9 +261,6 @@ async def update_item(
     if request.status is not None:
         item.disabled = request.status == "inactive"
 
-    item.updated_by_id = principal.id
-    item.write_back_status = "pending"
-
     db.commit()
     db.refresh(item)
 
@@ -296,10 +293,6 @@ async def delete_item(
 
     if soft or item.erpnext_id:
         item.disabled = True
-        item.is_deleted = True
-        item.deleted_at = datetime.utcnow()
-        item.deleted_by_id = principal.id
-        item.write_back_status = "pending"
         db.commit()
         logger.info("inventory_item_disabled", item_id=item.id, item_code=item.item_code, principal_id=principal.id, principal_type=principal.type)
         return {"status": "disabled", "item_id": item_id}
@@ -536,7 +529,8 @@ async def update_stock_entry(
         raise HTTPException(status_code=404, detail="Stock entry not found")
 
     if request.posting_date is not None:
-        entry.posting_date = _parse_date(request.posting_date, "posting_date")
+        parsed_date = _parse_date(request.posting_date, "posting_date")
+        entry.posting_date = datetime.combine(parsed_date, datetime.min.time()) if parsed_date else None
     if request.remarks is not None:
         entry.remarks = request.remarks
     if request.docstatus is not None:
@@ -705,7 +699,7 @@ async def list_items_with_stock(
 
     Combines Item master data with Stock Ledger balances.
     """
-    query = db.query(Item).filter(Item.disabled == False, Item.is_deleted == False)
+    query = db.query(Item).filter(Item.disabled == False)
 
     if item_group:
         query = query.filter(Item.item_group == item_group)
@@ -783,7 +777,7 @@ async def get_item_stock(
 ) -> Dict[str, Any]:
     """Get detailed stock information for a specific item."""
     item = db.query(Item).filter(Item.id == item_id).first()
-    if not item or item.is_deleted:
+    if not item or item.disabled:
         raise HTTPException(status_code=404, detail="Item not found")
 
     # Get stock by warehouse
@@ -1246,12 +1240,12 @@ async def get_inventory_valuation_report(
 
     # Group by item group for summary
     by_group: Dict[str, Dict[str, Any]] = {}
-    for item in valuation_data:
-        group = item["item_group"] or "Uncategorized"
+    for item_data in valuation_data:
+        group = item_data["item_group"] or "Uncategorized"
         if group not in by_group:
             by_group[group] = {"total_qty": 0, "total_value": 0, "item_count": 0}
-        by_group[group]["total_qty"] += item["quantity"]
-        by_group[group]["total_value"] += item["stock_value"]
+        by_group[group]["total_qty"] += item_data["quantity"]
+        by_group[group]["total_value"] += item_data["stock_value"]
         by_group[group]["item_count"] += 1
 
     return {
@@ -1375,7 +1369,7 @@ async def get_item_valuation_detail(
     as_of = _parse_date(as_of_date, "as_of_date") or date.today()
 
     item = db.query(Item).filter(Item.item_code == item_code).first()
-    if not item or item.is_deleted:
+    if not item or item.disabled:
         raise HTTPException(status_code=404, detail="Item not found")
 
     # Get stock by warehouse

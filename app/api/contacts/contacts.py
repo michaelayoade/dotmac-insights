@@ -22,7 +22,8 @@ from app.middleware.metrics import record_dual_write
 from .schemas import (
     UnifiedContactCreate, UnifiedContactUpdate, UnifiedContactResponse,
     UnifiedContactSummary, UnifiedContactListResponse, PersonContactResponse,
-    ContactTypeEnum, ContactCategoryEnum, ContactStatusEnum, LeadQualificationEnum
+    ContactTypeEnum, ContactCategoryEnum, ContactStatusEnum, LeadQualificationEnum,
+    BillingTypeEnum
 )
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ def _contact_to_response(contact: UnifiedContact) -> UnifiedContactResponse:
         zoho_id=contact.zoho_id,
         account_number=contact.account_number,
         contract_number=contact.contract_number,
-        billing_type=contact.billing_type.value if contact.billing_type else None,
+        billing_type=BillingTypeEnum(contact.billing_type.value) if contact.billing_type else None,
         mrr=contact.mrr,
         total_revenue=contact.total_revenue,
         outstanding_balance=contact.outstanding_balance,

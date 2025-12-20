@@ -138,20 +138,17 @@ export default function AccountsReceivablePage() {
     },
   ];
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load accounts receivable</p>
-      </div>
-    );
-  }
-
   const summary = (data?.aging as any) || {};
   const totalCustomers = data?.customers?.length || 0;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load accounts receivable</p>
+        </div>
+      )}
       {/* Aging Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">

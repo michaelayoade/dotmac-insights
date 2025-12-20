@@ -35,16 +35,6 @@ export default function BlockedCustomersPage() {
     return <AccessDenied />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load blocked customers"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const customers = (data as any)?.data || data?.items || [];
   const totalOutstanding = customers.reduce(
     (sum: number, c: any) => sum + ((c as any).outstanding_balance || (c.billing_health?.overdue_amount ?? 0) || 0),
@@ -53,6 +43,13 @@ export default function BlockedCustomersPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load blocked customers"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <SummaryCard

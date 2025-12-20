@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import structlog
 
@@ -41,13 +41,13 @@ class NotificationTemplateRegistry:
 
     def __init__(self, templates_path: Optional[str] = None):
         self.templates_path = templates_path or settings.notification_templates_path
-        self._templates: Optional[dict] = None
+        self._templates: Optional[Dict[str, Any]] = None
 
-    def _load_templates(self) -> dict:
+    def _load_templates(self) -> Dict[str, Any]:
         path = Path(self.templates_path)
         try:
             with path.open("r", encoding="utf-8") as handle:
-                data = json.load(handle)
+                data = cast(Dict[str, Any], json.load(handle))
         except FileNotFoundError:
             logger.warning("notification_templates_missing", path=str(path))
             data = {}
@@ -58,7 +58,7 @@ class NotificationTemplateRegistry:
         self._templates = data
         return data
 
-    def _get_templates(self) -> dict:
+    def _get_templates(self) -> Dict[str, Any]:
         if self._templates is None:
             return self._load_templates()
         return self._templates

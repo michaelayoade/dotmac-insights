@@ -55,7 +55,7 @@ def get_employment_type_config(
     - itf_applicable
     """
     # Default config (all deductions apply)
-    default_config = {
+    default_config: Dict[str, Any] = {
         "paye_applicable": True,
         "pension_applicable": True,
         "nhf_applicable": True,
@@ -78,6 +78,7 @@ def get_employment_type_config(
         return _employment_type_config_cache[cache_key]
 
     # Try to match to enum
+    emp_type_enum: Optional[EmploymentType]
     try:
         emp_type_enum = EmploymentType(emp_type_upper)
     except ValueError:
@@ -97,10 +98,9 @@ def get_employment_type_config(
         }
         emp_type_enum = type_mappings.get(emp_type_upper)
 
-        if emp_type_enum is None:
-            # Unknown type - use default (all deductions apply)
-            _employment_type_config_cache[cache_key] = default_config
-            return default_config
+    if emp_type_enum is None:
+        _employment_type_config_cache[cache_key] = default_config
+        return default_config
 
     # Look up in database
     config = db.query(EmploymentTypeDeductionConfig).filter(
@@ -714,7 +714,7 @@ def calculate_slip_deductions(
 
 
 # Standard salary component names for integration
-STATUTORY_COMPONENTS = {
+STATUTORY_COMPONENTS: Dict[str, Dict[str, Any]] = {
     "PAYE": {
         "name": "PAYE",
         "abbr": "PAYE",

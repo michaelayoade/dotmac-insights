@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, Type
 
 from sqlalchemy.orm import Session
 
@@ -19,10 +19,14 @@ from app.services.approval_engine import (
 from app.services.number_generator import NumberGenerator, FormatNotFoundError
 from app.services.expense_posting_service import ExpensePostingService
 
+if TYPE_CHECKING:
+    from app.models.books_settings import DocumentType as BooksDocumentTypeType
+
+BooksDocumentType: Optional[Type["BooksDocumentTypeType"]]
 try:
-    from app.models.books_settings import DocumentType
+    from app.models.books_settings import DocumentType as BooksDocumentType
 except Exception:
-    DocumentType = None
+    BooksDocumentType = None
 
 
 class CashAdvanceService:
@@ -140,10 +144,10 @@ class CashAdvanceService:
         return advance
 
     def _generate_number(self, advance: CashAdvance, company_code: Optional[str]) -> str:
-        if DocumentType is None:
+        if BooksDocumentType is None:
             return f"ADV-{advance.request_date:%Y%m%d}-{advance.id}"
 
-        document_type = getattr(DocumentType, "CASH_ADVANCE", None)
+        document_type = getattr(BooksDocumentType, "CASH_ADVANCE", None)
         if document_type is None:
             return f"ADV-{advance.request_date:%Y%m%d}-{advance.id}"
 

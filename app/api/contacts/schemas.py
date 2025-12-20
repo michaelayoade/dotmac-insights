@@ -392,25 +392,21 @@ class UnifiedContactListResponse(BaseModel):
 
     # Deprecated: kept for backward compatibility, will be removed in v2
     @computed_field
-    @property
     def items(self) -> List[UnifiedContactSummary]:
         """Deprecated: use 'data' instead."""
         return self.data
 
     @computed_field
-    @property
     def page(self) -> int:
         """Deprecated: use offset/limit instead."""
         return (self.offset // self.limit) + 1 if self.limit > 0 else 1
 
     @computed_field
-    @property
     def page_size(self) -> int:
         """Deprecated: use 'limit' instead."""
         return self.limit
 
     @computed_field
-    @property
     def total_pages(self) -> int:
         """Deprecated: use total/limit instead."""
         return (self.total + self.limit - 1) // self.limit if self.limit > 0 else 1

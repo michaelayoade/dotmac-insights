@@ -17,6 +17,8 @@ services:
       - ./.env:/app/.env:ro
 
   celery_worker:
+    # Increase concurrency from 4 to 8 for faster queue processing
+    command: celery -A app.worker worker --loglevel=info -c 8
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
     # Mount source code
@@ -36,12 +38,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        NEXT_PUBLIC_API_URL: "http://149.102.135.97:8000"
         NEXT_PUBLIC_SERVICE_TOKEN: "5tYE5IkM11HHhQh3C3ql2blUTn2w4QhSc5BO5mYtuiLtLwLQD3Y"
+        NEXT_PUBLIC_DEV_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXYtdXNlci0xIiwiZW1haWwiOiJkZXZAZG90bWFjLmlvIiwic2NvcGVzIjpbImN1c3RvbWVyczpyZWFkIiwiY3VzdG9tZXJzOndyaXRlIiwiYW5hbHl0aWNzOnJlYWQiLCJzeW5jOnJlYWQiLCJzeW5jOndyaXRlIiwiZXhwbG9yZTpyZWFkIiwiYWRtaW46cmVhZCIsImFkbWluOndyaXRlIiwiaHI6cmVhZCIsImhyOndyaXRlIiwiYWNjb3VudGluZzpyZWFkIiwiYWNjb3VudGluZzp3cml0ZSIsInBheW1lbnRzOnJlYWQiLCJwYXltZW50czp3cml0ZSIsIm9wZW5iYW5raW5nOnJlYWQiLCJvcGVuYmFua2luZzp3cml0ZSIsImdhdGV3YXk6cmVhZCIsImdhdGV3YXk6d3JpdGUiXSwiaWF0IjoxNzY2MjI1MTU0LCJleHAiOjE3OTc3NjExNTR9.ghyGRFX1H4xLnqvIdgMjlB88sa9eoL2qqpkI7atU6CA"
     environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+      NEXT_PUBLIC_API_URL: "http://149.102.135.97:8000"
       INTERNAL_API_URL: "http://api:8000"
       NEXT_PUBLIC_SERVICE_TOKEN: "5tYE5IkM11HHhQh3C3ql2blUTn2w4QhSc5BO5mYtuiLtLwLQD3Y"
+      NEXT_PUBLIC_DEV_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZXYtdXNlci0xIiwiZW1haWwiOiJkZXZAZG90bWFjLmlvIiwic2NvcGVzIjpbImN1c3RvbWVyczpyZWFkIiwiY3VzdG9tZXJzOndyaXRlIiwiYW5hbHl0aWNzOnJlYWQiLCJzeW5jOnJlYWQiLCJzeW5jOndyaXRlIiwiZXhwbG9yZTpyZWFkIiwiYWRtaW46cmVhZCIsImFkbWluOndyaXRlIiwiaHI6cmVhZCIsImhyOndyaXRlIiwiYWNjb3VudGluZzpyZWFkIiwiYWNjb3VudGluZzp3cml0ZSIsInBheW1lbnRzOnJlYWQiLCJwYXltZW50czp3cml0ZSIsIm9wZW5iYW5raW5nOnJlYWQiLCJvcGVuYmFua2luZzp3cml0ZSIsImdhdGV3YXk6cmVhZCIsImdhdGV3YXk6d3JpdGUiXSwiaWF0IjoxNzY2MjI1MTU0LCJleHAiOjE3OTc3NjExNTR9.ghyGRFX1H4xLnqvIdgMjlB88sa9eoL2qqpkI7atU6CA"
     # Disable healthcheck in dev
     healthcheck:
       disable: true

@@ -11,7 +11,7 @@ Exposes AR-facing endpoints under /api/v1/sales:
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract, and_, or_, distinct
-from typing import Dict, Any, Optional, List, Iterable
+from typing import Dict, Any, Optional, List, Iterable, cast
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
@@ -28,6 +28,7 @@ from app.models.sales import (
     Quotation,
     QuotationStatus,
 )
+from app.models.document_lines import InvoiceLine
 from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models.notification import NotificationEventType
@@ -64,7 +65,7 @@ def _resolve_currency_or_raise(db: Session, column, requested: Optional[str]) ->
             status_code=400,
             detail="Multiple currencies detected; please provide the 'currency' query parameter to avoid mixed-currency aggregates.",
         )
-    return currencies[0]
+    return cast(str, currencies[0])
 
 
 def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -539,7 +540,7 @@ class CustomerUpdateRequest(BaseModel):
 def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
     """Serialize an invoice with customer and payments for API responses."""
     payments = db.query(Payment).filter(Payment.invoice_id == invoice.id).all()
-    items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id == invoice.id).all()
+    items = db.query(InvoiceLine).filter(InvoiceLine.invoice_id == invoice.id).all()
 
     customer = None
     if invoice.customer_id:
@@ -586,22 +587,22 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
                 "item_code": it.item_code,
                 "item_name": it.item_name,
                 "description": it.description,
-                "qty": float(it.qty or 0),
-                "stock_qty": float(it.stock_qty or 0),
+                "qty": float(it.quantity or 0),
+                "stock_qty": None,
                 "uom": it.uom,
-                "stock_uom": it.stock_uom,
+                "stock_uom": None,
                 "rate": float(it.rate or 0),
-                "price_list_rate": float(it.price_list_rate or 0),
+                "price_list_rate": None,
                 "discount_percentage": float(it.discount_percentage or 0),
                 "discount_amount": float(it.discount_amount or 0),
                 "amount": float(it.amount or 0),
                 "net_amount": float(it.net_amount or 0),
-                "warehouse": it.warehouse,
-                "income_account": it.income_account,
-                "expense_account": it.expense_account,
+                "warehouse": None,
+                "income_account": it.account,
+                "expense_account": None,
                 "cost_center": it.cost_center,
-                "sales_order": it.sales_order,
-                "delivery_note": it.delivery_note,
+                "sales_order": None,
+                "delivery_note": None,
                 "idx": it.idx,
             }
             for it in items
@@ -975,6 +976,8 @@ async def list_invoices(
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
     sort_column = sort_map.get(sort_by or "invoice_date")
+    if sort_column is None:
+        sort_column = Invoice.invoice_date
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -1101,7 +1104,7 @@ async def update_invoice(
     if payload.status is not None:
         invoice.status = _parse_invoice_status(payload.status) or invoice.status
     if payload.invoice_date is not None:
-        invoice.invoice_date = _ensure_utc(payload.invoice_date)
+        invoice.invoice_date = cast(datetime, _ensure_utc(payload.invoice_date))
     if payload.due_date is not None:
         invoice.due_date = _ensure_utc(payload.due_date)
     if payload.paid_date is not None:
@@ -1254,7 +1257,7 @@ async def update_payment(
     if payload.status is not None:
         payment.status = _parse_payment_status(payload.status) or payment.status
     if payload.payment_date is not None:
-        payment.payment_date = _ensure_utc(payload.payment_date)
+        payment.payment_date = cast(datetime, _ensure_utc(payload.payment_date))
     if payload.transaction_reference is not None:
         payment.transaction_reference = payload.transaction_reference
     if payload.gateway_reference is not None:
@@ -1323,7 +1326,8 @@ async def delete_quotation(
     quote.is_deleted = True
     quote.deleted_at = datetime.utcnow()
     quote.deleted_by_id = principal.id
-    quote.write_back_status = "pending"
+    if hasattr(quote, "write_back_status"):
+        setattr(quote, "write_back_status", "pending")
     db.commit()
     return {"status": "disabled", "quotation_id": quotation_id}
 
@@ -1484,8 +1488,10 @@ async def update_quotation(
     if payload.order_lost_reason is not None:
         quote.order_lost_reason = payload.order_lost_reason
 
-    quote.updated_by_id = principal.id
-    quote.write_back_status = "pending"
+    if hasattr(quote, "updated_by_id"):
+        setattr(quote, "updated_by_id", principal.id)
+    if hasattr(quote, "write_back_status"):
+        setattr(quote, "write_back_status", "pending")
     db.commit()
     db.refresh(quote)
     return _serialize_quotation(quote)
@@ -1562,8 +1568,10 @@ async def update_credit_note(
     if payload.applied_date is not None:
         note.applied_date = _ensure_utc(payload.applied_date)
 
-    note.updated_by_id = principal.id
-    note.write_back_status = "pending"
+    if hasattr(note, "updated_by_id"):
+        setattr(note, "updated_by_id", principal.id)
+    if hasattr(note, "write_back_status"):
+        setattr(note, "write_back_status", "pending")
     db.commit()
     db.refresh(note)
     return _serialize_credit_note(note)
@@ -1584,7 +1592,8 @@ async def delete_credit_note(
     note.is_deleted = True
     note.deleted_at = datetime.utcnow()
     note.deleted_by_id = principal.id
-    note.write_back_status = "pending"
+    if hasattr(note, "write_back_status"):
+        setattr(note, "write_back_status", "pending")
     db.commit()
     return {"status": "disabled", "credit_note_id": credit_note_id}
 
@@ -1727,6 +1736,8 @@ async def list_payments(
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
     sort_column = sort_map.get(sort_by or "payment_date")
+    if sort_column is None:
+        sort_column = Payment.payment_date
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -1813,17 +1824,15 @@ async def get_payment(
         "references": [
             {
                 "id": ref.id,
-                "reference_doctype": ref.reference_doctype,
-                "reference_name": ref.reference_name,
-                "total_amount": float(ref.total_amount or 0),
-                "outstanding_amount": float(ref.outstanding_amount or 0),
+                "allocation_type": ref.allocation_type.value,
+                "document_id": ref.document_id,
                 "allocated_amount": float(ref.allocated_amount or 0),
-                "exchange_rate": float(ref.exchange_rate or 1),
+                "discount_amount": float(ref.discount_amount or 0),
+                "write_off_amount": float(ref.write_off_amount or 0),
                 "exchange_gain_loss": float(ref.exchange_gain_loss or 0),
-                "due_date": ref.due_date.isoformat() if ref.due_date else None,
-                "idx": ref.idx,
+                "conversion_rate": float(ref.conversion_rate or 1),
             }
-            for ref in payment.references
+            for ref in payment.allocations
         ],
     }
 
@@ -1878,6 +1887,8 @@ async def list_credit_notes(
     if sort_by and sort_by not in sort_map:
         raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
     sort_column = sort_map.get(sort_by or "issue_date")
+    if sort_column is None:
+        sort_column = CreditNote.issue_date
     sort_order = sort_dir.lower() if sort_dir else "desc"
     if sort_order not in ("asc", "desc"):
         raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
@@ -2005,7 +2016,7 @@ async def get_collections_analytics(
     start_dt = _parse_iso_utc(start_date, "start_date") or end_dt - timedelta(days=30)
 
     # Payment method distribution
-    by_method = db.query(
+    by_method_query = db.query(
         Payment.payment_method,
         func.count(Payment.id).label("count"),
         func.sum(Payment.amount).label("total"),
@@ -2016,9 +2027,9 @@ async def get_collections_analytics(
     )
 
     if currency:
-        by_method = by_method.filter(Payment.currency == currency)
+        by_method_query = by_method_query.filter(Payment.currency == currency)
 
-    by_method = by_method.group_by(Payment.payment_method).all()
+    by_method = by_method_query.group_by(Payment.payment_method).all()
 
     # Payment timing analysis (early/on-time/late)
     days_diff = func.date_part("day", Invoice.due_date - Payment.payment_date)
@@ -2207,7 +2218,7 @@ async def get_payment_behavior_insights(
     """Analyze customer payment behavior patterns."""
     currency = _resolve_currency_or_raise(db, Payment.currency, currency)
     # Get customers with payment history
-    customer_payments = db.query(
+    customer_payments_query = db.query(
         Payment.customer_id,
         func.count(Payment.id).label("total_payments"),
     ).filter(
@@ -2215,8 +2226,8 @@ async def get_payment_behavior_insights(
         Payment.customer_id.isnot(None),
     )
     if currency:
-        customer_payments = customer_payments.filter(Payment.currency == currency)
-    customer_payments = customer_payments.group_by(Payment.customer_id).subquery()
+        customer_payments_query = customer_payments_query.filter(Payment.currency == currency)
+    customer_payments = customer_payments_query.group_by(Payment.customer_id).subquery()
 
     # Count customers by payment frequency
     customers_with_payments = db.query(func.count(customer_payments.c.customer_id)).scalar() or 0

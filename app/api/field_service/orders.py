@@ -264,7 +264,7 @@ def serialize_order(order: ServiceOrder, include_details: bool = False) -> Dict[
         "task_id": order.task_id,
         "ticket_id": order.ticket_id,
         "assigned_technician_id": order.assigned_technician_id,
-        "technician_name": order.technician.employee_name if order.technician else None,
+        "technician_name": order.technician.name if order.technician else None,
         "assigned_team_id": order.assigned_team_id,
         "team_name": order.team.name if order.team else None,
         "zone_id": order.zone_id,
@@ -388,7 +388,7 @@ async def get_dashboard(db: Session = Depends(get_db)) -> Dict[str, Any]:
     ).group_by(ServiceOrder.status).all()
 
     status_counts = {s.status.value: s.count for s in by_status}
-    total_orders = sum(status_counts.values())
+    total_orders = sum(int(value) for value in status_counts.values())
 
     # Today's orders
     today_orders = db.query(func.count(ServiceOrder.id)).filter(
@@ -915,7 +915,7 @@ async def dispatch_order(
 
     record_status_change(
         db, order, ServiceOrderStatus.DISPATCHED,
-        notes=request.notes or f"Dispatched to {technician.employee_name}",
+        notes=request.notes or f"Dispatched to {technician.name}",
     )
 
     # Notify customer
@@ -934,7 +934,7 @@ async def dispatch_order(
         import asyncio
 
         order_data = serialize_order(order, include_details=False)
-        order_data["technician_name"] = technician.employee_name
+        order_data["technician_name"] = technician.name
 
         asyncio.create_task(
             broadcast_order_event(

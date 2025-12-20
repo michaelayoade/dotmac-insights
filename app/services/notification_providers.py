@@ -84,17 +84,23 @@ class SMTPEmailProvider(NotificationProvider):
         extra_data: Optional[Dict[str, Any]] = None,
     ) -> NotificationResult:
         """Send email via SMTP."""
-        if not self.username or not self.password:
+        if not self.host or not self.username or not self.password or not self.from_email:
             return NotificationResult(
                 success=False,
                 provider="smtp",
                 error_message="SMTP credentials not configured"
             )
 
+        # Store validated credentials as local vars for type narrowing
+        smtp_host = self.host
+        smtp_username = self.username
+        smtp_password = self.password
+        from_email = self.from_email
+
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = f"{self.from_name} <{self.from_email}>"
+            msg["From"] = f"{self.from_name} <{from_email}>"
             msg["To"] = to
 
             # Plain text version
@@ -117,11 +123,11 @@ class SMTPEmailProvider(NotificationProvider):
 
             # Connect and send
             context = ssl.create_default_context()
-            with smtplib.SMTP(self.host, self.port) as server:
+            with smtplib.SMTP(smtp_host, self.port) as server:
                 if self.use_tls:
                     server.starttls(context=context)
-                server.login(self.username, self.password)
-                server.sendmail(self.from_email, to, msg.as_string())
+                server.login(smtp_username, smtp_password)
+                server.sendmail(from_email, to, msg.as_string())
 
             logger.info(f"Email sent successfully to {to}")
             return NotificationResult(
@@ -237,12 +243,17 @@ class TwilioSMSProvider(NotificationProvider):
         extra_data: Optional[Dict[str, Any]] = None,
     ) -> NotificationResult:
         """Send SMS via Twilio."""
-        if not all([self.account_sid, self.auth_token, self.from_number]):
+        if not self.account_sid or not self.auth_token or not self.from_number:
             return NotificationResult(
                 success=False,
                 provider="twilio_sms",
                 error_message="Twilio credentials not configured"
             )
+
+        # Store validated credentials for type narrowing
+        account_sid = self.account_sid
+        auth_token = self.auth_token
+        from_number = self.from_number
 
         # Use short message for SMS
         sms_message = short_message or message[:160]
@@ -250,11 +261,11 @@ class TwilioSMSProvider(NotificationProvider):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}/Messages.json",
-                    auth=(self.account_sid, self.auth_token),
+                    f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
+                    auth=(account_sid, auth_token),
                     data={
                         "To": to,
-                        "From": self.from_number,
+                        "From": from_number,
                         "Body": sms_message,
                     },
                 )
@@ -376,22 +387,27 @@ class TwilioWhatsAppProvider(NotificationProvider):
         extra_data: Optional[Dict[str, Any]] = None,
     ) -> NotificationResult:
         """Send WhatsApp message via Twilio."""
-        if not all([self.account_sid, self.auth_token, self.from_number]):
+        if not self.account_sid or not self.auth_token or not self.from_number:
             return NotificationResult(
                 success=False,
                 provider="twilio_whatsapp",
                 error_message="Twilio WhatsApp credentials not configured"
             )
 
+        # Store validated credentials for type narrowing
+        account_sid = self.account_sid
+        auth_token = self.auth_token
+        from_number = self.from_number
+
         # Format phone numbers for WhatsApp
-        from_whatsapp = f"whatsapp:{self.from_number}"
+        from_whatsapp = f"whatsapp:{from_number}"
         to_whatsapp = f"whatsapp:{to}"
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}/Messages.json",
-                    auth=(self.account_sid, self.auth_token),
+                    f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
+                    auth=(account_sid, auth_token),
                     data={
                         "To": to_whatsapp,
                         "From": from_whatsapp,

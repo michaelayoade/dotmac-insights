@@ -130,18 +130,15 @@ export default function TemplatesPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load scorecard templates"
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load scorecard templates"
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

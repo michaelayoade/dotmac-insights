@@ -19,7 +19,7 @@ from app.models.accounting_ext import AccountingControl
 from app.models.accounting import (
     Account,
     JournalEntry,
-    JournalEntryAccount,
+    JournalEntryItem,
 )
 from app.services.period_manager import PeriodManager, PeriodError
 
@@ -42,7 +42,7 @@ class JEValidator:
     def validate(
         self,
         je: JournalEntry,
-        accounts: Optional[List[JournalEntryAccount]] = None,
+        accounts: Optional[List[JournalEntryItem]] = None,
         skip_period_check: bool = False,
         skip_voucher_check: bool = False,
     ) -> Tuple[bool, List[str]]:
@@ -58,11 +58,11 @@ class JEValidator:
         Returns:
             Tuple of (is_valid, list_of_errors)
         """
-        errors = []
+        errors: List[str] = []
 
         # Get account lines
         if accounts is None:
-            accounts = je.accounts if hasattr(je, 'accounts') else []
+            accounts = je.items if hasattr(je, "items") else []
 
         # 1. Basic required fields
         basic_errors = self._validate_basic_fields(je)
@@ -100,7 +100,7 @@ class JEValidator:
     def validate_or_raise(
         self,
         je: JournalEntry,
-        accounts: Optional[List[JournalEntryAccount]] = None,
+        accounts: Optional[List[JournalEntryItem]] = None,
         **kwargs,
     ) -> None:
         """
@@ -120,7 +120,7 @@ class JEValidator:
 
     def _validate_basic_fields(self, je: JournalEntry) -> List[str]:
         """Validate basic required fields."""
-        errors = []
+        errors: List[str] = []
 
         if not je.posting_date:
             errors.append("Posting date is required")
@@ -132,7 +132,7 @@ class JEValidator:
 
     def _validate_balanced(
         self,
-        accounts: List[JournalEntryAccount],
+        accounts: List[JournalEntryItem],
     ) -> List[str]:
         """
         Validate that debits equal credits.
@@ -140,16 +140,18 @@ class JEValidator:
         The sum of all debits must equal the sum of all credits for the
         journal entry to be balanced.
         """
-        errors = []
+        errors: List[str] = []
 
         if not accounts:
             return errors
 
         total_debit = sum(
-            (a.debit or Decimal("0")) for a in accounts
+            ((a.debit or Decimal("0")) for a in accounts),
+            Decimal("0"),
         )
         total_credit = sum(
-            (a.credit or Decimal("0")) for a in accounts
+            ((a.credit or Decimal("0")) for a in accounts),
+            Decimal("0"),
         )
 
         # Use tolerance for floating point comparison
@@ -167,7 +169,7 @@ class JEValidator:
 
     def _validate_accounts(
         self,
-        accounts: List[JournalEntryAccount],
+        accounts: List[JournalEntryItem],
     ) -> List[str]:
         """
         Validate each account line.
@@ -179,7 +181,7 @@ class JEValidator:
         - Debit and credit are not both non-zero
         - At least one of debit/credit is non-zero
         """
-        errors = []
+        errors: List[str] = []
 
         for idx, line in enumerate(accounts, 1):
             line_prefix = f"Line {idx}"
@@ -240,7 +242,7 @@ class JEValidator:
 
     def _validate_period(self, posting_date: date) -> List[str]:
         """Validate posting date is within an open period."""
-        errors = []
+        errors: List[str] = []
 
         # Convert datetime to date if needed
         if isinstance(posting_date, datetime):
@@ -254,22 +256,16 @@ class JEValidator:
 
     def _validate_voucher_unique(self, je: JournalEntry) -> List[str]:
         """Validate voucher number is unique."""
-        errors = []
+        errors: List[str] = []
 
         if not je.erpnext_id:
             return errors
 
         # Check for existing JE with same voucher number
-        existing = (
-            self.db.query(JournalEntry)
-            .filter(
-                and_(
-                    JournalEntry.erpnext_id == je.erpnext_id,
-                    JournalEntry.id != je.id if je.id else True,
-                )
-            )
-            .first()
-        )
+        query = self.db.query(JournalEntry).filter(JournalEntry.erpnext_id == je.erpnext_id)
+        if je.id:
+            query = query.filter(JournalEntry.id != je.id)
+        existing = query.first()
 
         if existing:
             errors.append(
@@ -280,7 +276,7 @@ class JEValidator:
 
     def _validate_backdating(self, posting_date: date) -> List[str]:
         """Validate posting date is within allowed backdating window."""
-        errors = []
+        errors: List[str] = []
 
         # Convert datetime to date if needed
         if isinstance(posting_date, datetime):
@@ -373,7 +369,7 @@ class AccountValidator:
         Returns:
             Tuple of (is_valid, list_of_errors)
         """
-        errors = []
+        errors: List[str] = []
 
         # Required fields
         if not account_data.get("account_name"):
@@ -431,7 +427,7 @@ class AccountValidator:
         Returns:
             Tuple of (is_valid, list_of_errors)
         """
-        errors = []
+        errors: List[str] = []
 
         # Can't change root_type if account has transactions
         if "root_type" in updates and updates["root_type"] != account.root_type:
@@ -472,7 +468,7 @@ class AccountValidator:
         Returns:
             Tuple of (is_valid, list_of_errors)
         """
-        errors = []
+        errors: List[str] = []
 
         # Check for outstanding balance
         from app.models.accounting import GLEntry
@@ -510,7 +506,7 @@ class AccountValidator:
             .filter(GLEntry.account == account.account_name)
             .scalar()
         )
-        return count > 0
+        return int(count or 0) > 0
 
     def _account_has_children(self, account: Account) -> bool:
         """Check if account has child accounts."""
@@ -519,7 +515,7 @@ class AccountValidator:
             .filter(Account.parent_account == account.account_name)
             .scalar()
         )
-        return count > 0
+        return int(count or 0) > 0
 
 
 class SupplierValidator:
@@ -530,7 +526,7 @@ class SupplierValidator:
 
     def validate_create(self, supplier_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         """Validate supplier creation."""
-        errors = []
+        errors: List[str] = []
 
         if not supplier_data.get("supplier_name"):
             errors.append("Supplier name is required")
@@ -550,7 +546,7 @@ class SupplierValidator:
 
     def validate_disable(self, supplier_id: int) -> Tuple[bool, List[str]]:
         """Validate supplier can be disabled."""
-        errors = []
+        errors: List[str] = []
 
         from app.models.accounting import PurchaseInvoice
 

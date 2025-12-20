@@ -31,6 +31,7 @@ import {
   useHrAnalyticsAttendanceTrend,
 } from '@/hooks/useApi';
 import { DashboardShell } from '@/components/ui/DashboardShell';
+import { ErrorDisplay } from '@/components/insights/shared';
 import { useSWRStatusFromArray } from '@/hooks/useSWRStatus';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import {
@@ -324,20 +325,28 @@ export default function HrOverviewPage() {
       error={error}
       onRetry={retryAll}
       errorMessage="Failed to load HR overview data"
+      softError
     >
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-white">Overview</h2>
-            <p className="text-slate-muted text-sm mt-1">People operations at a glance</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/hr/leave"
-              className="px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors flex items-center gap-2"
-            >
+      <div className="space-y-6">
+        {error && (
+          <ErrorDisplay
+            message="Failed to load HR overview data."
+            error={error as Error}
+            onRetry={retryAll}
+          />
+        )}
+        {/* Hero Section */}
+        <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">Overview</h2>
+              <p className="text-slate-muted text-sm mt-1">People operations at a glance</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/hr/leave"
+                className="px-4 py-2 bg-amber-500/20 text-amber-300 rounded-lg text-sm font-medium hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+              >
               <CalendarClock className="w-4 h-4" />
               Manage Leave
             </Link>

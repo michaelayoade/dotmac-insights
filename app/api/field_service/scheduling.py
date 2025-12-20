@@ -109,7 +109,7 @@ async def get_calendar(
             "service_address": order.service_address,
             "city": order.city,
             "technician_id": order.assigned_technician_id,
-            "technician_name": order.technician.employee_name if order.technician else None,
+            "technician_name": order.technician.name if order.technician else None,
             "team_id": order.assigned_team_id,
         })
 
@@ -193,8 +193,8 @@ async def get_technician_schedule(
     return {
         "technician": {
             "id": employee.id,
-            "name": employee.employee_name,
-            "email": employee.company_email,
+            "name": employee.name,
+            "email": employee.email,
         },
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
@@ -280,7 +280,7 @@ async def check_availability(
 
         availability.append({
             "technician_id": tech.id,
-            "technician_name": tech.employee_name,
+            "technician_name": tech.name,
             "date": check_date.isoformat(),
             "scheduled_orders": len(orders),
             "scheduled_hours": round(total_scheduled_hours, 1),
@@ -356,9 +356,9 @@ async def get_available_technicians(
         if total_hours + duration_hours <= 8:  # 8 hour max
             available.append({
                 "technician_id": tech.id,
-                "technician_name": tech.employee_name,
-                "email": tech.company_email,
-                "phone": tech.cell_number,
+                "technician_name": tech.name,
+                "email": tech.email,
+                "phone": tech.phone,
                 "scheduled_orders": len(orders),
                 "scheduled_hours": round(total_hours, 1),
                 "available_hours": round(8 - total_hours, 1),
@@ -419,7 +419,7 @@ async def get_dispatch_board(
             "service_address": order.service_address,
             "city": order.city,
             "technician_id": order.assigned_technician_id,
-            "technician_name": order.technician.employee_name if order.technician else None,
+            "technician_name": order.technician.name if order.technician else None,
             "team_id": order.assigned_team_id,
             "is_overdue": order.is_overdue,
         }
@@ -451,7 +451,7 @@ async def get_dispatch_board(
         tech_orders = [o for o in orders if o.assigned_technician_id == tech.id]
         tech_workload.append({
             "technician_id": tech.id,
-            "technician_name": tech.employee_name,
+            "technician_name": tech.name,
             "total_orders": len(tech_orders),
             "completed": sum(1 for o in tech_orders if o.status == ServiceOrderStatus.COMPLETED),
             "in_progress": sum(1 for o in tech_orders if o.status == ServiceOrderStatus.IN_PROGRESS),
@@ -530,7 +530,7 @@ async def bulk_assign_orders(
     return {
         "assigned": assigned,
         "assigned_count": len(assigned),
-        "technician_name": technician.employee_name,
+        "technician_name": technician.name,
         "errors": errors,
     }
 
@@ -620,7 +620,7 @@ async def get_route_suggestions(
                 "city": order.city,
                 "priority": order.priority.value,
                 "suggested_technician_id": best_match.id,
-                "suggested_technician_name": best_match.employee_name,
+                "suggested_technician_name": best_match.name,
                 "confidence_score": min(100, best_score),
             })
 

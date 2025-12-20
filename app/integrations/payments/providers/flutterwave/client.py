@@ -17,7 +17,7 @@ import hmac
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 
 import httpx
 from tenacity import (
@@ -147,7 +147,7 @@ class FlutterwaveClient(BasePaymentGateway):
                 params=params,
             )
 
-            result = response.json()
+            result: Dict[str, Any] = response.json()
 
             if response.status_code >= 500:
                 raise ProviderUnavailableError(
@@ -346,7 +346,7 @@ class FlutterwaveClient(BasePaymentGateway):
         # Get the transaction first
         verification = await self.verify_payment(reference)
 
-        payload = {}
+        payload: Dict[str, Any] = {}
         if amount is not None:
             payload["amount"] = float(amount)
 
@@ -356,7 +356,8 @@ class FlutterwaveClient(BasePaymentGateway):
                 f"/transactions/{verification.provider_reference}/refund",
                 data=payload if payload else None,
             )
-            return result.get("data", {})
+            data = result.get("data", {})
+            return data if isinstance(data, dict) else {}
         except PaymentError:
             raise
         except Exception as e:

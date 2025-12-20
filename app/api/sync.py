@@ -33,6 +33,7 @@ try:
         sync_erpnext_all,
         sync_erpnext_accounting,
         sync_erpnext_extended_accounting,
+        sync_erpnext_hr,
         sync_chatwoot_all,
     )
     # Require explicit broker configuration
@@ -436,6 +437,29 @@ async def trigger_erpnext_extended_accounting_sync(full_sync: bool = False) -> D
                 db.close()
         asyncio.create_task(_run(), name="erpnext_extended_accounting_sync")
         return {"message": "ERPNext extended accounting sync started", "full_sync": full_sync, "backend": "asyncio"}
+
+
+@router.post("/erpnext/hr", dependencies=[Depends(Require("sync:erpnext:write"))])
+async def trigger_erpnext_hr_sync(full_sync: bool = False) -> Dict[str, Any]:
+    """Trigger ERPNext HR sync (Employees, Departments, Leave, Payroll, Attendance)."""
+    if _celery_available:
+        task = sync_erpnext_hr.delay(full_sync=full_sync)
+        return {
+            "message": "ERPNext HR sync enqueued",
+            "task_id": task.id,
+            "full_sync": full_sync,
+            "backend": "celery",
+        }
+    else:
+        async def _run():
+            db = SessionLocal()
+            try:
+                sync_client = ERPNextSync(db)
+                await sync_client.sync_hr_task(full_sync=full_sync)
+            finally:
+                db.close()
+        asyncio.create_task(_run(), name="erpnext_hr_sync")
+        return {"message": "ERPNext HR sync started", "full_sync": full_sync, "backend": "asyncio"}
 
 
 @router.post("/chatwoot", dependencies=[Depends(Require("sync:chatwoot:write"))])

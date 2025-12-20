@@ -1,6 +1,6 @@
 """Celery tasks for performance module - scorecard computation and period processing."""
 import structlog
-from typing import Optional
+from typing import Optional, List
 import redis
 
 from app.worker import celery_app
@@ -366,7 +366,7 @@ def send_scorecard_notification(scorecard_id: int, notification_type: str):
         logger.info(
             "scorecard_notification_sent",
             scorecard_id=scorecard_id,
-            employee_name=employee.employee_name if employee else "Unknown",
+            employee_name=employee.name if employee else "Unknown",
             notification_type=notification_type,
         )
 
@@ -412,20 +412,14 @@ def send_weekly_summaries():
             logger.info("send_weekly_summaries_no_active_periods")
             return {"success": True, "message": "No active periods"}
 
-        # Get all managers (employees who have direct reports)
-        managers = db.query(Employee).filter(
-            Employee.status == 'Active',
-            Employee.user_id.isnot(None)
-        ).all()
-
         # Filter to only those who have direct reports
         manager_ids = set()
-        for emp in db.query(Employee).filter(Employee.reports_to.isnot(None)).all():
-            manager = db.query(Employee).filter(Employee.employee_name == emp.reports_to).first()
-            if manager and manager.user_id:
-                manager_ids.add(manager.user_id)
-
         notification_service = PerformanceNotificationService(db)
+        for emp in db.query(Employee).filter(Employee.reports_to.isnot(None)).all():
+            manager = db.query(Employee).filter(Employee.name == emp.reports_to).first()
+            manager_user_id = notification_service._get_user_id_for_employee(manager)
+            if manager_user_id:
+                manager_ids.add(manager_user_id)
         summaries_sent = 0
 
         for period in active_periods:
@@ -519,7 +513,7 @@ def check_period_closing():
 
 
 @celery_app.task(name="performance.generate_period_report")
-def generate_period_report(period_id: int, email_recipients: list = None):
+def generate_period_report(period_id: int, email_recipients: Optional[List[str]] = None):
     """
     Generate and optionally email a comprehensive period report.
 

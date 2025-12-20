@@ -4,7 +4,7 @@ Performance Analytics API - Dashboards and reporting
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel
@@ -122,7 +122,7 @@ async def get_dashboard(
         EmployeeScorecardInstance.evaluation_period_id == period_id,
         EmployeeScorecardInstance.total_weighted_score.isnot(None)
     ).scalar()
-    avg_score = float(avg_score_result) if avg_score_result else None
+    avg_score = float(avg_score_result) if avg_score_result is not None else None
 
     # Score distribution (bands)
     score_distribution = {
@@ -138,6 +138,8 @@ async def get_dashboard(
     ).all()
 
     for sc in scored_cards:
+        if sc.total_weighted_score is None:
+            continue
         score = float(sc.total_weighted_score)
         if score >= 85:
             score_distribution["outstanding"] += 1
@@ -160,7 +162,7 @@ async def get_dashboard(
         if emp:
             top_performers.append({
                 "employee_id": sc.employee_id,
-                "employee_name": emp.employee_name,
+                "employee_name": emp.name,
                 "department": emp.department,
                 "score": float(sc.total_weighted_score) if sc.total_weighted_score else None,
             })
@@ -178,7 +180,7 @@ async def get_dashboard(
         if emp:
             improvement_needed.append({
                 "employee_id": sc.employee_id,
-                "employee_name": emp.employee_name,
+                "employee_name": emp.name,
                 "department": emp.department,
                 "score": float(sc.total_weighted_score) if sc.total_weighted_score else None,
             })
@@ -311,9 +313,9 @@ async def get_score_distribution(
         percentage = (count / total_scored * 100) if total_scored > 0 else 0
 
         results.append(ScoreDistribution(
-            rating=band["rating"],
-            min_score=band["min"],
-            max_score=band["max"],
+            rating=str(band.get("rating", "")),
+            min_score=float(band.get("min", 0)),
+            max_score=float(band.get("max", 0)),
             count=count,
             percentage=round(percentage, 1),
         ))
@@ -337,7 +339,7 @@ async def get_bonus_eligibility(
     if not policy:
         raise HTTPException(status_code=404, detail="No active bonus policy found")
 
-    score_bands = policy.score_bands or []
+    score_bands: List[Dict[str, Any]] = policy.score_bands or []
 
     # Get finalized scorecards
     scorecards = db.query(EmployeeScorecardInstance).filter(
@@ -364,7 +366,7 @@ async def get_bonus_eligibility(
 
         results.append(BonusEligibility(
             employee_id=sc.employee_id,
-            employee_name=emp.employee_name,
+            employee_name=emp.name,
             department=emp.department,
             final_score=score,
             rating=sc.final_rating,
@@ -631,6 +633,10 @@ async def get_manager_pending_reviews(
         })
 
     # Sort by score descending
-    items.sort(key=lambda x: x["score"] or 0, reverse=True)
+    def _score_key(item: Dict[str, Any]) -> float:
+        score = item.get("score")
+        return float(score) if score is not None else 0.0
+
+    items.sort(key=_score_key, reverse=True)
 
     return {"items": items, "total": len(items)}

@@ -53,7 +53,7 @@ def validate_date_order(start, end, field: str = "start_date/end_date"):
 
 def status_counts(records) -> Dict[str, int]:
     """Convert status query results to a dict of status -> count."""
-    return {row[0].value if row[0] else None: int(row[1] or 0) for row in records}
+    return {row[0].value if row[0] else "unknown": int(row[1] or 0) for row in records}
 
 
 def get_leave_balance(
@@ -83,7 +83,7 @@ def get_leave_balance(
         return Decimal("0")
 
     # Use the tracked unused_leaves to align with prior approvals/cancellations
-    remaining = sum((a.unused_leaves or Decimal("0")) for a in allocations)
+    remaining = sum([a.unused_leaves or Decimal("0") for a in allocations], Decimal("0"))
     return remaining
 
 

@@ -595,7 +595,7 @@ def calculate_sla(
         "applicable_targets": targets,
         "ticket_priority": ticket.priority.value if ticket.priority else None,
         "ticket_created_at": ticket.created_at.isoformat() if ticket.created_at else None,
-        "first_response_at": ticket.first_response_at.isoformat() if ticket.first_response_at else None,
+        "first_response_at": ticket.first_responded_on.isoformat() if ticket.first_responded_on else None,
         "response_by": ticket.response_by.isoformat() if ticket.response_by else None,
         "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
     }

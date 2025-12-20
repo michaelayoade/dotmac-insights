@@ -84,11 +84,17 @@ function SwrErrorBoundary({ children }: { children: React.ReactNode }) {
     [formatKey, toast]
   );
 
+  // Disable SWR's built-in retry - core.ts fetchApi handles retry with exponential backoff
+  // This avoids double retry amplification (core retries + SWR retries = 9 total attempts)
+  // Core layer handles retry for GET/idempotent methods with proper timeout + backoff
+
   return (
     <SWRConfig
       value={{
         onError: handleError,
-        shouldRetryOnError: false,
+        shouldRetryOnError: false, // Disabled - core.ts handles retry
+        dedupingInterval: 5000,
+        revalidateOnFocus: false,
       }}
     >
       {children}

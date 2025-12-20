@@ -82,27 +82,26 @@ export default function TransferDetailPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 py-6 text-red-400">
-        <AlertCircle className="w-5 h-5" />
-        <span>Failed to load transfer: {error.message}</span>
-      </div>
-    );
-  }
-
   if (!transfer) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-muted mx-auto mb-3" />
-        <p className="text-white font-medium">Transfer not found</p>
-        <Link
-          href="/inventory/transfers"
-          className="inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to transfers
-        </Link>
+      <div className="space-y-6">
+        {error && (
+          <div className="flex items-center gap-2 py-6 text-red-400">
+            <AlertCircle className="w-5 h-5" />
+            <span>Failed to load transfer: {error.message}</span>
+          </div>
+        )}
+        <div className="text-center py-12">
+          <AlertCircle className="w-12 h-12 text-slate-muted mx-auto mb-3" />
+          <p className="text-white font-medium">Transfer not found</p>
+          <Link
+            href="/inventory/transfers"
+            className="inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to transfers
+          </Link>
+        </div>
       </div>
     );
   }
@@ -112,6 +111,12 @@ export default function TransferDetailPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="flex items-center gap-2 py-6 text-red-400">
+          <AlertCircle className="w-5 h-5" />
+          <span>Failed to load transfer: {error.message}</span>
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <Link
           href="/inventory/transfers"

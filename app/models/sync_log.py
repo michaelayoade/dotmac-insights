@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 import enum
 from app.database import Base
-from app.utils.datetime_utils import utc_now
+from app.utils.datetime_utils import utc_now, ensure_utc
 
 
 class SyncStatus(enum.Enum):
@@ -44,7 +44,7 @@ class SyncLog(Base):
     records_failed: Mapped[int] = mapped_column(default=0)
 
     # Timing
-    started_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    started_at: Mapped[datetime] = mapped_column(default=utc_now)
     completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     duration_seconds: Mapped[Optional[int]] = mapped_column(nullable=True)
 
@@ -62,7 +62,11 @@ class SyncLog(Base):
         self.status = status
         self.completed_at = utc_now()
         if self.started_at:
-            self.duration_seconds = int((self.completed_at - self.started_at).total_seconds())
+            # Ensure both datetimes are timezone-aware for subtraction
+            started = ensure_utc(self.started_at)
+            completed = ensure_utc(self.completed_at)
+            if started and completed:
+                self.duration_seconds = int((completed - started).total_seconds())
 
     def fail(self, error_message: str, error_details: Optional[str] = None) -> None:
         self.status = SyncStatus.FAILED

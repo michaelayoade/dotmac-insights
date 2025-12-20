@@ -36,13 +36,13 @@ class DataSourceEnum(str, Enum):
 
 
 class AggregationEnum(str, Enum):
-    sum = "sum"
-    avg = "avg"
-    count = "count"
-    min = "min"
-    max = "max"
-    percent = "percent"
-    ratio = "ratio"
+    SUM = "sum"
+    AVG = "avg"
+    COUNT = "count"
+    MIN = "min"
+    MAX = "max"
+    PERCENT = "percent"
+    RATIO = "ratio"
 
 
 class ScoringMethodEnum(str, Enum):

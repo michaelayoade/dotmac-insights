@@ -31,27 +31,33 @@ export default function RelationshipsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load relationship map"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   if (!data?.entities || data.entities.length === 0) {
     return (
-      <EmptyState
-        title="No Relationship Data"
-        message="Entity relationship data is not yet available. Try syncing your data first."
-      />
+      <div className="space-y-6">
+        {error && (
+          <ErrorDisplay
+            message="Failed to load relationship map"
+            error={error}
+            onRetry={() => mutate()}
+          />
+        )}
+        <EmptyState
+          title="No Relationship Data"
+          message="Entity relationship data is not yet available. Try syncing your data first."
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load relationship map"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Overall Linkage */}
       <SummaryCard
         title="Overall Data Linkage Rate"

@@ -145,9 +145,9 @@ async def create_webhook(
         try:
             secrets_service = get_secrets()
             encrypted_auth_value = secrets_service.encrypt(request.auth_value)
-            logger.debug("webhook_auth_value_encrypted", webhook_name=request.name)
+            logger.debug("webhook_auth_value_encrypted", extra={"webhook_name": request.name})
         except SecretsServiceError as e:
-            logger.error("webhook_auth_encryption_failed", error=str(e))
+            logger.error("webhook_auth_encryption_failed", extra={"error": str(e)})
             raise HTTPException(
                 status_code=500,
                 detail="Failed to encrypt webhook credentials. Check secrets service configuration."
@@ -250,9 +250,9 @@ async def update_webhook(
         try:
             secrets_service = get_secrets()
             webhook.auth_value_encrypted = secrets_service.encrypt(request.auth_value)
-            logger.debug("webhook_auth_value_updated", webhook_id=webhook_id)
+            logger.debug("webhook_auth_value_updated", extra={"webhook_id": webhook_id})
         except SecretsServiceError as e:
-            logger.error("webhook_auth_encryption_failed", error=str(e))
+            logger.error("webhook_auth_encryption_failed", extra={"error": str(e)})
             raise HTTPException(
                 status_code=500,
                 detail="Failed to encrypt webhook credentials. Check secrets service configuration."
@@ -436,7 +436,7 @@ async def rotate_webhook_secret(
     webhook.updated_at = datetime.utcnow()
     db.commit()
 
-    logger.info("webhook_secret_rotated", webhook_id=webhook_id)
+    logger.info("webhook_secret_rotated", extra={"webhook_id": webhook_id})
 
     return {
         "webhook_id": webhook_id,
@@ -689,7 +689,7 @@ async def update_my_preferences(
 @router.post("/emit", dependencies=[Depends(Require("books:admin"))])
 async def emit_event(
     event_type: str = Query(..., description="Event type to emit"),
-    payload: Dict[str, Any] = None,
+    payload: Optional[Dict[str, Any]] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
     user_ids: Optional[List[int]] = Query(None),

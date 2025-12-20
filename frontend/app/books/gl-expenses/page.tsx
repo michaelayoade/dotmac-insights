@@ -141,20 +141,17 @@ export default function GLExpensesPage() {
     },
   ];
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load GL expense entries</p>
-        <p className="text-slate-muted text-sm mt-1">
-          {error instanceof Error ? error.message : 'Unknown error'}
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load GL expense entries</p>
+          <p className="text-slate-muted text-sm mt-1">
+            {error instanceof Error ? error.message : 'Unknown error'}
+          </p>
+        </div>
+      )}
       {/* Header */}
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

@@ -105,6 +105,35 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="10,25,40,55"),
         "kwargs": {"full_sync": False},
     },
+    # ERPNext accounting incremental (staggered to avoid overwhelming ERPNext)
+    "sync-erpnext-accounting-incremental": {
+        "task": "app.tasks.sync_tasks.sync_erpnext_accounting",
+        "schedule": crontab(minute="14,44"),  # Every 30 mins (accounting is heavier)
+        "kwargs": {"full_sync": False},
+    },
+    "sync-erpnext-extended-accounting-incremental": {
+        "task": "app.tasks.sync_tasks.sync_erpnext_extended_accounting",
+        "schedule": crontab(minute="16,46"),
+        "kwargs": {"full_sync": False},
+    },
+    # ERPNext sales incremental
+    "sync-erpnext-sales-incremental": {
+        "task": "app.tasks.sync_tasks.sync_erpnext_sales",
+        "schedule": crontab(minute="18,48"),  # Every 30 mins
+        "kwargs": {"full_sync": False},
+    },
+    # ERPNext HR incremental (less frequent - HR data changes infrequently)
+    "sync-erpnext-hr-incremental": {
+        "task": "app.tasks.sync_tasks.sync_erpnext_hr",
+        "schedule": crontab(hour="*/2", minute=20),  # Every 2 hours
+        "kwargs": {"full_sync": False},
+    },
+    # ERPNext inventory items incremental
+    "sync-erpnext-items-incremental": {
+        "task": "app.tasks.sync_tasks.sync_erpnext_items",
+        "schedule": crontab(minute="22,52"),  # Every 30 mins
+        "kwargs": {"full_sync": False},
+    },
     # ERPNext full nightly
     "sync-erpnext-full-nightly": {
         "task": "app.tasks.sync_tasks.sync_erpnext_all",

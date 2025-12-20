@@ -48,7 +48,8 @@ class ExpensePolicyService:
                 or_(ExpensePolicy.department_id.is_(None), ExpensePolicy.department_id == employee.department_id),
                 or_(ExpensePolicy.designation_id.is_(None), ExpensePolicy.designation_id == employee.designation_id),
                 or_(ExpensePolicy.employment_type.is_(None), ExpensePolicy.employment_type == employee.employment_type),
-                or_(ExpensePolicy.grade_level.is_(None), ExpensePolicy.grade_level == employee.grade_level),
+                # Note: Employee model doesn't have grade_level, always match on None
+                ExpensePolicy.grade_level.is_(None),
             )
 
         return query.first()

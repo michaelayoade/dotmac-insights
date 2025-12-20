@@ -146,7 +146,7 @@ def get_spend_trend(
         extract("month", CorporateCardTransaction.transaction_date),
     ).order_by("year", "month").all()
 
-    results = []
+    results: List[Dict[str, Any]] = []
     for row in spend:
         period = f"{int(row.year)}-{int(row.month):02d}"
         total = float(row.total_spend or 0)
@@ -344,17 +344,17 @@ def get_status_breakdown(
         CorporateCardTransaction.status
     ).all()
 
-    total_count = sum(row.count for row in statuses)
-    total_amount = sum(float(row.total or 0) for row in statuses)
+    total_count = sum(int(row._mapping["count"]) for row in statuses)
+    total_amount = sum(float(row._mapping["total"] or 0) for row in statuses)
 
     return {
         "by_status": [
             {
-                "status": row.status.value if row.status else "unknown",
-                "count": row.count,
-                "amount": float(row.total or 0),
-                "count_pct": round(row.count / total_count * 100, 1) if total_count > 0 else 0,
-                "amount_pct": round(float(row.total or 0) / total_amount * 100, 1) if total_amount > 0 else 0,
+                "status": row._mapping["status"].value if row._mapping["status"] else "unknown",
+                "count": int(row._mapping["count"]),
+                "amount": float(row._mapping["total"] or 0),
+                "count_pct": round(int(row._mapping["count"]) / total_count * 100, 1) if total_count > 0 else 0,
+                "amount_pct": round(float(row._mapping["total"] or 0) / total_amount * 100, 1) if total_amount > 0 else 0,
             }
             for row in statuses
         ],

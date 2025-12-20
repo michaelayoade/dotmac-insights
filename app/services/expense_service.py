@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, Type
 
 from sqlalchemy.orm import Session
 
@@ -26,10 +26,14 @@ from app.services.approval_engine import (
 )
 from app.models.accounting_ext import ApprovalStatus
 
+if TYPE_CHECKING:
+    from app.models.books_settings import DocumentType as BooksDocumentTypeType
+
+BooksDocumentType: Optional[Type["BooksDocumentTypeType"]]
 try:
-    from app.models.books_settings import DocumentType
+    from app.models.books_settings import DocumentType as BooksDocumentType
 except Exception:  # pragma: no cover - defensive for environments without books settings
-    DocumentType = None
+    BooksDocumentType = None
 
 
 class ExpenseService:
@@ -224,10 +228,10 @@ class ExpenseService:
 
     def _generate_claim_number(self, claim: ExpenseClaim, company_code: Optional[str]) -> str:
         """Generate a claim number using number formats if available."""
-        if DocumentType is None:
+        if BooksDocumentType is None:
             return f"EXP-{claim.claim_date:%Y%m%d}-{claim.id}"
 
-        document_type = getattr(DocumentType, "EXPENSE_CLAIM", None)
+        document_type = getattr(BooksDocumentType, "EXPENSE_CLAIM", None)
         if document_type is None:
             return f"EXP-{claim.claim_date:%Y%m%d}-{claim.id}"
 

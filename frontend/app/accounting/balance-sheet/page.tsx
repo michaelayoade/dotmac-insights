@@ -89,15 +89,6 @@ export default function BalanceSheetPage() {
   const [asOfDate, setAsOfDate] = useState<string>('');
   const { data, isLoading, error } = useAccountingBalanceSheet({ as_of_date: asOfDate || undefined });
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load balance sheet</p>
-      </div>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -138,6 +129,12 @@ export default function BalanceSheetPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load balance sheet</p>
+        </div>
+      )}
       {/* Header with date */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -631,7 +631,7 @@ def delete_salary_band(band_id: int, db: Session = Depends(get_db)):
     if not band:
         raise HTTPException(status_code=404, detail="Salary band not found")
 
-    band.is_active = False
+    band.is_active = False  # type: ignore[assignment]
     db.commit()
     return {"message": "Salary band deactivated"}
 
@@ -747,6 +747,6 @@ def delete_checklist_template(template_id: int, db: Session = Depends(get_db)):
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    template.is_active = False
+    template.is_active = False  # type: ignore[assignment]
     db.commit()
     return {"message": "Template deactivated"}

@@ -11,7 +11,7 @@ Business logic for Nigerian tax compliance including:
 
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, cast
 import uuid
 
 from sqlalchemy import select, func, and_, or_
@@ -264,10 +264,10 @@ class NigerianTaxService:
             VATTransaction.is_exempt == False,
         ).first()
 
-        output_vat = output_result.total if output_result else Decimal("0")
-        input_vat = input_result.total if input_result else Decimal("0")
-        output_count = output_result.count if output_result else 0
-        input_count = input_result.count if input_result else 0
+        output_vat = cast(Decimal, output_result._mapping["total"]) if output_result else Decimal("0")
+        input_vat = cast(Decimal, input_result._mapping["total"]) if input_result else Decimal("0")
+        output_count = int(output_result._mapping["count"]) if output_result else 0
+        input_count = int(input_result._mapping["count"]) if input_result else 0
 
         # Check if filed
         filed_count = self.db.query(VATTransaction).filter(
@@ -446,10 +446,10 @@ class NigerianTaxService:
             "supplier_id": supplier_id,
             "supplier_name": supplier_txn.supplier_name if supplier_txn else "",
             "supplier_tin": supplier_txn.supplier_tin if supplier_txn else None,
-            "total_gross_amount": result.total_gross,
-            "total_wht_deducted": result.total_wht,
-            "total_net_paid": result.total_net,
-            "transaction_count": result.count,
+            "total_gross_amount": result.total_gross if result else Decimal("0"),
+            "total_wht_deducted": result.total_wht if result else Decimal("0"),
+            "total_net_paid": result.total_net if result else Decimal("0"),
+            "transaction_count": result.count if result else 0,
             "certificates_issued": cert_count,
             "pending_certificate_amount": uncertified or Decimal("0"),
         }
@@ -687,10 +687,10 @@ class NigerianTaxService:
             "period_start": date(year, month, 1),
             "period_end": date(year, month, last_day),
             "due_date": get_paye_filing_deadline(period),
-            "employee_count": result.count,
-            "total_gross_income": result.total_gross,
-            "total_tax": result.total_tax,
-            "is_filed": filed_count > 0 and filed_count == result.count,
+            "employee_count": result.count if result else 0,
+            "total_gross_income": result.total_gross if result else Decimal("0"),
+            "total_tax": result.total_tax if result else Decimal("0"),
+            "is_filed": filed_count > 0 and (result is not None and filed_count == result.count),
             "company": company,
         }
 

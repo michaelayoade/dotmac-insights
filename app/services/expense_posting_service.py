@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, date
 from decimal import Decimal
-from typing import List
+from typing import List, Dict, Any
 
 from sqlalchemy.orm import Session
 
@@ -36,7 +36,7 @@ class ExpensePostingService:
         posting_ts = datetime.combine(posting_dt, datetime.min.time())
         self.posting._validate_fiscal_period(posting_ts)
 
-        entries: List[dict] = []
+        entries: List[Dict[str, Any]] = []
         total_credit = Decimal("0")
 
         for line in claim.lines:
@@ -175,7 +175,7 @@ class ExpensePostingService:
         advance_account = advance.advance_account or "Employee Advances - Default"
         bank_account = "Bank - Default"
 
-        entries = [
+        entries: List[Dict[str, Any]] = [
             {
                 "account": advance_account,
                 "party_type": "Employee",
@@ -224,7 +224,7 @@ class ExpensePostingService:
         advance_account = advance.advance_account or "Employee Advances - Default"
         bank_account = "Bank - Default"
 
-        entries = [
+        entries: List[Dict[str, Any]] = [
             {
                 "account": bank_account,
                 "party_type": None,
@@ -257,7 +257,7 @@ class ExpensePostingService:
         self,
         posting_ts: datetime,
         company: str | None,
-        entries: List[dict],
+        entries: List[Dict[str, Any]],
         remark: str,
         claim_number: str | None,
     ) -> JournalEntry:

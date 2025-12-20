@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN, ROUND_UP
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from sqlalchemy.orm import Session
 
@@ -179,8 +179,10 @@ class TaxCalculator:
                     "base_amount": Decimal("0"),
                     "tax_amount": Decimal("0"),
                 }
-            tax_breakdown[rate_key]["base_amount"] += result.net_amount
-            tax_breakdown[rate_key]["tax_amount"] += result.tax_amount
+            base_amount = cast(Decimal, tax_breakdown[rate_key]["base_amount"])
+            tax_amount = cast(Decimal, tax_breakdown[rate_key]["tax_amount"])
+            tax_breakdown[rate_key]["base_amount"] = base_amount + result.net_amount
+            tax_breakdown[rate_key]["tax_amount"] = tax_amount + result.tax_amount
 
         return TaxSummary(
             total_net=total_net,

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
+from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, field_validator
@@ -248,7 +249,7 @@ def update_rule(
         # Pydantic validators handle strategy validation
         rule.strategy = payload.strategy
     if payload.conditions is not None:
-        rule.conditions = [c.model_dump() for c in payload.conditions]
+        rule.conditions = cast(Any, [c.model_dump() for c in payload.conditions])
     if payload.priority is not None:
         rule.priority = payload.priority
     if payload.is_active is not None:
@@ -312,7 +313,8 @@ def auto_assign(
 
     matched_rule = None
     for rule in rules:
-        if _evaluate_routing_conditions(rule.conditions, ticket):
+        conditions = rule.conditions if isinstance(rule.conditions, list) else None
+        if _evaluate_routing_conditions(conditions, ticket):
             matched_rule = rule
             break
 
@@ -404,7 +406,9 @@ def auto_assign(
 
     # Assign the ticket
     ticket.assigned_to = selected_agent.display_name or selected_agent.email
-    ticket.team_id = team_id
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if team:
+        ticket.resolution_team = team.name
     ticket.updated_at = datetime.utcnow()
     db.commit()
 
@@ -431,7 +435,7 @@ def _evaluate_routing_conditions(conditions: Optional[List[dict]], ticket: Ticke
         value = condition.get("value")
 
         ticket_value = getattr(ticket, field, None)
-        if hasattr(ticket_value, "value"):
+        if isinstance(ticket_value, Enum):
             ticket_value = ticket_value.value
 
         if operator == "equals":
@@ -441,11 +445,11 @@ def _evaluate_routing_conditions(conditions: Optional[List[dict]], ticket: Ticke
             if str(ticket_value) == str(value):
                 return False
         elif operator == "contains":
-            if value not in str(ticket_value or ""):
+            if str(value) not in str(ticket_value or ""):
                 return False
         elif operator == "in_list":
             val_list = value if isinstance(value, list) else [value]
-            if str(ticket_value) not in val_list:
+            if str(ticket_value) not in [str(v) for v in val_list]:
                 return False
         elif operator == "is_empty":
             if ticket_value is not None and ticket_value != "":
@@ -474,11 +478,14 @@ def _round_robin_select(db: Session, team_id: int, agents: List[Agent]) -> Optio
         return selected
 
     # Find next agent after last assigned
-    try:
-        last_idx = agent_ids.index(state.last_agent_id)
-        next_idx = (last_idx + 1) % len(agents)
-    except ValueError:
+    if state.last_agent_id is None:
         next_idx = 0
+    else:
+        try:
+            last_idx = agent_ids.index(state.last_agent_id)
+            next_idx = (last_idx + 1) % len(agents)
+        except ValueError:
+            next_idx = 0
 
     selected = agents[next_idx]
     state.last_agent_id = selected.id
@@ -498,7 +505,7 @@ def _least_busy_select(db: Session, agents: List[Agent]) -> Optional[Agent]:
         name = agent.display_name or agent.email
         count = db.query(func.count(Ticket.id)).filter(
             Ticket.assigned_to == name,
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).scalar() or 0
         ticket_counts[agent.id] = count
 
@@ -550,7 +557,7 @@ def _load_balanced_select(db: Session, agents: List[Agent]) -> Optional[Agent]:
 
         current_load = db.query(func.count(Ticket.id)).filter(
             Ticket.assigned_to == name,
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).scalar() or 0
 
         utilization = current_load / capacity if capacity > 0 else float('inf')
@@ -591,7 +598,7 @@ def get_agent_workload(
 
         open_count = db.query(func.count(Ticket.id)).filter(
             Ticket.assigned_to == name,
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).scalar() or 0
 
         result.append({
@@ -617,7 +624,7 @@ async def get_queue_health(
     # Unassigned tickets
     unassigned = db.query(func.count(Ticket.id)).filter(
         Ticket.assigned_to.is_(None),
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS])
+        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
     ).scalar() or 0
 
     # Open tickets by status
@@ -625,7 +632,7 @@ async def get_queue_health(
         Ticket.status,
         func.count(Ticket.id).label("count")
     ).filter(
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
     ).group_by(Ticket.status).all()
 
     # Average wait time (unassigned tickets)
@@ -647,7 +654,7 @@ async def get_queue_health(
         name = agent.display_name or agent.email
         load = db.query(func.count(Ticket.id)).filter(
             Ticket.assigned_to == name,
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).scalar() or 0
         total_load += load
 
@@ -690,13 +697,13 @@ def rebalance_tickets(
         return {"rebalanced": 0, "message": "Need at least 2 agents to rebalance"}
 
     # Calculate workloads
-    workloads = {}
+    workloads: Dict[int, Dict[str, Any]] = {}
     for agent in agents:
         name = agent.display_name or agent.email
         capacity = agent.capacity or 10
         load = db.query(func.count(Ticket.id)).filter(
             Ticket.assigned_to == name,
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.PENDING])
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
         ).scalar() or 0
         workloads[agent.id] = {
             "agent": agent,
@@ -707,39 +714,39 @@ def rebalance_tickets(
         }
 
     # Find overloaded and underloaded agents
-    avg_utilization = sum(w["utilization"] for w in workloads.values()) / len(workloads)
+    avg_utilization = sum(float(w["utilization"]) for w in workloads.values()) / len(workloads)
     max_per_agent = payload.max_per_agent
 
     rebalanced = 0
-    for agent_id, data in sorted(workloads.items(), key=lambda x: -x[1]["utilization"]):
-        if data["utilization"] <= avg_utilization + 0.1:
+    for agent_id, data in sorted(workloads.items(), key=lambda x: -float(x[1]["utilization"])):
+        if float(data["utilization"]) <= avg_utilization + 0.1:
             continue  # Not overloaded
 
         # Find tickets to move
         tickets_to_move = db.query(Ticket).filter(
-            Ticket.assigned_to == data["name"],
+            Ticket.assigned_to == str(data["name"]),
             Ticket.status == TicketStatus.OPEN  # Only move open tickets
         ).order_by(Ticket.created_at.desc()).limit(
-            max(1, data["load"] - int(data["capacity"] * avg_utilization))
+            max(1, int(data["load"]) - int(int(data["capacity"]) * avg_utilization))
         ).all()
 
         for ticket in tickets_to_move:
             # Find underloaded agent
-            for target_id, target_data in sorted(workloads.items(), key=lambda x: x[1]["utilization"]):
+            for target_id, target_data in sorted(workloads.items(), key=lambda x: float(x[1]["utilization"])):
                 if target_id == agent_id:
                     continue
-                if target_data["utilization"] >= avg_utilization:
+                if float(target_data["utilization"]) >= avg_utilization:
                     continue
-                if max_per_agent and target_data["load"] >= max_per_agent:
+                if max_per_agent and int(target_data["load"]) >= max_per_agent:
                     continue
 
                 # Move ticket
-                ticket.assigned_to = target_data["name"]
+                ticket.assigned_to = str(target_data["name"])
                 ticket.updated_at = datetime.utcnow()
-                target_data["load"] += 1
-                target_data["utilization"] = target_data["load"] / target_data["capacity"]
-                data["load"] -= 1
-                data["utilization"] = data["load"] / data["capacity"] if data["capacity"] > 0 else 0
+                target_data["load"] = int(target_data["load"]) + 1
+                target_data["utilization"] = int(target_data["load"]) / int(target_data["capacity"])
+                data["load"] = int(data["load"]) - 1
+                data["utilization"] = int(data["load"]) / int(data["capacity"]) if int(data["capacity"]) > 0 else 0
                 rebalanced += 1
                 break
 

@@ -7,7 +7,7 @@ for Nigerian tax administration compliance.
 
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, timedelta
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any, cast
 from calendar import monthrange
 
 from app.models.tax_ng import (
@@ -121,7 +121,7 @@ PAYE_EXEMPTION_THRESHOLD = MINIMUM_WAGE_ANNUAL  # Income <= this is PAYE exempt
 # ---- CURRENT LAW (PITA - valid until Dec 2025) ----
 # PAYE progressive tax bands (annual income)
 # Personal Income Tax Act (PITA) as amended
-PAYE_BANDS_PITA: List[Tuple[Decimal, Decimal, Decimal]] = [
+PAYE_BANDS_PITA: List[Tuple[Decimal, Optional[Decimal], Decimal]] = [
     # (lower_limit, upper_limit, rate)
     (Decimal("0"), Decimal("300000"), Decimal("0.07")),       # First N300,000 @ 7%
     (Decimal("300000"), Decimal("600000"), Decimal("0.11")),  # Next N300,000 @ 11%
@@ -141,7 +141,7 @@ CRA_VARIABLE_PERCENTAGE = Decimal("0.20")  # 20% of gross income
 NTA_2025_TAX_FREE_THRESHOLD = Decimal("800000")  # N800,000/year fixed
 
 # NTA 2025 PAYE progressive tax bands (0%-25%)
-PAYE_BANDS_NTA_2025: List[Tuple[Decimal, Decimal, Decimal]] = [
+PAYE_BANDS_NTA_2025: List[Tuple[Decimal, Optional[Decimal], Decimal]] = [
     # (lower_limit, upper_limit, rate) - Updated bands for NTA 2025
     (Decimal("0"), Decimal("800000"), Decimal("0.00")),        # First N800,000 @ 0% (tax-free)
     (Decimal("800000"), Decimal("1100000"), Decimal("0.15")),  # Next N300,000 @ 15%
@@ -219,7 +219,7 @@ def calculate_pension_contributions(
     }
 
 
-def calculate_nhf_contribution(basic_salary: Decimal) -> Dict[str, Decimal]:
+def calculate_nhf_contribution(basic_salary: Decimal) -> Dict[str, Any]:
     """
     Calculate National Housing Fund contribution.
 
@@ -264,7 +264,7 @@ def calculate_nhis_contributions(basic_salary: Decimal) -> Dict[str, Decimal]:
     }
 
 
-def calculate_nsitf_contribution(gross_salary: Decimal) -> Dict[str, Decimal]:
+def calculate_nsitf_contribution(gross_salary: Decimal) -> Dict[str, Any]:
     """
     Calculate Nigeria Social Insurance Trust Fund contribution.
 
@@ -285,7 +285,7 @@ def calculate_nsitf_contribution(gross_salary: Decimal) -> Dict[str, Decimal]:
     }
 
 
-def calculate_itf_contribution(annual_payroll: Decimal) -> Dict[str, Decimal]:
+def calculate_itf_contribution(annual_payroll: Decimal) -> Dict[str, Any]:
     """
     Calculate Industrial Training Fund contribution.
 
@@ -395,7 +395,7 @@ def calculate_all_statutory_deductions(
         paye_annual = Decimal("0")
         effective_rate = Decimal("0")
         cra = (Decimal("0"), Decimal("0"), Decimal("0"))
-        bands_breakdown = []
+        bands_breakdown: List[Dict[str, Any]] = []
     else:
         # Get CRA
         cra = calculate_cra(gross_annual, tax_date)
@@ -421,7 +421,11 @@ def calculate_all_statutory_deductions(
         employee_deductions += nhis["employee_contribution"]
 
     # Total employer contributions
-    employer_contributions = pension["employer_contribution"] + nsitf["employer_contribution"] + itf["monthly_provision"]
+    employer_contributions = (
+        cast(Decimal, pension["employer_contribution"])
+        + cast(Decimal, nsitf["employer_contribution"])
+        + cast(Decimal, itf["monthly_provision"])
+    )
     if nhis:
         employer_contributions += nhis["employer_contribution"]
 
@@ -985,7 +989,7 @@ def get_tax_filing_calendar(
         })
 
     # Sort by due date
-    calendar.sort(key=lambda x: x["due_date"])
+    calendar.sort(key=lambda x: x["due_date"])  # type: ignore[arg-type, return-value]
 
     return calendar
 

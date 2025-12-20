@@ -15,7 +15,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -234,7 +234,7 @@ class OutboundSyncService:
                 target_system=system,
                 operation=operation,
                 idempotency_key=idempotency_key,
-                payload_hash=None,  # Will be computed during processing
+                payload_hash="",  # Will be computed during processing
             )
             self.db.add(log)
             logs.append(log)
@@ -281,12 +281,12 @@ class OutboundSyncService:
             log.payload_hash = payload_hash
             log.request_payload = payload
             try:
-                external_id = self._push_to_erpnext(contact, payload)
+                erpnext_external_id = self._push_to_erpnext(contact, payload)
                 contact.erpnext_sync_hash = payload_hash
                 contact.last_synced_to_erpnext = datetime.utcnow()
-                if external_id and not contact.erpnext_id:
-                    contact.erpnext_id = external_id
-                log.mark_success(external_id=external_id)
+                if erpnext_external_id and not contact.erpnext_id:
+                    contact.erpnext_id = erpnext_external_id
+                log.mark_success(external_id=erpnext_external_id)
                 record_outbound_sync("unified_contact", "erpnext", success=True)
                 logger.info(f"Retry success: contact {contact.id} to ERPNext")
             except Exception as e:
@@ -339,7 +339,7 @@ class OutboundSyncService:
             "login": contact.account_number or contact.email,
         }
 
-    def _build_erpnext_payload(self, contact: UnifiedContact) -> dict:
+    def _build_erpnext_payload(self, contact: UnifiedContact) -> Dict[str, Any]:
         """Build payload for ERPNext Lead/Customer API."""
         # Determine doctype based on contact type
         if contact.contact_type in (ContactType.LEAD, ContactType.PROSPECT):
@@ -347,7 +347,7 @@ class OutboundSyncService:
         else:
             doctype = "Customer"
 
-        payload = {
+        payload: Dict[str, Any] = {
             "doctype": doctype,
             "lead_name" if doctype == "Lead" else "customer_name": contact.name,
             "email_id": contact.email,
@@ -479,7 +479,7 @@ class OutboundSyncService:
                 response = client.post(endpoint, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                new_name = data.get("data", {}).get("name")
+                new_name: Optional[str] = data.get("data", {}).get("name")
                 logger.info(f"Created ERPNext {doctype} {new_name} for contact {contact.id}")
                 return new_name
 

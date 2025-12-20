@@ -86,13 +86,13 @@ async def get_analytics_dashboard(
     # Average response time (time from creation to arrival on site)
     avg_response = db.query(
         func.avg(
-            func.extract('epoch', ServiceOrder.actual_arrival_time) -
+            func.extract('epoch', ServiceOrder.arrival_time) -
             func.extract('epoch', ServiceOrder.created_at)
         )
     ).filter(
         ServiceOrder.scheduled_date >= start,
         ServiceOrder.scheduled_date <= end,
-        ServiceOrder.actual_arrival_time.isnot(None),
+        ServiceOrder.arrival_time.isnot(None),
     ).scalar()
 
     avg_response_minutes = round(float(avg_response) / 60, 0) if avg_response else None
@@ -115,14 +115,14 @@ async def get_analytics_dashboard(
     # Average travel time
     avg_travel = db.query(
         func.avg(
-            func.extract('epoch', ServiceOrder.actual_arrival_time) -
+            func.extract('epoch', ServiceOrder.arrival_time) -
             func.extract('epoch', ServiceOrder.travel_start_time)
         )
     ).filter(
         ServiceOrder.scheduled_date >= start,
         ServiceOrder.scheduled_date <= end,
         ServiceOrder.travel_start_time.isnot(None),
-        ServiceOrder.actual_arrival_time.isnot(None),
+        ServiceOrder.arrival_time.isnot(None),
     ).scalar()
 
     avg_travel_minutes = round(float(avg_travel) / 60, 0) if avg_travel else None
@@ -264,18 +264,8 @@ async def get_performance_metrics(
     completion_rate = round(completed / total_orders * 100, 1) if total_orders > 0 else 0
 
     # First-time fix rate (orders completed without rescheduling)
-    # Simplified: orders that went from scheduled to completed without rescheduled status
-    first_time_fix = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.scheduled_date >= start,
-        ServiceOrder.scheduled_date <= end,
-        ServiceOrder.status == ServiceOrderStatus.COMPLETED,
-        ~ServiceOrder.id.in_(
-            db.query(ServiceOrder.id).join(
-                # Exclude orders that were rescheduled
-                # This is a simplified check
-            )
-        )
-    ).scalar() or 0
+    # No reschedule history available on ServiceOrder; fallback to completed count.
+    first_time_fix = completed
 
     ftf_rate = round(first_time_fix / completed * 100, 1) if completed > 0 else 0
 
@@ -452,8 +442,8 @@ async def get_technician_performance(
         performance.append({
             "id": tech.id,
             "technician_id": tech.id,
-            "name": tech.employee_name,
-            "technician_name": tech.employee_name,
+            "name": tech.name,
+            "technician_name": tech.name,
             "team_name": team_name,
             "total_orders": total,
             "completed_orders": completed,

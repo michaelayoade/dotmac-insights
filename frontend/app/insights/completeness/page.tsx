@@ -67,18 +67,15 @@ export default function CompletenessPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load data completeness"
-        error={error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load data completeness"
+          error={error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <SummaryCard

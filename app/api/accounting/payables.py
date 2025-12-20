@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -22,6 +22,12 @@ from app.models.accounting import (
 from .helpers import parse_date, resolve_currency_or_raise, paginate
 
 router = APIRouter()
+
+
+class AgingBucket(TypedDict):
+    count: int
+    total: Decimal
+    invoices: List[Dict[str, Any]]
 
 
 # =============================================================================
@@ -68,7 +74,7 @@ def get_accounts_payable(
     invoices = query.all()
 
     # Age buckets
-    buckets = {
+    buckets: Dict[str, AgingBucket] = {
         "current": {"count": 0, "total": Decimal("0"), "invoices": []},
         "1_30": {"count": 0, "total": Decimal("0"), "invoices": []},
         "31_60": {"count": 0, "total": Decimal("0"), "invoices": []},
@@ -104,17 +110,16 @@ def get_accounts_payable(
             "days_overdue": days_overdue,
         })
 
-    # Convert totals to float
-    for bucket in buckets.values():
-        bucket["total"] = float(bucket["total"])
-
-    total_payable = sum(b["total"] for b in buckets.values())
+    buckets_response: Dict[str, Dict[str, Any]] = {
+        key: {**value, "total": float(value["total"])} for key, value in buckets.items()
+    }
+    total_payable = sum(b["total"] for b in buckets_response.values())
 
     return {
         "as_of_date": cutoff.isoformat(),
         "total_payable": total_payable,
         "total_invoices": sum(b["count"] for b in buckets.values()),
-        "aging": buckets,
+        "aging": buckets_response,
     }
 
 
@@ -209,7 +214,7 @@ def get_payables_outstanding(
 
     pi_query = db.query(
         func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
-        func.count(PurchaseInvoice.id).label("count"),
+        func.count(PurchaseInvoice.id).label("invoice_count"),
     ).filter(
         PurchaseInvoice.outstanding_amount > 0,
         PurchaseInvoice.status.in_([
@@ -221,6 +226,8 @@ def get_payables_outstanding(
     if currency:
         pi_query = pi_query.filter(PurchaseInvoice.currency == currency)
     pi_totals = pi_query.first()
+    total_outstanding = float(pi_totals.outstanding or 0) if pi_totals else 0.0
+    total_invoices = int(pi_totals.invoice_count or 0) if pi_totals else 0
 
     # Top suppliers by outstanding
     by_supplier_query = (
@@ -250,8 +257,8 @@ def get_payables_outstanding(
     return {
         "as_of_date": as_of.isoformat(),
         "currency": currency,
-        "total_outstanding": float(pi_totals.outstanding or 0),
-        "total_invoices": pi_totals.count or 0,
+        "total_outstanding": total_outstanding,
+        "total_invoices": total_invoices,
         "top_suppliers": [
             {
                 "supplier": row.supplier,

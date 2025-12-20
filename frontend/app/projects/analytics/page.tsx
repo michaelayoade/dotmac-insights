@@ -260,15 +260,6 @@ export default function ProjectsAnalyticsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load project analytics"
-        error={error as Error}
-      />
-    );
-  }
-
   // Calculate metrics
   const totalProjects = dashboard?.projects?.total || 0;
   const activeProjects = dashboard?.projects?.active || 0;
@@ -293,6 +284,12 @@ export default function ProjectsAnalyticsPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load project analytics"
+          error={error as Error}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-teal-electric/10 border border-teal-electric/30 flex items-center justify-center">

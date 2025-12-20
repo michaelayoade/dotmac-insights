@@ -63,7 +63,7 @@ class AuditLogger:
             user = self.db.query(User).filter(User.id == user_id).first()
             if user:
                 user_email = user_email or user.email
-                user_name = user_name or user.full_name
+                user_name = user_name or user.name
 
         # Auto-detect changed fields if not provided
         if changed_fields is None and old_values and new_values:

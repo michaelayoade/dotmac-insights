@@ -143,16 +143,13 @@ export default function SupportSettingsPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-6 text-center">
-        <p className="text-rose-400">Failed to load support settings. The settings may not be initialized yet.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-6 text-center">
+          <p className="text-rose-400">Failed to load support settings. The settings may not be initialized yet.</p>
+        </div>
+      )}
       <header>
         <h1 className="text-2xl font-bold text-white">Support Settings</h1>
         <p className="text-slate-muted text-sm">Configure helpdesk, SLA, routing, CSAT, and support operations.</p>

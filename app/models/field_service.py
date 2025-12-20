@@ -545,7 +545,7 @@ class ServiceOrderItem(Base):
     service_order_id: Mapped[int] = mapped_column(ForeignKey("service_orders.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Item reference
-    stock_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stock_items.id"), nullable=True)
+    stock_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("items.id"), nullable=True)
     item_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     item_name: Mapped[str] = mapped_column(String(255), nullable=False)
 

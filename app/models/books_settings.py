@@ -10,7 +10,10 @@ Comprehensive configuration for accounting/books module including:
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.document_lines import DebitNoteLine
 
 from sqlalchemy import (
     String, Text, Boolean, Integer, Numeric, Date, DateTime,

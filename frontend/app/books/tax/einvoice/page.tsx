@@ -189,16 +189,6 @@ export default function EInvoicePage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load e-invoices."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   // Calculate stats
   const stats = {
     total: data?.total || 0,
@@ -209,6 +199,13 @@ export default function EInvoicePage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load e-invoices."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link

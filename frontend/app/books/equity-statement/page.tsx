@@ -201,16 +201,6 @@ export default function EquityStatementPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load statement of changes in equity."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const currency = data?.currency || 'NGN';
   const summary = data?.summary;
   const reconciliation = data?.reconciliation;
@@ -218,6 +208,13 @@ export default function EquityStatementPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load statement of changes in equity."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">

@@ -304,12 +304,11 @@ function GeneralSettingsTab() {
     return <div className="text-slate-muted text-sm">Loading settings...</div>;
   }
 
-  if (error) {
-    return <div className="text-rose-400 text-sm">Failed to load settings. Please try again.</div>;
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="text-rose-400 text-sm">Failed to load settings. Please try again.</div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* General Settings */}
         <Card title="Currency & Precision" icon={Coins}>
@@ -696,12 +695,11 @@ function NumberFormatsTab() {
     return <div className="text-slate-muted text-sm">Loading number formats...</div>;
   }
 
-  if (error) {
-    return <div className="text-rose-400 text-sm">Failed to load number formats.</div>;
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="text-rose-400 text-sm">Failed to load number formats.</div>
+      )}
       {/* Format Tokens Guide */}
       <Card title="Format Pattern Tokens" icon={Hash}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -1084,12 +1082,11 @@ function CurrenciesTab() {
     return <div className="text-slate-muted text-sm">Loading currencies...</div>;
   }
 
-  if (error) {
-    return <div className="text-rose-400 text-sm">Failed to load currencies.</div>;
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="text-rose-400 text-sm">Failed to load currencies.</div>
+      )}
       {/* Add New Currency */}
       {!showAdd ? (
         <button

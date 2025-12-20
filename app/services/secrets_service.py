@@ -44,8 +44,9 @@ class OpenBaoSecretsService:
         token: Optional[str] = None,
         key_name: str = "settings",
     ):
-        self.url = (url or os.getenv("OPENBAO_URL", "")).rstrip("/")
-        self.token = token or os.getenv("OPENBAO_TOKEN", "")
+        resolved_url = url or os.getenv("OPENBAO_URL") or ""
+        self.url: str = resolved_url.rstrip("/")
+        self.token: str = token or os.getenv("OPENBAO_TOKEN") or ""
         self.key_name = key_name
         self._client: Optional[httpx.Client] = None
 
@@ -83,7 +84,7 @@ class OpenBaoSecretsService:
             )
             response.raise_for_status()
             data = response.json()
-            ciphertext = data["data"]["ciphertext"]
+            ciphertext: str = data["data"]["ciphertext"]
 
             logger.debug("openbao_encrypt_success", key=self.key_name)
             return ciphertext
@@ -162,7 +163,7 @@ class OpenBaoSecretsService:
             )
             response.raise_for_status()
             data = response.json()
-            new_ciphertext = data["data"]["ciphertext"]
+            new_ciphertext: str = data["data"]["ciphertext"]
 
             logger.debug("openbao_rewrap_success", key=self.key_name)
             return new_ciphertext

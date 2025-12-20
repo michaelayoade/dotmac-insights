@@ -173,7 +173,7 @@ async def link_account(
         existing = await db.execute(
             select(OpenBankingConnection).where(
                 OpenBankingConnection.provider == provider_enum,
-                OpenBankingConnection.provider_account_id == provider_account_id,
+                OpenBankingConnection.account_id == provider_account_id,
             )
         )
         connection = existing.scalar_one_or_none()
@@ -181,22 +181,22 @@ async def link_account(
         if connection:
             # Update existing connection
             connection.status = ConnectionStatus.CONNECTED
-            connection.balance = account.balance
+            connection.cached_balance = account.balance
             connection.balance_updated_at = datetime.utcnow()
         else:
             # Create new connection
             connection = OpenBankingConnection(
                 provider=provider_enum,
-                provider_account_id=provider_account_id,
+                account_id=provider_account_id,
                 customer_id=request.customer_id,
-                customer_email=request.customer_email,
+                email=request.customer_email,
                 account_number=account.account_number,
                 bank_code=account.bank_code,
                 bank_name=account.bank_name,
                 account_name=account.account_name,
                 account_type=account.account_type,
                 currency=account.currency,
-                balance=account.balance,
+                cached_balance=account.balance,
                 balance_updated_at=datetime.utcnow() if account.balance else None,
                 bvn=account.bvn,
                 status=ConnectionStatus.CONNECTED,
@@ -209,13 +209,13 @@ async def link_account(
         return LinkedAccountResponse(
             id=connection.id,
             provider=connection.provider.value,
-            provider_account_id=connection.provider_account_id,
+            provider_account_id=connection.account_id,
             account_number=connection.account_number,
             bank_name=connection.bank_name,
             account_name=connection.account_name,
-            account_type=connection.account_type,
+            account_type=connection.account_type or "",
             currency=connection.currency,
-            balance=connection.balance,
+            balance=connection.cached_balance,
             status=connection.status.value,
         )
 
@@ -232,7 +232,7 @@ async def link_account(
 async def list_linked_accounts(
     customer_id: Optional[int] = None,
     provider: Optional[str] = None,
-    status: Optional[str] = None,
+    connection_status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """List linked bank accounts."""
@@ -249,9 +249,9 @@ async def list_linked_accounts(
                 detail="Invalid provider filter",
             )
         query = query.where(OpenBankingConnection.provider == provider_enum)
-    if status:
+    if connection_status:
         try:
-            status_enum = ConnectionStatus(status)
+            status_enum = ConnectionStatus(connection_status)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -268,13 +268,13 @@ async def list_linked_accounts(
         LinkedAccountResponse(
             id=c.id,
             provider=c.provider.value,
-            provider_account_id=c.provider_account_id,
+            provider_account_id=c.account_id,
             account_number=c.account_number,
             bank_name=c.bank_name,
             account_name=c.account_name,
-            account_type=c.account_type,
+            account_type=c.account_type or "",
             currency=c.currency,
-            balance=c.balance,
+            balance=c.cached_balance,
             status=c.status.value,
         )
         for c in connections
@@ -301,7 +301,7 @@ async def get_linked_account(
     return {
         "id": connection.id,
         "provider": connection.provider.value,
-        "provider_account_id": connection.provider_account_id,
+        "provider_account_id": connection.account_id,
         "customer_id": connection.customer_id,
         "account_number": connection.account_number,
         "bank_code": connection.bank_code,
@@ -309,7 +309,7 @@ async def get_linked_account(
         "account_name": connection.account_name,
         "account_type": connection.account_type,
         "currency": connection.currency,
-        "balance": connection.balance,
+        "balance": connection.cached_balance,
         "balance_updated_at": connection.balance_updated_at.isoformat() if connection.balance_updated_at else None,
         "status": connection.status.value,
         "created_at": connection.created_at.isoformat(),
@@ -337,10 +337,10 @@ async def get_account_balance(
     client = get_openbanking_client(connection.provider.value)
 
     try:
-        balance = await client.get_account_balance(connection.provider_account_id)
+        balance = await client.get_account_balance(connection.account_id)
 
         # Update stored balance
-        connection.balance = balance
+        connection.cached_balance = balance
         connection.balance_updated_at = datetime.utcnow()
         await db.commit()
 
@@ -384,7 +384,7 @@ async def get_account_transactions(
 
     try:
         transactions = await client.get_transactions(
-            account_id=connection.provider_account_id,
+            account_id=connection.account_id,
             start_date=start_date,
             end_date=end_date,
             limit=limit,
@@ -436,7 +436,7 @@ async def get_account_identity(
     client = get_openbanking_client(connection.provider.value)
 
     try:
-        identity = await client.get_identity(connection.provider_account_id)
+        identity = await client.get_identity(connection.account_id)
 
         # Update BVN if available
         if identity.bvn and not connection.bvn:
@@ -482,7 +482,7 @@ async def reauthorize_account(
     client = get_openbanking_client(connection.provider.value)
 
     try:
-        reauth_url = await client.reauthorize(connection.provider_account_id)
+        reauth_url = await client.reauthorize(connection.account_id)
 
         return {
             "account_id": account_id,
@@ -519,7 +519,7 @@ async def unlink_account(
 
     try:
         # Unlink from provider
-        await client.unlink_account(connection.provider_account_id)
+        await client.unlink_account(connection.account_id)
 
         # Update local status
         connection.status = ConnectionStatus.DISCONNECTED

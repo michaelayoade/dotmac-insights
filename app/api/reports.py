@@ -113,17 +113,17 @@ async def get_revenue_summary(
 
     # Total revenue from payments in period
     total_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.date >= start,
-        Payment.date <= end,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= start,
+        Payment.payment_date <= end,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
 
     # Previous period for growth calculation
     prev_start = start - relativedelta(months=((end - start).days // 30) or 1)
     prev_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.date >= prev_start,
-        Payment.date < start,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= prev_start,
+        Payment.payment_date < start,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
 
     growth_rate = 0.0
@@ -131,15 +131,15 @@ async def get_revenue_summary(
         growth_rate = float((total_revenue - prev_revenue) / prev_revenue * 100)
 
     # Revenue from invoices
-    invoiced_revenue = db.query(func.coalesce(func.sum(Invoice.total), 0)).filter(
-        Invoice.date >= start,
-        Invoice.date <= end,
+    invoiced_revenue = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).filter(
+        Invoice.invoice_date >= start,
+        Invoice.invoice_date <= end,
         Invoice.status != InvoiceStatus.CANCELLED,
     ).scalar() or Decimal("0")
 
     # Outstanding AR
-    outstanding_ar = db.query(func.coalesce(func.sum(Invoice.amount_due), 0)).filter(
-        Invoice.status.in_([InvoiceStatus.UNPAID, InvoiceStatus.PARTIALLY_PAID]),
+    outstanding_ar = db.query(func.coalesce(func.sum(Invoice.balance), 0)).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
     ).scalar() or Decimal("0")
 
     return {
@@ -173,28 +173,28 @@ async def get_revenue_trend(
     if interval == "week":
         # Weekly aggregation
         results = db.query(
-            func.date_trunc("week", Payment.date).label("period"),
+            func.date_trunc("week", Payment.payment_date).label("period"),
             func.sum(Payment.amount).label("revenue"),
             func.count(Payment.id).label("payment_count"),
         ).filter(
-            Payment.date >= start,
-            Payment.date <= end,
-            Payment.status == PaymentStatus.SUCCESSFUL,
+            Payment.payment_date >= start,
+            Payment.payment_date <= end,
+            Payment.status == PaymentStatus.COMPLETED,
         ).group_by(
-            func.date_trunc("week", Payment.date)
+            func.date_trunc("week", Payment.payment_date)
         ).order_by(text("period")).all()
     else:
         # Monthly aggregation
         results = db.query(
-            func.date_trunc("month", Payment.date).label("period"),
+            func.date_trunc("month", Payment.payment_date).label("period"),
             func.sum(Payment.amount).label("revenue"),
             func.count(Payment.id).label("payment_count"),
         ).filter(
-            Payment.date >= start,
-            Payment.date <= end,
-            Payment.status == PaymentStatus.SUCCESSFUL,
+            Payment.payment_date >= start,
+            Payment.payment_date <= end,
+            Payment.status == PaymentStatus.COMPLETED,
         ).group_by(
-            func.date_trunc("month", Payment.date)
+            func.date_trunc("month", Payment.payment_date)
         ).order_by(text("period")).all()
 
     trend = []
@@ -243,9 +243,9 @@ async def get_revenue_by_customer(
     ).join(
         Payment, Payment.customer_id == Customer.id
     ).filter(
-        Payment.date >= start,
-        Payment.date <= end,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= start,
+        Payment.payment_date <= end,
+        Payment.status == PaymentStatus.COMPLETED,
     ).group_by(
         Customer.id, Customer.name, Customer.customer_type
     ).order_by(
@@ -253,9 +253,9 @@ async def get_revenue_by_customer(
     ).limit(top).all()
 
     total_revenue = db.query(func.sum(Payment.amount)).filter(
-        Payment.date >= start,
-        Payment.date <= end,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= start,
+        Payment.payment_date <= end,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
 
     customers = []
@@ -660,9 +660,9 @@ async def get_profitability_by_segment(
     ).join(
         Payment, Payment.customer_id == Customer.id
     ).filter(
-        Payment.date >= start,
-        Payment.date <= end,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= start,
+        Payment.payment_date <= end,
+        Payment.status == PaymentStatus.COMPLETED,
     ).group_by(Customer.customer_type).all()
 
     total_revenue = sum(float(r.revenue or 0) for r in results)
@@ -763,13 +763,13 @@ async def get_cash_flow_forecast(
     # Calculate average monthly inflows (last 6 months)
     six_months_ago = today - relativedelta(months=6)
     avg_inflows = db.query(func.coalesce(func.avg(Payment.amount), 0)).filter(
-        Payment.date >= six_months_ago,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= six_months_ago,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
 
     monthly_inflow = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.date >= six_months_ago,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= six_months_ago,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
     monthly_inflow = float(monthly_inflow) / 6 if monthly_inflow else 0
 
@@ -781,8 +781,8 @@ async def get_cash_flow_forecast(
     monthly_outflow = float(monthly_outflow) / 6 if monthly_outflow else 0
 
     # Outstanding receivables
-    outstanding_ar = db.query(func.coalesce(func.sum(Invoice.amount_due), 0)).filter(
-        Invoice.status.in_([InvoiceStatus.UNPAID, InvoiceStatus.PARTIALLY_PAID]),
+    outstanding_ar = db.query(func.coalesce(func.sum(Invoice.balance), 0)).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
     ).scalar() or Decimal("0")
 
     # Outstanding payables
@@ -847,8 +847,8 @@ async def get_cash_runway(
 
     # Average monthly revenue
     total_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.date >= six_months_ago,
-        Payment.status == PaymentStatus.SUCCESSFUL,
+        Payment.payment_date >= six_months_ago,
+        Payment.status == PaymentStatus.COMPLETED,
     ).scalar() or Decimal("0")
     monthly_revenue = float(total_revenue) / 6 if total_revenue else 0
 

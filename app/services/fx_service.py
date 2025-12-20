@@ -17,6 +17,7 @@ from app.models.accounting_ext import (
     ExchangeRateSource,
     RevaluationEntry,
     FiscalPeriod,
+    FiscalPeriodStatus,
     AccountingControl,
 )
 from app.models.accounting import (
@@ -24,7 +25,7 @@ from app.models.accounting import (
     AccountType,
     GLEntry,
     JournalEntry,
-    JournalEntryAccount,
+    JournalEntryItem,
     JournalEntryType,
 )
 from app.services.audit_logger import AuditLogger, serialize_for_audit
@@ -462,26 +463,24 @@ class FXService:
             if gain_loss > Decimal("0"):
                 # Gain: Debit the account, Credit FX Gain
                 # Debit account (increase asset or decrease liability)
-                je_line_account = JournalEntryAccount(
+                je_line_account = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=entry["account_id"] or entry["account_name"],
                     debit=gain_loss,
                     credit=Decimal("0"),
                     idx=idx,
-                    user_remark=f"FX revaluation gain - {entry['original_currency']}",
                 )
                 self.db.add(je_line_account)
                 total_debit += gain_loss
 
                 idx += 1
                 # Credit FX Gain (income)
-                je_line_gain = JournalEntryAccount(
+                je_line_gain = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=gain_account,
                     debit=Decimal("0"),
                     credit=gain_loss,
                     idx=idx,
-                    user_remark=f"FX gain on {entry['account_name']}",
                 )
                 self.db.add(je_line_gain)
                 total_credit += gain_loss
@@ -491,26 +490,24 @@ class FXService:
                 loss_amount = abs(gain_loss)
 
                 # Credit account (decrease asset or increase liability)
-                je_line_account = JournalEntryAccount(
+                je_line_account = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=entry["account_id"] or entry["account_name"],
                     debit=Decimal("0"),
                     credit=loss_amount,
                     idx=idx,
-                    user_remark=f"FX revaluation loss - {entry['original_currency']}",
                 )
                 self.db.add(je_line_account)
                 total_credit += loss_amount
 
                 idx += 1
                 # Debit FX Loss (expense)
-                je_line_loss = JournalEntryAccount(
+                je_line_loss = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=loss_account,
                     debit=loss_amount,
                     credit=Decimal("0"),
                     idx=idx,
-                    user_remark=f"FX loss on {entry['account_name']}",
                 )
                 self.db.add(je_line_loss)
                 total_debit += loss_amount
@@ -559,6 +556,8 @@ class FXService:
         je_groups: Dict[int, List[RevaluationEntry]] = {}
         for entry in entries:
             je_id = entry.journal_entry_id
+            if je_id is None:
+                continue
             if je_id not in je_groups:
                 je_groups[je_id] = []
             je_groups[je_id].append(entry)

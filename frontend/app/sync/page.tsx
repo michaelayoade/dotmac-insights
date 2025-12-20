@@ -23,27 +23,37 @@ import { useToast, Modal } from '@dotmac/core';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { DashboardShell, PageHeader, Button } from '@/components/ui';
 
 type SyncSource = 'splynx' | 'erpnext' | 'chatwoot';
 
-const SOURCE_CONFIG: Record<SyncSource, { name: string; icon: typeof Database; color: string; description: string }> = {
+const SOURCE_CONFIG: Record<SyncSource, {
+  name: string;
+  icon: typeof Database;
+  color: string;
+  description: string;
+  entities: string[];
+}> = {
   splynx: {
     name: 'Splynx',
     icon: CreditCard,
     color: 'text-blue-400',
     description: 'Customer billing, subscriptions, invoices, and payments',
+    entities: ['Customers', 'Subscriptions', 'Invoices', 'Payments', 'Services'],
   },
   erpnext: {
     name: 'ERPNext',
     icon: Server,
     color: 'text-purple-400',
     description: 'Employees, expenses, and business operations',
+    entities: ['Employees', 'Expenses', 'Leave Requests', 'Payroll', 'Attendance'],
   },
   chatwoot: {
     name: 'Chatwoot',
     icon: MessageSquare,
     color: 'text-amber-400',
     description: 'Customer conversations and support tickets',
+    entities: ['Conversations', 'Messages', 'Contacts', 'Agents', 'Teams'],
   },
 };
 
@@ -124,51 +134,47 @@ export default function SyncPage() {
     return <AccessDenied />;
   }
 
-  if (statusLoading || logsLoading) {
-    return <LoadingState />;
-  }
-
-  if (syncStatusError || syncLogsError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load sync status."
-        error={(syncStatusError || syncLogsError) as Error}
-        onRetry={() => {
-          refreshStatus();
-          refreshLogs();
-        }}
-      />
-    );
-  }
+  const isLoading = statusLoading || logsLoading;
+  const firstError = syncStatusError || syncLogsError;
+  const retryAll = () => {
+    refreshStatus();
+    refreshLogs();
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold text-white">Data Sync</h1>
-          <p className="text-slate-muted mt-1">
-            Manage data synchronization from external systems
-          </p>
-        </div>
-        <button
-          onClick={() => handleSync('all', false)}
-          disabled={syncingSource !== null || !canWrite}
-          className={cn(
-            'flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all',
-            syncingSource !== null || !canWrite
-              ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
-              : 'bg-teal-electric text-slate-deep hover:bg-teal-glow'
-          )}
-        >
-          {syncingSource === 'all' ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <RefreshCw className="w-5 h-5" />
-          )}
-          Sync All Sources
-        </button>
-      </div>
+    <DashboardShell
+      isLoading={isLoading}
+      error={firstError}
+      onRetry={retryAll}
+      softError={true}
+      loadingMessage="Loading sync status..."
+      errorMessage="Failed to load sync data"
+    >
+      <div className="space-y-8">
+        {firstError && (
+          <ErrorDisplay
+            message="Failed to load sync status."
+            error={firstError as Error}
+            onRetry={retryAll}
+          />
+        )}
+        {/* Header */}
+        <PageHeader
+          title="Data Sync"
+          subtitle="Manage data synchronization from external systems"
+          icon={Database}
+          actions={
+            <Button
+              variant="primary"
+              icon={syncingSource === 'all' ? Loader2 : RefreshCw}
+              onClick={() => handleSync('all', false)}
+              disabled={syncingSource !== null || !canWrite}
+              loading={syncingSource === 'all'}
+            >
+              Sync All Sources
+            </Button>
+          }
+        />
 
       {/* Sync Status Overview */}
       {syncStatus && (
@@ -259,7 +265,19 @@ export default function SyncPage() {
                 </div>
 
                 {/* Description */}
-                <p className="text-slate-muted text-sm mb-4">{config.description}</p>
+                <p className="text-slate-muted text-sm mb-3">{config.description}</p>
+
+                {/* Synced Entities */}
+                <div className="flex flex-wrap gap-1 mb-4">
+                  {config.entities.map((entity) => (
+                    <span
+                      key={entity}
+                      className="px-2 py-0.5 text-xs rounded-full bg-slate-elevated text-slate-muted"
+                    >
+                      {entity}
+                    </span>
+                  ))}
+                </div>
 
                 {/* Stats */}
                 {sourceStatus && (
@@ -451,6 +469,7 @@ export default function SyncPage() {
           </button>
         </div>
       </Modal>
-    </div>
+      </div>
+    </DashboardShell>
   );
 }

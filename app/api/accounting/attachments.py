@@ -71,6 +71,8 @@ async def upload_attachment(
 ) -> Dict[str, Any]:
     """Upload an attachment for a document."""
     # Validate file extension
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required")
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(

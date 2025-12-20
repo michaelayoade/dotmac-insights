@@ -43,6 +43,7 @@ import {
   Settings,
   ChevronDown,
   Zap,
+  Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
@@ -240,6 +241,12 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
       { name: 'Customer 360', href: '/customers', icon: Users, requiredScopes: ['customers:read', 'explore:read'] },
       { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explore:read'] },
     ],
   },
 ];

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
+from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, field_validator
@@ -265,13 +266,13 @@ def update_rule(
     if payload.trigger is not None:
         rule.trigger = payload.trigger
     if payload.conditions is not None:
-        rule.conditions = [c.model_dump() for c in payload.conditions]
+        rule.conditions = cast(Any, [c.model_dump() for c in payload.conditions])
     if payload.actions is not None:
         if not payload.actions:
             raise HTTPException(
                 status_code=400, detail="At least one action is required"
             )
-        rule.actions = [a.model_dump() for a in payload.actions]
+        rule.actions = cast(Any, [a.model_dump() for a in payload.actions])
     if payload.is_active is not None:
         rule.is_active = payload.is_active
     if payload.priority is not None:
@@ -347,7 +348,7 @@ def test_rule(
 
             # Get ticket field value
             ticket_value = getattr(ticket, field, None)
-            if hasattr(ticket_value, "value"):
+            if isinstance(ticket_value, Enum):
                 ticket_value = ticket_value.value
 
             # Simple evaluation

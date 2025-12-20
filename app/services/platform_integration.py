@@ -22,7 +22,7 @@ from app.platform.client import platform_client
 from app.feature_flags import feature_flags
 from app.models.unified_contact import UnifiedContact
 from app.models.invoice import Invoice
-from app.middleware.metrics import CONTACTS_DUAL_WRITE_FAILURES  # type: ignore
+from app.middleware.metrics import CONTACTS_DUAL_WRITE_FAILURES
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class LicenseCache:
         """Mark the start of grace period when platform becomes unreachable."""
         if self.grace_started_at is None:
             self.grace_started_at = time.time()
-            logger.warning("license_grace_period_started", started_at=self.grace_started_at)
+            logger.warning("license_grace_period_started started_at=%s", self.grace_started_at)
 
 
 license_cache = LicenseCache()
@@ -113,7 +113,7 @@ def validate_license() -> bool:
 
     # Platform reachable but explicitly invalid
     if data and isinstance(data, dict) and data.get("valid") is False:
-        logger.error("license_explicitly_invalid", data=data, status=LicenseStatus.INVALID)
+        logger.error("license_explicitly_invalid data=%s status=%s", data, LicenseStatus.INVALID)
         license_cache.update(False, ttl)
         license_cache.entitlements = {}
         _apply_entitlements({}, disable_missing=True)
@@ -127,19 +127,19 @@ def validate_license() -> bool:
         if license_cache.is_in_grace_period(grace_seconds):
             remaining = grace_seconds - (time.time() - (license_cache.grace_started_at or 0))
             logger.warning(
-                "license_validation_fail_open",
-                reason="platform_unreachable",
-                status=LicenseStatus.GRACE_PERIOD,
-                grace_remaining_hours=round(remaining / 3600, 1),
+                "license_validation_fail_open reason=%s status=%s grace_remaining_hours=%s",
+                "platform_unreachable",
+                LicenseStatus.GRACE_PERIOD,
+                round(remaining / 3600, 1),
             )
             license_cache.update(True, ttl)  # Allow operation during grace
             return True
         else:
             # Grace period exhausted
             logger.error(
-                "license_grace_period_expired",
-                status=LicenseStatus.EXPIRED,
-                grace_started_at=license_cache.grace_started_at,
+                "license_grace_period_expired status=%s grace_started_at=%s",
+                LicenseStatus.EXPIRED,
+                license_cache.grace_started_at,
             )
             license_cache.update(False, ttl)
             license_cache.entitlements = {}
@@ -147,7 +147,7 @@ def validate_license() -> bool:
             return False
 
     # No fail-open configured
-    logger.error("license_validation_failed", data=data, status=LicenseStatus.INVALID)
+    logger.error("license_validation_failed data=%s status=%s", data, LicenseStatus.INVALID)
     license_cache.update(False, ttl)
     license_cache.entitlements = {}
     _apply_entitlements({}, disable_missing=True)
@@ -225,9 +225,9 @@ def refresh_feature_flags_from_platform() -> None:
         cached = _feature_flags_cache.get_fallback()
         if cached and settings.feature_flags_platform_precedence:
             logger.warning(
-                "feature_flags_using_cached",
-                cached_count=len(cached),
-                last_refresh=_feature_flags_cache.last_refresh,
+                "feature_flags_using_cached cached_count=%s last_refresh=%s",
+                len(cached),
+                _feature_flags_cache.last_refresh,
             )
             _apply_feature_flags(cached, source="cached")
 
@@ -243,7 +243,7 @@ def _apply_feature_flags(data: dict, source: str) -> None:
             except Exception:
                 pass
     if applied:
-        logger.info("feature_flags_applied", source=source, flags=applied)
+        logger.info("feature_flags_applied source=%s flags=%s", source, applied)
 
 
 def _apply_entitlements(entitlements: dict, disable_missing: bool) -> None:
@@ -302,7 +302,7 @@ def report_usage(db: Session) -> None:
     dual_write_failures = 0
     # Use metric getter if available (stub returns 0 when prometheus is absent)
     try:
-        dual_write_failures = int(CONTACTS_DUAL_WRITE_FAILURES.get())  # type: ignore[attr-defined]
+        dual_write_failures = int(CONTACTS_DUAL_WRITE_FAILURES.get())
     except Exception:
         dual_write_failures = 0
 

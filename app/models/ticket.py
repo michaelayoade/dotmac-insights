@@ -163,6 +163,9 @@ class Ticket(SoftDeleteMixin, Base):
         back_populates="ticket"
     )
 
+    # Escalation
+    is_escalated: Mapped[bool] = mapped_column(default=False, index=True)
+
     # Enhancements (Phase 3)
     tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)  # simple tag names
     watchers: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)  # user IDs watching the ticket

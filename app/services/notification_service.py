@@ -12,7 +12,7 @@ from decimal import Decimal
 import httpx
 import structlog
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from app.models.notification import (
     WebhookConfig,
@@ -24,6 +24,10 @@ from app.models.notification import (
     NotificationStatus,
     NotificationChannel,
 )
+from app.models.agent import Team, TeamMember, Agent
+from app.models.field_service import FieldTeam, FieldTeamMember
+from app.models.employee import Employee, EmploymentStatus
+from app.models.auth import User
 from app.services.secrets_service import get_secrets, SecretsServiceError
 from app.services.notification_templates import (
     NotificationTemplateRegistry,
@@ -75,13 +79,14 @@ class NotificationService:
             Summary of dispatch results
         """
         event_id = str(uuid.uuid4())
-        results = {
+        errors: List[str] = []
+        results: Dict[str, Any] = {
             "event_id": event_id,
             "event_type": event_type.value,
             "webhooks_queued": 0,
             "notifications_created": 0,
             "emails_queued": 0,
-            "errors": [],
+            "errors": errors,
         }
 
         logger.info(
@@ -100,7 +105,7 @@ class NotificationService:
             results["webhooks_queued"] = webhook_count
         except Exception as e:
             logger.error("webhook_queue_error", error=str(e))
-            results["errors"].append(f"Webhook error: {str(e)}")
+            errors.append(f"Webhook error: {str(e)}")
 
         # 2. Create in-app notifications for specified users
         if user_ids:
@@ -111,7 +116,7 @@ class NotificationService:
                 results["notifications_created"] = notif_count
             except Exception as e:
                 logger.error("notification_create_error", error=str(e))
-                results["errors"].append(f"Notification error: {str(e)}")
+                errors.append(f"Notification error: {str(e)}")
 
         # 3. Queue emails based on user preferences
         if user_ids:
@@ -122,7 +127,7 @@ class NotificationService:
                 results["emails_queued"] = email_count
             except Exception as e:
                 logger.error("email_queue_error", error=str(e))
-                results["errors"].append(f"Email error: {str(e)}")
+                errors.append(f"Email error: {str(e)}")
 
         self.db.commit()
         return results
@@ -602,3 +607,278 @@ class NotificationService:
                 Notification.is_read == False,
             )
         ).count()
+
+    # =========================================================================
+    # TEAM NOTIFICATIONS
+    # =========================================================================
+
+    def _get_user_ids_from_emails(self, emails: List[str]) -> List[int]:
+        """Get user IDs by matching email addresses."""
+        normalized_emails = {
+            email.strip().lower()
+            for email in emails
+            if email and email.strip()
+        }
+        if not normalized_emails:
+            return []
+        users = self.db.query(User).filter(
+            func.lower(User.email).in_(normalized_emails),
+            User.is_active == True,
+        ).all()
+        return [u.id for u in users]
+
+    def get_team_user_ids(self, team_id: int) -> List[int]:
+        """Get user IDs for all active members of an agent/support team.
+
+        Resolves: Team → TeamMember → Agent → Employee → User (via email match)
+        """
+        emails = (
+            self.db.query(Employee.email)
+            .join(Agent, Agent.employee_id == Employee.id)
+            .join(TeamMember, TeamMember.agent_id == Agent.id)
+            .join(Team, Team.id == TeamMember.team_id)
+            .filter(
+                TeamMember.team_id == team_id,
+                TeamMember.is_active == True,
+                Agent.is_active == True,
+                Team.is_active == True,
+                Employee.status == EmploymentStatus.ACTIVE,
+                Employee.is_deleted == False,
+                Employee.email.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+
+        return self._get_user_ids_from_emails([email for (email,) in emails])
+
+    def get_field_team_user_ids(self, team_id: int) -> List[int]:
+        """Get user IDs for all active members of a field service team.
+
+        Resolves: FieldTeam → FieldTeamMember → Employee → User (via email match)
+        """
+        emails = (
+            self.db.query(Employee.email)
+            .join(FieldTeamMember, FieldTeamMember.employee_id == Employee.id)
+            .join(FieldTeam, FieldTeam.id == FieldTeamMember.team_id)
+            .filter(
+                FieldTeamMember.team_id == team_id,
+                FieldTeamMember.is_active == True,
+                FieldTeam.is_active == True,
+                Employee.status == EmploymentStatus.ACTIVE,
+                Employee.is_deleted == False,
+                Employee.email.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+
+        return self._get_user_ids_from_emails([email for (email,) in emails])
+
+    def notify_team(
+        self,
+        team_id: int,
+        event_type: NotificationEventType,
+        payload: Dict[str, Any],
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        company: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send notifications to all members of an agent/support team.
+
+        Args:
+            team_id: ID of the Team (agent teams from agent.py)
+            event_type: Type of notification event
+            payload: Event data payload
+            entity_type: Type of related entity
+            entity_id: ID of related entity
+            company: Company filter for webhooks
+
+        Returns:
+            Summary of dispatch results with team info
+        """
+        team = self.db.query(Team).filter(Team.id == team_id).first()
+        if not team:
+            return {
+                "error": "Team not found",
+                "team_id": team_id,
+            }
+        if not team.is_active:
+            return {
+                "error": "Team is inactive",
+                "team_id": team_id,
+                "team_name": team.name,
+            }
+
+        user_ids = self.get_team_user_ids(team_id)
+
+        logger.info(
+            "notify_team",
+            team_id=team_id,
+            team_name=team.name,
+            user_count=len(user_ids),
+            event_type=event_type.value,
+        )
+
+        if not user_ids:
+            return {
+                "team_id": team_id,
+                "team_name": team.name,
+                "user_count": 0,
+                "message": "No active users found for team",
+            }
+
+        result = self.emit_event(
+            event_type=event_type,
+            payload=payload,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_ids=user_ids,
+            company=company,
+        )
+
+        result["team_id"] = team_id
+        result["team_name"] = team.name
+        result["user_count"] = len(user_ids)
+
+        return result
+
+    def notify_field_team(
+        self,
+        team_id: int,
+        event_type: NotificationEventType,
+        payload: Dict[str, Any],
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        company: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send notifications to all members of a field service team.
+
+        Args:
+            team_id: ID of the FieldTeam
+            event_type: Type of notification event
+            payload: Event data payload
+            entity_type: Type of related entity
+            entity_id: ID of related entity
+            company: Company filter for webhooks
+
+        Returns:
+            Summary of dispatch results with team info
+        """
+        team = self.db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
+        if not team:
+            return {
+                "error": "Field team not found",
+                "team_id": team_id,
+            }
+        if not team.is_active:
+            return {
+                "error": "Field team is inactive",
+                "team_id": team_id,
+                "team_name": team.name,
+            }
+
+        user_ids = self.get_field_team_user_ids(team_id)
+
+        logger.info(
+            "notify_field_team",
+            team_id=team_id,
+            team_name=team.name,
+            user_count=len(user_ids),
+            event_type=event_type.value,
+        )
+
+        if not user_ids:
+            return {
+                "team_id": team_id,
+                "team_name": team.name,
+                "user_count": 0,
+                "message": "No active users found for field team",
+            }
+
+        result = self.emit_event(
+            event_type=event_type,
+            payload=payload,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_ids=user_ids,
+            company=company,
+        )
+
+        result["team_id"] = team_id
+        result["team_name"] = team.name
+        result["user_count"] = len(user_ids)
+
+        return result
+
+    def notify_teams(
+        self,
+        team_ids: List[int],
+        event_type: NotificationEventType,
+        payload: Dict[str, Any],
+        entity_type: Optional[str] = None,
+        entity_id: Optional[int] = None,
+        company: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send notifications to multiple agent/support teams.
+
+        Deduplicates users who are members of multiple teams.
+
+        Args:
+            team_ids: List of Team IDs
+            event_type: Type of notification event
+            payload: Event data payload
+            entity_type: Type of related entity
+            entity_id: ID of related entity
+            company: Company filter for webhooks
+
+        Returns:
+            Summary of dispatch results
+        """
+        all_user_ids = set()
+        team_names = []
+
+        for team_id in team_ids:
+            team = self.db.query(Team).filter(Team.id == team_id).first()
+            if not team:
+                logger.info("notify_teams_missing_team", team_id=team_id)
+                continue
+            if not team.is_active:
+                logger.info("notify_teams_inactive_team", team_id=team_id, team_name=team.name)
+                continue
+            team_names.append(team.name)
+            user_ids = self.get_team_user_ids(team_id)
+            all_user_ids.update(user_ids)
+
+        user_ids_list = list(all_user_ids)
+
+        logger.info(
+            "notify_teams",
+            team_ids=team_ids,
+            team_names=team_names,
+            user_count=len(user_ids_list),
+            event_type=event_type.value,
+        )
+
+        if not user_ids_list:
+            return {
+                "team_ids": team_ids,
+                "team_names": team_names,
+                "user_count": 0,
+                "message": "No active users found for teams",
+            }
+
+        result = self.emit_event(
+            event_type=event_type,
+            payload=payload,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_ids=user_ids_list,
+            company=company,
+        )
+
+        result["team_ids"] = team_ids
+        result["team_names"] = team_names
+        result["user_count"] = len(user_ids_list)
+
+        return result

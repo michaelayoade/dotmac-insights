@@ -179,7 +179,7 @@ class InventoryPostingService:
         self,
         stock_entry: "StockEntry",
         user_id: Optional[int],
-    ) -> "JournalEntry":
+    ) -> Optional["JournalEntry"]:
         """
         Post material transfer to GL.
         If warehouses have different stock accounts:

@@ -96,21 +96,18 @@ export default function AccountingTaxesPage() {
     return <LoadingState />;
   }
 
-  if (hasError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load tax reference data."
-        error={(categoriesError || templatesError) as Error}
-        onRetry={() => {
-          refetchCategories();
-          refetchTemplates();
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {hasError && (
+        <ErrorDisplay
+          message="Failed to load tax reference data."
+          error={(categoriesError || templatesError) as Error}
+          onRetry={() => {
+            refetchCategories();
+            refetchTemplates();
+          }}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Books</p>

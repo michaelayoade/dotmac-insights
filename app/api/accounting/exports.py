@@ -145,6 +145,7 @@ def export_trial_balance(
 
     try:
         base_filename = filename or "trial_balance"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "trial_balance")
             return _stream_export(content, "text/csv", base_filename, "csv")
@@ -209,6 +210,7 @@ def export_balance_sheet(
 
     try:
         base_filename = filename or "balance_sheet"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "balance_sheet")
             return _stream_export(content, "text/csv", base_filename, "csv")
@@ -285,6 +287,7 @@ def export_income_statement(
 
     try:
         base_filename = filename or "income_statement"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "income_statement")
             return _stream_export(content, "text/csv", base_filename, "csv")
@@ -364,6 +367,7 @@ def export_general_ledger(
 
     try:
         base_filename = filename or "general_ledger"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "general_ledger")
             return _stream_export(content, "text/csv", base_filename, "csv")
@@ -421,6 +425,7 @@ def export_receivables_aging(
 
     try:
         base_filename = filename or "receivables_aging"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "receivables_aging")
             return _stream_export(content, "text/csv", base_filename, "csv")
@@ -478,6 +483,7 @@ def export_payables_aging(
 
     try:
         base_filename = filename or "payables_aging"
+        content: Any
         if format == "csv":
             content = export_service.export_csv(data, "payables_aging")
             return _stream_export(content, "text/csv", base_filename, "csv")

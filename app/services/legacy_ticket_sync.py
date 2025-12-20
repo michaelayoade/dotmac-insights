@@ -19,7 +19,7 @@ Usage:
         sync = LegacyTicketSync(db)
         sync.sync_from_legacy_ticket(ticket)
 """
-import logging
+import structlog
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -41,7 +41,7 @@ from app.models.conversation import Conversation
 from app.models.unified_contact import UnifiedContact
 from app.middleware.metrics import TICKETS_DUAL_WRITE_FAILURES
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class LegacyTicketSync:
@@ -644,7 +644,7 @@ class LegacyTicketSync:
         }
         return mapping.get(source_str, TicketSource.INTERNAL)
 
-    def _map_legacy_type_to_unified(self, ticket_type: str) -> TicketType:
+    def _map_legacy_type_to_unified(self, ticket_type: Optional[str]) -> TicketType:
         """Map legacy ticket type string to UnifiedTicket type."""
         if not ticket_type:
             return TicketType.SUPPORT
@@ -689,7 +689,7 @@ class LegacyTicketSync:
         }
         return mapping.get(priority_str, TicketPriority.MEDIUM)
 
-    def _map_channel(self, channel: str) -> Optional[TicketChannel]:
+    def _map_channel(self, channel: Optional[str]) -> Optional[TicketChannel]:
         """Map channel string to TicketChannel enum."""
         if not channel:
             return None

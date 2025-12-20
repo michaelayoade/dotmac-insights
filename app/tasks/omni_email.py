@@ -4,6 +4,7 @@ import imaplib
 import email
 from email.header import decode_header
 from email.message import Message as EmailMessage
+from email.utils import parseaddr
 import ssl
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -22,9 +23,11 @@ from app.models.agent import Agent
 from app.worker import celery_app
 
 
-def _decode_header_value(value: Optional[str]) -> str:
-    if not value:
+def _decode_header_value(value: Optional[object]) -> str:
+    if value is None:
         return ""
+    if not isinstance(value, str):
+        value = str(value)
     parts = decode_header(value)
     decoded = []
     for text, enc in parts:
@@ -41,7 +44,11 @@ def _get_part_content(part: EmailMessage) -> Optional[str]:
         if payload is None:
             return None
         charset = part.get_content_charset() or "utf-8"
-        return payload.decode(charset, errors="ignore")
+        if isinstance(payload, bytes):
+            return payload.decode(charset, errors="ignore")
+        if isinstance(payload, str):
+            return payload
+        return None
     except Exception:
         return None
 
@@ -50,7 +57,7 @@ def _extract_email_fields(msg: EmailMessage) -> Dict[str, Any]:
     subject = _decode_header_value(msg.get("Subject"))
     msg_id = msg.get("Message-ID")
     in_reply_to = msg.get("In-Reply-To")
-    sender = email.utils.parseaddr(msg.get("From"))[1]
+    sender = parseaddr(msg.get("From") or "")[1]
 
     text_body = None
     html_body = None
@@ -191,6 +198,7 @@ def poll_email_channel(self, channel_id: int):
         if not host or not username or not password:
             return
 
+        imap: imaplib.IMAP4
         if use_ssl:
             imap = imaplib.IMAP4_SSL(host, port)
         else:
@@ -208,8 +216,15 @@ def poll_email_channel(self, channel_id: int):
             status, msg_data = imap.fetch(num, "(RFC822)")
             if status != "OK":
                 continue
-            raw_email = msg_data[0][1]
-            email_msg = email.message_from_bytes(raw_email)
+            if not msg_data:
+                continue
+            first_part = msg_data[0]
+            if not isinstance(first_part, tuple) or len(first_part) < 2:
+                continue
+            raw_email = first_part[1]
+            if not isinstance(raw_email, (bytes, bytearray)):
+                continue
+            email_msg = email.message_from_bytes(bytes(raw_email))
             payload = _extract_email_fields(email_msg)
             thread_id = payload.get("in_reply_to") or payload.get("message_id")
 

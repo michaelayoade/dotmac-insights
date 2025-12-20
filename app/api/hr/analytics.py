@@ -6,7 +6,7 @@ Cross-module analytics and dashboard endpoints.
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, Integer
 from typing import Dict, Any, Optional, List
 from datetime import date, datetime, timedelta
 
@@ -204,7 +204,7 @@ async def leave_trend(
             "year": int(r.year),
             "month_num": int(r.month),
             "month": f"{int(r.year)}-{int(r.month):02d}",
-            "count": int(r.count or 0),
+            "count": int(r._mapping.get("count") or 0),
         }
         for r in results
     ]
@@ -235,7 +235,7 @@ async def attendance_trend(
     return [
         {
             "date": r.attendance_date.isoformat() if r.attendance_date else None,
-            "total": int(r.count or 0),
+            "total": int(r._mapping.get("count") or 0),
         }
         for r in results
     ]
@@ -312,14 +312,14 @@ async def payroll_components(
             "salary_component": row.component,
             "component_type": "earning",
             "amount": float(row.amount or 0),
-            "count": int(row.count or 0),
+            "count": int(row._mapping.get("count") or 0),
         })
     for row in deductions:
         rows.append({
             "salary_component": row.component,
             "component_type": "deduction",
             "amount": float(row.amount or 0),
-            "count": int(row.count or 0),
+            "count": int(row._mapping.get("count") or 0),
         })
 
     # Respect limit to avoid overly long responses
@@ -395,9 +395,9 @@ async def attendance_summary_report(
         Attendance.employee_id,
         Attendance.employee_name,
         func.count(Attendance.id).label("total_days"),
-        func.sum(func.cast(Attendance.status == AttendanceStatus.PRESENT, db.bind.dialect.type_descriptor(type(1)))).label("present_days"),
-        func.sum(func.cast(Attendance.status == AttendanceStatus.ABSENT, db.bind.dialect.type_descriptor(type(1)))).label("absent_days"),
-        func.sum(func.cast(Attendance.late_entry == True, db.bind.dialect.type_descriptor(type(1)))).label("late_entries"),
+        func.sum(func.cast(Attendance.status == AttendanceStatus.PRESENT, Integer())).label("present_days"),
+        func.sum(func.cast(Attendance.status == AttendanceStatus.ABSENT, Integer())).label("absent_days"),
+        func.sum(func.cast(Attendance.late_entry == True, Integer())).label("late_entries"),
         func.sum(Attendance.working_hours).label("total_working_hours"),
     )
 
@@ -457,12 +457,13 @@ async def payroll_summary_report(
     query = query.filter(SalarySlip.status == SalarySlipStatus.SUBMITTED)
 
     result = query.first()
+    totals = result._mapping if result else {}
 
     summary = {
-        "total_slips": int(result[0] or 0),
-        "total_gross": float(result[1] or 0),
-        "total_deductions": float(result[2] or 0),
-        "total_net": float(result[3] or 0),
+        "total_slips": int(totals.get("total_slips") or 0),
+        "total_gross": float(totals.get("total_gross") or 0),
+        "total_deductions": float(totals.get("total_deductions") or 0),
+        "total_net": float(totals.get("total_net") or 0),
     }
     summary.update(
         {

@@ -131,30 +131,36 @@ export default function ContactDetailPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load contact"
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   if (!contact) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="w-12 h-12 text-slate-muted mb-4" />
-        <p className="text-white text-lg">Contact not found</p>
-        <Link href="/contacts" className="mt-4 text-teal-electric hover:text-teal-glow">
-          Back to contacts
-        </Link>
+      <div className="space-y-6">
+        {Boolean(error) && (
+          <ErrorDisplay
+            message="Failed to load contact"
+            error={error as Error}
+            onRetry={() => mutate()}
+          />
+        )}
+        <div className="flex flex-col items-center justify-center py-12">
+          <AlertCircle className="w-12 h-12 text-slate-muted mb-4" />
+          <p className="text-white text-lg">Contact not found</p>
+          <Link href="/contacts" className="mt-4 text-teal-electric hover:text-teal-glow">
+            Back to contacts
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {Boolean(error) && (
+        <ErrorDisplay
+          message="Failed to load contact"
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

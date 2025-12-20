@@ -122,18 +122,15 @@ export default function ExpensesDashboard() {
     return <LoadingState />;
   }
 
-  if (firstError) {
-    return (
-      <ErrorDisplay
-        message="Failed to load expenses data."
-        error={firstError}
-        onRetry={retryAll}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {firstError && (
+        <ErrorDisplay
+          message="Failed to load expenses data."
+          error={firstError}
+          onRetry={retryAll}
+        />
+      )}
       <div className="rounded-3xl border border-slate-border bg-slate-card p-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-sky-500/5 via-emerald-500/5 to-transparent pointer-events-none" />
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between relative z-10">

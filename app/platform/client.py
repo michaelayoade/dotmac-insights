@@ -44,9 +44,9 @@ class CircuitBreaker:
         if self.failures >= self.threshold:
             self.open_until = time.time() + self.timeout
             logger.warning(
-                "platform_circuit_opened",
-                threshold=self.threshold,
-                timeout=self.timeout,
+                "platform_circuit_opened threshold=%s timeout=%s",
+                self.threshold,
+                self.timeout,
             )
 
     def reset(self) -> None:
@@ -79,7 +79,7 @@ class PlatformClient:
         if not self.base_url:
             return None
         if not self.circuit.allow():
-            logger.warning("platform_circuit_open", path=path)
+            logger.warning("platform_circuit_open path=%s", path)
             return None
 
         url = f"{self.base_url}{path}"
@@ -98,13 +98,24 @@ class PlatformClient:
                 attempt += 1
                 self.circuit.record_failure()
                 if attempt > self.max_retries:
-                    logger.error("platform_request_failed", method=method, url=url, error=str(exc))
+                    logger.error(
+                        "platform_request_failed method=%s url=%s error=%s",
+                        method,
+                        url,
+                        str(exc),
+                    )
                     return None
                 # Add jitter (±25%) to avoid thundering herd
                 base_sleep = min(backoff, self.retry_max)
                 jitter = base_sleep * 0.25 * (2 * random.random() - 1)  # ±25%
                 sleep_for = max(0.1, base_sleep + jitter)
-                logger.warning("platform_request_retry", attempt=attempt, url=url, wait=sleep_for, error=str(exc))
+                logger.warning(
+                    "platform_request_retry attempt=%s url=%s wait=%s error=%s",
+                    attempt,
+                    url,
+                    sleep_for,
+                    str(exc),
+                )
                 time.sleep(sleep_for)
                 backoff = min(backoff * 2, self.retry_max)
         return None
@@ -115,7 +126,7 @@ class PlatformClient:
             try:
                 return resp.json()
             except Exception:
-                logger.error("platform_response_parse_error", path=path)
+                logger.error("platform_response_parse_error path=%s", path)
         return None
 
     def post_json(self, path: str, payload: dict) -> Optional[Any]:
@@ -124,10 +135,9 @@ class PlatformClient:
             try:
                 return resp.json()
             except Exception:
-                logger.error("platform_response_parse_error", path=path)
+                logger.error("platform_response_parse_error path=%s", path)
         return None
 
 
 # Singleton client
 platform_client = PlatformClient()
-

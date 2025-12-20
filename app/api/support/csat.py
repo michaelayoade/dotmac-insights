@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
@@ -188,13 +188,13 @@ def update_survey(
     if payload.trigger is not None:
         survey.trigger = payload.trigger
     if payload.questions is not None:
-        survey.questions = payload.questions
+        survey.questions = cast(Any, payload.questions)
     if payload.delay_hours is not None:
         survey.delay_hours = payload.delay_hours
     if payload.send_via is not None:
         survey.send_via = payload.send_via
     if payload.conditions is not None:
-        survey.conditions = payload.conditions
+        survey.conditions = cast(Any, payload.conditions)
     if payload.is_active is not None:
         survey.is_active = payload.is_active
 

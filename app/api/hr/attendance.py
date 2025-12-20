@@ -431,16 +431,16 @@ async def export_attendances(
     rows = [["id", "employee", "employee_id", "attendance_date", "status", "in_time", "out_time", "working_hours", "late_entry", "early_exit", "company"]]
     for a in query.order_by(Attendance.attendance_date.desc()).all():
         rows.append([
-            a.id,
+            str(a.id),
             a.employee,
-            a.employee_id,
+            str(a.employee_id) if a.employee_id is not None else "",
             a.attendance_date.isoformat() if a.attendance_date else "",
             a.status.value if a.status else "",
             a.in_time.isoformat() if a.in_time else "",
             a.out_time.isoformat() if a.out_time else "",
-            float(a.working_hours or 0),
-            a.late_entry,
-            a.early_exit,
+            str(float(a.working_hours or 0)),
+            str(bool(a.late_entry)),
+            str(bool(a.early_exit)),
             a.company or "",
         ])
     return csv_response(rows, "attendances.csv")

@@ -33,6 +33,8 @@ export interface DashboardShellProps {
   loadingMessage?: string;
   /** Custom error message */
   errorMessage?: string;
+  /** Render children even when there is an error */
+  softError?: boolean;
   /** Children to render when loaded */
   children: React.ReactNode;
   /** Additional CSS classes */
@@ -70,6 +72,7 @@ export function DashboardShell({
   emptyState,
   loadingMessage = 'Loading dashboard data...',
   errorMessage = 'Failed to load dashboard data',
+  softError = false,
   children,
   className,
 }: DashboardShellProps) {
@@ -77,7 +80,7 @@ export function DashboardShell({
     return <DashboardLoadingState message={loadingMessage} className={className} />;
   }
 
-  if (error) {
+  if (error && !softError) {
     return (
       <DashboardErrorState
         message={errorMessage}

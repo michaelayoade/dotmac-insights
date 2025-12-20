@@ -126,7 +126,7 @@ async def list_teams(
                 "coverage_zone_ids": t.coverage_zone_ids,
                 "max_daily_orders": t.max_daily_orders,
                 "supervisor_id": t.supervisor_id,
-                "supervisor_name": t.supervisor.employee_name if t.supervisor else None,
+                "supervisor_name": t.supervisor.name if t.supervisor else None,
                 "contact_phone": t.contact_phone,
                 "contact_email": t.contact_email,
                 "is_active": t.is_active,
@@ -167,8 +167,8 @@ async def get_team(team_id: int, db: Session = Depends(get_db)) -> Dict[str, Any
         "supervisor_id": team.supervisor_id,
         "supervisor": {
             "id": team.supervisor.id,
-            "name": team.supervisor.employee_name,
-            "email": team.supervisor.company_email,
+            "name": team.supervisor.name,
+            "email": team.supervisor.email,
         } if team.supervisor else None,
         "contact_phone": team.contact_phone,
         "contact_email": team.contact_email,
@@ -179,7 +179,7 @@ async def get_team(team_id: int, db: Session = Depends(get_db)) -> Dict[str, Any
             {
                 "id": m.id,
                 "employee_id": m.employee_id,
-                "employee_name": m.employee.employee_name if m.employee else None,
+                "employee_name": m.employee.name if m.employee else None,
                 "role": m.role,
                 "is_active": m.is_active,
                 "joined_date": m.joined_date.isoformat() if m.joined_date else None,
@@ -294,7 +294,7 @@ async def add_team_member(
     return {
         "message": "Member added",
         "member_id": member.id,
-        "employee_name": employee.employee_name,
+        "employee_name": employee.name,
     }
 
 
@@ -356,7 +356,7 @@ async def list_technicians(
         )
 
     if search:
-        query = query.filter(Employee.employee_name.ilike(f"%{search}%"))
+        query = query.filter(Employee.name.ilike(f"%{search}%"))
 
     total = query.count()
     technicians = query.offset(offset).limit(limit).all()
@@ -385,9 +385,9 @@ async def list_technicians(
 
         result.append({
             "id": tech.id,
-            "employee_name": tech.employee_name,
-            "company_email": tech.company_email,
-            "cell_number": tech.cell_number,
+            "employee_name": tech.name,
+            "company_email": tech.email,
+            "cell_number": tech.phone,
             "department": tech.department,
             "designation": tech.designation,
             "today_orders": today_orders,
@@ -457,9 +457,9 @@ async def get_technician(technician_id: int, db: Session = Depends(get_db)) -> D
 
     return {
         "id": tech.id,
-        "employee_name": tech.employee_name,
-        "company_email": tech.company_email,
-        "cell_number": tech.cell_number,
+        "employee_name": tech.name,
+        "company_email": tech.email,
+        "cell_number": tech.phone,
         "department": tech.department,
         "designation": tech.designation,
         "teams": [

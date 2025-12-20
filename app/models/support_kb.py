@@ -122,10 +122,10 @@ class KBArticle(Base):
     published_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Restricted visibility - team IDs that can access (JSON array)
-    team_ids: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    team_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
 
     # Related articles (JSON array of article IDs)
-    related_article_ids: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    related_article_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
 
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

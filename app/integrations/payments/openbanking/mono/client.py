@@ -15,7 +15,7 @@ import hmac
 import logging
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 
 import httpx
 from tenacity import (
@@ -137,7 +137,7 @@ class MonoClient(BaseOpenBankingProvider):
             if response.status_code >= 400:
                 self._handle_error_response(result, response.status_code)
 
-            return result
+            return result if isinstance(result, dict) else {}
 
         except httpx.TimeoutException:
             logger.error(f"Mono request timeout: {method} {endpoint}")
@@ -224,7 +224,7 @@ class MonoClient(BaseOpenBankingProvider):
                 "/account/auth",
                 data={"code": code},
             )
-            return result.get("id", "")
+            return cast(str, result.get("id", ""))
         except OpenBankingError:
             raise
         except Exception as e:
@@ -420,7 +420,7 @@ class MonoClient(BaseOpenBankingProvider):
                 "POST",
                 f"/accounts/{account_id}/reauthorise",
             )
-            return result.get("reauthorisation_url", "")
+            return cast(str, result.get("reauthorisation_url", ""))
         except OpenBankingError:
             raise
         except Exception as e:
@@ -506,7 +506,8 @@ class MonoClient(BaseOpenBankingProvider):
                 "/v1/lookup/bvn",
                 params={"bvn": bvn},
             )
-            return result.get("data", {})
+            data = result.get("data", {})
+            return data if isinstance(data, dict) else {}
         except Exception as e:
             logger.error(f"BVN lookup failed: {e}")
             return {}

@@ -12,7 +12,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Date, Time,
     Numeric, Text, ForeignKey, JSON, Enum as SAEnum, UniqueConstraint
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship, mapped_column
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -94,7 +94,7 @@ class SupportSettings(Base):
     # -------------------------------------------------------------------------
     # BUSINESS HOURS
     # -------------------------------------------------------------------------
-    working_hours_type = Column(
+    working_hours_type: Mapped[WorkingHoursType] = mapped_column(
         SAEnum(WorkingHoursType, name="workinghourstype"),
         nullable=False, default=WorkingHoursType.STANDARD
     )
@@ -129,7 +129,7 @@ class SupportSettings(Base):
     # -------------------------------------------------------------------------
     # TICKET ROUTING
     # -------------------------------------------------------------------------
-    default_routing_strategy = Column(
+    default_routing_strategy: Mapped[DefaultRoutingStrategy] = mapped_column(
         SAEnum(DefaultRoutingStrategy, name="defaultroutingstrategy"),
         nullable=False, default=DefaultRoutingStrategy.ROUND_ROBIN
     )
@@ -144,7 +144,7 @@ class SupportSettings(Base):
     # -------------------------------------------------------------------------
     # TICKET DEFAULTS
     # -------------------------------------------------------------------------
-    default_priority = Column(
+    default_priority: Mapped[TicketPriorityDefault] = mapped_column(
         SAEnum(TicketPriorityDefault, name="ticketprioritydefault"),
         nullable=False, default=TicketPriorityDefault.MEDIUM
     )
@@ -157,7 +157,7 @@ class SupportSettings(Base):
     # -------------------------------------------------------------------------
     auto_close_enabled = Column(Boolean, nullable=False, default=True)
     auto_close_resolved_days = Column(Integer, nullable=False, default=7)  # Days after resolved
-    auto_close_action = Column(
+    auto_close_action: Mapped[TicketAutoCloseAction] = mapped_column(
         SAEnum(TicketAutoCloseAction, name="ticketautocloseaction"),
         nullable=False, default=TicketAutoCloseAction.CLOSE
     )
@@ -187,7 +187,7 @@ class SupportSettings(Base):
     # CSAT / CUSTOMER FEEDBACK
     # -------------------------------------------------------------------------
     csat_enabled = Column(Boolean, nullable=False, default=True)
-    csat_survey_trigger = Column(
+    csat_survey_trigger: Mapped[CSATSurveyTrigger] = mapped_column(
         SAEnum(CSATSurveyTrigger, name="csatsurveytrigger"),
         nullable=False, default=CSATSurveyTrigger.ON_RESOLVE
     )
@@ -325,7 +325,7 @@ class EscalationLevel(Base):
     policy_id = Column(Integer, ForeignKey("escalation_policies.id", ondelete="CASCADE"), nullable=False, index=True)
 
     level = Column(Integer, nullable=False)  # 1, 2, 3, etc.
-    trigger = Column(
+    trigger: Mapped[EscalationTrigger] = mapped_column(
         SAEnum(EscalationTrigger, name="escalationtrigger"),
         nullable=False, default=EscalationTrigger.SLA_BREACH
     )

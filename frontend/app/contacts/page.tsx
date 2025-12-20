@@ -152,18 +152,15 @@ export default function ContactsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load contacts"
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {Boolean(error) && (
+        <ErrorDisplay
+          message="Failed to load contacts"
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       <PageHeader
         title="Unified Contacts"
         subtitle="Manage leads, prospects, customers, and contacts in one place"

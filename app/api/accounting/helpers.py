@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
@@ -232,6 +232,11 @@ def get_fiscal_year_dates(db: Session, fiscal_year: Optional[str] = None) -> Tup
         fy = db.query(FiscalYear).filter(FiscalYear.year == fiscal_year).first()
         if not fy:
             raise HTTPException(status_code=404, detail=f"Fiscal year {fiscal_year} not found")
+        if fy.year_start_date is None or fy.year_end_date is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Fiscal year {fiscal_year} is missing start or end date",
+            )
         return fy.year_start_date, fy.year_end_date
 
     # Default to current calendar year
@@ -269,7 +274,7 @@ def resolve_currency_or_raise(db: Session, column, requested: Optional[str]) -> 
             status_code=400,
             detail="Multiple currencies detected; please provide the 'currency' query parameter to avoid mixed-currency aggregates.",
         )
-    return currencies[0]
+    return cast(str, currencies[0])
 
 
 # =============================================================================
@@ -756,7 +761,7 @@ def serialize_gl_entry(entry: GLEntry, include_account_name: bool = False) -> Di
         "voucher_type": entry.voucher_type,
         "voucher_no": entry.voucher_no,
         "cost_center": entry.cost_center,
-        "remarks": entry.remarks,
+        "remarks": getattr(entry, "remarks", None),
         "is_cancelled": entry.is_cancelled,
     }
 

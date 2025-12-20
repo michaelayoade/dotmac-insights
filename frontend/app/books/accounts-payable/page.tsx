@@ -154,21 +154,18 @@ export default function AccountsPayablePage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load accounts payable."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const summary = (data?.aging as any) || {};
   const totalSuppliers = data?.suppliers?.length || 0;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load accounts payable."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Aging Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">

@@ -287,12 +287,12 @@ def list_debit_notes(
             pass
 
     if start_date:
-        query = query.filter(DebitNote.issue_date >= parse_date(start_date, "start_date"))
+        query = query.filter(DebitNote.posting_date >= parse_date(start_date, "start_date"))
 
     if end_date:
-        query = query.filter(DebitNote.issue_date <= parse_date(end_date, "end_date"))
+        query = query.filter(DebitNote.posting_date <= parse_date(end_date, "end_date"))
 
-    query = query.order_by(DebitNote.issue_date.desc(), DebitNote.id.desc())
+    query = query.order_by(DebitNote.posting_date.desc(), DebitNote.id.desc())
     total, notes = paginate(query, offset, limit)
 
     return {
@@ -305,11 +305,11 @@ def list_debit_notes(
                 "debit_note_number": n.debit_note_number,
                 "supplier_id": n.supplier_id,
                 "supplier_name": n.supplier_name,
-                "issue_date": n.issue_date.isoformat() if n.issue_date else None,
-                "amount": float(n.amount),
+                "issue_date": n.posting_date.isoformat() if n.posting_date else None,
+                "amount": float(n.total_amount),
                 "currency": n.currency,
                 "status": n.status.value if n.status else None,
-                "amount_remaining": float(n.amount_remaining) if n.amount_remaining else 0,
+                "amount_remaining": float(n.outstanding_amount) if n.outstanding_amount else 0,
             }
             for n in notes
         ],
@@ -331,19 +331,19 @@ def get_debit_note(
         "debit_note_number": note.debit_note_number,
         "supplier_id": note.supplier_id,
         "supplier_name": note.supplier_name,
-        "original_bill_id": note.original_bill_id,
-        "description": note.description,
-        "issue_date": note.issue_date.isoformat() if note.issue_date else None,
+        "original_bill_id": note.purchase_invoice_id,
+        "description": note.remarks,
+        "issue_date": note.posting_date.isoformat() if note.posting_date else None,
         "posting_date": note.posting_date.isoformat() if note.posting_date else None,
-        "amount": float(note.amount),
-        "tax_amount": float(note.tax_amount) if note.tax_amount else 0,
-        "total_amount": float(note.total_amount) if note.total_amount else float(note.amount),
+        "amount": float(note.total_amount),
+        "tax_amount": float(sum((line.tax_amount or Decimal("0")) for line in getattr(note, "lines", []))),
+        "total_amount": float(note.total_amount),
         "currency": note.currency,
         "base_currency": note.base_currency,
         "conversion_rate": float(note.conversion_rate) if note.conversion_rate else 1,
         "base_amount": float(note.base_amount) if note.base_amount else 0,
-        "amount_applied": float(note.amount_applied) if note.amount_applied else 0,
-        "amount_remaining": float(note.amount_remaining) if note.amount_remaining else 0,
+        "amount_applied": float(note.total_amount - note.outstanding_amount) if note.outstanding_amount is not None else 0,
+        "amount_remaining": float(note.outstanding_amount) if note.outstanding_amount else 0,
         "status": note.status.value if note.status else None,
         "workflow_status": note.workflow_status,
         "docstatus": note.docstatus,
@@ -391,9 +391,8 @@ def create_debit_note(
         debit_note_number=debit_note_number,
         supplier_id=data.supplier_id,
         supplier_name=data.supplier_name,
-        original_bill_id=data.original_bill_id,
-        description=data.description,
-        issue_date=issue_date,
+        purchase_invoice_id=data.original_bill_id,
+        remarks=data.description,
         posting_date=posting_date,
         currency=data.currency,
         conversion_rate=Decimal(str(data.conversion_rate)),
@@ -430,12 +429,9 @@ def create_debit_note(
         total_amount += line.amount
         total_tax += line.tax_amount
 
-    note.amount = total_amount
-    note.tax_amount = total_tax
     note.total_amount = total_amount + total_tax
-    note.amount_remaining = note.total_amount
-    note.base_amount = note.amount * note.conversion_rate
-    note.base_tax_amount = note.tax_amount * note.conversion_rate
+    note.outstanding_amount = note.total_amount
+    note.base_amount = note.total_amount * note.conversion_rate
 
     db.commit()
     db.refresh(note)

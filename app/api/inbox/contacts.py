@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -49,7 +49,7 @@ class ContactUpdateRequest(BaseModel):
 # HELPER FUNCTIONS
 # =============================================================================
 
-def serialize_contact(contact: InboxContact, db: Session = None) -> Dict[str, Any]:
+def serialize_contact(contact: InboxContact, db: Optional[Session] = None) -> Dict[str, Any]:
     """Serialize a contact to JSON."""
     result = {
         "id": contact.id,
@@ -255,7 +255,7 @@ async def update_contact(
         contact.job_title = payload.job_title
 
     if payload.tags is not None:
-        contact.tags = payload.tags
+        contact.tags = cast(Any, payload.tags)
 
     if payload.customer_id is not None:
         contact.customer_id = payload.customer_id if payload.customer_id > 0 else None

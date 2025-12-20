@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import func, false
 from sqlalchemy.orm import Session
 
 from app.auth import Require
@@ -228,7 +228,7 @@ def get_trial_balance(
     results = query.all()
 
     # Get account details
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
     trial_balance = []
     total_debit = Decimal("0")
@@ -332,20 +332,20 @@ def get_balance_sheet(
             GLEntry.posting_date <= cutoff_date,
         ).group_by(GLEntry.account).all()
 
-        return {r.account: r.balance or Decimal("0") for r in results}
+        return {r.account: r.balance or Decimal("0") for r in results if r.account}
 
     # Get account details
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
     current_balances = get_balances(end_date)
     comparative_balances = get_balances(comp_date) if comp_date else {}
 
     # Track reclassified accounts for warnings
-    reclassified = []
+    reclassified: List[Dict[str, Any]] = []
 
-    def build_section(root_type: AccountType, negate: bool = False) -> Dict:
+    def build_section(root_type: AccountType, negate: bool = False) -> Dict[str, Any]:
         """Build a section of the balance sheet."""
-        section_accounts = []
+        section_accounts: List[Dict[str, Any]] = []
         total = Decimal("0")
         comp_total = Decimal("0")
 
@@ -372,7 +372,7 @@ def get_balance_sheet(
 
             if balance != 0 or comp_balance != 0:
                 section_accounts.append({
-                    "account": acc.account_name,
+                    "account": acc.account_name or "",
                     "account_type": acc.account_type,
                     "balance": float(balance),
                     "comparative_balance": float(comp_balance) if comp_date else None,
@@ -381,7 +381,7 @@ def get_balance_sheet(
                 total += balance
                 comp_total += comp_balance
 
-        section_accounts.sort(key=lambda x: x["account"])
+        section_accounts.sort(key=lambda x: str(x.get("account") or ""))
 
         return {
             "accounts": section_accounts,
@@ -391,12 +391,12 @@ def get_balance_sheet(
         }
 
     # Build standard sections
-    assets = build_section(AccountType.ASSET)
-    liabilities = build_section(AccountType.LIABILITY, negate=True)
-    equity = build_section(AccountType.EQUITY, negate=True)
+    assets: Dict[str, Any] = build_section(AccountType.ASSET)
+    liabilities: Dict[str, Any] = build_section(AccountType.LIABILITY, negate=True)
+    equity: Dict[str, Any] = build_section(AccountType.EQUITY, negate=True)
 
     # Build Current/Non-Current classified sections with IFRS 16/IAS 12/IAS 37 breakouts
-    def classify_accounts(section_accounts: list, account_type: str) -> Dict:
+    def classify_accounts(section_accounts: List[Dict[str, Any]], account_type: str) -> Dict[str, Any]:
         """Classify accounts as current or non-current with special IFRS line items."""
         if account_type == "asset":
             current_types = CURRENT_ASSET_TYPES
@@ -405,28 +405,28 @@ def get_balance_sheet(
             current_types = CURRENT_LIABILITY_TYPES
             non_current_types = NON_CURRENT_LIABILITY_TYPES
 
-        current_accounts = []
-        non_current_accounts = []
-        current_total = 0
-        non_current_total = 0
+        current_accounts: List[Dict[str, Any]] = []
+        non_current_accounts: List[Dict[str, Any]] = []
+        current_total: float = 0.0
+        non_current_total: float = 0.0
 
         # IFRS 16 - Right-of-use assets and lease liabilities
-        rou_assets = {"accounts": [], "total": 0}
-        lease_liabilities_current = {"accounts": [], "total": 0}
-        lease_liabilities_non_current = {"accounts": [], "total": 0}
+        rou_assets: Dict[str, Any] = {"accounts": [], "total": 0.0}
+        lease_liabilities_current: Dict[str, Any] = {"accounts": [], "total": 0.0}
+        lease_liabilities_non_current: Dict[str, Any] = {"accounts": [], "total": 0.0}
 
         # IAS 12 - Deferred tax
-        deferred_tax_assets = {"accounts": [], "total": 0}
-        deferred_tax_liabilities = {"accounts": [], "total": 0}
+        deferred_tax_assets: Dict[str, Any] = {"accounts": [], "total": 0.0}
+        deferred_tax_liabilities: Dict[str, Any] = {"accounts": [], "total": 0.0}
 
         # IAS 37 - Provisions
-        provisions_current = {"accounts": [], "total": 0}
-        provisions_non_current = {"accounts": [], "total": 0}
+        provisions_current: Dict[str, Any] = {"accounts": [], "total": 0.0}
+        provisions_non_current: Dict[str, Any] = {"accounts": [], "total": 0.0}
 
         for acc_entry in section_accounts:
             acc_type_str = acc_entry.get("account_type", "")
             acc_name = acc_entry.get("account", "").lower()
-            balance = acc_entry.get("balance", 0)
+            balance = float(acc_entry.get("balance") or 0)
 
             # IFRS 16 - Right-of-use assets (assets only)
             if account_type == "asset":
@@ -533,21 +533,21 @@ def get_balance_sheet(
     liabilities_classified = classify_accounts(liabilities["accounts"], "liability")
 
     # Classify equity accounts by component (IAS 1)
-    def classify_equity_by_component(equity_accounts: list) -> Dict:
+    def classify_equity_by_component(equity_accounts: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         """Classify equity accounts into IFRS components."""
-        components = {
-            "share_capital": {"accounts": [], "total": 0},
-            "share_premium": {"accounts": [], "total": 0},
-            "reserves": {"accounts": [], "total": 0},
-            "other_comprehensive_income": {"accounts": [], "total": 0},
-            "retained_earnings": {"accounts": [], "total": 0},
-            "treasury_shares": {"accounts": [], "total": 0},
+        components: Dict[str, Dict[str, Any]] = {
+            "share_capital": {"accounts": [], "total": 0.0},
+            "share_premium": {"accounts": [], "total": 0.0},
+            "reserves": {"accounts": [], "total": 0.0},
+            "other_comprehensive_income": {"accounts": [], "total": 0.0},
+            "retained_earnings": {"accounts": [], "total": 0.0},
+            "treasury_shares": {"accounts": [], "total": 0.0},
         }
 
         for acc_entry in equity_accounts:
             acc_type = acc_entry.get("account_type", "")
             acc_name = acc_entry.get("account", "").lower()
-            balance = acc_entry.get("balance", 0)
+            balance = float(acc_entry.get("balance") or 0)
 
             # Classify by account type or name
             if acc_type in SHARE_CAPITAL_TYPES or any(kw in acc_name for kw in ["share capital", "common stock", "ordinary share"]):
@@ -576,14 +576,20 @@ def get_balance_sheet(
 
     # Calculate retained earnings (Income - Expense for all time)
     income_total = sum(
-        -current_balances.get(acc_id, Decimal("0"))
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.INCOME
+        (
+            -current_balances.get(acc_id, Decimal("0"))
+            for acc_id, acc in accounts.items()
+            if get_effective_root_type(acc) == AccountType.INCOME
+        ),
+        Decimal("0"),
     )
     expense_total = sum(
-        current_balances.get(acc_id, Decimal("0"))
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EXPENSE
+        (
+            current_balances.get(acc_id, Decimal("0"))
+            for acc_id, acc in accounts.items()
+            if get_effective_root_type(acc) == AccountType.EXPENSE
+        ),
+        Decimal("0"),
     )
     retained_earnings = income_total - expense_total
 
@@ -607,8 +613,8 @@ def get_balance_sheet(
     total_equity_value = equity["total"] + float(retained_earnings)
 
     # === VALIDATION (IAS 1) ===
-    validation_errors = []
-    validation_warnings = []
+    validation_errors: List[Dict[str, Any]] = []
+    validation_warnings: List[Dict[str, Any]] = []
 
     # Validate balance sheet equation: Assets = Liabilities + Equity
     validation_result_bs = validate_balance_sheet_equation(
@@ -808,9 +814,14 @@ def get_income_statement(
     # Determine date range
     if fiscal_year:
         period_start, period_end = get_fiscal_year_dates(db, fiscal_year)
+        if period_start is None or period_end is None:
+            raise HTTPException(status_code=400, detail="Invalid fiscal year dates")
     else:
         period_end = parse_date(end_date, "end_date") or date.today()
         period_start = parse_date(start_date, "start_date") or date(period_end.year, 1, 1)
+
+    if period_start is None or period_end is None:
+        raise HTTPException(status_code=400, detail="Invalid period dates")
 
     # Comparative period - use provided dates or auto-calculate
     comp_start = parse_date(compare_start, "compare_start")
@@ -826,9 +837,9 @@ def get_income_statement(
     ytd_start = date(period_end.year, 1, 1)
 
     # Get account details
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
-    def get_period_data(p_start: date, p_end: date, cc: Optional[str] = None) -> Dict[str, tuple]:
+    def get_period_data(p_start: date, p_end: date, cc: Optional[str] = None) -> Dict[str, tuple[Decimal, Account]]:
         """Get account totals for a period."""
         query = db.query(
             GLEntry.account,
@@ -846,7 +857,7 @@ def get_income_statement(
         query = query.group_by(GLEntry.account)
         results = query.all()
 
-        data = {}
+        data: Dict[str, tuple[Decimal, Account]] = {}
         for row in results:
             acc = accounts.get(row.account)
             if not acc:
@@ -862,10 +873,13 @@ def get_income_statement(
 
     # Get data for all periods
     current_data = get_period_data(period_start, period_end, cost_center)
-    comp_data = get_period_data(comp_start, comp_end, cost_center) if has_comparison else {}
+    if comp_start is not None and comp_end is not None:
+        comp_data = get_period_data(comp_start, comp_end, cost_center)
+    else:
+        comp_data = {}
     ytd_data = get_period_data(ytd_start, period_end, cost_center) if show_ytd and ytd_start != period_start else {}
 
-    def build_section(root_type: AccountType, filter_cogs: Optional[bool] = None) -> Dict:
+    def build_section(root_type: AccountType, filter_cogs: Optional[bool] = None) -> Dict[str, Any]:
         """Build income or expense section.
 
         Args:
@@ -873,7 +887,7 @@ def get_income_statement(
             filter_cogs: If True, only include COGS accounts. If False, exclude COGS.
                         If None, include all accounts of the root_type.
         """
-        section_accounts = []
+        section_accounts: List[Dict[str, Any]] = []
         total = Decimal("0")
         comp_total = Decimal("0")
         ytd_total = Decimal("0")
@@ -899,7 +913,7 @@ def get_income_statement(
 
             if amount != 0 or (comp_amount and comp_amount != 0) or (ytd_amount and ytd_amount != 0):
                 entry = {
-                    "account": acc.account_name,
+                    "account": acc.account_name or "",
                     "account_type": acc.account_type,
                     "amount": float(amount),
                 }
@@ -918,7 +932,7 @@ def get_income_statement(
                 if show_ytd and ytd_amount:
                     ytd_total += ytd_amount
 
-        section_accounts.sort(key=lambda x: -abs(x["amount"]))
+        section_accounts.sort(key=lambda x: -abs(float(x.get("amount") or 0)))
 
         result = {
             "accounts": section_accounts,
@@ -971,11 +985,11 @@ def get_income_statement(
         return not is_cogs_account(acc) and not is_finance_cost(acc) and not is_tax_expense(acc)
 
     # Build sections with IFRS-compliant structure
-    revenue = build_section(AccountType.INCOME)
-    cost_of_goods_sold = build_section(AccountType.EXPENSE, filter_cogs=True)
+    revenue: Dict[str, Any] = build_section(AccountType.INCOME)
+    cost_of_goods_sold: Dict[str, Any] = build_section(AccountType.EXPENSE, filter_cogs=True)
 
     # Build operating expenses (excluding COGS, finance costs, and tax)
-    opex_accounts = []
+    opex_accounts: List[Dict[str, Any]] = []
     opex_total = Decimal("0")
     opex_comp_total = Decimal("0")
     opex_ytd_total = Decimal("0")
@@ -995,7 +1009,7 @@ def get_income_statement(
 
         if amount != 0 or (comp_amount and comp_amount != 0) or (ytd_amount and ytd_amount != 0):
             entry = {
-                "account": acc.account_name,
+                "account": acc.account_name or "",
                 "account_type": acc.account_type,
                 "amount": float(amount),
             }
@@ -1013,15 +1027,15 @@ def get_income_statement(
             if is_depreciation(acc):
                 depreciation_total += amount
 
-    opex_accounts.sort(key=lambda x: -abs(x["amount"]))
-    operating_expenses = {"accounts": opex_accounts, "total": float(opex_total)}
+    opex_accounts.sort(key=lambda x: -abs(float(x.get("amount") or 0)))
+    operating_expenses: Dict[str, Any] = {"accounts": opex_accounts, "total": float(opex_total)}
     if has_comparison:
         operating_expenses["prior_total"] = float(opex_comp_total)
     if show_ytd and ytd_data:
         operating_expenses["ytd_total"] = float(opex_ytd_total)
 
     # Build finance income section
-    finance_income_accounts = []
+    finance_income_accounts: List[Dict[str, Any]] = []
     finance_income_total = Decimal("0")
     for acc_id in all_acc_ids:
         acc = accounts.get(acc_id)
@@ -1032,7 +1046,7 @@ def get_income_statement(
         amount = current_data.get(acc_id, (Decimal("0"), acc))[0]
         if amount != 0:
             finance_income_accounts.append({
-                "account": acc.account_name,
+                "account": acc.account_name or "",
                 "account_type": acc.account_type,
                 "amount": float(amount),
             })
@@ -1041,7 +1055,7 @@ def get_income_statement(
     finance_income = {"accounts": finance_income_accounts, "total": float(finance_income_total)}
 
     # Build finance costs section
-    finance_cost_accounts = []
+    finance_cost_accounts: List[Dict[str, Any]] = []
     finance_cost_total = Decimal("0")
     for acc_id in all_acc_ids:
         acc = accounts.get(acc_id)
@@ -1052,7 +1066,7 @@ def get_income_statement(
         amount = current_data.get(acc_id, (Decimal("0"), acc))[0]
         if amount != 0:
             finance_cost_accounts.append({
-                "account": acc.account_name,
+                "account": acc.account_name or "",
                 "account_type": acc.account_type,
                 "amount": float(amount),
             })
@@ -1061,7 +1075,7 @@ def get_income_statement(
     finance_costs = {"accounts": finance_cost_accounts, "total": float(finance_cost_total)}
 
     # Build tax expense section
-    tax_accounts = []
+    tax_accounts: List[Dict[str, Any]] = []
     tax_total = Decimal("0")
     for acc_id in all_acc_ids:
         acc = accounts.get(acc_id)
@@ -1072,7 +1086,7 @@ def get_income_statement(
         amount = current_data.get(acc_id, (Decimal("0"), acc))[0]
         if amount != 0:
             tax_accounts.append({
-                "account": acc.account_name,
+                "account": acc.account_name or "",
                 "account_type": acc.account_type,
                 "amount": float(amount),
             })
@@ -1120,8 +1134,8 @@ def get_income_statement(
         operating_expenses["pct_of_revenue"] = round(total_opex / total_revenue * 100, 2)
 
     # === SUBTOTAL VALIDATION (IAS 1) ===
-    validation_errors = []
-    validation_warnings = []
+    validation_errors: list[dict[str, Any]] = []
+    validation_warnings: list[dict[str, Any]] = []
 
     # Validate: Revenue - COGS = Gross Profit
     expected_gross_profit = total_revenue - total_cogs
@@ -1326,6 +1340,10 @@ def get_income_statement(
     }
 
     if has_comparison:
+        if comp_start is None or comp_end is None:
+            raise HTTPException(status_code=400, detail="Comparison period dates are missing")
+        comp_start_date = comp_start
+        comp_end_date = comp_end
         comp_revenue = revenue.get("prior_total", 0)
         comp_cogs = cost_of_goods_sold.get("prior_total", 0)
         comp_opex = operating_expenses.get("prior_total", 0)
@@ -1335,8 +1353,8 @@ def get_income_statement(
 
         result["prior_period"] = {
             "period": {
-                "start_date": comp_start.isoformat(),
-                "end_date": comp_end.isoformat(),
+                "start_date": comp_start_date.isoformat(),
+                "end_date": comp_end_date.isoformat(),
             },
             "revenue": comp_revenue,
             "cost_of_goods_sold": comp_cogs,
@@ -1355,8 +1373,8 @@ def get_income_statement(
 
         # Legacy variance fields
         result["comparison_period"] = {
-            "start_date": comp_start.isoformat(),
-            "end_date": comp_end.isoformat(),
+            "start_date": comp_start_date.isoformat(),
+            "end_date": comp_end_date.isoformat(),
         }
         result["prior_revenue"] = comp_revenue
         result["prior_gross_profit"] = comp_gross
@@ -1491,7 +1509,7 @@ def get_cash_flow(
         period_start = parse_date(start_date, "start_date") or date(period_end.year, 1, 1)
 
     # Get all accounts
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
     # Get bank/cash accounts
     cash_accounts = db.query(Account).filter(
@@ -1590,6 +1608,15 @@ def get_cash_flow(
     accrued_change = get_balance_change({"Current Liability"}, period_start, period_end) - ap_change
 
     # Operating = Net Income + Depreciation - Increase in AR - Increase in Inventory + Increase in AP
+    operating_net = float(
+        net_income
+        + depreciation
+        - ar_change
+        - inventory_change
+        - prepaid_change
+        - ap_change
+        - accrued_change
+    )
     operating_activities = {
         "net_income": float(net_income),
         "adjustments": {
@@ -1602,30 +1629,32 @@ def get_cash_flow(
             "accounts_payable": float(-ap_change),  # Increase in AP = cash inflow (liability increases)
             "accrued_liabilities": float(-accrued_change),
         },
-        "net": float(net_income + depreciation - ar_change - inventory_change - prepaid_change - ap_change - accrued_change),
+        "net": operating_net,
     }
 
     # 4. Investing Activities
     fixed_asset_change = get_balance_change({"Fixed Asset", "Capital Work in Progress"}, period_start, period_end)
     investment_change = get_balance_change({"Investment", "Long Term Investment"}, period_start, period_end)
 
+    investing_net = float(-fixed_asset_change - investment_change)
     investing_activities = {
         "fixed_asset_purchases": float(-fixed_asset_change) if fixed_asset_change > 0 else 0,
         "fixed_asset_sales": float(-fixed_asset_change) if fixed_asset_change < 0 else 0,
         "investments": float(-investment_change),
-        "net": float(-fixed_asset_change - investment_change),
+        "net": investing_net,
     }
 
     # 5. Financing Activities
     long_term_debt_change = get_balance_change({"Long Term Liability", "Loan"}, period_start, period_end)
     equity_change = get_balance_change({"Equity", "Share Capital"}, period_start, period_end)
 
+    financing_net = float(-long_term_debt_change - equity_change)
     financing_activities = {
         "debt_proceeds": float(-long_term_debt_change) if long_term_debt_change < 0 else 0,
         "debt_repayments": float(-long_term_debt_change) if long_term_debt_change > 0 else 0,
         "equity_proceeds": float(-equity_change) if equity_change < 0 else 0,
         "dividends_paid": 0,  # Would need specific dividend tracking
-        "net": float(-long_term_debt_change - equity_change),
+        "net": financing_net,
     }
 
     # Bank transactions summary
@@ -1643,14 +1672,18 @@ def get_cash_flow(
         if acc.account_type in FINANCE_COST_TYPES or
         any(kw in (acc.account_name or "").lower() for kw in ["interest expense", "finance cost", "loan interest"])
     ]
-    interest_paid = db.query(
+    interest_paid_query = db.query(
         func.sum(GLEntry.debit - GLEntry.credit)
     ).filter(
-        GLEntry.account.in_(interest_expense_accounts) if interest_expense_accounts else False,
         GLEntry.is_cancelled == False,
         GLEntry.posting_date >= period_start,
         GLEntry.posting_date <= period_end,
-    ).scalar() or Decimal("0")
+    )
+    if interest_expense_accounts:
+        interest_paid_query = interest_paid_query.filter(GLEntry.account.in_(interest_expense_accounts))
+    else:
+        interest_paid_query = interest_paid_query.filter(false())
+    interest_paid = interest_paid_query.scalar() or Decimal("0")
 
     # Interest received (from finance income accounts)
     interest_income_accounts = [
@@ -1658,14 +1691,18 @@ def get_cash_flow(
         if acc.account_type in FINANCE_INCOME_TYPES or
         any(kw in (acc.account_name or "").lower() for kw in ["interest income", "bank interest", "investment income"])
     ]
-    interest_received = db.query(
+    interest_received_query = db.query(
         func.sum(GLEntry.credit - GLEntry.debit)
     ).filter(
-        GLEntry.account.in_(interest_income_accounts) if interest_income_accounts else False,
         GLEntry.is_cancelled == False,
         GLEntry.posting_date >= period_start,
         GLEntry.posting_date <= period_end,
-    ).scalar() or Decimal("0")
+    )
+    if interest_income_accounts:
+        interest_received_query = interest_received_query.filter(GLEntry.account.in_(interest_income_accounts))
+    else:
+        interest_received_query = interest_received_query.filter(false())
+    interest_received = interest_received_query.scalar() or Decimal("0")
 
     # Taxes paid (from tax expense accounts - approximated by tax expense)
     tax_expense_accounts = [
@@ -1673,28 +1710,36 @@ def get_cash_flow(
         if acc.account_type in TAX_EXPENSE_TYPES or
         any(kw in (acc.account_name or "").lower() for kw in ["income tax", "tax expense", "corporate tax"])
     ]
-    taxes_paid = db.query(
+    taxes_paid_query = db.query(
         func.sum(GLEntry.debit - GLEntry.credit)
     ).filter(
-        GLEntry.account.in_(tax_expense_accounts) if tax_expense_accounts else False,
         GLEntry.is_cancelled == False,
         GLEntry.posting_date >= period_start,
         GLEntry.posting_date <= period_end,
-    ).scalar() or Decimal("0")
+    )
+    if tax_expense_accounts:
+        taxes_paid_query = taxes_paid_query.filter(GLEntry.account.in_(tax_expense_accounts))
+    else:
+        taxes_paid_query = taxes_paid_query.filter(false())
+    taxes_paid = taxes_paid_query.scalar() or Decimal("0")
 
     # Dividends paid (from dividend accounts - would need specific tracking)
     dividend_accounts = [
         acc_id for acc_id, acc in accounts.items()
         if "dividend" in (acc.account_name or "").lower()
     ]
-    dividends_paid = db.query(
+    dividends_paid_query = db.query(
         func.sum(GLEntry.debit - GLEntry.credit)
     ).filter(
-        GLEntry.account.in_(dividend_accounts) if dividend_accounts else False,
         GLEntry.is_cancelled == False,
         GLEntry.posting_date >= period_start,
         GLEntry.posting_date <= period_end,
-    ).scalar() or Decimal("0")
+    )
+    if dividend_accounts:
+        dividends_paid_query = dividends_paid_query.filter(GLEntry.account.in_(dividend_accounts))
+    else:
+        dividends_paid_query = dividends_paid_query.filter(false())
+    dividends_paid = dividends_paid_query.scalar() or Decimal("0")
 
     # === FX EFFECT ON CASH (IAS 7.28) ===
     # Note: In practice, this would come from FX revaluation journals on cash accounts
@@ -1702,11 +1747,7 @@ def get_cash_flow(
     fx_effect_on_cash = Decimal("0")  # Placeholder - would need specific FX tracking
 
     # Reconciliation
-    total_cash_flow = (
-        operating_activities["net"] +
-        investing_activities["net"] +
-        financing_activities["net"]
-    )
+    total_cash_flow = operating_net + investing_net + financing_net
     actual_change = float(closing_cash - opening_cash)
 
     # The reconciliation difference (excluding FX) represents unexplained variance
@@ -1727,9 +1768,9 @@ def get_cash_flow(
             "accrued_liabilities": float(-accrued_change),
             "total": float(-ar_change - inventory_change - prepaid_change - ap_change - accrued_change),
         },
-        "cash_from_operations": operating_activities["net"],
+        "cash_from_operations": operating_net,
         "is_reconciled": abs(
-            operating_activities["net"] -
+            operating_net -
             (float(net_income) + float(depreciation) - float(ar_change) - float(inventory_change) -
              float(prepaid_change) - float(ap_change) - float(accrued_change))
         ) < 1.0,
@@ -1850,7 +1891,10 @@ def get_cash_flow(
     if include_prior_period and prior_period_data:
         result["prior_period"] = prior_period_data
         result["variance"] = {
-            "net_change_in_cash": calculate_variance(actual_change, prior_period_data["net_change_in_cash"]),
+            "net_change_in_cash": calculate_variance(
+                actual_change,
+                float(prior_period_data.get("net_change_in_cash", 0) or 0),
+            ),
         }
 
     return result
@@ -1891,7 +1935,7 @@ def get_financial_ratios(
         period_end = end_date
 
     # Get all accounts
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
     # Get cumulative balances for balance sheet items
     balances = db.query(
@@ -1902,7 +1946,7 @@ def get_financial_ratios(
         GLEntry.posting_date <= end_date,
     ).group_by(GLEntry.account).all()
 
-    balance_map = {r.account: float(r.balance or 0) for r in balances}
+    balance_map = {r.account: float(r.balance or 0) for r in balances if r.account}
 
     # Get period data for P&L items
     period_data = db.query(
@@ -1915,7 +1959,11 @@ def get_financial_ratios(
         GLEntry.posting_date <= period_end,
     ).group_by(GLEntry.account).all()
 
-    period_map = {r.account: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)} for r in period_data}
+    period_map = {
+        r.account: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)}
+        for r in period_data
+        if r.account
+    }
 
     # === BALANCE SHEET COMPONENTS ===
 
@@ -2270,7 +2318,7 @@ def get_equity_statement(
     prior_start, prior_end = calculate_prior_period(period_start, period_end)
 
     # Get all accounts
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
 
     def classify_equity_account(acc: Account) -> str:
         """Classify an equity account into its component type."""
@@ -2333,7 +2381,9 @@ def get_equity_statement(
 
         return None
 
-    def get_equity_balances(as_of: date) -> Dict[str, Dict[str, Any]]:
+    def get_equity_balances(
+        as_of: date,
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         """Get equity account balances by component as of a date."""
         results = db.query(
             GLEntry.account,
@@ -2343,7 +2393,7 @@ def get_equity_statement(
             GLEntry.posting_date <= as_of,
         ).group_by(GLEntry.account).all()
 
-        components = {
+        components: Dict[str, Dict[str, Any]] = {
             "share_capital": {"total": Decimal("0"), "accounts": {}},
             "share_premium": {"total": Decimal("0"), "accounts": {}},
             "reserves": {"total": Decimal("0"), "accounts": {}},
@@ -2355,7 +2405,7 @@ def get_equity_statement(
         }
 
         # OCI breakdown by reclassification category
-        oci_breakdown = {
+        oci_breakdown: Dict[str, Dict[str, Any]] = {
             "may_reclassify": {"total": Decimal("0"), "items": {}},
             "not_reclassify": {"total": Decimal("0"), "items": {}},
         }
@@ -2367,19 +2417,28 @@ def get_equity_statement(
 
             balance = row.balance or Decimal("0")
             component = classify_equity_account(acc)
-            components[component]["total"] += balance
-            components[component]["accounts"][acc.account_name] = float(balance)
+            component_data = components[component]
+            component_total = cast(Decimal, component_data["total"])
+            component_data["total"] = component_total + balance
+            component_accounts = cast(Dict[str, float], component_data["accounts"])
+            component_accounts[acc.account_name or ""] = float(balance)
 
             # Track OCI breakdown
             if component == "other_comprehensive_income":
                 oci_category = classify_oci_component(acc)
                 if oci_category:
-                    oci_breakdown[oci_category]["total"] += balance
-                    oci_breakdown[oci_category]["items"][acc.account_name] = float(balance)
+                    oci_data = oci_breakdown[oci_category]
+                    oci_total = cast(Decimal, oci_data["total"])
+                    oci_data["total"] = oci_total + balance
+                    oci_items = cast(Dict[str, float], oci_data["items"])
+                    oci_items[acc.account_name or ""] = float(balance)
 
         return components, oci_breakdown
 
-    def get_period_movements(p_start: date, p_end: date) -> Dict[str, Dict[str, Any]]:
+    def get_period_movements(
+        p_start: date,
+        p_end: date,
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         """Get equity movements during a specific period."""
         results = db.query(
             GLEntry.account,
@@ -2390,7 +2449,7 @@ def get_equity_statement(
             GLEntry.posting_date <= p_end,
         ).group_by(GLEntry.account).all()
 
-        components = {
+        components: Dict[str, Dict[str, Any]] = {
             "share_capital": {"total": Decimal("0"), "accounts": {}},
             "share_premium": {"total": Decimal("0"), "accounts": {}},
             "reserves": {"total": Decimal("0"), "accounts": {}},
@@ -2402,7 +2461,7 @@ def get_equity_statement(
         }
 
         # OCI movement breakdown
-        oci_movement_breakdown = {
+        oci_movement_breakdown: Dict[str, Dict[str, Any]] = {
             "may_reclassify": {"total": Decimal("0"), "items": {}},
             "not_reclassify": {"total": Decimal("0"), "items": {}},
         }
@@ -2414,15 +2473,21 @@ def get_equity_statement(
 
             movement = row.movement or Decimal("0")
             component = classify_equity_account(acc)
-            components[component]["total"] += movement
-            components[component]["accounts"][acc.account_name] = float(movement)
+            component_data = components[component]
+            component_total = cast(Decimal, component_data["total"])
+            component_data["total"] = component_total + movement
+            component_accounts = cast(Dict[str, float], component_data["accounts"])
+            component_accounts[acc.account_name or ""] = float(movement)
 
             # Track OCI movement breakdown
             if component == "other_comprehensive_income":
                 oci_category = classify_oci_component(acc)
                 if oci_category:
-                    oci_movement_breakdown[oci_category]["total"] += movement
-                    oci_movement_breakdown[oci_category]["items"][acc.account_name] = float(movement)
+                    oci_data = oci_movement_breakdown[oci_category]
+                    oci_total = cast(Decimal, oci_data["total"])
+                    oci_data["total"] = oci_total + movement
+                    oci_items = cast(Dict[str, float], oci_data["items"])
+                    oci_items[acc.account_name or ""] = float(movement)
 
         return components, oci_movement_breakdown
 
@@ -2454,6 +2519,13 @@ def get_equity_statement(
     # Calculate current period data
     profit_for_period = calculate_profit_for_period(period_start, period_end)
     opening_date = period_start - timedelta(days=1)
+    opening_balances: Dict[str, Dict[str, Any]]
+    opening_oci: Dict[str, Dict[str, Any]]
+    closing_balances: Dict[str, Dict[str, Any]]
+    closing_oci: Dict[str, Dict[str, Any]]
+    period_movements: Dict[str, Dict[str, Any]]
+    oci_movements: Dict[str, Dict[str, Any]]
+
     opening_balances, opening_oci = get_equity_balances(opening_date)
     closing_balances, closing_oci = get_equity_balances(period_end)
     period_movements, oci_movements = get_period_movements(period_start, period_end)
@@ -2463,6 +2535,13 @@ def get_equity_statement(
     if include_prior_period:
         prior_profit = calculate_profit_for_period(prior_start, prior_end)
         prior_opening_date = prior_start - timedelta(days=1)
+        prior_opening_balances: Dict[str, Dict[str, Any]]
+        prior_opening_oci: Dict[str, Dict[str, Any]]
+        prior_closing_balances: Dict[str, Dict[str, Any]]
+        prior_closing_oci: Dict[str, Dict[str, Any]]
+        prior_movements: Dict[str, Dict[str, Any]]
+        prior_oci_movements: Dict[str, Dict[str, Any]]
+
         prior_opening_balances, prior_opening_oci = get_equity_balances(prior_opening_date)
         prior_closing_balances, prior_closing_oci = get_equity_balances(prior_end)
         prior_movements, prior_oci_movements = get_period_movements(prior_start, prior_end)
@@ -2491,7 +2570,7 @@ def get_equity_statement(
         transfers = movement if name == "reserves" else 0
         oci_impact = movement if name == "other_comprehensive_income" else 0
 
-        other_movements = 0
+        other_movements = 0.0
         if name not in ("share_capital", "share_premium", "treasury_shares", "reserves",
                         "share_based_payments", "fx_translation_reserve", "other_comprehensive_income"):
             if profit_impact == 0:
@@ -2566,8 +2645,8 @@ def get_equity_statement(
     }
 
     # Validate equity statement
-    validation_errors = []
-    validation_warnings = []
+    validation_errors: List[Dict[str, Any]] = []
+    validation_warnings: List[Dict[str, Any]] = []
 
     # Validate each component reconciliation
     for comp in components:
@@ -2625,7 +2704,7 @@ def get_equity_statement(
         variances = calculate_variance(total_closing, prior_total_closing)
 
     # Build response
-    response = {
+    response: Dict[str, Any] = {
         "period": {
             "start_date": period_start.isoformat(),
             "end_date": period_end.isoformat(),
@@ -2670,7 +2749,7 @@ def get_equity_statement(
     }
 
     # Add prior period and variance if available
-    if include_prior_period:
+    if include_prior_period and prior_components:
         prior_total_opening = sum(c["opening_balance"] for c in prior_components)
         prior_total_closing = sum(c["closing_balance"] for c in prior_components)
         response["prior_period"] = {

@@ -10,7 +10,7 @@ Provides CSV and PDF export functionality for accounting reports:
 """
 import csv
 import io
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -86,9 +86,11 @@ class ExportService:
         html = HTML(string=html_content)
         pdf_bytes = html.write_pdf(stylesheets=[CSS(string=css)])
 
-        return pdf_bytes
+        if pdf_bytes is None:
+            raise ExportError("PDF generation failed - no output produced")
+        return cast(bytes, pdf_bytes)
 
-    def _write_trial_balance_csv(self, writer: csv.writer, data: Dict[str, Any]) -> None:
+    def _write_trial_balance_csv(self, writer: Any, data: Dict[str, Any]) -> None:
         """Write trial balance to CSV."""
         writer.writerow([f"Trial Balance as of {data.get('as_of_date', '')}"])
         writer.writerow([])
@@ -113,7 +115,7 @@ class ExportService:
         ])
         writer.writerow(["Balanced:", "Yes" if data.get("is_balanced") else "No"])
 
-    def _write_balance_sheet_csv(self, writer: csv.writer, data: Dict[str, Any]) -> None:
+    def _write_balance_sheet_csv(self, writer: Any, data: Dict[str, Any]) -> None:
         """Write balance sheet to CSV."""
         writer.writerow([f"Balance Sheet as of {data.get('as_of_date', '')}"])
         writer.writerow([])
@@ -161,7 +163,7 @@ class ExportService:
         writer.writerow(["Total Liabilities + Equity", self._format_number(data.get("total_liabilities_equity", 0))])
         writer.writerow(["Balanced:", "Yes" if data.get("is_balanced") else "No"])
 
-    def _write_income_statement_csv(self, writer: csv.writer, data: Dict[str, Any]) -> None:
+    def _write_income_statement_csv(self, writer: Any, data: Dict[str, Any]) -> None:
         """Write income statement to CSV."""
         period = data.get("period", {})
         writer.writerow([f"Income Statement"])
@@ -199,7 +201,7 @@ class ExportService:
         writer.writerow(["Net Income", self._format_number(data.get("net_income", 0))])
         writer.writerow(["Profit Margin", f"{data.get('profit_margin', 0):.2f}%"])
 
-    def _write_general_ledger_csv(self, writer: csv.writer, data: Dict[str, Any]) -> None:
+    def _write_general_ledger_csv(self, writer: Any, data: Dict[str, Any]) -> None:
         """Write general ledger to CSV."""
         writer.writerow(["General Ledger"])
         writer.writerow([])
@@ -225,7 +227,7 @@ class ExportService:
         writer.writerow([])
         writer.writerow(["Total Records:", data.get("total", 0)])
 
-    def _write_aging_csv(self, writer: csv.writer, data: Dict[str, Any], report_name: str) -> None:
+    def _write_aging_csv(self, writer: Any, data: Dict[str, Any], report_name: str) -> None:
         """Write aging report to CSV."""
         writer.writerow([f"{report_name} Aging Report"])
         writer.writerow([f"As of: {data.get('as_of_date', '')}"])

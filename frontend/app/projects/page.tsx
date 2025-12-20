@@ -481,22 +481,21 @@ export default function ProjectsPage() {
       </div>
 
       {/* Projects Table */}
-      {error ? (
+      {error && (
         <ErrorDisplay
           message="Failed to load projects. Please check your connection and try again."
           error={error}
           onRetry={handleRetry}
         />
-      ) : (
-        <DataTable
-          columns={columns}
-          data={projects}
-          keyField="id"
-          loading={isLoading}
-          emptyMessage="No projects found matching your filters"
-          onRowClick={(item) => router.push(`/projects/${(item as any).id}`)}
-        />
       )}
+      <DataTable
+        columns={columns}
+        data={projects}
+        keyField="id"
+        loading={isLoading}
+        emptyMessage="No projects found matching your filters"
+        onRowClick={(item) => router.push(`/projects/${(item as any).id}`)}
+      />
 
       {/* Pagination */}
       {total > pageSize && (

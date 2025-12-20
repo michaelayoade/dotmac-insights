@@ -68,16 +68,6 @@ export default function FilingCalendarPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load filing calendar."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   // Group filings by month
   const filingsByMonth: Record<string, any[]> = {};
   (calendar?.filings || []).forEach((filing: any) => {
@@ -99,6 +89,13 @@ export default function FilingCalendarPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load filing calendar."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link

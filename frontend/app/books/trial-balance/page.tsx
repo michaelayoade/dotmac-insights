@@ -105,21 +105,18 @@ export default function TrialBalancePage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load trial balance."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   const isBalanced = data?.is_balanced ?? true;
   const difference = data?.difference ?? 0;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load trial balance."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">

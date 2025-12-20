@@ -221,16 +221,6 @@ export default function BalanceSheetPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load balance sheet."
-        error={error as Error}
-        onRetry={() => mutate()}
-      />
-    );
-  }
-
   // Extract data with IFRS structure support
   const totalAssets = data?.total_assets || data?.assets?.total || 0;
   const totalLiabilities = data?.total_liabilities || data?.liabilities?.total || 0;
@@ -254,6 +244,13 @@ export default function BalanceSheetPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load balance sheet."
+          error={error as Error}
+          onRetry={() => mutate()}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">

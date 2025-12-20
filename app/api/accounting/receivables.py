@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, TypedDict
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, and_
@@ -18,6 +18,12 @@ from .helpers import parse_date, resolve_currency_or_raise
 from app.cache import cached
 
 router = APIRouter()
+
+
+class AgingBucket(TypedDict):
+    count: int
+    total: Decimal
+    invoices: List[Dict[str, Any]]
 
 
 # =============================================================================
@@ -61,7 +67,7 @@ def get_accounts_receivable(
     invoices = query.all()
 
     # Age buckets
-    buckets = {
+    buckets: Dict[str, AgingBucket] = {
         "current": {"count": 0, "total": Decimal("0"), "invoices": []},
         "1_30": {"count": 0, "total": Decimal("0"), "invoices": []},
         "31_60": {"count": 0, "total": Decimal("0"), "invoices": []},
@@ -103,17 +109,16 @@ def get_accounts_receivable(
             "days_overdue": days_overdue,
         })
 
-    # Convert totals to float
-    for bucket in buckets.values():
-        bucket["total"] = float(bucket["total"])
-
-    total_receivable = sum(b["total"] for b in buckets.values())
+    buckets_response: Dict[str, Dict[str, Any]] = {
+        key: {**value, "total": float(value["total"])} for key, value in buckets.items()
+    }
+    total_receivable = sum(b["total"] for b in buckets_response.values())
 
     return {
         "as_of_date": cutoff.isoformat(),
         "total_receivable": total_receivable,
         "total_invoices": sum(b["count"] for b in buckets.values()),
-        "aging": buckets,
+        "aging": buckets_response,
     }
 
 
@@ -153,13 +158,15 @@ def get_receivables_outstanding(
 
     inv_query = db.query(
         func.sum(Invoice.total_amount - (Invoice.amount_paid or 0)).label("outstanding"),
-        func.count(Invoice.id).label("count"),
+        func.count(Invoice.id).label("invoice_count"),
     ).filter(
         Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
     )
     if currency:
         inv_query = inv_query.filter(Invoice.currency == currency)
     inv_totals = inv_query.first()
+    total_outstanding = float(inv_totals.outstanding or 0) if inv_totals else 0.0
+    total_invoices = int(inv_totals.invoice_count or 0) if inv_totals else 0
 
     inv_by_customer_query = (
         db.query(
@@ -182,8 +189,8 @@ def get_receivables_outstanding(
     return {
         "as_of_date": as_of.isoformat(),
         "currency": currency,
-        "total_outstanding": float(inv_totals.outstanding or 0),
-        "total_invoices": inv_totals.count or 0,
+        "total_outstanding": total_outstanding,
+        "total_invoices": total_invoices,
         "top_customers": [
             {
                 "customer_id": row.customer_id,
@@ -322,7 +329,7 @@ async def get_receivables_aging_enhanced(
         "total": total_count,
         "offset": offset,
         "limit": limit,
-        "total_receivable": to_float(sum(totals.values())),
+        "total_receivable": to_float(sum(totals.values(), Decimal("0"))),
         "aging": {
             "current": to_float(totals["current"]),
             "1_30": to_float(totals["1_30"]),

@@ -5,10 +5,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.utils.datetime_utils import utc_now
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
 from app.models.document_lines import BillLine
+
+if TYPE_CHECKING:
+    from app.models.bank_transaction_split import BankTransactionSplit
 
 
 # ============= SUPPLIER =============
@@ -308,6 +311,7 @@ class PurchaseInvoice(Base):
 
     status: Mapped[PurchaseInvoiceStatus] = mapped_column(Enum(PurchaseInvoiceStatus), default=PurchaseInvoiceStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
+    is_return: Mapped[bool] = mapped_column(default=False)
 
     # Workflow
     workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

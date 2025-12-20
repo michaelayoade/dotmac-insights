@@ -13,7 +13,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, validator
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -626,7 +626,7 @@ def create_currency(
     # If setting as base currency, unset others
     if data.is_base_currency:
         db.execute(
-            CurrencySettings.__table__.update().values(is_base_currency=False)
+            update(CurrencySettings).values(is_base_currency=False)
         )
 
     currency = CurrencySettings(
@@ -685,7 +685,7 @@ def update_currency(
     # If setting as base currency, unset others
     if data.is_base_currency:
         db.execute(
-            CurrencySettings.__table__.update()
+            update(CurrencySettings)
             .where(CurrencySettings.currency_code != currency_code.upper())
             .values(is_base_currency=False)
         )

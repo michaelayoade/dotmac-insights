@@ -25,7 +25,7 @@ from app.models.accounting import (
     Account,
     AccountType,
     JournalEntry,
-    JournalEntryAccount,
+    JournalEntryItem,
     JournalEntryType,
     GLEntry,
 )
@@ -465,7 +465,7 @@ class PeriodManager:
 
             if balance["root_type"] == AccountType.INCOME:
                 # Income has credit balance, debit to close
-                je_line = JournalEntryAccount(
+                je_line = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=balance["account_name"],
                     debit=balance["total_credit"] - balance["total_debit"],
@@ -475,7 +475,7 @@ class PeriodManager:
                 total_je_debit += je_line.debit
             else:
                 # Expense has debit balance, credit to close
-                je_line = JournalEntryAccount(
+                je_line = JournalEntryItem(
                     journal_entry_id=je.id,
                     account=balance["account_name"],
                     debit=Decimal("0"),
@@ -490,7 +490,7 @@ class PeriodManager:
         idx += 1
         if net_income >= Decimal("0"):
             # Net income - credit retained earnings
-            re_line = JournalEntryAccount(
+            re_line = JournalEntryItem(
                 journal_entry_id=je.id,
                 account=re_account,
                 debit=Decimal("0"),
@@ -500,7 +500,7 @@ class PeriodManager:
             total_je_credit += net_income
         else:
             # Net loss - debit retained earnings
-            re_line = JournalEntryAccount(
+            re_line = JournalEntryItem(
                 journal_entry_id=je.id,
                 account=re_account,
                 debit=abs(net_income),

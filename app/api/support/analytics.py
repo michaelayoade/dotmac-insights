@@ -31,7 +31,7 @@ def get_support_overview(
 
     total = db.query(func.count(Ticket.id)).scalar() or 0
     open_count = db.query(func.count(Ticket.id)).filter(
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.IN_PROGRESS])
+        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
     ).scalar() or 0
     resolved = db.query(func.count(Ticket.id)).filter(Ticket.status == TicketStatus.RESOLVED).scalar() or 0
     closed = db.query(func.count(Ticket.id)).filter(Ticket.status == TicketStatus.CLOSED).scalar() or 0

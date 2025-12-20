@@ -282,15 +282,6 @@ export default function CustomerAnalyticsPage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load customer analytics"
-        error={error}
-      />
-    );
-  }
-
   const tabs = [
     { key: 'trends' as ExtendedTab, label: 'Trends' },
     { key: 'active' as ExtendedTab, label: 'Active Health' },
@@ -302,6 +293,12 @@ export default function CustomerAnalyticsPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load customer analytics"
+          error={error}
+        />
+      )}
       {/* Sub-tabs */}
       <div className="flex gap-2 border-b border-slate-border pb-2">
         {tabs.map((tab) => (

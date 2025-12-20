@@ -12,7 +12,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Date, Time,
     Numeric, Text, ForeignKey, JSON, Enum as SAEnum, UniqueConstraint
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, relationship, mapped_column
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -129,11 +129,11 @@ class HRSettings(Base):
     # -------------------------------------------------------------------------
     # LEAVE POLICY SETTINGS
     # -------------------------------------------------------------------------
-    leave_accounting_frequency = Column(
+    leave_accounting_frequency: Mapped[LeaveAccountingFrequency] = mapped_column(
         SAEnum(LeaveAccountingFrequency, name="leaveaccountingfrequency"),
         nullable=False, default=LeaveAccountingFrequency.ANNUAL
     )
-    pro_rata_method = Column(
+    pro_rata_method: Mapped[ProRataMethod] = mapped_column(
         SAEnum(ProRataMethod, name="proratamethod"),
         nullable=False, default=ProRataMethod.WORKING_DAYS
     )
@@ -148,7 +148,7 @@ class HRSettings(Base):
     # -------------------------------------------------------------------------
     # ATTENDANCE SETTINGS
     # -------------------------------------------------------------------------
-    attendance_marking_mode = Column(
+    attendance_marking_mode: Mapped[AttendanceMarkingMode] = mapped_column(
         SAEnum(AttendanceMarkingMode, name="attendancemarkingmode"),
         nullable=False, default=AttendanceMarkingMode.MANUAL
     )
@@ -175,7 +175,7 @@ class HRSettings(Base):
     # -------------------------------------------------------------------------
     # PAYROLL SETTINGS
     # -------------------------------------------------------------------------
-    payroll_frequency = Column(
+    payroll_frequency: Mapped[PayrollFrequency] = mapped_column(
         SAEnum(PayrollFrequency, name="payrollfrequency"),
         nullable=False, default=PayrollFrequency.MONTHLY
     )
@@ -190,7 +190,7 @@ class HRSettings(Base):
     # OVERTIME SETTINGS
     # -------------------------------------------------------------------------
     overtime_enabled = Column(Boolean, nullable=False, default=True)
-    overtime_calculation = Column(
+    overtime_calculation: Mapped[OvertimeCalculation] = mapped_column(
         SAEnum(OvertimeCalculation, name="overtimecalculation"),
         nullable=False, default=OvertimeCalculation.HOURLY_RATE
     )
@@ -204,7 +204,7 @@ class HRSettings(Base):
     # BENEFITS & COMPENSATION
     # -------------------------------------------------------------------------
     gratuity_enabled = Column(Boolean, nullable=False, default=True)
-    gratuity_calculation = Column(
+    gratuity_calculation: Mapped[GratuityCalculation] = mapped_column(
         SAEnum(GratuityCalculation, name="gratuitycalculation"),
         nullable=False, default=GratuityCalculation.LAST_SALARY
     )
@@ -246,7 +246,7 @@ class HRSettings(Base):
     # -------------------------------------------------------------------------
     # PERFORMANCE APPRAISAL
     # -------------------------------------------------------------------------
-    appraisal_frequency = Column(
+    appraisal_frequency: Mapped[AppraisalFrequency] = mapped_column(
         SAEnum(AppraisalFrequency, name="appraisalfrequency"),
         nullable=False, default=AppraisalFrequency.ANNUAL
     )
@@ -274,7 +274,7 @@ class HRSettings(Base):
     # -------------------------------------------------------------------------
     # DISPLAY & FORMATTING
     # -------------------------------------------------------------------------
-    employee_id_format = Column(
+    employee_id_format: Mapped[EmployeeIDFormat] = mapped_column(
         SAEnum(EmployeeIDFormat, name="employeeidformat"),
         nullable=False, default=EmployeeIDFormat.NUMERIC
     )
@@ -470,7 +470,7 @@ class EmploymentTypeDeductionConfig(Base):
     company = Column(String(255), nullable=True, index=True)
 
     # Employment type this config applies to
-    employment_type = Column(
+    employment_type: Mapped[EmploymentType] = mapped_column(
         SAEnum(EmploymentType, name="employmenttype"),
         nullable=False, index=True
     )

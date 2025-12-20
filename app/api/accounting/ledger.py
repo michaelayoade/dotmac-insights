@@ -115,8 +115,9 @@ def get_account_detail(
         GLEntry.is_cancelled == False,
     ).first()
 
-    total_debit = balance_result.total_debit or Decimal("0")
-    total_credit = balance_result.total_credit or Decimal("0")
+    totals = balance_result._mapping if balance_result else {}
+    total_debit = totals.get("total_debit") or Decimal("0")
+    total_credit = totals.get("total_credit") or Decimal("0")
     balance = total_debit - total_credit
 
     # Determine normal balance type
@@ -125,7 +126,7 @@ def get_account_detail(
     else:
         normal_balance = "credit"
 
-    result = {
+    result: Dict[str, Any] = {
         "id": account.id,
         "erpnext_id": account.erpnext_id,
         "name": account.account_name,
@@ -155,7 +156,7 @@ def get_account_detail(
 
         entries = ledger_query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc()).limit(limit).all()
 
-        result["ledger"] = [
+        ledger_entries = [
             {
                 "id": e.id,
                 "posting_date": e.posting_date.isoformat() if e.posting_date else None,
@@ -169,6 +170,7 @@ def get_account_detail(
             }
             for e in entries
         ]
+        result["ledger"] = ledger_entries
         result["ledger_count"] = len(entries)
 
     return result
@@ -341,7 +343,7 @@ def get_chart_of_accounts(
         tree = []
         for acc in accs:
             if acc.parent_account == parent:
-                balance = account_balances.get(acc.erpnext_id, 0.0)
+                balance = account_balances.get(acc.erpnext_id or "", 0.0)
                 node = {
                     "id": acc.id,
                     "name": acc.account_name,
@@ -368,7 +370,7 @@ def get_chart_of_accounts(
             "account_type": acc.account_type,
             "is_group": acc.is_group,
             "disabled": acc.disabled,
-            "balance": account_balances.get(acc.erpnext_id, 0.0),
+            "balance": account_balances.get(acc.erpnext_id or "", 0.0),
         }
         for acc in accounts
     ]
@@ -549,7 +551,8 @@ def list_gl_entries(
         )
 
     # Sorting
-    sort_column = getattr(GLEntry, sort_by, GLEntry.posting_date)
+    sort_key = sort_by or "posting_date"
+    sort_column = getattr(GLEntry, sort_key, GLEntry.posting_date)
     if sort_dir == "asc":
         query = query.order_by(sort_column.asc())
     else:

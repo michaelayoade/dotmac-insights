@@ -135,6 +135,18 @@ const baseSections: NavSection[] = [
     ],
   },
   {
+    key: 'controls',
+    label: 'Controls',
+    description: 'Period close & operations',
+    icon: ShieldCheck,
+    items: [
+      { name: 'Period Close', href: '/books/controls', description: 'Fiscal period management' },
+      { name: 'FX Revaluation', href: '/books/controls#fx', description: 'Currency adjustments' },
+      { name: 'Approvals', href: '/books/controls#approvals', description: 'Pending approvals' },
+      { name: 'Audit Log', href: '/books/controls#audit', description: 'Change history' },
+    ],
+  },
+  {
     key: 'config',
     label: 'Configuration',
     description: 'Preferences & setup',

@@ -93,20 +93,17 @@ export default function TrialBalancePage() {
     },
   ];
 
-  if (error) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-        <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-400">Failed to load trial balance</p>
-      </div>
-    );
-  }
-
   const isBalanced = data?.is_balanced ?? true;
   const difference = data?.difference ?? 0;
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">Failed to load trial balance</p>
+        </div>
+      )}
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">

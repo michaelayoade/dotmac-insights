@@ -206,7 +206,7 @@ async def create_journal_entry(
     Returns:
         Created journal entry details
     """
-    from app.models.accounting import JournalEntryAccount
+    from app.models.accounting import JournalEntryItem
     from app.services.je_validator import JEValidator, ValidationError
     from app.services.audit_logger import AuditLogger, serialize_for_audit
 
@@ -220,7 +220,7 @@ async def create_journal_entry(
     # Create JE
     je = JournalEntry(
         voucher_type=voucher_type_enum,
-        posting_date=posting_dt,
+        posting_date=datetime.combine(posting_dt, datetime.min.time()) if posting_dt else None,
         user_remark=je_data.user_remark,
         company=je_data.company,
         total_debit=Decimal("0"),
@@ -229,16 +229,15 @@ async def create_journal_entry(
     )
 
     # Parse account lines
-    je_accounts = []
+    je_accounts: List[JournalEntryItem] = []
     for acc_data in je_data.accounts:
-        je_acc = JournalEntryAccount(
+        je_acc = JournalEntryItem(
             account=acc_data.account,
             debit=Decimal(str(acc_data.debit)),
             credit=Decimal(str(acc_data.credit)),
             party_type=acc_data.party_type,
             party=acc_data.party,
             cost_center=acc_data.cost_center,
-            user_remark=acc_data.user_remark,
         )
         je_accounts.append(je_acc)
 
@@ -250,8 +249,8 @@ async def create_journal_entry(
         raise HTTPException(status_code=400, detail={"errors": e.errors})
 
     # Calculate totals
-    je.total_debit = sum(a.debit for a in je_accounts)
-    je.total_credit = sum(a.credit for a in je_accounts)
+    je.total_debit = sum(((a.debit or Decimal("0")) for a in je_accounts), Decimal("0"))
+    je.total_credit = sum(((a.credit or Decimal("0")) for a in je_accounts), Decimal("0"))
 
     db.add(je)
     db.flush()
@@ -312,7 +311,8 @@ def update_journal_entry(
     old_values = serialize_for_audit(je)
 
     if posting_date:
-        je.posting_date = parse_date(posting_date, "posting_date")
+        parsed_posting_date = parse_date(posting_date, "posting_date")
+        je.posting_date = datetime.combine(parsed_posting_date, datetime.min.time()) if parsed_posting_date else None
     if user_remark is not None:
         je.user_remark = user_remark
 

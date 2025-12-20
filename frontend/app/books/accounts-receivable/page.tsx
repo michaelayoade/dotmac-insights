@@ -170,23 +170,20 @@ export default function AccountsReceivablePage() {
     return <LoadingState />;
   }
 
-  if (error) {
-    return (
-      <ErrorDisplay
-        message="Failed to load accounts receivable."
-        error={error as Error}
-        onRetry={() => {
-          base.mutate?.();
-          enhancedResult.mutate?.();
-        }}
-      />
-    );
-  }
-
   const summary = data?.aging || {};
 
   return (
     <div className="space-y-6">
+      {error && (
+        <ErrorDisplay
+          message="Failed to load accounts receivable."
+          error={error as Error}
+          onRetry={() => {
+            base.mutate?.();
+            enhancedResult.mutate?.();
+          }}
+        />
+      )}
       {/* Aging Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
