@@ -12,6 +12,7 @@ import {
   expensesApi,
   fieldServiceApi,
   financeApi,
+  fleetApi,
   hrApi,
   inboxApi,
   inventoryApi,
@@ -90,6 +91,8 @@ const api: ApiGroup = {
   ...withDomainPrefix(inventoryApi, 'Inventory'),
   ...hrApi,
   ...withDomainPrefix(hrApi, 'Hr'),
+  ...fleetApi,
+  ...withDomainPrefix(fleetApi, 'Fleet'),
   ...analyticsApi,
   ...withDomainPrefix(analyticsApi, 'Reports'),
   ...insightsApi,
@@ -1472,6 +1475,8 @@ export function useAccountingDashboard(currency = 'NGN', config?: SWRConfigurati
     refreshInterval: 60000,
     dedupingInterval: 60000,
     revalidateOnFocus: false,
+    revalidateIfStale: true,
+    keepPreviousData: true,
     ...config,
   });
 }
@@ -1512,7 +1517,13 @@ export function useAccountingBalanceSheet(
   return useSWR(
     key,
     () => api.getAccountingBalanceSheet(params),
-    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
+    {
+      dedupingInterval: 5 * 60 * 1000,
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      ...config,
+    }
   );
 }
 
@@ -1533,7 +1544,13 @@ export function useAccountingIncomeStatement(
   return useSWR(
     key,
     () => api.getAccountingIncomeStatement(params),
-    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
+    {
+      dedupingInterval: 5 * 60 * 1000,
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      ...config,
+    }
   );
 }
 
@@ -1615,7 +1632,12 @@ export function useAccountingGeneralLedger(
   return useSWR<AccountingGeneralLedgerResponse>(
     ['accounting-general-ledger', params],
     () => api.getAccountingGeneralLedger(params),
-    config
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      ...config,
+    }
   );
 }
 
@@ -1626,7 +1648,13 @@ export function useAccountingCashFlow(
   return useSWR(
     ['accounting-cash-flow', params],
     () => api.getAccountingCashFlow(params),
-    { dedupingInterval: 5 * 60 * 1000, revalidateOnFocus: false, ...config }
+    {
+      dedupingInterval: 5 * 60 * 1000,
+      revalidateOnFocus: false,
+      revalidateIfStale: true,
+      keepPreviousData: true,
+      ...config,
+    }
   );
 }
 
@@ -2546,6 +2574,32 @@ export function usePurchasingExpenseTypes(
   return useSWR(
     ['purchasing-expense-types', params],
     () => api.getPurchasingExpenseTypes(params),
+    config
+  );
+}
+
+// ERPNext Expense Claims
+export function useERPNextExpenses(
+  params?: {
+    employee_id?: number;
+    project_id?: number;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['erpnext-expenses', params],
+    () => api.getERPNextExpenses(params),
+    config
+  );
+}
+
+export function useERPNextExpenseDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['erpnext-expense-detail', id] as const : null,
+    ([, expenseId]) => api.getERPNextExpenseDetail(expenseId),
     config
   );
 }
@@ -3749,6 +3803,91 @@ export function useHRSettingsMutations() {
 }
 
 // ============================================================================
+// FLEET MANAGEMENT HOOKS
+// ============================================================================
+
+export function useFleetVehicles(
+  params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    make?: string;
+    model?: string;
+    fuel_type?: string;
+    employee_id?: number;
+    is_active?: boolean;
+    sort_by?: 'license_plate' | 'make' | 'model' | 'acquisition_date' | 'vehicle_value' | 'odometer_value';
+    sort_order?: 'asc' | 'desc';
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['fleet-vehicles', params],
+    () => api.getVehicles(params),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetVehicle(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['fleet-vehicle', id] : null,
+    () => api.getVehicle(id!),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetSummary(config?: SWRConfiguration) {
+  return useSWR(
+    ['fleet-summary'],
+    () => api.getVehicleSummary(),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetInsuranceExpiring(days = 30, config?: SWRConfiguration) {
+  return useSWR(
+    ['fleet-insurance-expiring', days],
+    () => api.getVehiclesInsuranceExpiring(days),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetMakes(config?: SWRConfiguration) {
+  return useSWR(
+    ['fleet-makes'],
+    () => api.getVehicleMakes(),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetFuelTypes(config?: SWRConfiguration) {
+  return useSWR(
+    ['fleet-fuel-types'],
+    () => api.getFuelTypes(),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetVehiclesByDriver(employeeId: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    employeeId ? ['fleet-vehicles-by-driver', employeeId] : null,
+    () => api.getVehiclesByDriver(employeeId!),
+    { revalidateOnFocus: false, ...config }
+  );
+}
+
+export function useFleetMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    updateVehicle: async (id: number | string, body: Parameters<typeof api.updateVehicle>[1]) => {
+      const res = await api.updateVehicle(id, body);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'fleet-vehicles' || key[0] === 'fleet-vehicle' || key[0] === 'fleet-summary'));
+      return res;
+    },
+  };
+}
+
+// ============================================================================
 // SUPPORT SETTINGS HOOKS
 // ============================================================================
 
@@ -4639,6 +4778,12 @@ export interface UnifiedContact {
   name: string;
   contact_type: string;
   status: string;
+  is_organization?: boolean | null;
+  is_primary_contact?: boolean | null;
+  is_billing_contact?: boolean | null;
+  is_decision_maker?: boolean | null;
+  designation?: string | null;
+  department?: string | null;
   company_name?: string | null;
   lead_qualification?: string | null;
   email?: string | null;
@@ -4663,6 +4808,8 @@ export interface UnifiedContact {
   source?: string | null;
   lead_score?: number | null;
   tags?: string[];
+  cancellation_date?: string | null;
+  churn_reason?: string | null;
   created_at?: string;
   first_contact_date?: string | null;
   qualified_date?: string | null;
@@ -5008,27 +5155,11 @@ export interface EntitlementsResponse {
 }
 
 async function fetchPlatformApi<T>(endpoint: string): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
-  const response = await fetch(`/api/platform${endpoint}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: token ? 'omit' : 'include',
-  });
-  if (!response.ok) {
-    throw new Error(`Platform API error: ${response.status}`);
-  }
-  return response.json();
+  return fetchApi<T>(`/platform${endpoint}`);
 }
 
 async function fetchEntitlements<T>(): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('dotmac_access_token') : null;
-  const response = await fetch('/api/entitlements', {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: token ? 'omit' : 'include',
-  });
-  if (!response.ok) {
-    throw new Error(`Entitlements API error: ${response.status}`);
-  }
-  return response.json();
+  return fetchApi<T>('/entitlements');
 }
 
 export function usePlatformStatus(config?: SWRConfiguration) {

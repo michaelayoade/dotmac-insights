@@ -4,10 +4,13 @@ Contact Analytics Endpoints
 Dashboard metrics, distribution analysis, funnel analytics
 """
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+import csv
+import io
 
 from app.database import get_db
 from app.models.unified_contact import (
@@ -478,3 +481,300 @@ def get_churn_analytics(
             for m in monthly_churn
         ],
     }
+
+
+# =============================================================================
+# TAGS ANALYTICS
+# =============================================================================
+
+@router.get("/analytics/tags", dependencies=[Depends(Require("contacts:read"))])
+def get_tags_analytics(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """
+    Tag usage analytics across all contacts.
+    Returns tag counts aggregated from the tags array field.
+    """
+    # Get all contacts with tags
+    contacts_with_tags = db.query(UnifiedContact).filter(
+        UnifiedContact.tags.isnot(None),
+        func.array_length(UnifiedContact.tags, 1) > 0
+    ).all()
+
+    # Aggregate tags
+    tag_counts: Dict[str, int] = {}
+    total_tagged = 0
+    total_tag_assignments = 0
+
+    for contact in contacts_with_tags:
+        if contact.tags:
+            total_tagged += 1
+            for tag in contact.tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                total_tag_assignments += 1
+
+    # Sort by count and limit
+    sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:limit]
+
+    total_contacts = db.query(func.count(UnifiedContact.id)).scalar() or 0
+
+    return {
+        "total_unique_tags": len(tag_counts),
+        "total_contacts": total_contacts,
+        "total_tagged_contacts": total_tagged,
+        "total_tag_assignments": total_tag_assignments,
+        "avg_tags_per_contact": round(total_tag_assignments / total_tagged, 2) if total_tagged > 0 else 0,
+        "tags": [
+            {"tag": tag, "count": count}
+            for tag, count in sorted_tags
+        ],
+    }
+
+
+# =============================================================================
+# DATA QUALITY ANALYTICS
+# =============================================================================
+
+@router.get("/analytics/quality", dependencies=[Depends(Require("contacts:read"))])
+def get_quality_analytics(db: Session = Depends(get_db)):
+    """
+    Data quality analysis for contacts.
+    Returns counts of missing/invalid fields and quality score.
+    """
+    total = db.query(func.count(UnifiedContact.id)).scalar() or 0
+
+    if total == 0:
+        return {
+            "total_contacts": 0,
+            "quality_score": 100,
+            "complete_contacts": 0,
+            "completeness_rate": 100,
+            "issues": [],
+        }
+
+    # Count missing fields
+    missing_email = db.query(func.count(UnifiedContact.id)).filter(
+        (UnifiedContact.email.is_(None)) | (UnifiedContact.email == "")
+    ).scalar() or 0
+
+    missing_phone = db.query(func.count(UnifiedContact.id)).filter(
+        (UnifiedContact.phone.is_(None)) | (UnifiedContact.phone == "")
+    ).scalar() or 0
+
+    missing_address = db.query(func.count(UnifiedContact.id)).filter(
+        (UnifiedContact.city.is_(None)) | (UnifiedContact.city == ""),
+        (UnifiedContact.address_line1.is_(None)) | (UnifiedContact.address_line1 == "")
+    ).scalar() or 0
+
+    missing_company = db.query(func.count(UnifiedContact.id)).filter(
+        UnifiedContact.is_organization == True,
+        (UnifiedContact.company_name.is_(None)) | (UnifiedContact.company_name == "")
+    ).scalar() or 0
+
+    missing_territory = db.query(func.count(UnifiedContact.id)).filter(
+        (UnifiedContact.territory.is_(None)) | (UnifiedContact.territory == "")
+    ).scalar() or 0
+
+    missing_category = db.query(func.count(UnifiedContact.id)).filter(
+        UnifiedContact.category.is_(None)
+    ).scalar() or 0
+
+    no_tags = db.query(func.count(UnifiedContact.id)).filter(
+        (UnifiedContact.tags.is_(None)) | (func.array_length(UnifiedContact.tags, 1).is_(None))
+    ).scalar() or 0
+
+    # Invalid email (simple check - missing @)
+    invalid_email = db.query(func.count(UnifiedContact.id)).filter(
+        UnifiedContact.email.isnot(None),
+        UnifiedContact.email != "",
+        ~UnifiedContact.email.contains("@")
+    ).scalar() or 0
+
+    # Complete contacts (have email, phone, and address)
+    complete = db.query(func.count(UnifiedContact.id)).filter(
+        UnifiedContact.email.isnot(None),
+        UnifiedContact.email != "",
+        UnifiedContact.phone.isnot(None),
+        UnifiedContact.phone != "",
+        ((UnifiedContact.city.isnot(None) & (UnifiedContact.city != "")) |
+         (UnifiedContact.address_line1.isnot(None) & (UnifiedContact.address_line1 != "")))
+    ).scalar() or 0
+
+    # Build issues list
+    issues = []
+    if missing_email > 0:
+        issues.append({
+            "field": "email",
+            "label": "Missing Email",
+            "count": missing_email,
+            "percentage": round(missing_email / total * 100, 1),
+            "severity": "high"
+        })
+    if invalid_email > 0:
+        issues.append({
+            "field": "invalid_email",
+            "label": "Invalid Email Format",
+            "count": invalid_email,
+            "percentage": round(invalid_email / total * 100, 1),
+            "severity": "high"
+        })
+    if missing_phone > 0:
+        issues.append({
+            "field": "phone",
+            "label": "Missing Phone",
+            "count": missing_phone,
+            "percentage": round(missing_phone / total * 100, 1),
+            "severity": "medium"
+        })
+    if missing_company > 0:
+        issues.append({
+            "field": "company",
+            "label": "Missing Company Name",
+            "count": missing_company,
+            "percentage": round(missing_company / total * 100, 1),
+            "severity": "medium"
+        })
+    if missing_address > 0:
+        issues.append({
+            "field": "address",
+            "label": "Missing Address",
+            "count": missing_address,
+            "percentage": round(missing_address / total * 100, 1),
+            "severity": "low"
+        })
+    if missing_territory > 0:
+        issues.append({
+            "field": "territory",
+            "label": "No Territory Assigned",
+            "count": missing_territory,
+            "percentage": round(missing_territory / total * 100, 1),
+            "severity": "low"
+        })
+    if missing_category > 0:
+        issues.append({
+            "field": "category",
+            "label": "No Category Set",
+            "count": missing_category,
+            "percentage": round(missing_category / total * 100, 1),
+            "severity": "low"
+        })
+    if no_tags > 0:
+        issues.append({
+            "field": "tags",
+            "label": "No Tags",
+            "count": no_tags,
+            "percentage": round(no_tags / total * 100, 1),
+            "severity": "low"
+        })
+
+    # Calculate quality score (weighted penalties)
+    penalty = 0
+    for issue in issues:
+        weight = 3 if issue["severity"] == "high" else 2 if issue["severity"] == "medium" else 1
+        penalty += (issue["count"] / total) * weight * 10
+
+    quality_score = max(0, round(100 - penalty))
+    completeness_rate = round(complete / total * 100, 1) if total > 0 else 100
+
+    return {
+        "total_contacts": total,
+        "quality_score": quality_score,
+        "complete_contacts": complete,
+        "completeness_rate": completeness_rate,
+        "issues": issues,
+    }
+
+
+# =============================================================================
+# EXPORT
+# =============================================================================
+
+EXPORT_FIELDS = [
+    "id", "name", "email", "phone", "mobile", "company_name",
+    "contact_type", "category", "status", "is_organization",
+    "lead_qualification", "lead_score",
+    "address_line1", "address_line2", "city", "state", "postal_code", "country",
+    "territory", "industry", "market_segment", "tags",
+    "mrr", "lifetime_value", "outstanding_balance", "billing_type",
+    "source", "source_campaign", "referrer",
+    "first_contact_date", "conversion_date", "cancellation_date",
+    "created_at", "updated_at", "notes",
+]
+
+
+@router.get("/export", dependencies=[Depends(Require("contacts:read"))])
+def export_contacts(
+    format: str = Query("csv", pattern="^(csv|json)$"),
+    contact_type: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    fields: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Export contacts to CSV or JSON format.
+
+    Args:
+        format: Export format (csv or json)
+        contact_type: Filter by contact type
+        category: Filter by category
+        status: Filter by status
+        fields: Comma-separated list of fields to include (default: all)
+    """
+    query = db.query(UnifiedContact)
+
+    if contact_type:
+        query = query.filter(UnifiedContact.contact_type == ContactType(contact_type))
+    if category:
+        query = query.filter(UnifiedContact.category == ContactCategory(category))
+    if status:
+        query = query.filter(UnifiedContact.status == ContactStatus(status))
+
+    contacts = query.all()
+
+    # Determine fields to export
+    if fields:
+        export_fields = [f.strip() for f in fields.split(",") if f.strip() in EXPORT_FIELDS]
+    else:
+        export_fields = EXPORT_FIELDS
+
+    def format_value(contact, field):
+        """Format a field value for export."""
+        value = getattr(contact, field, None)
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple)):
+            return "; ".join(str(v) for v in value)
+        if hasattr(value, "value"):  # Enum
+            return value.value
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return str(value)
+
+    if format == "json":
+        import json
+        data = [
+            {field: format_value(c, field) for field in export_fields}
+            for c in contacts
+        ]
+        content = json.dumps(data, indent=2)
+        return StreamingResponse(
+            io.StringIO(content),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.utcnow().strftime('%Y%m%d')}.json"}
+        )
+    else:
+        # CSV export
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(export_fields)
+        for contact in contacts:
+            writer.writerow([format_value(contact, field) for field in export_fields])
+
+        output.seek(0)
+        return StreamingResponse(
+            output,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.utcnow().strftime('%Y%m%d')}.csv"}
+        )

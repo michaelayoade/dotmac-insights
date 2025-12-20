@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, validator
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,88 @@ from app.models.accounting import Account, AccountType, GLEntry
 from .helpers import parse_date, paginate, serialize_account
 
 router = APIRouter()
+
+
+class AccountCreateRequest(BaseModel):
+    account_name: str
+    account_number: Optional[str] = None
+    parent_account: Optional[str] = None
+    root_type: Optional[str] = None
+    account_type: Optional[str] = None
+    company: Optional[str] = None
+    is_group: bool = False
+    disabled: bool = False
+    balance_must_be: Optional[str] = None
+
+
+class AccountUpdateRequest(BaseModel):
+    account_name: Optional[str] = None
+    account_number: Optional[str] = None
+    parent_account: Optional[str] = None
+    root_type: Optional[str] = None
+    account_type: Optional[str] = None
+    company: Optional[str] = None
+    is_group: Optional[bool] = None
+    disabled: Optional[bool] = None
+    balance_must_be: Optional[str] = None
+
+
+class GLEntryCreateRequest(BaseModel):
+    posting_date: Optional[date] = None
+    account: Optional[str] = None
+    party_type: Optional[str] = None
+    party: Optional[str] = None
+    debit: Optional[Decimal] = Decimal("0")
+    credit: Optional[Decimal] = Decimal("0")
+    debit_in_account_currency: Optional[Decimal] = None
+    credit_in_account_currency: Optional[Decimal] = None
+    voucher_type: Optional[str] = None
+    voucher_no: Optional[str] = None
+    cost_center: Optional[str] = None
+    company: Optional[str] = None
+    fiscal_year: Optional[str] = None
+    is_cancelled: bool = False
+
+    @validator(
+        "debit",
+        "credit",
+        "debit_in_account_currency",
+        "credit_in_account_currency",
+        pre=True,
+    )
+    def _to_decimal(cls, value):
+        if value is None:
+            return None
+        return Decimal(str(value))
+
+
+class GLEntryUpdateRequest(BaseModel):
+    posting_date: Optional[date] = None
+    account: Optional[str] = None
+    party_type: Optional[str] = None
+    party: Optional[str] = None
+    debit: Optional[Decimal] = None
+    credit: Optional[Decimal] = None
+    debit_in_account_currency: Optional[Decimal] = None
+    credit_in_account_currency: Optional[Decimal] = None
+    voucher_type: Optional[str] = None
+    voucher_no: Optional[str] = None
+    cost_center: Optional[str] = None
+    company: Optional[str] = None
+    fiscal_year: Optional[str] = None
+    is_cancelled: Optional[bool] = None
+
+    @validator(
+        "debit",
+        "credit",
+        "debit_in_account_currency",
+        "credit_in_account_currency",
+        pre=True,
+    )
+    def _to_decimal(cls, value):
+        if value is None:
+            return None
+        return Decimal(str(value))
 
 
 # =============================================================================
@@ -174,6 +257,81 @@ def get_account_detail(
         result["ledger_count"] = len(entries)
 
     return result
+
+
+# =============================================================================
+# ACCOUNT CRUD
+# =============================================================================
+
+@router.post("/accounts", dependencies=[Depends(Require("accounting:write"))])
+def create_account(
+    payload: AccountCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a chart of accounts entry locally."""
+    root_type_enum = None
+    if payload.root_type:
+        try:
+            root_type_enum = AccountType(payload.root_type.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid root_type: {payload.root_type}")
+
+    account = Account(
+        account_name=payload.account_name,
+        account_number=payload.account_number,
+        parent_account=payload.parent_account,
+        root_type=root_type_enum,
+        account_type=payload.account_type,
+        company=payload.company,
+        is_group=payload.is_group,
+        disabled=payload.disabled,
+        balance_must_be=payload.balance_must_be,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return {"id": account.id}
+
+
+@router.patch("/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_account(
+    account_id: int,
+    payload: AccountUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a chart of accounts entry locally."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "root_type" in update_data and update_data["root_type"]:
+        try:
+            update_data["root_type"] = AccountType(update_data["root_type"].lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid root_type: {update_data['root_type']}")
+
+    for key, value in update_data.items():
+        setattr(account, key, value)
+
+    db.commit()
+    db.refresh(account)
+    return {"id": account.id}
+
+
+@router.delete("/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_account(
+    account_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Disable a chart of accounts entry."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    account.disabled = True
+    db.commit()
+    return {"status": "disabled", "account_id": account_id}
 
 
 # =============================================================================
@@ -625,6 +783,77 @@ def get_gl_entry_detail(
         "is_cancelled": entry.is_cancelled,
         "company": entry.company,
     }
+
+
+# =============================================================================
+# GL ENTRY CRUD
+# =============================================================================
+
+@router.post("/gl-entries", dependencies=[Depends(Require("accounting:write"))])
+def create_gl_entry(
+    payload: GLEntryCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a GL entry locally."""
+    entry = GLEntry(
+        posting_date=payload.posting_date,
+        account=payload.account,
+        party_type=payload.party_type,
+        party=payload.party,
+        debit=payload.debit or Decimal("0"),
+        credit=payload.credit or Decimal("0"),
+        debit_in_account_currency=payload.debit_in_account_currency
+        if payload.debit_in_account_currency is not None
+        else payload.debit or Decimal("0"),
+        credit_in_account_currency=payload.credit_in_account_currency
+        if payload.credit_in_account_currency is not None
+        else payload.credit or Decimal("0"),
+        voucher_type=payload.voucher_type,
+        voucher_no=payload.voucher_no,
+        cost_center=payload.cost_center,
+        company=payload.company,
+        fiscal_year=payload.fiscal_year,
+        is_cancelled=payload.is_cancelled,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {"id": entry.id}
+
+
+@router.patch("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_gl_entry(
+    entry_id: int,
+    payload: GLEntryUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a GL entry locally."""
+    entry = db.query(GLEntry).filter(GLEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="GL entry not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(entry, key, value)
+
+    db.commit()
+    db.refresh(entry)
+    return {"id": entry.id}
+
+
+@router.delete("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_gl_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete a GL entry."""
+    entry = db.query(GLEntry).filter(GLEntry.id == entry_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="GL entry not found")
+
+    db.delete(entry)
+    db.commit()
+    return {"status": "deleted", "gl_entry_id": entry_id}
 
 
 # =============================================================================

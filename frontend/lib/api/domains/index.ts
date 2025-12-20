@@ -317,6 +317,7 @@ export type {
   AccountingAccountTreeNode,
   AccountingChartOfAccounts,
   AccountingAccountDetail,
+  AccountingAccountPayload,
   // General Ledger
   AccountingGeneralLedgerEntry,
   AccountingGeneralLedgerResponse,
@@ -341,9 +342,11 @@ export type {
   // Suppliers
   AccountingSupplier,
   AccountingSupplierListResponse,
+  AccountingSupplierPayload,
   // Bank Accounts & Transactions
   AccountingBankAccount,
   AccountingBankAccountListResponse,
+  AccountingBankAccountPayload,
   AccountingBankTransaction,
   AccountingBankTransactionListResponse,
   AccountingBankTransactionPayment,
@@ -463,6 +466,12 @@ export type {
   PurchasingExpensePayload,
   PurchasingExpenseTypesResponse,
   PurchasingExpenseListParams,
+  // ERPNext Expense Claims
+  ERPNextExpenseClaim,
+  ERPNextExpenseClaimListResponse,
+  ERPNextExpenseClaimDetail,
+  ERPNextExpenseClaimPayload,
+  ERPNextExpenseClaimListParams,
   // Analytics
   PurchasingAgingInvoice,
   PurchasingAgingBucket,
@@ -671,3 +680,27 @@ export * from './assets';
 // Inbox Domain (Omnichannel - Conversations, Contacts, Routing Rules, Analytics)
 export { inboxApi } from './inbox';
 export * from './inbox';
+
+// Sales Domain (Customer Groups, Territories, Sales Persons)
+export { salesApi } from './sales';
+export type {
+  CustomerGroup,
+  CustomerGroupListResponse,
+  CustomerGroupPayload,
+  Territory,
+  TerritoryListResponse,
+  TerritoryPayload,
+  SalesPerson,
+  SalesPersonListResponse,
+  SalesPersonPayload,
+} from './sales';
+
+// Fleet Management Domain (Vehicles, Driver Assignments, Insurance)
+export { fleetApi } from './fleet';
+export type {
+  Vehicle,
+  VehicleListResponse,
+  VehicleSummary,
+  VehicleUpdatePayload,
+  VehicleListParams,
+} from './fleet';

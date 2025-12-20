@@ -148,7 +148,6 @@ export default function SyncPage() {
       onRetry={retryAll}
       softError={true}
       loadingMessage="Loading sync status..."
-      errorMessage="Failed to load sync data"
     >
       <div className="space-y-8">
         {firstError && (

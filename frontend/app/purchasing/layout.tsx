@@ -10,6 +10,7 @@ import {
   Calendar,
   TrendingUp,
   Settings,
+  Receipt,
 } from 'lucide-react';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
@@ -58,6 +59,16 @@ const sections: NavSection[] = [
     icon: Users,
     items: [
       { name: 'Suppliers', href: '/purchasing/suppliers', description: 'Vendor directory' },
+    ],
+  },
+  {
+    key: 'expenses',
+    label: 'Expenses',
+    description: 'Expense claims',
+    icon: Receipt,
+    items: [
+      { name: 'Expenses', href: '/purchasing/expenses', description: 'GL expense entries' },
+      { name: 'ERPNext Claims', href: '/purchasing/erpnext-expenses', description: 'ERPNext expense claims' },
     ],
   },
 ];

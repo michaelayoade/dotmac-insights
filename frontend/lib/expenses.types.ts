@@ -11,6 +11,14 @@ export type ExpenseClaimStatus =
   | 'reversed'
   | 'cancelled';
 
+export type ExpenseClaimPaymentStatus =
+  | 'unpaid'
+  | 'pending'
+  | 'partially_paid'
+  | 'paid'
+  | 'failed'
+  | 'reversed';
+
 // ============== Expense Categories ==============
 
 export interface ExpenseCategory {
@@ -134,7 +142,28 @@ export interface ExpenseClaim {
   currency: string;
   base_currency: string;
   conversion_rate: number;
+  payment_status?: ExpenseClaimPaymentStatus | null;
+  amount_paid?: number | null;
+  payment_date?: string | null;
+  payment_reference?: string | null;
+  mode_of_payment?: string | null;
+  transfer_reference?: string | null;
+  transfer_status?: string | null;
+  transfer_provider?: string | null;
+  transfer_amount?: number | null;
+  transfer_fee?: number | null;
+  transfer_created_at?: string | null;
   lines: ExpenseClaimLine[];
+}
+
+export interface ExpenseClaimPayNowPayload {
+  account_number: string;
+  bank_code: string;
+  account_name?: string | null;
+  amount?: number | null;
+  reason?: string | null;
+  narration?: string | null;
+  provider?: 'paystack' | 'flutterwave' | null;
 }
 
 export interface ExpenseClaimLinePayload {

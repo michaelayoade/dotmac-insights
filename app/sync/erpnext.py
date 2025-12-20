@@ -64,6 +64,10 @@ from app.sync.erpnext_parts import (
     # Support
     sync_hd_tickets,
     sync_projects,
+    # Assets & Vehicles
+    sync_asset_categories,
+    sync_assets,
+    sync_vehicles,
 )
 
 logger = structlog.get_logger()
@@ -546,3 +550,14 @@ class ERPNextSync(BaseSyncClient):
             resolve_employee_relationships(self)
             # Link sales persons to employees
             resolve_sales_person_employees(self)
+
+    async def sync_assets_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Assets and Asset Categories."""
+        async with httpx.AsyncClient(timeout=180) as client:
+            await sync_asset_categories(self, client, full_sync)
+            await sync_assets(self, client, full_sync)
+
+    async def sync_vehicles_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Vehicles (Fleet Management)."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await sync_vehicles(self, client, full_sync)

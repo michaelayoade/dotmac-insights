@@ -324,7 +324,6 @@ export default function HrOverviewPage() {
       isLoading={isLoading}
       error={error}
       onRetry={retryAll}
-      errorMessage="Failed to load HR overview data"
       softError
     >
       <div className="space-y-6">

@@ -161,6 +161,17 @@ export interface AccountingAccountDetail extends AccountingAccount {
   ledger?: AccountingGeneralLedgerEntry[];
 }
 
+export interface AccountingAccountPayload {
+  account_name: string;
+  account_number?: string | null;
+  account_type?: string | null;
+  root_type?: string | null;
+  parent_account?: string | null;
+  is_group?: boolean;
+  currency?: string | null;
+  disabled?: boolean;
+}
+
 // =============================================================================
 // GENERAL LEDGER
 // =============================================================================
@@ -797,6 +808,20 @@ export interface AccountingSupplierListResponse {
   currency?: string;
 }
 
+export interface AccountingSupplierPayload {
+  supplier_name: string;
+  supplier_code?: string | null;
+  supplier_type?: string | null;
+  supplier_group?: string | null;
+  country?: string | null;
+  default_currency?: string | null;
+  payment_terms?: string | null;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  disabled?: boolean;
+}
+
 // =============================================================================
 // BANK ACCOUNTS & TRANSACTIONS
 // =============================================================================
@@ -818,6 +843,17 @@ export interface AccountingBankAccount {
 export interface AccountingBankAccountListResponse {
   accounts: AccountingBankAccount[];
   total: number;
+}
+
+export interface AccountingBankAccountPayload {
+  account_name: string;
+  bank?: string | null;
+  account_number?: string | null;
+  account_type?: string | null;
+  currency?: string | null;
+  is_default?: boolean;
+  is_company_account?: boolean;
+  disabled?: boolean;
 }
 
 export interface AccountingBankTransaction {
@@ -1006,6 +1042,42 @@ export interface AccountingCostCenter {
 export interface AccountingCostCenterListResponse {
   cost_centers: AccountingCostCenter[];
   total: number;
+}
+
+export interface AccountingFiscalYearPayload {
+  name?: string;
+  year_start_date: string;
+  year_end_date: string;
+  is_closed?: boolean;
+}
+
+export interface AccountingCostCenterPayload {
+  cost_center_name: string;
+  parent_cost_center?: string | null;
+  is_group?: boolean;
+  company?: string | null;
+}
+
+// Mode of Payment Types
+export interface AccountingModeOfPayment {
+  id: number;
+  name: string;
+  mode_of_payment: string;
+  type?: string | null;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AccountingModeOfPaymentListResponse {
+  items: AccountingModeOfPayment[];
+  total: number;
+}
+
+export interface AccountingModeOfPaymentPayload {
+  mode_of_payment: string;
+  type?: string | null;
+  enabled?: boolean;
 }
 
 // =============================================================================
@@ -1537,6 +1609,21 @@ export const accountingApi = {
       params: params ? ({ ...params } as Record<string, unknown>) : undefined,
     }),
 
+  createAccount: (body: AccountingAccountPayload) =>
+    fetchApi<AccountingAccount>('/v1/accounting/accounts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateAccount: (id: number | string, body: Partial<AccountingAccountPayload>) =>
+    fetchApi<AccountingAccount>(`/v1/accounting/accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteAccount: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/accounts/${id}`, { method: 'DELETE' }),
+
   // Financial Statements
   getTrialBalance: (params?: { fiscal_year?: string; start_date?: string; end_date?: string; currency?: string; drill?: boolean }) =>
     fetchApi<AccountingTrialBalance>('/v1/accounting/trial-balance', { params }),
@@ -1638,9 +1725,45 @@ export const accountingApi = {
       params: params ? ({ ...params } as Record<string, unknown>) : undefined,
     }),
 
+  getSupplierDetail: (id: number | string) =>
+    fetchApi<AccountingSupplier>(`/v1/accounting/suppliers/${id}`),
+
+  createSupplier: (body: AccountingSupplierPayload) =>
+    fetchApi<AccountingSupplier>('/v1/accounting/suppliers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupplier: (id: number | string, body: Partial<AccountingSupplierPayload>) =>
+    fetchApi<AccountingSupplier>(`/v1/accounting/suppliers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupplier: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/suppliers/${id}`, { method: 'DELETE' }),
+
   // Bank Accounts
   getBankAccounts: () =>
     fetchApi<AccountingBankAccountListResponse>('/v1/accounting/bank-accounts'),
+
+  getBankAccountDetail: (id: number | string) =>
+    fetchApi<AccountingBankAccount>(`/v1/accounting/bank-accounts/${id}`),
+
+  createBankAccount: (body: AccountingBankAccountPayload) =>
+    fetchApi<AccountingBankAccount>('/v1/accounting/bank-accounts', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateBankAccount: (id: number | string, body: Partial<AccountingBankAccountPayload>) =>
+    fetchApi<AccountingBankAccount>(`/v1/accounting/bank-accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteBankAccount: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/bank-accounts/${id}`, { method: 'DELETE' }),
 
   // Bank Transactions
   getBankTransactions: (params?: AccountingBankTransactionListParams) =>
@@ -1678,12 +1801,80 @@ export const accountingApi = {
   getPurchaseInvoiceDetail: (id: number, currency?: string) =>
     fetchApi<AccountingPurchaseInvoiceDetail>(`/v1/accounting/purchase-invoices/${id}`, { params: { currency } }),
 
-  // Fiscal Years & Cost Centers
+  // -------------------------------------------------------------------------
+  // Fiscal Years
+  // -------------------------------------------------------------------------
+
   getFiscalYears: () =>
     fetchApi<AccountingFiscalYearListResponse>('/v1/accounting/fiscal-years'),
 
+  getFiscalYear: (id: number | string) =>
+    fetchApi<AccountingFiscalYear>(`/v1/accounting/fiscal-years/${id}`),
+
+  createFiscalYear: (body: AccountingFiscalYearPayload) =>
+    fetchApi<AccountingFiscalYear>('/v1/accounting/fiscal-years', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateFiscalYear: (id: number | string, body: Partial<AccountingFiscalYearPayload>) =>
+    fetchApi<AccountingFiscalYear>(`/v1/accounting/fiscal-years/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteFiscalYear: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/fiscal-years/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Cost Centers
+  // -------------------------------------------------------------------------
+
   getCostCenters: () =>
     fetchApi<AccountingCostCenterListResponse>('/v1/accounting/cost-centers'),
+
+  getCostCenter: (id: number | string) =>
+    fetchApi<AccountingCostCenter>(`/v1/accounting/cost-centers/${id}`),
+
+  createCostCenter: (body: AccountingCostCenterPayload) =>
+    fetchApi<AccountingCostCenter>('/v1/accounting/cost-centers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCostCenter: (id: number | string, body: Partial<AccountingCostCenterPayload>) =>
+    fetchApi<AccountingCostCenter>(`/v1/accounting/cost-centers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteCostCenter: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/cost-centers/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Modes of Payment
+  // -------------------------------------------------------------------------
+
+  getModesOfPayment: (params?: { limit?: number; offset?: number }) =>
+    fetchApi<AccountingModeOfPaymentListResponse>('/v1/accounting/modes-of-payment', { params }),
+
+  getModeOfPayment: (id: number | string) =>
+    fetchApi<AccountingModeOfPayment>(`/v1/accounting/modes-of-payment/${id}`),
+
+  createModeOfPayment: (body: AccountingModeOfPaymentPayload) =>
+    fetchApi<AccountingModeOfPayment>('/v1/accounting/modes-of-payment', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateModeOfPayment: (id: number | string, body: Partial<AccountingModeOfPaymentPayload>) =>
+    fetchApi<AccountingModeOfPayment>(`/v1/accounting/modes-of-payment/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteModeOfPayment: (id: number | string) =>
+    fetchApi<void>(`/v1/accounting/modes-of-payment/${id}`, { method: 'DELETE' }),
 
   // Tax Templates & Summaries
   getTaxCategories: () =>

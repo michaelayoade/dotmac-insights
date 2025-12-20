@@ -38,7 +38,6 @@ export default function NotificationsPage() {
         icon: Bell,
       }}
       loadingMessage="Loading notifications..."
-      errorMessage="Failed to load notifications"
     >
       <div className="space-y-6">
         <PageHeader

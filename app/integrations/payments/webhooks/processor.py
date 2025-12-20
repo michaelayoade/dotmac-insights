@@ -25,6 +25,7 @@ from app.models.gateway_transaction import (
     GatewayProvider,
     GatewayTransactionStatus,
 )
+from app.models.expense_management import ExpenseClaim, ExpenseClaimStatus
 from app.models.transfer import Transfer, TransferStatus
 from app.models.webhook_event import WebhookEvent
 from app.integrations.payments.enums import PaymentProvider, TransactionStatus
@@ -463,6 +464,27 @@ class WebhookProcessor:
             transfer.completed_at = datetime.utcnow()
             logger.info(f"Transfer marked successful: {reference}")
 
+            claim_id = (transfer.extra_data or {}).get("expense_claim_id")
+            if claim_id:
+                result = await db.execute(
+                    select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
+                )
+                claim = result.scalar_one_or_none()
+                if claim:
+                    payable = claim.total_reimbursable or claim.total_sanctioned_amount or claim.total_claimed_amount
+                    payable = Decimal(str(payable or 0))
+                    already_paid = Decimal(str(claim.amount_paid or 0))
+                    new_paid = already_paid + transfer.amount
+                    claim.amount_paid = new_paid
+                    claim.payment_reference = transfer.reference
+                    claim.payment_date = datetime.utcnow()
+                    claim.mode_of_payment = provider.value
+                    if new_paid >= payable and payable > 0:
+                        claim.payment_status = "paid"
+                        claim.status = ExpenseClaimStatus.PAID
+                    else:
+                        claim.payment_status = "partially_paid"
+
     async def _handle_transfer_failed(
         self,
         provider: PaymentProvider,
@@ -484,6 +506,15 @@ class WebhookProcessor:
             transfer.failure_reason = event_data.get("reason", "Transfer failed")
             logger.info(f"Transfer marked failed: {reference}")
 
+            claim_id = (transfer.extra_data or {}).get("expense_claim_id")
+            if claim_id:
+                result = await db.execute(
+                    select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
+                )
+                claim = result.scalar_one_or_none()
+                if claim:
+                    claim.payment_status = "failed"
+
     async def _handle_transfer_reversed(
         self,
         provider: PaymentProvider,
@@ -504,6 +535,15 @@ class WebhookProcessor:
             transfer.status = TransferStatus.REVERSED
             transfer.failure_reason = "Transfer reversed"
             logger.info(f"Transfer marked reversed: {reference}")
+
+            claim_id = (transfer.extra_data or {}).get("expense_claim_id")
+            if claim_id:
+                result = await db.execute(
+                    select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
+                )
+                claim = result.scalar_one_or_none()
+                if claim:
+                    claim.payment_status = "reversed"
 
     async def _handle_refund(
         self,

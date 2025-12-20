@@ -167,6 +167,7 @@ from app.models.asset import (
     AssetFinanceBook,
     AssetDepreciationSchedule,
 )
+from app.models.vehicle import Vehicle
 from app.models.field_service import (
     ServiceZone,
     FieldTeam,
@@ -472,6 +473,8 @@ __all__ = [
     "AssetCategoryFinanceBook",
     "AssetFinanceBook",
     "AssetDepreciationSchedule",
+    # Vehicle model
+    "Vehicle",
     # CRM models
     "OpportunityStage",
     "Opportunity",

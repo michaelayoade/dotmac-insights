@@ -32,7 +32,9 @@ import {
   AlertTriangle,
   XCircle,
   ShoppingBag,
+  ChevronRight,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   useCardAnalyticsOverview,
   useCardSpendTrend,
@@ -76,6 +78,8 @@ function MetricCard({
   colorClass = 'text-violet-400',
   trend,
   loading,
+  href,
+  onClick,
 }: {
   title: string;
   value: string | number;
@@ -84,31 +88,61 @@ function MetricCard({
   colorClass?: string;
   trend?: { value: number; positive?: boolean };
   loading?: boolean;
+  href?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-          {trend && (
-            <div className={cn('flex items-center gap-1 text-xs', trend.positive ? 'text-emerald-400' : 'text-rose-400')}>
-              {trend.positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              <span>{Math.abs(trend.value).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
+  const isClickable = Boolean(href || onClick);
+
+  const content = (
+    <div className="flex items-start justify-between">
+      <div className="space-y-1">
+        <p className="text-slate-muted text-sm">{title}</p>
+        {loading ? (
+          <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
+        ) : (
+          <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
+        )}
+        {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
+        {trend && (
+          <div className={cn('flex items-center gap-1 text-xs', trend.positive ? 'text-emerald-400' : 'text-rose-400')}>
+            {trend.positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            <span>{Math.abs(trend.value).toFixed(1)}%</span>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
         <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
           <Icon className={cn('w-5 h-5', colorClass)} />
         </div>
+        {isClickable && (
+          <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all duration-200" />
+        )}
       </div>
     </div>
   );
+
+  const cardClasses = cn(
+    'bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors group',
+    isClickable && 'cursor-pointer hover:bg-slate-card/80'
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cn(cardClasses, 'block')}>
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full text-left')}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cardClasses}>{content}</div>;
 }
 
 function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
@@ -260,6 +294,7 @@ export default function CardAnalyticsPage() {
           colorClass="text-violet-400"
           loading={overviewLoading}
           trend={spendTrendPct ? { value: spendTrendPct, positive: spendTrendPct < 0 } : undefined}
+          href="/expenses/cards/transactions"
         />
         <MetricCard
           title="Active Cards"
@@ -268,6 +303,7 @@ export default function CardAnalyticsPage() {
           icon={CreditCard}
           colorClass="text-emerald-400"
           loading={overviewLoading}
+          href="/expenses/cards"
         />
         <MetricCard
           title="Transactions"
@@ -276,6 +312,7 @@ export default function CardAnalyticsPage() {
           icon={Receipt}
           colorClass="text-blue-400"
           loading={overviewLoading}
+          href="/expenses/cards/transactions"
         />
         <MetricCard
           title="Reconciliation"
@@ -290,6 +327,7 @@ export default function CardAnalyticsPage() {
               : 'text-rose-400'
           }
           loading={overviewLoading}
+          href="/expenses/cards/transactions?status=unmatched"
         />
         <MetricCard
           title="Disputed"
@@ -298,6 +336,7 @@ export default function CardAnalyticsPage() {
           icon={AlertTriangle}
           colorClass="text-rose-400"
           loading={overviewLoading}
+          href="/expenses/cards/transactions?status=disputed"
         />
       </div>
 

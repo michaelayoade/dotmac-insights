@@ -502,6 +502,97 @@ export interface PurchasingExpenseListParams {
 }
 
 // =============================================================================
+// ERPNEXT EXPENSE CLAIMS
+// =============================================================================
+
+export interface ERPNextExpenseClaim {
+  id: number;
+  erpnext_id: string | null;
+  employee_id: number | null;
+  employee_name: string | null;
+  erpnext_employee: string | null;
+  project_id: number | null;
+  erpnext_project: string | null;
+  expense_type: string | null;
+  description: string | null;
+  remark: string | null;
+  total_claimed_amount: number;
+  total_sanctioned_amount: number;
+  total_amount_reimbursed: number;
+  total_advance_amount: number;
+  amount: number;
+  currency: string | null;
+  cost_center: string | null;
+  company: string | null;
+  status: string | null;
+  is_paid: boolean;
+  posting_date: string | null;
+}
+
+export interface ERPNextExpenseClaimListResponse {
+  expenses: ERPNextExpenseClaim[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ERPNextExpenseClaimDetail extends ERPNextExpenseClaim {
+  ticket_id: number | null;
+  task_id: number | null;
+  erpnext_task: string | null;
+  total_taxes_and_charges: number;
+  category: string | null;
+  pop_id: number | null;
+  payable_account: string | null;
+  mode_of_payment: string | null;
+  clearance_date: string | null;
+  approval_status: string | null;
+  expense_approver: string | null;
+}
+
+export interface ERPNextExpenseClaimPayload {
+  employee_id?: number | null;
+  employee_name?: string | null;
+  erpnext_employee?: string | null;
+  project_id?: number | null;
+  erpnext_project?: string | null;
+  ticket_id?: number | null;
+  task_id?: number | null;
+  erpnext_task?: string | null;
+  expense_type?: string | null;
+  description?: string | null;
+  remark?: string | null;
+  total_claimed_amount?: number;
+  total_sanctioned_amount?: number;
+  total_amount_reimbursed?: number;
+  total_advance_amount?: number;
+  amount?: number;
+  currency?: string;
+  total_taxes_and_charges?: number;
+  category?: string | null;
+  cost_center?: string | null;
+  pop_id?: number | null;
+  company?: string | null;
+  payable_account?: string | null;
+  mode_of_payment?: string | null;
+  clearance_date?: string | null;
+  approval_status?: string | null;
+  expense_approver?: string | null;
+  status?: string;
+  is_paid?: boolean;
+  expense_date?: string | null;
+  posting_date?: string | null;
+}
+
+export interface ERPNextExpenseClaimListParams {
+  employee_id?: number;
+  project_id?: number;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// =============================================================================
 // ANALYTICS
 // =============================================================================
 
@@ -717,4 +808,30 @@ export const purchasingApi = {
 
   getExpenseTrend: (params?: { months?: number; interval?: 'month' | 'week'; currency?: string }) =>
     fetchApi<PurchasingExpenseTrendResponse>('/v1/purchasing/analytics/expense-trend', { params }),
+
+  // ERPNext Expense Claims
+  getERPNextExpenses: (params?: ERPNextExpenseClaimListParams) => {
+    const paging = buildPagingParams(params);
+    return fetchApi<ERPNextExpenseClaimListResponse>('/v1/purchasing/erpnext-expenses', { params: { ...params, ...paging } });
+  },
+
+  getERPNextExpenseDetail: (id: number | string) =>
+    fetchApi<ERPNextExpenseClaimDetail>(`/v1/purchasing/erpnext-expenses/${id}`),
+
+  createERPNextExpense: (body: ERPNextExpenseClaimPayload) =>
+    fetchApi<{ id: number }>('/v1/purchasing/erpnext-expenses', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateERPNextExpense: (id: number | string, body: Partial<ERPNextExpenseClaimPayload>) =>
+    fetchApi<{ id: number }>(`/v1/purchasing/erpnext-expenses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteERPNextExpense: (id: number | string) =>
+    fetchApi<void>(`/v1/purchasing/erpnext-expenses/${id}`, {
+      method: 'DELETE',
+    }),
 };

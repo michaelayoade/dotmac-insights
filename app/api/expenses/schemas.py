@@ -1,7 +1,7 @@
 """Pydantic schemas for Expense Management APIs."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -167,8 +167,29 @@ class ExpenseClaimRead(BaseModel):
     currency: str
     base_currency: str
     conversion_rate: Decimal
+    payment_status: Optional[str] = None
+    amount_paid: Decimal = Decimal("0")
+    payment_date: Optional[datetime] = None
+    payment_reference: Optional[str] = None
+    mode_of_payment: Optional[str] = None
+    transfer_reference: Optional[str] = None
+    transfer_status: Optional[str] = None
+    transfer_provider: Optional[str] = None
+    transfer_amount: Optional[Decimal] = None
+    transfer_fee: Optional[Decimal] = None
+    transfer_created_at: Optional[datetime] = None
     lines: List[ExpenseClaimLineRead]
     model_config = ConfigDict(from_attributes=True)
+
+
+class ExpenseClaimPayNow(BaseModel):
+    account_number: str = Field(min_length=10, max_length=10)
+    bank_code: str = Field(min_length=2, max_length=10)
+    account_name: Optional[str] = None
+    amount: Optional[Decimal] = Field(default=None, gt=0)
+    reason: Optional[str] = None
+    narration: Optional[str] = None
+    provider: Optional[str] = None
 
 
 # ---------------- Cash Advances ----------------

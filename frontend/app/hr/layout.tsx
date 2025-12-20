@@ -10,6 +10,7 @@ import {
   Users,
   UserPlus,
   Activity,
+  Car,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
@@ -64,6 +65,15 @@ const baseSections: NavSection[] = [
     ],
   },
   {
+    key: 'fleet',
+    label: 'Fleet Management',
+    description: 'Vehicles and driver assignments',
+    icon: Car,
+    items: [
+      { name: 'Vehicles', href: '/hr/fleet', description: 'Vehicle tracking & insurance' },
+    ],
+  },
+  {
     key: 'development',
     label: 'Development',
     description: 'Training and performance',
@@ -87,8 +97,8 @@ const baseSections: NavSection[] = [
 const quickLinks: QuickLink[] = [
   { label: 'Leave', href: '/hr/leave', icon: CalendarClock, color: 'amber-400' },
   { label: 'Payroll', href: '/hr/payroll', icon: Wallet2, color: 'violet-400' },
+  { label: 'Fleet', href: '/hr/fleet', icon: Car, color: 'orange-400' },
   { label: 'Recruit', href: '/hr/recruitment', icon: UserPlus, color: 'emerald-400' },
-  { label: 'Reports', href: '/hr/analytics', icon: Activity, color: 'cyan-400' },
 ];
 
 const workflowPhases: WorkflowPhase[] = [
@@ -109,6 +119,7 @@ function getWorkflowPhase(sectionKey: string | null): string {
   if (!sectionKey) return 'setup';
   if (sectionKey === 'overview') return 'analyze';
   if (sectionKey === 'people' || sectionKey === 'config') return 'setup';
+  // time, compensation, fleet, development are all 'operate'
   return 'operate';
 }
 

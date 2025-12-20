@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, Optional, List, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,50 @@ class AgingBucket(TypedDict):
     count: int
     total: Decimal
     invoices: List[Dict[str, Any]]
+
+
+class SupplierCreateRequest(BaseModel):
+    supplier_name: str
+    supplier_group: Optional[str] = None
+    supplier_type: Optional[str] = None
+    country: Optional[str] = None
+    default_currency: Optional[str] = None
+    default_bank_account: Optional[str] = None
+    tax_id: Optional[str] = None
+    tax_withholding_category: Optional[str] = None
+    supplier_primary_contact: Optional[str] = None
+    supplier_primary_address: Optional[str] = None
+    email_id: Optional[str] = None
+    mobile_no: Optional[str] = None
+    default_price_list: Optional[str] = None
+    payment_terms: Optional[str] = None
+    is_transporter: bool = False
+    is_internal_supplier: bool = False
+    disabled: bool = False
+    is_frozen: bool = False
+    on_hold: bool = False
+
+
+class SupplierUpdateRequest(BaseModel):
+    supplier_name: Optional[str] = None
+    supplier_group: Optional[str] = None
+    supplier_type: Optional[str] = None
+    country: Optional[str] = None
+    default_currency: Optional[str] = None
+    default_bank_account: Optional[str] = None
+    tax_id: Optional[str] = None
+    tax_withholding_category: Optional[str] = None
+    supplier_primary_contact: Optional[str] = None
+    supplier_primary_address: Optional[str] = None
+    email_id: Optional[str] = None
+    mobile_no: Optional[str] = None
+    default_price_list: Optional[str] = None
+    payment_terms: Optional[str] = None
+    is_transporter: Optional[bool] = None
+    is_internal_supplier: Optional[bool] = None
+    disabled: Optional[bool] = None
+    is_frozen: Optional[bool] = None
+    on_hold: Optional[bool] = None
 
 
 # =============================================================================
@@ -188,6 +233,109 @@ def get_suppliers(
             for s in suppliers
         ],
     }
+
+
+@router.get("/suppliers/{supplier_id}", dependencies=[Depends(Require("accounting:read"))])
+def get_supplier_detail(
+    supplier_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get supplier detail."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    return {
+        "id": supplier.id,
+        "erpnext_id": supplier.erpnext_id,
+        "supplier_name": supplier.supplier_name,
+        "supplier_group": supplier.supplier_group,
+        "supplier_type": supplier.supplier_type,
+        "country": supplier.country,
+        "default_currency": supplier.default_currency,
+        "default_bank_account": supplier.default_bank_account,
+        "tax_id": supplier.tax_id,
+        "tax_withholding_category": supplier.tax_withholding_category,
+        "supplier_primary_contact": supplier.supplier_primary_contact,
+        "supplier_primary_address": supplier.supplier_primary_address,
+        "email_id": supplier.email_id,
+        "mobile_no": supplier.mobile_no,
+        "default_price_list": supplier.default_price_list,
+        "payment_terms": supplier.payment_terms,
+        "is_transporter": supplier.is_transporter,
+        "is_internal_supplier": supplier.is_internal_supplier,
+        "disabled": supplier.disabled,
+        "is_frozen": supplier.is_frozen,
+        "on_hold": supplier.on_hold,
+    }
+
+
+@router.post("/suppliers", dependencies=[Depends(Require("accounting:write"))])
+def create_supplier(
+    payload: SupplierCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a supplier locally."""
+    supplier = Supplier(
+        supplier_name=payload.supplier_name,
+        supplier_group=payload.supplier_group,
+        supplier_type=payload.supplier_type,
+        country=payload.country,
+        default_currency=payload.default_currency or "NGN",
+        default_bank_account=payload.default_bank_account,
+        tax_id=payload.tax_id,
+        tax_withholding_category=payload.tax_withholding_category,
+        supplier_primary_contact=payload.supplier_primary_contact,
+        supplier_primary_address=payload.supplier_primary_address,
+        email_id=payload.email_id,
+        mobile_no=payload.mobile_no,
+        default_price_list=payload.default_price_list,
+        payment_terms=payload.payment_terms,
+        is_transporter=payload.is_transporter,
+        is_internal_supplier=payload.is_internal_supplier,
+        disabled=payload.disabled,
+        is_frozen=payload.is_frozen,
+        on_hold=payload.on_hold,
+    )
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return {"id": supplier.id}
+
+
+@router.patch("/suppliers/{supplier_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_supplier(
+    supplier_id: int,
+    payload: SupplierUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a supplier locally."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(supplier, key, value)
+
+    db.commit()
+    db.refresh(supplier)
+    return {"id": supplier.id}
+
+
+@router.delete("/suppliers/{supplier_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_supplier(
+    supplier_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Disable a supplier."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    supplier.disabled = True
+    db.commit()
+    return {"status": "disabled", "supplier_id": supplier_id}
 
 
 # =============================================================================

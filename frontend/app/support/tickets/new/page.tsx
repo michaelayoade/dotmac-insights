@@ -6,14 +6,17 @@ import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, LifeBuoy, User, Users, Tag, Clock } from 'lucide-react';
 import { useSupportTicketMutations, useSupportAgents, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function SupportTicketCreatePage() {
   const router = useRouter();
   const { createTicket } = useSupportTicketMutations();
   const { data: agentsData } = useSupportAgents();
   const { data: teamsData } = useSupportTeams();
+  const { hasAccess: canWrite, isLoading: authLoading } = useRequireScope('support:write');
 
-const agents = agentsData?.agents?.filter((a: any) => a.is_active) || [];
+  const agents = agentsData?.agents?.filter((a: any) => a.is_active) || [];
   const teams = teamsData?.teams || [];
 
   const [subject, setSubject] = useState('');
@@ -35,6 +38,22 @@ const agents = agentsData?.agents?.filter((a: any) => a.is_active) || [];
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-electric" />
+      </div>
+    );
+  }
+
+  if (!canWrite) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
 
   const validate = () => {
     const errs: Record<string, string> = {};

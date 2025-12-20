@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useInventoryItems } from "@/hooks/useApi";
 import { Package, Plus, Search, Loader2, AlertCircle, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function InventoryItemsPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [hasStock, setHasStock] = useState<boolean | undefined>(undefined);
   const { data, isLoading, error } = useInventoryItems({ search: search || undefined, has_stock: hasStock, limit: 100 });
@@ -111,10 +113,14 @@ export default function InventoryItemsPage() {
               </thead>
               <tbody className="divide-y divide-slate-border/50">
                 {items.map((item: any) => (
-                  <tr key={item.id} className="hover:bg-slate-elevated/50 transition-colors">
+                  <tr
+                    key={item.id}
+                    className="hover:bg-slate-elevated/50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/inventory/items/${item.id}`)}
+                  >
                     <td className="py-3">
                       <Link
-                        href={`/inventory/valuation/${encodeURIComponent(item.item_code)}`}
+                        href={`/inventory/items/${item.id}`}
                         className="text-amber-400 hover:text-amber-300 font-mono"
                       >
                         {item.item_code}

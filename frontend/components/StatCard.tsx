@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus, LucideIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, LucideIcon } from 'lucide-react';
 
 /**
  * Variant type matches the standard vocabulary from lib/design-tokens.ts
@@ -22,6 +23,10 @@ interface StatCardProps {
   loading?: boolean;
   className?: string;
   animateValue?: boolean;
+  /** URL to navigate to when clicked */
+  href?: string;
+  /** Click handler for custom actions */
+  onClick?: () => void;
 }
 
 function AnimatedNumber({ value, duration = 1500 }: { value: number; duration?: number }) {
@@ -62,7 +67,10 @@ export function StatCard({
   loading = false,
   className,
   animateValue = true,
+  href,
+  onClick,
 }: StatCardProps) {
+  const isClickable = Boolean(href || onClick);
   // Variant styles matching design-tokens.ts vocabulary
   const variantStyles: Record<StatCardVariant, { iconBg: string; iconColor: string; valueBorder: string }> = {
     default: {
@@ -123,22 +131,22 @@ export function StatCard({
     );
   }
 
-  return (
-    <div
-      className={cn(
-        'stat-card bg-slate-card rounded-xl border border-slate-border p-6 transition-all duration-300 hover:border-slate-elevated group',
-        className
-      )}
-    >
+  const cardContent = (
+    <>
       <div className="flex items-start justify-between mb-4">
         <span className="text-slate-muted text-sm font-medium uppercase tracking-wide">
           {title}
         </span>
-        {Icon && (
-          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', styles.iconBg)}>
-            <Icon className={cn('w-5 h-5', styles.iconColor)} />
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {Icon && (
+            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', styles.iconBg)}>
+              <Icon className={cn('w-5 h-5', styles.iconColor)} />
+            </div>
+          )}
+          {isClickable && (
+            <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all duration-200" />
+          )}
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -169,6 +177,34 @@ export function StatCard({
 
       {/* Subtle glow effect on hover */}
       <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gradient-to-br from-teal-electric/5 to-transparent" />
+    </>
+  );
+
+  const cardClasses = cn(
+    'stat-card relative bg-slate-card rounded-xl border border-slate-border p-6 transition-all duration-300 hover:border-slate-elevated group',
+    isClickable && 'cursor-pointer hover:bg-slate-card/80',
+    className
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cn(cardClasses, 'block')}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full text-left')}>
+        {cardContent}
+      </button>
+    );
+  }
+
+  return (
+    <div className={cardClasses}>
+      {cardContent}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { AlertTriangle, Plus, Shield, Users, UserPlus, Trash2, User, Filter, Search, RefreshCw, Scale } from 'lucide-react';
 import { useSupportTeams, useSupportTeamMutations, useSupportAgents } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
 
 function MetricCard({
   label,
@@ -35,6 +36,7 @@ export default function SupportTeamsPage() {
   const { data, error, isLoading } = useSupportTeams();
   const { createTeam, updateTeam, deleteTeam, addMember, deleteMember } = useSupportTeamMutations();
   const { data: agentsData } = useSupportAgents();
+  const { hasAccess: canWrite } = useRequireScope('support:write');
 
   const agents = agentsData?.agents ?? [];
   const teams = data?.teams;
@@ -76,6 +78,10 @@ export default function SupportTeamsPage() {
       setFormError('Team name is required');
       return;
     }
+    if (!canWrite) {
+      setFormError('Access denied');
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
@@ -114,7 +120,8 @@ export default function SupportTeamsPage() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+          disabled={!canWrite}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Create Team
@@ -138,7 +145,7 @@ export default function SupportTeamsPage() {
       </div>
 
       {/* Create Team Form */}
-      {showForm && (
+      {showForm && canWrite && (
         <form onSubmit={handleCreateTeam} className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Plus className="w-4 h-4 text-teal-electric" />
@@ -185,7 +192,7 @@ export default function SupportTeamsPage() {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !canWrite}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
             >
               {saving ? 'Creating…' : 'Create Team'}
@@ -248,7 +255,8 @@ export default function SupportTeamsPage() {
                       </span>
                       <button
                         onClick={() => deleteTeam(team.id)}
-                        className="px-2 py-1 rounded border border-red-500/40 text-red-300 hover:text-white text-xs"
+                        disabled={!canWrite}
+                        className="px-2 py-1 rounded border border-red-500/40 text-red-300 hover:text-white text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         Delete
                       </button>
@@ -280,7 +288,8 @@ export default function SupportTeamsPage() {
                             </div>
                             <button
                               onClick={() => deleteMember(team.id, member.id)}
-                              className="text-red-300 hover:text-white ml-2"
+                              disabled={!canWrite}
+                              className="text-red-300 hover:text-white ml-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -327,13 +336,14 @@ export default function SupportTeamsPage() {
                       />
                       <button
                         onClick={async () => {
+                          if (!canWrite) return;
                           const form = memberForms[team.id];
                           if (!form?.agent_id) return;
                           await addMember(team.id, { agent_id: Number(form.agent_id), role: form.role || undefined });
                           setMemberForms((prev) => ({ ...prev, [team.id]: { agent_id: '', role: '' } }));
                         }}
-                        disabled={!memberForms[team.id]?.agent_id}
-                        className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50"
+                        disabled={!memberForms[team.id]?.agent_id || !canWrite}
+                        className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Add
                       </button>

@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAccountingSuppliers } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Building, Phone, Mail, MapPin, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertTriangle, Building, Phone, Mail, MapPin, CheckCircle2, XCircle, Plus } from 'lucide-react';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -147,33 +148,42 @@ export default function SuppliersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="text"
-            placeholder="Search suppliers..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex flex-wrap gap-4 items-center flex-1">
+          <div className="flex-1 min-w-[200px] max-w-md">
+            <input
+              type="text"
+              placeholder="Search suppliers..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
+              className="input-field"
+            />
+          </div>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setOffset(0); }}
             className="input-field"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setOffset(0); }}
-          className="input-field"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        {(search || status) && (
-          <button
-            onClick={() => { setSearch(''); setStatus(''); setOffset(0); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
           >
-            Clear filters
-          </button>
-        )}
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          {(search || status) && (
+            <button
+              onClick={() => { setSearch(''); setStatus(''); setOffset(0); }}
+              className="text-slate-muted text-sm hover:text-white transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+        <Link
+          href="/books/suppliers/new"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
+        >
+          <Plus className="w-4 h-4" />
+          Add Supplier
+        </Link>
       </div>
 
       {/* Table */}

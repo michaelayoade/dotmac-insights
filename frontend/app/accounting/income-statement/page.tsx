@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useAccountingIncomeStatement } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, TrendingUp, TrendingDown, Calendar, Loader2, DollarSign, Minus, Equal } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, Calendar, DollarSign, Minus, Equal } from 'lucide-react';
+import PageSkeleton from '@/components/PageSkeleton';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -45,12 +46,8 @@ export default function IncomeStatementPage() {
     end_date: endDate || undefined,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-electric" />
-      </div>
-    );
+  if (isLoading && !data) {
+    return <PageSkeleton showHeader showStats statsCount={3} />;
   }
 
   const revenue = data?.revenue || { items: [], total: 0 };

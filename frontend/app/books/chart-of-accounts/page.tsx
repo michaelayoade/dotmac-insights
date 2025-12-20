@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAccountingChartOfAccounts } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, BookOpen, ChevronRight, Folder, FolderOpen } from 'lucide-react';
+import { AlertTriangle, BookOpen, ChevronRight, Folder, FolderOpen, Plus } from 'lucide-react';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -161,28 +162,37 @@ export default function ChartOfAccountsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="text"
-            placeholder="Search accounts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex flex-wrap gap-4 items-center flex-1">
+          <div className="flex-1 min-w-[200px] max-w-md">
+            <input
+              type="text"
+              placeholder="Search accounts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field"
+            />
+          </div>
+          <select
+            value={accountType}
+            onChange={(e) => setAccountType(e.target.value)}
             className="input-field"
-          />
+          >
+            <option value="">All Types</option>
+            <option value="asset">Assets</option>
+            <option value="liability">Liabilities</option>
+            <option value="equity">Equity</option>
+            <option value="income">Income</option>
+            <option value="expense">Expenses</option>
+          </select>
         </div>
-        <select
-          value={accountType}
-          onChange={(e) => setAccountType(e.target.value)}
-          className="input-field"
+        <Link
+          href="/books/chart-of-accounts/new"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
         >
-          <option value="">All Types</option>
-          <option value="asset">Assets</option>
-          <option value="liability">Liabilities</option>
-          <option value="equity">Equity</option>
-          <option value="income">Income</option>
-          <option value="expense">Expenses</option>
-        </select>
+          <Plus className="w-4 h-4" />
+          Add Account
+        </Link>
       </div>
 
       {/* Table */}

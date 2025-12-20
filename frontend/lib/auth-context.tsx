@@ -7,6 +7,8 @@ import { hasAuthToken, clearAuthToken, setAuthToken, onAuthError } from './api';
 export type Scope =
   | 'customers:read'
   | 'customers:write'
+  | 'contacts:read'
+  | 'contacts:write'
   | 'analytics:read'
   | 'sync:read'
   | 'sync:write'
@@ -14,11 +16,22 @@ export type Scope =
   | 'admin:read'
   | 'admin:write'
   | 'hr:read'
-  | 'hr:write';
+  | 'hr:write'
+  | 'support:read'
+  | 'support:write'
+  | 'inbox:read'
+  | 'inbox:write'
+  | 'accounting:read'
+  | 'accounting:write'
+  | 'purchasing:read'
+  | 'purchasing:write'
+  | '*';
 
 const ALL_SCOPES: Scope[] = [
   'customers:read',
   'customers:write',
+  'contacts:read',
+  'contacts:write',
   'analytics:read',
   'sync:read',
   'sync:write',
@@ -27,6 +40,14 @@ const ALL_SCOPES: Scope[] = [
   'admin:write',
   'hr:read',
   'hr:write',
+  'support:read',
+  'support:write',
+  'inbox:read',
+  'inbox:write',
+  'accounting:read',
+  'accounting:write',
+  'purchasing:read',
+  'purchasing:write',
 ];
 
 interface AuthState {
@@ -199,12 +220,23 @@ export function useAuth() {
 
 // Hook for protecting routes/components by scope
 export function useRequireScope(scope: Scope | Scope[]) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, scopes, hasScope, hasAnyScope } = useAuth();
+
+  const requiredScopes = Array.isArray(scope) ? scope : [scope];
+
+  // Check if user has any of the required scopes or wildcard access
+  const hasAccess = isLoading
+    ? false
+    : !isAuthenticated
+    ? false
+    : scopes.includes('*' as Scope)
+    ? true
+    : hasAnyScope(requiredScopes);
 
   return {
     isLoading,
     isAuthenticated,
-    hasAccess: true,
-    missingScope: false,
+    hasAccess,
+    missingScope: !isLoading && isAuthenticated && !hasAccess,
   };
 }

@@ -42,6 +42,7 @@ import type {
 import { ErrorState, SearchInput, StatGrid } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { useRequireScope } from '@/lib/auth-context';
 
 // Channel icons and colors
 const CHANNEL_ICONS: Record<ChannelType, React.ElementType> = {
@@ -176,6 +177,7 @@ export default function InboxPage() {
 
   const mutations = useInboxConversationMutations();
   const { handleError, handleSuccess } = useErrorHandler();
+  const { hasAccess: canWrite } = useRequireScope('inbox:write');
 
   const conversations = conversationsData?.data;
 
@@ -230,6 +232,10 @@ export default function InboxPage() {
   // Handle create ticket
   const handleCreateTicket = async () => {
     if (!selectedConversation) return;
+    if (!canWrite) {
+      handleError('Access denied', 'Access denied');
+      return;
+    }
     try {
       const result = await mutations.createTicket(selectedConversation.id);
       handleSuccess(`Ticket created: #${result.ticket_id}`);
@@ -242,6 +248,10 @@ export default function InboxPage() {
   // Handle create lead
   const handleCreateLead = async () => {
     if (!selectedConversation) return;
+    if (!canWrite) {
+      handleError('Access denied', 'Access denied');
+      return;
+    }
     try {
       const result = await mutations.createLead(selectedConversation.id);
       handleSuccess(`Lead created: #${result.lead_id}`);

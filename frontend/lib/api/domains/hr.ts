@@ -755,6 +755,70 @@ export interface HrEmployeeListResponse {
   offset: number;
 }
 
+export interface HrEmployeePayload {
+  employee_name?: string;
+  first_name?: string;
+  last_name?: string;
+  gender?: string;
+  date_of_birth?: string;
+  date_of_joining?: string;
+  department?: string;
+  designation?: string;
+  status?: string;
+  company_email?: string;
+  personal_email?: string;
+  cell_number?: string;
+  company?: string;
+  employment_type?: string;
+  holiday_list?: string;
+}
+
+// Department Types
+export interface HrDepartment {
+  id: number;
+  name: string;
+  department_name?: string;
+  parent_department?: string | null;
+  company?: string | null;
+  is_group?: boolean;
+  disabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HrDepartmentListResponse {
+  items: HrDepartment[];
+  total: number;
+}
+
+export interface HrDepartmentPayload {
+  department_name: string;
+  parent_department?: string | null;
+  company?: string | null;
+  is_group?: boolean;
+}
+
+// Designation Types
+export interface HrDesignation {
+  id: number;
+  name: string;
+  designation_name?: string;
+  description?: string | null;
+  disabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface HrDesignationListResponse {
+  items: HrDesignation[];
+  total: number;
+}
+
+export interface HrDesignationPayload {
+  designation_name: string;
+  description?: string | null;
+}
+
 // =============================================================================
 // PARAM TYPES
 // =============================================================================
@@ -1351,9 +1415,77 @@ export const hrApi = {
   deleteEmployeeTransfer: (id: number | string) =>
     fetchApi<void>(`/hr/employee-transfers/${id}`, { method: 'DELETE' }),
 
-  // Employees (simple list)
+  // -------------------------------------------------------------------------
+  // Employees
+  // -------------------------------------------------------------------------
+
+  /** List employees */
   getEmployees: (params?: { search?: string; department?: string; status?: string; limit?: number; offset?: number }) =>
-    fetchApi<HrEmployeeListResponse>('/hr/analytics/employees', { params }),
+    fetchApi<HrEmployeeListResponse>('/hr/employees', { params }),
+
+  /** Get employee detail */
+  getEmployee: (id: number | string) =>
+    fetchApi<HrEmployee>(`/hr/employees/${id}`),
+
+  /** Create an employee */
+  createEmployee: (body: HrEmployeePayload) =>
+    fetchApi<HrEmployee>('/hr/employees', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** Update an employee */
+  updateEmployee: (id: number | string, body: Partial<HrEmployeePayload>) =>
+    fetchApi<HrEmployee>(`/hr/employees/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** Delete an employee (soft) */
+  deleteEmployee: (id: number | string) =>
+    fetchApi<void>(`/hr/employees/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Departments
+  // -------------------------------------------------------------------------
+
+  /** List departments */
+  getDepartments: (params?: { search?: string; company?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrDepartmentListResponse>('/hr/departments', { params }),
+
+  /** Get department detail */
+  getDepartment: (id: number | string) =>
+    fetchApi<HrDepartment>(`/hr/departments/${id}`),
+
+  /** Create a department */
+  createDepartment: (body: HrDepartmentPayload) =>
+    fetchApi<HrDepartment>('/hr/departments', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** Update a department */
+  updateDepartment: (id: number | string, body: Partial<HrDepartmentPayload>) =>
+    fetchApi<HrDepartment>(`/hr/departments/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** Delete a department */
+  deleteDepartment: (id: number | string) =>
+    fetchApi<void>(`/hr/departments/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Designations
+  // -------------------------------------------------------------------------
+
+  /** List designations */
+  getDesignations: (params?: { search?: string; limit?: number; offset?: number }) =>
+    fetchApi<HrDesignationListResponse>('/hr/designations', { params }),
+
+  /** Get designation detail */
+  getDesignation: (id: number | string) =>
+    fetchApi<HrDesignation>(`/hr/designations/${id}`),
+
+  /** Create a designation */
+  createDesignation: (body: HrDesignationPayload) =>
+    fetchApi<HrDesignation>('/hr/designations', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** Update a designation */
+  updateDesignation: (id: number | string, body: Partial<HrDesignationPayload>) =>
+    fetchApi<HrDesignation>(`/hr/designations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+
+  /** Delete a designation */
+  deleteDesignation: (id: number | string) =>
+    fetchApi<void>(`/hr/designations/${id}`, { method: 'DELETE' }),
 
   // Analytics
   getAnalyticsOverview: (params?: { company?: string }) =>

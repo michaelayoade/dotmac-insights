@@ -189,7 +189,6 @@ export default function AnalyticsPage() {
       onRetry={retryAll}
       softError={true}
       loadingMessage="Loading analytics data..."
-      errorMessage="Failed to load analytics data"
     >
       <div className="space-y-8">
         {firstError && (
@@ -257,6 +256,7 @@ export default function AnalyticsPage() {
           variant={dsoData && dsoData.current_dso > 90 ? 'danger' : dsoData && dsoData.current_dso > 60 ? 'warning' : 'default'}
           loading={!dsoData}
           animateValue={false}
+          href="/books/invoices?status=overdue"
         />
         <StatCard
           title="SLA Attainment"
@@ -266,6 +266,7 @@ export default function AnalyticsPage() {
           variant={slaData && slaData.sla_attainment.rate >= 90 ? 'success' : slaData && slaData.sla_attainment.rate >= 70 ? 'warning' : 'danger'}
           loading={!slaData}
           animateValue={false}
+          href="/support/tickets"
         />
         <StatCard
           title="Pipeline Conversion"
@@ -275,6 +276,7 @@ export default function AnalyticsPage() {
           variant={pipelineData && pipelineData.conversion.quotation_to_order_rate >= 30 ? 'success' : 'warning'}
           loading={!pipelineData}
           animateValue={false}
+          href="/sales/quotations"
         />
         <StatCard
           title="Outstanding"
@@ -284,6 +286,7 @@ export default function AnalyticsPage() {
           variant={(invoiceAging?.total_outstanding || 0) > 0 ? 'warning' : 'default'}
           loading={!invoiceAging}
           animateValue={false}
+          href="/books/invoices?status=unpaid"
         />
       </div>
 
@@ -842,6 +845,7 @@ export default function AnalyticsPage() {
               variant={uptime >= 95 ? 'success' : uptime >= 85 ? 'warning' : 'danger'}
               loading={!networkStatus}
               animateValue={false}
+              href="/inventory/network-devices"
             />
             <StatCard
               title="IP Pool Utilization"
@@ -851,6 +855,7 @@ export default function AnalyticsPage() {
               variant={ipOverall <= 70 ? 'success' : ipOverall <= 85 ? 'warning' : 'danger'}
               loading={!ipUtilization}
               animateValue={false}
+              href="/inventory/ip-pools"
             />
             <StatCard
               title="Monthly Expense Run-Rate"
@@ -860,6 +865,7 @@ export default function AnalyticsPage() {
               variant="default"
               loading={!expenseTrend}
               animateValue={false}
+              href="/expenses"
             />
             <StatCard
               title="Top Vendor"
@@ -869,6 +875,7 @@ export default function AnalyticsPage() {
               variant="default"
               loading={!vendorSpend}
               animateValue={false}
+              href="/books/suppliers"
             />
           </div>
 

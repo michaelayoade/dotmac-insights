@@ -81,6 +81,32 @@ class BankTransactionUpdate(BaseModel):
     party: Optional[str] = None
 
 
+class BankAccountCreate(BaseModel):
+    """Schema for creating a bank account."""
+    account_name: str
+    bank: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    account: Optional[str] = None
+    company: Optional[str] = None
+    currency: str = "NGN"
+    is_company_account: bool = True
+    is_default: bool = False
+    disabled: bool = False
+
+
+class BankAccountUpdate(BaseModel):
+    """Schema for updating a bank account."""
+    account_name: Optional[str] = None
+    bank: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    account: Optional[str] = None
+    company: Optional[str] = None
+    currency: Optional[str] = None
+    is_company_account: Optional[bool] = None
+    is_default: Optional[bool] = None
+    disabled: Optional[bool] = None
+
+
 class ReconciliationAllocation(BaseModel):
     """Schema for a single reconciliation allocation."""
     document_type: str  # "Sales Invoice" or "Purchase Invoice"
@@ -156,6 +182,68 @@ def get_bank_accounts(
             for acc in accounts
         ],
     }
+
+
+# =============================================================================
+# BANK ACCOUNT CRUD
+# =============================================================================
+
+@router.post("/bank-accounts", dependencies=[Depends(Require("accounting:write"))])
+def create_bank_account(
+    payload: BankAccountCreate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a bank account locally."""
+    account = BankAccount(
+        account_name=payload.account_name,
+        bank=payload.bank,
+        bank_account_no=payload.bank_account_no,
+        account=payload.account,
+        company=payload.company,
+        currency=payload.currency,
+        is_company_account=payload.is_company_account,
+        is_default=payload.is_default,
+        disabled=payload.disabled,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return {"id": account.id}
+
+
+@router.patch("/bank-accounts/{bank_account_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_bank_account(
+    bank_account_id: int,
+    payload: BankAccountUpdate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a bank account locally."""
+    account = db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(account, key, value)
+
+    db.commit()
+    db.refresh(account)
+    return {"id": account.id}
+
+
+@router.delete("/bank-accounts/{bank_account_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_bank_account(
+    bank_account_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Disable a bank account."""
+    account = db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    account.disabled = True
+    db.commit()
+    return {"status": "disabled", "bank_account_id": bank_account_id}
 
 
 # =============================================================================

@@ -5,6 +5,7 @@ import { AlertTriangle, Plus, User, Users, CheckCircle2, XCircle, Activity, Brie
 import { useSupportAgents, useSupportAgentMutations, useSupportRoutingQueueHealth } from '@/hooks/useApi';
 import type { SupportAgent } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
 
 function MetricCard({
   label,
@@ -48,6 +49,7 @@ export default function SupportAgentsPage() {
   const { data, error, isLoading } = useSupportAgents();
   const { data: queueHealth } = useSupportRoutingQueueHealth();
   const { createAgent, updateAgent, deleteAgent } = useSupportAgentMutations();
+  const { hasAccess: canWrite } = useRequireScope('support:write');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -98,6 +100,10 @@ export default function SupportAgentsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canWrite) {
+      setSaveError('Access denied');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -132,7 +138,8 @@ export default function SupportAgentsPage() {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
+          disabled={!canWrite}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Add Agent
@@ -163,7 +170,7 @@ export default function SupportAgentsPage() {
       </div>
 
       {/* Add Agent Form */}
-      {showForm && (
+      {showForm && canWrite && (
         <form onSubmit={handleSubmit} className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Plus className="w-4 h-4 text-teal-electric" />
@@ -229,7 +236,7 @@ export default function SupportAgentsPage() {
               </button>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || !canWrite}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
               >
                 {saving ? 'Creating…' : 'Create Agent'}
@@ -340,13 +347,15 @@ export default function SupportAgentsPage() {
                   <div className="mt-4 pt-3 border-t border-slate-border/50 flex items-center justify-end gap-2">
                     <button
                       onClick={() => updateAgent(agent.id, { is_active: !agent.is_active })}
-                      className="px-3 py-1.5 rounded-lg border border-slate-border text-xs text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                      disabled={!canWrite}
+                      className="px-3 py-1.5 rounded-lg border border-slate-border text-xs text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {agent.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                     <button
                       onClick={() => deleteAgent(agent.id)}
-                      className="px-3 py-1.5 rounded-lg border border-rose-500/40 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      disabled={!canWrite}
+                      className="px-3 py-1.5 rounded-lg border border-rose-500/40 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       Delete
                     </button>

@@ -316,6 +316,31 @@ export interface InventoryValuationDetail {
   }>;
 }
 
+// Item Group Types
+export interface InventoryItemGroup {
+  id: number;
+  name: string;
+  parent_item_group?: string | null;
+  is_group?: boolean;
+  default_uom?: string | null;
+  default_warehouse?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryItemGroupListResponse {
+  items: InventoryItemGroup[];
+  total: number;
+}
+
+export interface InventoryItemGroupPayload {
+  name: string;
+  parent_item_group?: string | null;
+  is_group?: boolean;
+  default_uom?: string | null;
+  default_warehouse?: string | null;
+}
+
 // =============================================================================
 // INVENTORY API
 // =============================================================================
@@ -357,6 +382,36 @@ export const inventoryApi = {
   /** Delete an item */
   deleteItem: (id: number | string) =>
     fetchApi<void>(`/inventory/items/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Item Groups
+  // -------------------------------------------------------------------------
+
+  /** List item groups */
+  getItemGroups: (params?: { limit?: number; offset?: number; search?: string }) =>
+    fetchApi<InventoryItemGroupListResponse>('/inventory/item-groups', { params }),
+
+  /** Get item group detail */
+  getItemGroup: (id: number | string) =>
+    fetchApi<InventoryItemGroup>(`/inventory/item-groups/${id}`),
+
+  /** Create an item group */
+  createItemGroup: (body: InventoryItemGroupPayload) =>
+    fetchApi<InventoryItemGroup>('/inventory/item-groups', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Update an item group */
+  updateItemGroup: (id: number | string, body: Partial<InventoryItemGroupPayload>) =>
+    fetchApi<InventoryItemGroup>(`/inventory/item-groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  /** Delete an item group */
+  deleteItemGroup: (id: number | string) =>
+    fetchApi<void>(`/inventory/item-groups/${id}`, { method: 'DELETE' }),
 
   // -------------------------------------------------------------------------
   // Warehouses

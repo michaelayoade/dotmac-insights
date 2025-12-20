@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAccountingGeneralLedger } from '@/hooks/useApi';
 import { AccountingGeneralLedgerEntry } from '@/lib/api';
 import { DataTable, Pagination } from '@/components/DataTable';
+import PageSkeleton from '@/components/PageSkeleton';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, BookMarked, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
@@ -40,6 +41,10 @@ export default function GeneralLedgerPage() {
     limit,
     offset,
   });
+
+  if (isLoading && !data) {
+    return <PageSkeleton showHeader={false} showStats statsCount={4} />;
+  }
 
   const entries = data?.entries;
   const totals = useMemo(
@@ -214,7 +219,7 @@ export default function GeneralLedgerPage() {
         columns={columns}
         data={entries ?? []}
         keyField="id"
-        loading={isLoading}
+        loading={isLoading && !data}
         emptyMessage="No ledger entries found"
       />
 

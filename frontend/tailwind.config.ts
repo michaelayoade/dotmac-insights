@@ -25,6 +25,13 @@ const config: Config = {
     // Workflow step colors
     { pattern: /^bg-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-500\/20$/ },
     { pattern: /^text-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-400$/ },
+    // Gradient colors for card icons (from-X-N to-Y-N patterns)
+    { pattern: /^from-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-[345]00$/ },
+    { pattern: /^to-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-[345]00$/ },
+    // Card background, border, text colors
+    { pattern: /^bg-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-500\/10$/ },
+    { pattern: /^border-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-500\/30$/ },
+    { pattern: /^border-(amber|teal|sky|violet|emerald|rose|cyan|indigo|orange|blue|purple|lime|stone|slate)-500\/40$/ },
   ],
   theme: {
     extend: {

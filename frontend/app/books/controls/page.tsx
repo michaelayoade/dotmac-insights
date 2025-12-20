@@ -86,7 +86,6 @@ export default function BooksControlsPage() {
       error={firstError}
       onRetry={retryAll}
       loadingMessage="Loading accounting controls..."
-      errorMessage="Failed to load controls data"
     >
       <div className="space-y-6">
         <PageHeader

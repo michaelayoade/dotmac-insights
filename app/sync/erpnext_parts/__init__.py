@@ -57,6 +57,11 @@ from app.sync.erpnext_parts.support import (
     sync_hd_tickets,
     sync_projects,
 )
+from app.sync.erpnext_parts.assets import (
+    sync_asset_categories,
+    sync_assets,
+    sync_vehicles,
+)
 
 __all__ = [
     # Accounting
@@ -103,4 +108,8 @@ __all__ = [
     # Support
     "sync_hd_tickets",
     "sync_projects",
+    # Assets & Vehicles
+    "sync_asset_categories",
+    "sync_assets",
+    "sync_vehicles",
 ]

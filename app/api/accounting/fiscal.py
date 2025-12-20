@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any, Dict, Optional
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import Require
@@ -20,6 +22,46 @@ from app.models.accounting import (
 from .helpers import parse_date, invalidate_report_cache
 
 router = APIRouter()
+
+
+class FiscalYearCreateRequest(BaseModel):
+    year: str
+    year_start_date: Optional[date] = None
+    year_end_date: Optional[date] = None
+    is_short_year: bool = False
+    disabled: bool = False
+    auto_created: bool = False
+
+
+class FiscalYearUpdateRequest(BaseModel):
+    year: Optional[str] = None
+    year_start_date: Optional[date] = None
+    year_end_date: Optional[date] = None
+    is_short_year: Optional[bool] = None
+    disabled: Optional[bool] = None
+    auto_created: Optional[bool] = None
+
+
+class CostCenterCreateRequest(BaseModel):
+    cost_center_name: str
+    cost_center_number: Optional[str] = None
+    parent_cost_center: Optional[str] = None
+    company: Optional[str] = None
+    is_group: bool = False
+    disabled: bool = False
+    lft: Optional[int] = None
+    rgt: Optional[int] = None
+
+
+class CostCenterUpdateRequest(BaseModel):
+    cost_center_name: Optional[str] = None
+    cost_center_number: Optional[str] = None
+    parent_cost_center: Optional[str] = None
+    company: Optional[str] = None
+    is_group: Optional[bool] = None
+    disabled: Optional[bool] = None
+    lft: Optional[int] = None
+    rgt: Optional[int] = None
 
 
 # =============================================================================
@@ -50,6 +92,61 @@ def get_fiscal_years(
             for fy in years
         ],
     }
+
+
+@router.post("/fiscal-years", dependencies=[Depends(Require("accounting:write"))])
+def create_fiscal_year(
+    payload: FiscalYearCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a fiscal year locally."""
+    fiscal_year = FiscalYear(
+        year=payload.year,
+        year_start_date=payload.year_start_date,
+        year_end_date=payload.year_end_date,
+        is_short_year=payload.is_short_year,
+        disabled=payload.disabled,
+        auto_created=payload.auto_created,
+    )
+    db.add(fiscal_year)
+    db.commit()
+    db.refresh(fiscal_year)
+    return {"id": fiscal_year.id}
+
+
+@router.patch("/fiscal-years/{fiscal_year_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_fiscal_year(
+    fiscal_year_id: int,
+    payload: FiscalYearUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a fiscal year locally."""
+    fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+    if not fiscal_year:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(fiscal_year, key, value)
+
+    db.commit()
+    db.refresh(fiscal_year)
+    return {"id": fiscal_year.id}
+
+
+@router.delete("/fiscal-years/{fiscal_year_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_fiscal_year(
+    fiscal_year_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Disable a fiscal year."""
+    fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+    if not fiscal_year:
+        raise HTTPException(status_code=404, detail="Fiscal year not found")
+
+    fiscal_year.disabled = True
+    db.commit()
+    return {"status": "disabled", "fiscal_year_id": fiscal_year_id}
 
 
 # =============================================================================
@@ -407,3 +504,60 @@ def get_cost_center_detail(
         "total_expenses": float(total),
         "breakdown": breakdown,
     }
+
+
+@router.post("/cost-centers", dependencies=[Depends(Require("accounting:write"))])
+def create_cost_center(
+    payload: CostCenterCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a cost center locally."""
+    center = CostCenter(
+        cost_center_name=payload.cost_center_name,
+        cost_center_number=payload.cost_center_number,
+        parent_cost_center=payload.parent_cost_center,
+        company=payload.company,
+        is_group=payload.is_group,
+        disabled=payload.disabled,
+        lft=payload.lft,
+        rgt=payload.rgt,
+    )
+    db.add(center)
+    db.commit()
+    db.refresh(center)
+    return {"id": center.id}
+
+
+@router.patch("/cost-centers/{cost_center_id}", dependencies=[Depends(Require("accounting:write"))])
+def update_cost_center(
+    cost_center_id: int,
+    payload: CostCenterUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a cost center locally."""
+    center = db.query(CostCenter).filter(CostCenter.id == cost_center_id).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Cost center not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(center, key, value)
+
+    db.commit()
+    db.refresh(center)
+    return {"id": center.id}
+
+
+@router.delete("/cost-centers/{cost_center_id}", dependencies=[Depends(Require("accounting:write"))])
+def delete_cost_center(
+    cost_center_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Disable a cost center."""
+    center = db.query(CostCenter).filter(CostCenter.id == cost_center_id).first()
+    if not center:
+        raise HTTPException(status_code=404, detail="Cost center not found")
+
+    center.disabled = True
+    db.commit()
+    return {"status": "disabled", "cost_center_id": cost_center_id}

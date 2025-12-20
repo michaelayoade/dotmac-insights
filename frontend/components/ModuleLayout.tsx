@@ -448,24 +448,34 @@ export function ModuleLayout({
           {workflowPhases && workflowPhases.length > 0 && (
             <div className="bg-slate-elevated rounded-lg p-3">
               <p className="text-xs text-slate-muted mb-2">Workflow Phase</p>
-              <div className="flex items-center gap-1">
-                {workflowPhases.map((phase, idx) => (
-                  <div key={phase.key} className="flex items-center">
-                    <div
-                      className={cn(
-                        'px-2 py-1 rounded text-xs font-medium transition-colors',
-                        currentPhase === phase.key
-                          ? `${colors.activeItemBg} ${colors.activeItemText} border ${colors.activeBorder}`
-                          : 'text-slate-muted'
+              <div className="flex flex-wrap items-center gap-1">
+                {workflowPhases.map((phase, idx) => {
+                  // Find the section that maps to this workflow phase
+                  const matchingSection = sections.find(
+                    (s) => getWorkflowPhase && getWorkflowPhase(s.key) === phase.key
+                  );
+                  const phaseHref = matchingSection?.items[0]?.href || baseRoute;
+
+                  return (
+                    <div key={phase.key} className="flex items-center">
+                      <Link
+                        href={phaseHref}
+                        className={cn(
+                          'px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer hover:opacity-80',
+                          currentPhase === phase.key
+                            ? `${colors.activeItemBg} ${colors.activeItemText} border ${colors.activeBorder}`
+                            : 'text-slate-muted hover:text-white hover:bg-slate-border/30'
+                        )}
+                        title={phase.description}
+                      >
+                        {phase.label}
+                      </Link>
+                      {idx < workflowPhases.length - 1 && (
+                        <ChevronRight className="w-3 h-3 text-slate-muted mx-1 flex-shrink-0" />
                       )}
-                    >
-                      {phase.label}
                     </div>
-                    {idx < workflowPhases.length - 1 && (
-                      <ChevronRight className="w-3 h-3 text-slate-muted mx-1" />
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -529,13 +529,10 @@ async def sync_salary_components(
             fields=[
                 "name",
                 "salary_component",
-                "salary_component_name",
                 "salary_component_abbr",
-                "abbr",
                 "type",
                 "description",
                 "is_tax_applicable",
-                "is_payable",
                 "is_flexible_benefit",
                 "depends_on_payment_days",
                 "variable_based_on_taxable_salary",
@@ -543,7 +540,6 @@ async def sync_salary_components(
                 "statistical_component",
                 "do_not_include_in_total",
                 "disabled",
-                "default_account",
                 "modified",
             ],
             filters=filters,
@@ -640,7 +636,6 @@ async def sync_salary_structures(
             "Salary Structure",
             fields=[
                 "name",
-                "salary_structure_name",
                 "company",
                 "is_active",
                 "payroll_frequency",
@@ -1070,7 +1065,6 @@ async def sync_leave_types(
             fields=[
                 "name",
                 "leave_type_name",
-                "leave_type",
                 "max_leaves_allowed",
                 "max_continuous_days_allowed",
                 "is_carry_forward",
@@ -1168,6 +1162,7 @@ async def sync_leave_allocations(
         allocations = await sync_client._fetch_all_doctype(
             client,
             "Leave Allocation",
+            # Use minimal field set - some fields may not exist in all ERPNext versions
             fields=[
                 "name",
                 "employee",
@@ -1176,12 +1171,6 @@ async def sync_leave_allocations(
                 "from_date",
                 "to_date",
                 "new_leaves_allocated",
-                "total_leaves_allocated",
-                "unused_leaves",
-                "carry_forwarded_leaves",
-                "carry_forwarded_leaves_count",
-                "leave_policy",
-                "status",
                 "docstatus",
                 "company",
                 "modified",
@@ -1432,11 +1421,6 @@ async def sync_attendances(
                 "in_time",
                 "out_time",
                 "working_hours",
-                "check_in_latitude",
-                "check_in_longitude",
-                "check_out_latitude",
-                "check_out_longitude",
-                "device_info",
                 "late_entry",
                 "early_exit",
                 "company",
@@ -1451,19 +1435,35 @@ async def sync_attendances(
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
         }
 
+        # Track pending additions to handle duplicates in same batch
+        pending_by_key: Dict[tuple, Attendance] = {}
+
         for att_data in attendances:
             erpnext_id = att_data.get("name")
+            employee_ref = att_data.get("employee")
+            employee_id = employees_by_erpnext_id.get(employee_ref) if employee_ref else None
+            attendance_date = _parse_date(att_data.get("attendance_date"))
+            if not attendance_date:
+                continue
+
+            # Look up by erpnext_id first
             existing = None
             if erpnext_id:
                 existing = sync_client.db.query(Attendance).filter(
                     Attendance.erpnext_id == erpnext_id
                 ).first()
 
-            employee_ref = att_data.get("employee")
-            employee_id = employees_by_erpnext_id.get(employee_ref) if employee_ref else None
-            attendance_date = _parse_date(att_data.get("attendance_date"))
-            if not attendance_date:
-                continue
+            # Fall back to employee_id + date (unique constraint)
+            if not existing and employee_id:
+                existing = sync_client.db.query(Attendance).filter(
+                    Attendance.employee_id == employee_id,
+                    Attendance.attendance_date == attendance_date,
+                ).first()
+
+            # Check pending additions in current batch (not yet committed)
+            batch_key = (employee_id, attendance_date)
+            if not existing and batch_key in pending_by_key:
+                existing = pending_by_key[batch_key]
 
             status = _map_attendance_status(att_data.get("status"))
 
@@ -1515,6 +1515,9 @@ async def sync_attendances(
                     docstatus=int(att_data.get("docstatus") or 0),
                 )
                 sync_client.db.add(attendance)
+                # Track in pending dict to detect duplicates in same batch
+                if employee_id and attendance_date:
+                    pending_by_key[batch_key] = attendance
                 sync_client.increment_created()
 
         sync_client.db.commit()

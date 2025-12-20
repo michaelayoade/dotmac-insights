@@ -14,7 +14,8 @@ import {
   useHrAnalyticsLifecycleEvents,
 } from '@/hooks/useApi';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
-import { Activity, CalendarClock, ClipboardList, DollarSign, Factory, FileText, Users, UserPlus, Award, ArrowRightLeft, TrendingUp } from 'lucide-react';
+import { Activity, CalendarClock, ClipboardList, DollarSign, Factory, FileText, Users, UserPlus, Award, ArrowRightLeft, TrendingUp, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 function FormLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs text-slate-muted mb-1">{children}</label>;
@@ -24,15 +25,53 @@ function Stat({
   label,
   value,
   tone = 'text-amber-400',
+  href,
+  onClick,
 }: {
   label: string;
   value: string | number;
   tone?: string;
+  href?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-lg p-4 flex items-center justify-between">
+  const isClickable = Boolean(href || onClick);
+
+  const content = (
+    <>
       <span className="text-slate-muted text-sm">{label}</span>
-      <span className={cn('text-lg font-mono font-semibold', tone)}>{value}</span>
+      <div className="flex items-center gap-2">
+        <span className={cn('text-lg font-mono font-semibold', tone)}>{value}</span>
+        {isClickable && (
+          <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
+        )}
+      </div>
+    </>
+  );
+
+  const cardClasses = cn(
+    'bg-slate-card border border-slate-border rounded-lg p-4 flex items-center justify-between group',
+    isClickable && 'cursor-pointer hover:border-slate-border/80 hover:bg-slate-card/80 transition-colors'
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClasses}>
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full')}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className={cardClasses}>
+      {content}
     </div>
   );
 }
@@ -77,9 +116,9 @@ export default function HrAnalyticsPage() {
     <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Stat label="Leave Applications (30d)" value={Object.values(overview?.leave_by_status || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-amber-300" />
-        <Stat label="Attendance Records (30d)" value={Object.values(overview?.attendance_status_30d || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-emerald-300" />
-        <Stat label="Net Payroll (30d)" value={formatCurrency(overview?.payroll_30d?.net_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-violet-300" />
+        <Stat label="Leave Applications (30d)" value={Object.values(overview?.leave_by_status || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-amber-300" href="/hr/leave" />
+        <Stat label="Attendance Records (30d)" value={Object.values(overview?.attendance_status_30d || {}).reduce((a: number, b: any) => a + (b as number), 0)} tone="text-emerald-300" href="/hr/attendance" />
+        <Stat label="Net Payroll (30d)" value={formatCurrency(overview?.payroll_30d?.net_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-violet-300" href="/hr/payroll" />
       </div>
 
       {/* Leave & Attendance Status */}
@@ -141,10 +180,10 @@ export default function HrAnalyticsPage() {
           <h3 className="text-white font-semibold">Payroll Summary</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="Gross Total" value={formatCurrency(payrollSummary?.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-white" />
-          <Stat label="Deductions" value={formatCurrency(payrollSummary?.deduction_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-rose-300" />
-          <Stat label="Net Total" value={formatCurrency(payrollSummary?.net_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-emerald-300" />
-          <Stat label="Salary Slips" value={payrollSummary?.slip_count ?? 0} tone="text-violet-300" />
+          <Stat label="Gross Total" value={formatCurrency(payrollSummary?.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-white" href="/hr/payroll" />
+          <Stat label="Deductions" value={formatCurrency(payrollSummary?.deduction_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-rose-300" href="/hr/payroll" />
+          <Stat label="Net Total" value={formatCurrency(payrollSummary?.net_total || 0, 'NGN', { maximumFractionDigits: 0 })} tone="text-emerald-300" href="/hr/payroll" />
+          <Stat label="Salary Slips" value={payrollSummary?.slip_count ?? 0} tone="text-violet-300" href="/hr/payroll/salary-slips" />
         </div>
       </div>
 

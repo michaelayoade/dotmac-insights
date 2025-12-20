@@ -21,6 +21,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useUnifiedContactMutations } from '@/hooks/useApi';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type ContactType = 'lead' | 'prospect' | 'customer' | 'person' | 'churned';
 type ContactCategory = 'residential' | 'business' | 'enterprise' | 'government' | 'nonprofit';
@@ -140,12 +142,29 @@ export default function NewContactPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { createContact, isLoading, error } = useUnifiedContactMutations();
+  const { hasAccess: canWrite, isLoading: authLoading } = useRequireScope('contacts:write');
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [newTag, setNewTag] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400" />
+      </div>
+    );
+  }
+
+  if (!canWrite) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
 
   // Set initial type from URL params
   useEffect(() => {

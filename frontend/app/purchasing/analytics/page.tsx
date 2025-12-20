@@ -16,7 +16,9 @@ import {
   Calendar,
   DollarSign,
   PieChart,
+  ChevronRight,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
@@ -180,43 +182,53 @@ export default function PurchasingAnalyticsPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+        <Link href="/purchasing/purchase-invoices?status=unpaid" className="bg-slate-card border border-slate-border rounded-xl p-4 group hover:border-slate-border/80 hover:bg-slate-card/80 transition-colors cursor-pointer">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-teal-electric" />
               <p className="text-slate-muted text-sm">Total Outstanding</p>
             </div>
+            <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-2xl font-bold text-white">
             {formatCurrency(totalOutstanding)}
           </p>
-        </div>
+        </Link>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Building2 className="w-4 h-4 text-blue-400" />
-            <p className="text-slate-muted text-sm">Active Suppliers</p>
+        <Link href="/books/suppliers" className="bg-slate-card border border-slate-border rounded-xl p-4 group hover:border-slate-border/80 hover:bg-slate-card/80 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-400" />
+              <p className="text-slate-muted text-sm">Active Suppliers</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-2xl font-bold text-white">
             {formatNumber(supplierCount)}
           </p>
           <p className="text-xs text-slate-muted mt-1">Due this week: {formatCurrency(dueThisWeek)} ({formatNumber(dueThisWeekCount)} bills)</p>
-        </div>
+        </Link>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-purple-400" />
-            <p className="text-slate-muted text-sm">Avg Transaction</p>
+        <Link href="/purchasing/purchase-invoices" className="bg-slate-card border border-slate-border rounded-xl p-4 group hover:border-slate-border/80 hover:bg-slate-card/80 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-purple-400" />
+              <p className="text-slate-muted text-sm">Avg Transaction</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-2xl font-bold text-white">
             {formatCurrency(totalSupplierSpend && supplierCount ? totalSupplierSpend / supplierCount : 0)}
           </p>
-        </div>
+        </Link>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingDown className="w-4 h-4 text-red-400" />
-            <p className="text-slate-muted text-sm">Overdue</p>
+        <Link href="/purchasing/purchase-invoices?status=overdue" className="bg-slate-card border border-slate-border rounded-xl p-4 group hover:border-slate-border/80 hover:bg-slate-card/80 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-red-400" />
+              <p className="text-slate-muted text-sm">Overdue</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-2xl font-bold text-red-400">
             {formatCurrency(totalOverdue)}
@@ -224,7 +236,7 @@ export default function PurchasingAnalyticsPage() {
           <p className="text-xs text-slate-muted mt-1">
             Entries in range: {formatNumber(totalTransactions)}
           </p>
-        </div>
+        </Link>
       </div>
 
       {/* Expense Trend Chart */}
@@ -433,10 +445,13 @@ export default function PurchasingAnalyticsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <PieChart className="w-4 h-4 text-green-400" />
-            <p className="text-green-400 text-sm">Paid Bills</p>
+        <Link href="/purchasing/purchase-invoices?status=paid" className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 group hover:bg-green-500/20 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-green-400" />
+              <p className="text-green-400 text-sm">Paid Bills</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-green-400/50 group-hover:text-green-400 group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-xl font-bold text-green-400">
             {formatCurrency(totalSupplierSpend)}
@@ -444,12 +459,15 @@ export default function PurchasingAnalyticsPage() {
           <p className="text-xs text-green-400/70 mt-1">
             {formatNumber(totalTransactions)} entries
           </p>
-        </div>
+        </Link>
 
-        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="w-4 h-4 text-orange-400" />
-            <p className="text-orange-400 text-sm">Outstanding</p>
+        <Link href="/purchasing/purchase-invoices?status=unpaid" className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 group hover:bg-orange-500/20 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-orange-400" />
+              <p className="text-orange-400 text-sm">Outstanding</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-orange-400/50 group-hover:text-orange-400 group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-xl font-bold text-orange-400">
             {formatCurrency(totalOutstanding)}
@@ -457,12 +475,15 @@ export default function PurchasingAnalyticsPage() {
           <p className="text-xs text-orange-400/70 mt-1">
             {formatNumber(totalSupplierSpend ? totalTransactions : 0)} entries
           </p>
-        </div>
+        </Link>
 
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <p className="text-red-400 text-sm">Overdue</p>
+        <Link href="/purchasing/purchase-invoices?status=overdue" className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 group hover:bg-red-500/20 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+              <p className="text-red-400 text-sm">Overdue</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-red-400/50 group-hover:text-red-400 group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-xl font-bold text-red-400">
             {formatCurrency(totalOverdue)}
@@ -470,12 +491,15 @@ export default function PurchasingAnalyticsPage() {
           <p className="text-xs text-red-400/70 mt-1">
             {formatNumber(topSuppliers.length)} suppliers in data
           </p>
-        </div>
+        </Link>
 
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Calendar className="w-4 h-4 text-blue-400" />
-            <p className="text-blue-400 text-sm">Due This Week</p>
+        <Link href="/purchasing/purchase-invoices?due_this_week=true" className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 group hover:bg-blue-500/20 transition-colors cursor-pointer">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-400" />
+              <p className="text-blue-400 text-sm">Due This Week</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-blue-400/50 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
           </div>
           <p className="text-xl font-bold text-blue-400">
             {formatCurrency(dueThisWeek)}
@@ -483,7 +507,7 @@ export default function PurchasingAnalyticsPage() {
           <p className="text-xs text-blue-400/70 mt-1">
             {formatNumber(dueThisWeekCount)} bills
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );

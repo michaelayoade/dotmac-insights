@@ -16,6 +16,7 @@ import type {
   ExpensePolicyCreatePayload,
   ExpenseClaim,
   ExpenseClaimCreatePayload,
+  ExpenseClaimPayNowPayload,
   CashAdvance,
   CashAdvanceCreatePayload,
   CashAdvanceDisbursePayload,
@@ -201,6 +202,15 @@ export const expensesApi = {
       method: 'POST',
       params: { reason },
     }),
+
+  payClaimNow: (id: number, payload: ExpenseClaimPayNowPayload) =>
+    fetchApi<ExpenseClaim>(`/expenses/claims/${id}/pay-now`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  verifyClaimTransfer: (id: number) =>
+    fetchApi<ExpenseClaim>(`/expenses/claims/${id}/verify-transfer`, { method: 'POST' }),
 
   // =========================================================================
   // CASH ADVANCES

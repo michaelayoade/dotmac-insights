@@ -10,10 +10,16 @@ export interface SWRStatusResult {
   isLoading: boolean;
   /** True if any hook is revalidating (background refresh) */
   isValidating: boolean;
-  /** First error encountered, if any */
+  /** First error encountered, if any (for backward compatibility) */
   error: Error | undefined;
+  /** All errors encountered */
+  errors: Error[];
+  /** Number of failed requests */
+  errorCount: number;
   /** True if all hooks have returned data */
   hasData: boolean;
+  /** True if at least some hooks have data (for partial rendering) */
+  hasPartialData: boolean;
   /** True if all data arrays/objects are empty */
   isEmpty: boolean;
   /** Retry all hooks */
@@ -59,8 +65,13 @@ export function useSWRStatus(
 ): SWRStatusResult {
   const isLoading = responses.some((r) => r.isLoading);
   const isValidating = responses.some((r) => r.isValidating);
-  const error = responses.find((r) => r.error)?.error as Error | undefined;
+  const errors = responses
+    .filter((r) => r.error)
+    .map((r) => r.error as Error);
+  const error = errors[0]; // First error for backward compatibility
+  const errorCount = errors.length;
   const hasData = responses.every((r) => r.data !== undefined);
+  const hasPartialData = responses.some((r) => r.data !== undefined);
   const isEmpty = hasData && responses.every((r) => isDataEmpty(r.data));
 
   const retry = () => {
@@ -81,7 +92,18 @@ export function useSWRStatus(
       });
   };
 
-  return { isLoading, isValidating, error, hasData, isEmpty, retry, retryFailed };
+  return {
+    isLoading,
+    isValidating,
+    error,
+    errors,
+    errorCount,
+    hasData,
+    hasPartialData,
+    isEmpty,
+    retry,
+    retryFailed,
+  };
 }
 
 /**
@@ -107,8 +129,13 @@ export interface SWRStateItem {
 export function useSWRStatusFromArray(states: SWRStateItem[]): SWRStatusResult {
   const isLoading = states.some((s) => s.isLoading);
   const isValidating = states.some((s) => s.isValidating);
-  const error = states.find((s) => s.error)?.error as Error | undefined;
+  const errors = states
+    .filter((s) => s.error)
+    .map((s) => s.error as Error);
+  const error = errors[0]; // First error for backward compatibility
+  const errorCount = errors.length;
   const hasData = states.every((s) => s.data !== undefined);
+  const hasPartialData = states.some((s) => s.data !== undefined);
   const isEmpty = hasData && states.every((s) => isDataEmpty(s.data));
 
   const retry = () => {
@@ -129,5 +156,16 @@ export function useSWRStatusFromArray(states: SWRStateItem[]): SWRStatusResult {
       });
   };
 
-  return { isLoading, isValidating, error, hasData, isEmpty, retry, retryFailed };
+  return {
+    isLoading,
+    isValidating,
+    error,
+    errors,
+    errorCount,
+    hasData,
+    hasPartialData,
+    isEmpty,
+    retry,
+    retryFailed,
+  };
 }

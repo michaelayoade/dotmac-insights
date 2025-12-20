@@ -14,6 +14,7 @@ import {
   ChevronRight,
   PieChart,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useExpenseSummaryReport, useExpenseReportExports } from '@/hooks/useExpenses';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -323,10 +324,13 @@ export default function ExpenseReportsPage() {
             ) : summary ? (
               <div className="space-y-4">
                 {/* Claims Summary */}
-                <div className="p-4 bg-slate-elevated rounded-xl">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileText className="w-4 h-4 text-sky-400" />
-                    <span className="text-sm font-medium text-white">Expense Claims</span>
+                <Link href="/expenses/claims" className="block p-4 bg-slate-elevated rounded-xl group hover:bg-slate-elevated/80 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-sky-400" />
+                      <span className="text-sm font-medium text-white">Expense Claims</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-sky-400 group-hover:translate-x-0.5 transition-all" />
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -342,13 +346,16 @@ export default function ExpenseReportsPage() {
                       <p className="text-emerald-400 font-semibold">{formatCurrency(summary.claims.total_approved)}</p>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Advances Summary */}
-                <div className="p-4 bg-slate-elevated rounded-xl">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Wallet2 className="w-4 h-4 text-amber-400" />
-                    <span className="text-sm font-medium text-white">Cash Advances</span>
+                <Link href="/expenses/advances" className="block p-4 bg-slate-elevated rounded-xl group hover:bg-slate-elevated/80 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Wallet2 className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-medium text-white">Cash Advances</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -368,7 +375,7 @@ export default function ExpenseReportsPage() {
                       <p className="text-amber-400 font-semibold">{formatCurrency(summary.advances.total_outstanding)}</p>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Top Categories */}
                 {summary.top_categories && summary.top_categories.length > 0 && (

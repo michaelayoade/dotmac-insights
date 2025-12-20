@@ -19,7 +19,8 @@ import {
   Receipt,
   DollarSign,
 } from 'lucide-react';
-import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { ErrorDisplay } from '@/components/insights/shared';
+import PageSkeleton from '@/components/PageSkeleton';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -106,8 +107,8 @@ export default function CashFlowPage() {
 
   const { data, isLoading, error, mutate } = useAccountingCashFlow(params);
 
-  if (isLoading) {
-    return <LoadingState />;
+  if (isLoading && !data) {
+    return <PageSkeleton showHeader showStats statsCount={3} />;
   }
 
   const currency = data?.currency || 'NGN';

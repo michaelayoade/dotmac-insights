@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, extract
 from typing import Dict, Any, Optional, List, TypedDict
@@ -18,6 +19,7 @@ from app.models.accounting import (
     Account,
     AccountType,
 )
+from app.models.expense import Expense, ExpenseStatus
 
 router = APIRouter()
 
@@ -26,6 +28,154 @@ class AgingBucket(TypedDict):
     count: int
     total: float | Decimal
     invoices: List[Dict[str, Any]]
+
+
+class PurchaseInvoiceCreateRequest(BaseModel):
+    bill_number: Optional[str] = None
+    supplier_id: Optional[int] = None
+    supplier: Optional[str] = None
+    supplier_name: Optional[str] = None
+    company: Optional[str] = None
+    supplier_tax_id: Optional[str] = None
+    supplier_address: Optional[str] = None
+    posting_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    grand_total: Decimal = Decimal("0")
+    outstanding_amount: Decimal = Decimal("0")
+    paid_amount: Decimal = Decimal("0")
+    tax_amount: Decimal = Decimal("0")
+    currency: str = "NGN"
+    status: Optional[str] = PurchaseInvoiceStatus.DRAFT.value
+    docstatus: int = 0
+    is_return: bool = False
+    workflow_status: Optional[str] = None
+    fiscal_period_id: Optional[int] = None
+    journal_entry_id: Optional[int] = None
+
+    @validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", pre=True)
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else Decimal("0")
+
+
+class PurchaseInvoiceUpdateRequest(BaseModel):
+    bill_number: Optional[str] = None
+    supplier_id: Optional[int] = None
+    supplier: Optional[str] = None
+    supplier_name: Optional[str] = None
+    company: Optional[str] = None
+    supplier_tax_id: Optional[str] = None
+    supplier_address: Optional[str] = None
+    posting_date: Optional[datetime] = None
+    due_date: Optional[datetime] = None
+    grand_total: Optional[Decimal] = None
+    outstanding_amount: Optional[Decimal] = None
+    paid_amount: Optional[Decimal] = None
+    tax_amount: Optional[Decimal] = None
+    currency: Optional[str] = None
+    status: Optional[str] = None
+    docstatus: Optional[int] = None
+    is_return: Optional[bool] = None
+    workflow_status: Optional[str] = None
+    fiscal_period_id: Optional[int] = None
+    journal_entry_id: Optional[int] = None
+
+    @validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", pre=True)
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else None
+
+
+class ExpenseCreateRequest(BaseModel):
+    employee_id: Optional[int] = None
+    employee_name: Optional[str] = None
+    erpnext_employee: Optional[str] = None
+    project_id: Optional[int] = None
+    erpnext_project: Optional[str] = None
+    ticket_id: Optional[int] = None
+    task_id: Optional[int] = None
+    erpnext_task: Optional[str] = None
+    expense_type: Optional[str] = None
+    description: Optional[str] = None
+    remark: Optional[str] = None
+    total_claimed_amount: Decimal = Decimal("0")
+    total_sanctioned_amount: Decimal = Decimal("0")
+    total_amount_reimbursed: Decimal = Decimal("0")
+    total_advance_amount: Decimal = Decimal("0")
+    amount: Decimal = Decimal("0")
+    currency: str = "NGN"
+    total_taxes_and_charges: Decimal = Decimal("0")
+    category: Optional[str] = None
+    cost_center: Optional[str] = None
+    pop_id: Optional[int] = None
+    company: Optional[str] = None
+    payable_account: Optional[str] = None
+    mode_of_payment: Optional[str] = None
+    clearance_date: Optional[datetime] = None
+    approval_status: Optional[str] = None
+    expense_approver: Optional[str] = None
+    status: Optional[str] = ExpenseStatus.DRAFT.value
+    is_paid: bool = False
+    docstatus: int = 0
+    expense_date: Optional[datetime] = None
+    posting_date: Optional[datetime] = None
+
+    @validator(
+        "total_claimed_amount",
+        "total_sanctioned_amount",
+        "total_amount_reimbursed",
+        "total_advance_amount",
+        "amount",
+        "total_taxes_and_charges",
+        pre=True,
+    )
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else Decimal("0")
+
+
+class ExpenseUpdateRequest(BaseModel):
+    employee_id: Optional[int] = None
+    employee_name: Optional[str] = None
+    erpnext_employee: Optional[str] = None
+    project_id: Optional[int] = None
+    erpnext_project: Optional[str] = None
+    ticket_id: Optional[int] = None
+    task_id: Optional[int] = None
+    erpnext_task: Optional[str] = None
+    expense_type: Optional[str] = None
+    description: Optional[str] = None
+    remark: Optional[str] = None
+    total_claimed_amount: Optional[Decimal] = None
+    total_sanctioned_amount: Optional[Decimal] = None
+    total_amount_reimbursed: Optional[Decimal] = None
+    total_advance_amount: Optional[Decimal] = None
+    amount: Optional[Decimal] = None
+    currency: Optional[str] = None
+    total_taxes_and_charges: Optional[Decimal] = None
+    category: Optional[str] = None
+    cost_center: Optional[str] = None
+    pop_id: Optional[int] = None
+    company: Optional[str] = None
+    payable_account: Optional[str] = None
+    mode_of_payment: Optional[str] = None
+    clearance_date: Optional[datetime] = None
+    approval_status: Optional[str] = None
+    expense_approver: Optional[str] = None
+    status: Optional[str] = None
+    is_paid: Optional[bool] = None
+    docstatus: Optional[int] = None
+    expense_date: Optional[datetime] = None
+    posting_date: Optional[datetime] = None
+
+    @validator(
+        "total_claimed_amount",
+        "total_sanctioned_amount",
+        "total_amount_reimbursed",
+        "total_advance_amount",
+        "amount",
+        "total_taxes_and_charges",
+        pre=True,
+    )
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else None
 
 
 def _parse_date(value: Optional[str], field_name: str) -> Optional[date]:
@@ -288,6 +438,97 @@ async def get_bill_detail(
             for e in gl_entries
         ],
     }
+
+
+@router.post("/bills", dependencies=[Depends(Require("purchasing:write"))])
+async def create_bill(
+    payload: PurchaseInvoiceCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a purchase invoice locally."""
+    if payload.supplier_id:
+        supplier_exists = db.query(Supplier.id).filter(Supplier.id == payload.supplier_id).first()
+        if not supplier_exists:
+            raise HTTPException(status_code=400, detail=f"Supplier {payload.supplier_id} not found")
+
+    status_enum = None
+    if payload.status:
+        try:
+            status_enum = PurchaseInvoiceStatus(payload.status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {payload.status}")
+
+    bill = PurchaseInvoice(
+        bill_number=payload.bill_number,
+        supplier=payload.supplier,
+        supplier_name=payload.supplier_name,
+        supplier_id=payload.supplier_id,
+        company=payload.company,
+        supplier_tax_id=payload.supplier_tax_id,
+        supplier_address=payload.supplier_address,
+        posting_date=payload.posting_date,
+        due_date=payload.due_date,
+        grand_total=payload.grand_total,
+        outstanding_amount=payload.outstanding_amount,
+        paid_amount=payload.paid_amount,
+        tax_amount=payload.tax_amount,
+        currency=payload.currency,
+        status=status_enum or PurchaseInvoiceStatus.DRAFT,
+        docstatus=payload.docstatus,
+        is_return=payload.is_return,
+        workflow_status=payload.workflow_status,
+        fiscal_period_id=payload.fiscal_period_id,
+        journal_entry_id=payload.journal_entry_id,
+    )
+    db.add(bill)
+    db.commit()
+    db.refresh(bill)
+    return {"id": bill.id}
+
+
+@router.patch("/bills/{bill_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def update_bill(
+    bill_id: int,
+    payload: PurchaseInvoiceUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a purchase invoice locally."""
+    bill = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "supplier_id" in update_data and update_data["supplier_id"]:
+        supplier_exists = db.query(Supplier.id).filter(Supplier.id == update_data["supplier_id"]).first()
+        if not supplier_exists:
+            raise HTTPException(status_code=400, detail=f"Supplier {update_data['supplier_id']} not found")
+    if "status" in update_data and update_data["status"]:
+        try:
+            update_data["status"] = PurchaseInvoiceStatus(update_data["status"])
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {update_data['status']}")
+
+    for key, value in update_data.items():
+        setattr(bill, key, value)
+
+    db.commit()
+    db.refresh(bill)
+    return {"id": bill.id}
+
+
+@router.delete("/bills/{bill_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def delete_bill(
+    bill_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete a purchase invoice."""
+    bill = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    db.delete(bill)
+    db.commit()
+    return {"status": "deleted", "bill_id": bill_id}
 
 
 # ============= PAYMENTS =============
@@ -853,6 +1094,181 @@ async def get_expense_detail(
         "cost_center": expense.cost_center,
         "fiscal_year": expense.fiscal_year,
     }
+
+
+# ============= ERPNext EXPENSE CLAIMS =============
+
+@router.get("/erpnext-expenses", dependencies=[Depends(Require("purchasing:read"))])
+async def list_erpnext_expenses(
+    employee_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = Query(default=50, le=500),
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List ERPNext expense claims stored locally."""
+    query = db.query(Expense)
+    if employee_id:
+        query = query.filter(Expense.employee_id == employee_id)
+    if project_id:
+        query = query.filter(Expense.project_id == project_id)
+    if status:
+        try:
+            status_enum = ExpenseStatus(status)
+            query = query.filter(Expense.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    total = query.count()
+    expenses = query.order_by(Expense.posting_date.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "expenses": [
+            {
+                "id": exp.id,
+                "erpnext_id": exp.erpnext_id,
+                "employee_id": exp.employee_id,
+                "employee_name": exp.employee_name,
+                "project_id": exp.project_id,
+                "expense_type": exp.expense_type,
+                "total_claimed_amount": float(exp.total_claimed_amount),
+                "total_sanctioned_amount": float(exp.total_sanctioned_amount),
+                "status": exp.status.value if exp.status else None,
+                "currency": exp.currency,
+                "posting_date": exp.posting_date.isoformat() if exp.posting_date else None,
+            }
+            for exp in expenses
+        ],
+    }
+
+
+@router.get("/erpnext-expenses/{expense_id}", dependencies=[Depends(Require("purchasing:read"))])
+async def get_erpnext_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get an ERPNext expense claim by id."""
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    return {
+        "id": expense.id,
+        "erpnext_id": expense.erpnext_id,
+        "employee_id": expense.employee_id,
+        "employee_name": expense.employee_name,
+        "project_id": expense.project_id,
+        "expense_type": expense.expense_type,
+        "description": expense.description,
+        "remark": expense.remark,
+        "total_claimed_amount": float(expense.total_claimed_amount),
+        "total_sanctioned_amount": float(expense.total_sanctioned_amount),
+        "total_amount_reimbursed": float(expense.total_amount_reimbursed),
+        "total_advance_amount": float(expense.total_advance_amount),
+        "amount": float(expense.amount),
+        "currency": expense.currency,
+        "status": expense.status.value if expense.status else None,
+        "is_paid": expense.is_paid,
+        "posting_date": expense.posting_date.isoformat() if expense.posting_date else None,
+    }
+
+
+@router.post("/erpnext-expenses", dependencies=[Depends(Require("purchasing:write"))])
+async def create_erpnext_expense(
+    payload: ExpenseCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create an ERPNext expense claim locally."""
+    status_enum = None
+    if payload.status:
+        try:
+            status_enum = ExpenseStatus(payload.status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {payload.status}")
+
+    expense = Expense(
+        employee_id=payload.employee_id,
+        employee_name=payload.employee_name,
+        erpnext_employee=payload.erpnext_employee,
+        project_id=payload.project_id,
+        erpnext_project=payload.erpnext_project,
+        ticket_id=payload.ticket_id,
+        task_id=payload.task_id,
+        erpnext_task=payload.erpnext_task,
+        expense_type=payload.expense_type,
+        description=payload.description,
+        remark=payload.remark,
+        total_claimed_amount=payload.total_claimed_amount,
+        total_sanctioned_amount=payload.total_sanctioned_amount,
+        total_amount_reimbursed=payload.total_amount_reimbursed,
+        total_advance_amount=payload.total_advance_amount,
+        amount=payload.amount,
+        currency=payload.currency,
+        total_taxes_and_charges=payload.total_taxes_and_charges,
+        category=payload.category,
+        cost_center=payload.cost_center,
+        pop_id=payload.pop_id,
+        company=payload.company,
+        payable_account=payload.payable_account,
+        mode_of_payment=payload.mode_of_payment,
+        clearance_date=payload.clearance_date,
+        approval_status=payload.approval_status,
+        expense_approver=payload.expense_approver,
+        status=status_enum or ExpenseStatus.DRAFT,
+        is_paid=payload.is_paid,
+        docstatus=payload.docstatus,
+        expense_date=payload.expense_date,
+        posting_date=payload.posting_date,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return {"id": expense.id}
+
+
+@router.patch("/erpnext-expenses/{expense_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def update_erpnext_expense(
+    expense_id: int,
+    payload: ExpenseUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update an ERPNext expense claim locally."""
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "status" in update_data and update_data["status"]:
+        try:
+            update_data["status"] = ExpenseStatus(update_data["status"])
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {update_data['status']}")
+
+    for key, value in update_data.items():
+        setattr(expense, key, value)
+
+    db.commit()
+    db.refresh(expense)
+    return {"id": expense.id}
+
+
+@router.delete("/erpnext-expenses/{expense_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def delete_erpnext_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete an ERPNext expense claim."""
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    db.delete(expense)
+    db.commit()
+    return {"status": "deleted", "expense_id": expense_id}
 
 
 # ============= AP AGING =============

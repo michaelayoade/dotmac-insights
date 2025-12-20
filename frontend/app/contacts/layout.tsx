@@ -118,7 +118,7 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function ContactsLayout({ children }: { children: React.ReactNode }) {
-  const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+  const { hasAccess, isLoading: authLoading } = useRequireScope('contacts:read');
 
   if (authLoading) {
     return (

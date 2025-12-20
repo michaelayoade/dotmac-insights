@@ -49,7 +49,8 @@ import {
   FileText,
   Plus,
 } from 'lucide-react';
-import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { ErrorDisplay } from '@/components/insights/shared';
+import { DashboardSkeleton } from '@/components/PageSkeleton';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
 // Theme-aware tooltip styling using CSS variables
@@ -193,6 +194,8 @@ export default function AccountingDashboardPage() {
 
   const firstError = swrStates.find((state) => state.error)?.error;
   const loading = swrStates.some((state) => state.isLoading);
+  const hasCoreData = Boolean(dashboard || balanceSheet || incomeStatement);
+  const showSkeleton = !hasCoreData && loading;
   const retryAll = () => swrStates.forEach((state) => state.mutate?.());
 
   // Extract key metrics with dashboard as primary source and statements as fallback
@@ -299,8 +302,8 @@ export default function AccountingDashboardPage() {
   }, [cashFlow]);
 
   // Early returns AFTER all hooks have been called
-  if (loading) {
-    return <LoadingState />;
+  if (showSkeleton) {
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -319,28 +322,28 @@ export default function AccountingDashboardPage() {
           value={formatCurrency(totalAssets)}
           icon={Building2}
           colorClass="text-blue-400"
-          loading={loading}
+          loading={showSkeleton}
         />
         <MetricCard
           title="Total Liabilities"
           value={formatCurrency(totalLiabilities)}
           icon={CreditCard}
           colorClass="text-red-400"
-          loading={loading}
+          loading={showSkeleton}
         />
         <MetricCard
           title="Total Equity"
           value={formatCurrency(totalEquity)}
           icon={PiggyBank}
           colorClass="text-green-400"
-          loading={loading}
+          loading={showSkeleton}
         />
         <MetricCard
           title="Net Income (YTD)"
           value={formatCurrency(netIncome)}
           icon={TrendingUp}
           colorClass="text-teal-electric"
-          loading={loading}
+          loading={showSkeleton}
         />
       </div>
 
@@ -373,7 +376,7 @@ export default function AccountingDashboardPage() {
           subtitle={`${profitMargin.toFixed(1)}% profit margin`}
           icon={DollarSign}
           colorClass="text-green-400"
-          loading={loading}
+          loading={showSkeleton}
         />
       </div>
 
@@ -559,7 +562,7 @@ export default function AccountingDashboardPage() {
             <TrendingUp className="w-5 h-5 text-green-400" />
             <h2 className="text-lg font-semibold text-white">Revenue (YTD)</h2>
           </div>
-          {loading ? (
+          {showSkeleton ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
           ) : (
             <>
@@ -573,7 +576,7 @@ export default function AccountingDashboardPage() {
             <TrendingDown className="w-5 h-5 text-red-400" />
             <h2 className="text-lg font-semibold text-white">Expenses (YTD)</h2>
           </div>
-          {loading ? (
+          {showSkeleton ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
           ) : (
             <>

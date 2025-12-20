@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ShieldAlert, ServerCrash, Inbox, RefreshCw, LucideIcon } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, ServerCrash, WifiOff, Inbox, RefreshCw, LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,10 @@ export interface DashboardShellProps {
   isLoading: boolean;
   /** Error object if there was an error */
   error?: Error | { status?: number; message?: string } | null;
+  /** All errors (when multiple requests fail) */
+  errors?: Error[];
+  /** Number of failed requests */
+  errorCount?: number;
   /** Callback to retry fetching data */
   onRetry?: () => void;
   /** Whether the data is empty */
@@ -31,9 +35,9 @@ export interface DashboardShellProps {
   };
   /** Custom loading message */
   loadingMessage?: string;
-  /** Custom error message */
+  /** Custom error message (overrides auto-detected message) */
   errorMessage?: string;
-  /** Render children even when there is an error */
+  /** Render children even when there is an error (shows inline error banner) */
   softError?: boolean;
   /** Children to render when loaded */
   children: React.ReactNode;
@@ -67,11 +71,13 @@ export interface DashboardShellProps {
 export function DashboardShell({
   isLoading,
   error,
+  errors,
+  errorCount,
   onRetry,
   isEmpty,
   emptyState,
   loadingMessage = 'Loading dashboard data...',
-  errorMessage = 'Failed to load dashboard data',
+  errorMessage,
   softError = false,
   children,
   className,
@@ -80,14 +86,32 @@ export function DashboardShell({
     return <DashboardLoadingState message={loadingMessage} className={className} />;
   }
 
+  // Full-page error (blocks content)
   if (error && !softError) {
     return (
       <DashboardErrorState
-        message={errorMessage}
         error={error}
+        errors={errors}
+        errorCount={errorCount}
+        customMessage={errorMessage}
         onRetry={onRetry}
         className={className}
       />
+    );
+  }
+
+  // Soft error mode - show inline banner + content
+  if (error && softError) {
+    return (
+      <div className={className}>
+        <DashboardErrorBanner
+          error={error}
+          errors={errors}
+          errorCount={errorCount}
+          onRetry={onRetry}
+        />
+        {children}
+      </div>
     );
   }
 
@@ -125,45 +149,114 @@ function DashboardLoadingState({
 }
 
 // =============================================================================
-// ERROR STATE - With smart detection for auth/server errors
+// ERROR STATE - With smart detection for auth/server/network errors
 // =============================================================================
 
 interface DashboardErrorStateProps {
-  message: string;
   error?: Error | { status?: number; message?: string } | null;
+  errors?: Error[];
+  errorCount?: number;
+  customMessage?: string;
   onRetry?: () => void;
   className?: string;
 }
 
+type ErrorType = 'auth' | 'server' | 'network' | 'generic';
+
+function detectErrorType(error: unknown): { type: ErrorType; status?: number } {
+  if (!error || typeof error !== 'object') {
+    return { type: 'generic' };
+  }
+  const status = 'status' in error ? (error as { status: number }).status : undefined;
+
+  if (status === 401 || status === 403) {
+    return { type: 'auth', status };
+  }
+  if (status === 0 || status === undefined) {
+    // Network error or timeout - case-insensitive check
+    const message = 'message' in error ? String((error as { message: string }).message).toLowerCase() : '';
+    if (message.includes('timeout') || message.includes('network') || message.includes('fetch') || message.includes('failed to fetch')) {
+      return { type: 'network', status: 0 };
+    }
+  }
+  if (status && status >= 500) {
+    return { type: 'server', status };
+  }
+  return { type: 'generic', status };
+}
+
+function getErrorConfig(type: ErrorType, status?: number) {
+  switch (type) {
+    case 'auth':
+      return {
+        Icon: ShieldAlert,
+        title: status === 403 ? 'Access Denied' : 'Authentication Required',
+        textColorClass: 'text-amber-warn',
+        bgClass: 'bg-amber-warn/10 border-amber-warn/30',
+        iconBgClass: 'bg-amber-warn/20',
+      };
+    case 'network':
+      return {
+        Icon: WifiOff,
+        title: 'Connection Error',
+        textColorClass: 'text-slate-muted',
+        bgClass: 'bg-slate-elevated border-slate-border',
+        iconBgClass: 'bg-slate-border',
+      };
+    case 'server':
+      return {
+        Icon: ServerCrash,
+        title: 'Server Error',
+        textColorClass: 'text-coral-alert',
+        bgClass: 'bg-coral-alert/10 border-coral-alert/30',
+        iconBgClass: 'bg-coral-alert/20',
+      };
+    default:
+      return {
+        Icon: AlertTriangle,
+        title: 'Error Loading Data',
+        textColorClass: 'text-coral-alert',
+        bgClass: 'bg-coral-alert/10 border-coral-alert/30',
+        iconBgClass: 'bg-coral-alert/20',
+      };
+  }
+}
+
+function getErrorMessage(error: unknown, type: ErrorType): string {
+  // Get actual error message from error object
+  const message = error && typeof error === 'object' && 'message' in error
+    ? String((error as { message: string }).message)
+    : '';
+
+  switch (type) {
+    case 'auth':
+      return 'Your session may have expired or you lack permission to view this data.';
+    case 'network':
+      if (message.toLowerCase().includes('timeout')) {
+        return 'The request took too long. Please check your connection and try again.';
+      }
+      return 'Unable to connect to the server. Please check your internet connection.';
+    case 'server':
+      return message || 'The server encountered an error. Our team has been notified.';
+    default:
+      return message || 'An unexpected error occurred while loading data.';
+  }
+}
+
 function DashboardErrorState({
-  message,
   error,
+  errors,
+  errorCount,
+  customMessage,
   onRetry,
   className,
 }: DashboardErrorStateProps) {
-  // Detect error type from status code
-  const status =
-    error && typeof error === 'object' && 'status' in error
-      ? error.status
-      : undefined;
-  const isAuthError = status === 401 || status === 403;
-  const isServerError = status && status >= 500;
+  const { type, status } = detectErrorType(error);
+  const config = getErrorConfig(type, status);
+  const { Icon, title, textColorClass, bgClass, iconBgClass } = config;
 
-  const Icon = isAuthError
-    ? ShieldAlert
-    : isServerError
-    ? ServerCrash
-    : AlertTriangle;
-
-  const title = isAuthError
-    ? 'Authentication Required'
-    : isServerError
-    ? 'Server Error'
-    : 'Error Loading Data';
-
-  const description = isAuthError
-    ? 'Your session may have expired or you lack permission to view this data.'
-    : message;
+  const description = customMessage ?? getErrorMessage(error, type);
+  const failedCount = errorCount || (errors?.length ?? (error ? 1 : 0));
 
   return (
     <div
@@ -172,41 +265,24 @@ function DashboardErrorState({
         className
       )}
     >
-      <div
-        className={cn(
-          'max-w-md w-full rounded-xl border p-6',
-          isAuthError
-            ? 'bg-amber-warn/10 border-amber-warn/30'
-            : 'bg-coral-alert/10 border-coral-alert/30'
-        )}
-      >
+      <div className={cn('max-w-md w-full rounded-xl border p-6', bgClass)}>
         <div className="flex items-start gap-4">
-          <div
-            className={cn(
-              'p-3 rounded-lg',
-              isAuthError ? 'bg-amber-warn/20' : 'bg-coral-alert/20'
-            )}
-          >
-            <Icon
-              className={cn(
-                'w-6 h-6',
-                isAuthError ? 'text-amber-warn' : 'text-coral-alert'
-              )}
-            />
+          <div className={cn('p-3 rounded-lg', iconBgClass)}>
+            <Icon className={cn('w-6 h-6', textColorClass)} />
           </div>
           <div className="flex-1">
-            <h3
-              className={cn(
-                'font-semibold text-lg',
-                isAuthError ? 'text-amber-warn' : 'text-coral-alert'
-              )}
-            >
+            <h3 className={cn('font-semibold text-lg', textColorClass)}>
               {title}
             </h3>
             <p className="text-sm text-slate-muted mt-1">{description}</p>
-            {status && (
+            {status !== undefined && status > 0 && (
               <p className="text-xs text-slate-muted mt-2">
                 Error code: {status}
+              </p>
+            )}
+            {failedCount > 1 && (
+              <p className="text-xs text-slate-muted mt-1">
+                {failedCount} requests failed
               </p>
             )}
             {onRetry && (
@@ -220,6 +296,59 @@ function DashboardErrorState({
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ERROR BANNER - Inline error for soft error mode
+// =============================================================================
+
+interface DashboardErrorBannerProps {
+  error?: Error | { status?: number; message?: string } | null;
+  errors?: Error[];
+  errorCount?: number;
+  onRetry?: () => void;
+}
+
+function DashboardErrorBanner({
+  error,
+  errors,
+  errorCount,
+  onRetry,
+}: DashboardErrorBannerProps) {
+  const { type, status } = detectErrorType(error);
+  const config = getErrorConfig(type, status);
+  const { Icon, title, textColorClass } = config;
+
+  const message = getErrorMessage(error, type);
+  const failedCount = errorCount || (errors?.length ?? (error ? 1 : 0));
+
+  return (
+    <div className="mb-4 rounded-lg border bg-coral-alert/10 border-coral-alert/30 p-4">
+      <div className="flex items-center gap-3">
+        <Icon className={cn('w-5 h-5 flex-shrink-0', textColorClass)} />
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-sm font-medium', textColorClass)}>
+            {title}
+            {failedCount > 1 && (
+              <span className="text-slate-muted font-normal ml-2">
+                ({failedCount} requests failed)
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-slate-muted mt-0.5 truncate">{message}</p>
+        </div>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded text-xs text-white transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry
+          </button>
+        )}
       </div>
     </div>
   );
@@ -288,5 +417,8 @@ function DashboardEmptyState({
 export {
   DashboardLoadingState,
   DashboardErrorState,
+  DashboardErrorBanner,
   DashboardEmptyState,
+  detectErrorType,
+  getErrorMessage,
 };

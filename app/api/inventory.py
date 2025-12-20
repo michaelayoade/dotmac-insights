@@ -21,7 +21,7 @@ from app.models.inventory import (
     LandedCostItem,
     LandedCostTax,
 )
-from app.models.sales import Item
+from app.models.sales import Item, ItemGroup
 from pydantic import validator
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -112,6 +112,22 @@ def _validate_stock_entry_request(entry_type_raw: str, lines: List[StockEntryLin
 
 
 # Pydantic request schemas
+class ItemGroupCreateRequest(BaseModel):
+    item_group_name: str = Field(..., min_length=1)
+    parent_item_group: Optional[str] = None
+    is_group: bool = False
+    lft: Optional[int] = None
+    rgt: Optional[int] = None
+
+
+class ItemGroupUpdateRequest(BaseModel):
+    item_group_name: Optional[str] = None
+    parent_item_group: Optional[str] = None
+    is_group: Optional[bool] = None
+    lft: Optional[int] = None
+    rgt: Optional[int] = None
+
+
 class ItemCreateRequest(BaseModel):
     item_code: str = Field(..., min_length=1)
     item_name: str = Field(..., min_length=1)
@@ -177,6 +193,116 @@ class StockEntryUpdateRequest(BaseModel):
     posting_date: Optional[str] = Field(None, description="YYYY-MM-DD")
     remarks: Optional[str] = None
     docstatus: Optional[int] = Field(default=None, ge=0, le=2, description="0=draft, 1=submitted, 2=cancelled")
+
+
+# ============= ITEM GROUPS =============
+
+@router.get("/item-groups", dependencies=[Depends(Require("inventory:read"))])
+async def list_item_groups(
+    search: Optional[str] = None,
+    limit: int = Query(default=100, le=500),
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List item groups."""
+    query = db.query(ItemGroup)
+    if search:
+        query = query.filter(ItemGroup.item_group_name.ilike(f"%{search}%"))
+
+    total = query.count()
+    groups = query.order_by(ItemGroup.item_group_name).offset(offset).limit(limit).all()
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "item_groups": [
+            {
+                "id": group.id,
+                "erpnext_id": group.erpnext_id,
+                "item_group_name": group.item_group_name,
+                "parent_item_group": group.parent_item_group,
+                "is_group": group.is_group,
+                "lft": group.lft,
+                "rgt": group.rgt,
+            }
+            for group in groups
+        ],
+    }
+
+
+@router.get("/item-groups/{group_id}", dependencies=[Depends(Require("inventory:read"))])
+async def get_item_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get an item group by id."""
+    group = db.query(ItemGroup).filter(ItemGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Item group not found")
+
+    return {
+        "id": group.id,
+        "erpnext_id": group.erpnext_id,
+        "item_group_name": group.item_group_name,
+        "parent_item_group": group.parent_item_group,
+        "is_group": group.is_group,
+        "lft": group.lft,
+        "rgt": group.rgt,
+    }
+
+
+@router.post("/item-groups", dependencies=[Depends(Require("inventory:write"))])
+async def create_item_group(
+    payload: ItemGroupCreateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create an item group locally."""
+    group = ItemGroup(
+        item_group_name=payload.item_group_name,
+        parent_item_group=payload.parent_item_group,
+        is_group=payload.is_group,
+        lft=payload.lft,
+        rgt=payload.rgt,
+    )
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return {"id": group.id}
+
+
+@router.patch("/item-groups/{group_id}", dependencies=[Depends(Require("inventory:write"))])
+async def update_item_group(
+    group_id: int,
+    payload: ItemGroupUpdateRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update an item group locally."""
+    group = db.query(ItemGroup).filter(ItemGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Item group not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(group, key, value)
+
+    db.commit()
+    db.refresh(group)
+    return {"id": group.id}
+
+
+@router.delete("/item-groups/{group_id}", dependencies=[Depends(Require("inventory:write"))])
+async def delete_item_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete an item group."""
+    group = db.query(ItemGroup).filter(ItemGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Item group not found")
+
+    db.delete(group)
+    db.commit()
+    return {"status": "deleted", "item_group_id": group_id}
 
 
 # ============= WRITE ENDPOINTS (LOCAL) =============

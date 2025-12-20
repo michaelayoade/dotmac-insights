@@ -35,6 +35,7 @@ from app.api.omni import public_router as public_omni_router
 from app.api.platform import router as platform_router
 from app.api.payroll_config import router as payroll_config_router
 from app.api.tax_core import router as tax_core_router
+from app.api.vehicles import router as vehicles_router
 
 api_router = APIRouter()
 
@@ -54,6 +55,37 @@ api_router.include_router(expenses.router, tags=["expenses"])
 api_router.include_router(sales.router, prefix="/v1", tags=["sales"])
 api_router.include_router(accounting.router, prefix="/v1/accounting", tags=["accounting"])
 api_router.include_router(purchasing.router, prefix="/v1/purchasing", tags=["purchasing"])
+api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])
+api_router.include_router(finance.router, prefix="/v1/finance", tags=["finance"])
+api_router.include_router(tax_router, prefix="/v1/tax", tags=["tax"])
+api_router.include_router(books_settings.router, prefix="/v1", tags=["books-settings"])
+api_router.include_router(hr_settings.router, prefix="/v1", tags=["hr-settings"])
+api_router.include_router(support_settings.router, prefix="/v1", tags=["support-settings"])
+api_router.include_router(settings.router, prefix="/v1", tags=["settings"])
+api_router.include_router(expenses.router, prefix="/v1", tags=["expenses"])
+api_router.include_router(support.router, prefix="/v1/support", tags=["support"])
+api_router.include_router(network.router, prefix="/v1/network", tags=["network"])
+api_router.include_router(inventory.router, prefix="/v1", tags=["inventory"])
+api_router.include_router(assets_router, prefix="/v1", tags=["assets"])
+api_router.include_router(crm_router, prefix="/v1", tags=["crm"])
+api_router.include_router(inbox_router, prefix="/v1", tags=["inbox"])
+api_router.include_router(contacts_router, prefix="/v1")
+api_router.include_router(performance_router, prefix="/v1")
+api_router.include_router(analytics.router, prefix="/v1/analytics", tags=["analytics"])
+api_router.include_router(insights.router, prefix="/v1/insights", tags=["insights"])
+api_router.include_router(data_explorer.router, prefix="/v1/explore", tags=["data-explorer"])
+api_router.include_router(hr.router, prefix="/v1/hr", tags=["hr"])
+api_router.include_router(projects.router, prefix="/v1/projects", tags=["projects"])
+api_router.include_router(field_service_router, prefix="/v1")
+api_router.include_router(integrations_router, prefix="/v1")
+api_router.include_router(sync.router, prefix="/v1/sync", tags=["sync"])
+api_router.include_router(admin.router, prefix="/v1")
+api_router.include_router(platform_router, prefix="/v1")
+api_router.include_router(entitlements.router, prefix="/v1")
+api_router.include_router(payroll_config_router, prefix="/v1")
+api_router.include_router(tax_core_router, prefix="/v1")
+api_router.include_router(vehicles_router, prefix="/v1", tags=["vehicles"])
+api_router.include_router(zoho_import.router, prefix="/v1")
 api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(network.router, prefix="/network", tags=["network"])
 api_router.include_router(inventory.router, tags=["inventory"])
@@ -87,6 +119,7 @@ api_router.include_router(platform_router)  # Already has /platform prefix
 api_router.include_router(entitlements.router)
 api_router.include_router(payroll_config_router)  # Generic payroll configuration
 api_router.include_router(tax_core_router)  # Generic tax configuration
+api_router.include_router(vehicles_router, tags=["vehicles"])  # Fleet/Vehicle management
 
 # Import routers
 api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   usePurchasingDashboard,
@@ -116,6 +117,7 @@ function StatusBadge({ status, count, total }: StatusBadgeProps) {
 }
 
 export default function PurchasingDashboardPage() {
+  const router = useRouter();
   const currency = 'NGN';
   const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = usePurchasingDashboard({ currency });
   const { data: suppliers, isLoading: suppliersLoading, error: suppliersError, mutate: refetchSuppliers } = usePurchasingSuppliers({ limit: 1, offset: 0 });
@@ -369,7 +371,11 @@ export default function PurchasingDashboardPage() {
           {recentBills?.bills?.length ? (
             <div className="space-y-2">
               {recentBills.bills.map((bill: any) => (
-                <div key={bill.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
+                <div
+                  key={bill.id}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 cursor-pointer hover:border-slate-border transition-colors"
+                  onClick={() => router.push(`/purchasing/bills/${bill.id}`)}
+                >
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   useUnifiedContacts,
   useUnifiedContactsDashboard,
@@ -116,6 +117,9 @@ const qualificationColors: Record<string, string> = {
 };
 
 export default function ContactsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initializedFromQuery = useRef(false);
   const [params, setParams] = useState<UnifiedContactsParams>({
     page: 1,
     page_size: 20,
@@ -123,6 +127,39 @@ export default function ContactsPage() {
     sort_order: 'desc',
   });
   const [searchInput, setSearchInput] = useState('');
+
+  useEffect(() => {
+    if (initializedFromQuery.current) return;
+    initializedFromQuery.current = true;
+
+    const nextParams: UnifiedContactsParams = {};
+    const type = searchParams.get('type') as UnifiedContactsParams['contact_type'] | null;
+    const status = searchParams.get('status') as UnifiedContactsParams['status'] | null;
+    const category = searchParams.get('category') as UnifiedContactsParams['category'] | null;
+    const qualification = searchParams.get('qualification') as UnifiedContactsParams['qualification'] | null;
+    const territory = searchParams.get('territory');
+    const tag = searchParams.get('tag');
+    const org = searchParams.get('org');
+    const search = searchParams.get('search');
+
+    if (type) nextParams.contact_type = type;
+    if (status) nextParams.status = status;
+    if (category) nextParams.category = category;
+    if (qualification) nextParams.qualification = qualification;
+    if (territory) nextParams.territory = territory;
+    if (tag) nextParams.tag = tag;
+    if (org === '1') nextParams.is_organization = true;
+    if (org === '0') nextParams.is_organization = false;
+
+    if (search) {
+      nextParams.search = search;
+      setSearchInput(search);
+    }
+
+    if (Object.keys(nextParams).length > 0) {
+      setParams((prev) => ({ ...prev, ...nextParams, page: 1 }));
+    }
+  }, [searchParams]);
 
   const { data: contacts, isLoading, error, mutate } = useUnifiedContacts(params) as {
     data?: UnifiedContactsResponse;
@@ -319,7 +356,11 @@ export default function ContactsPage() {
             </thead>
             <tbody className="divide-y divide-slate-border/50">
               {contacts?.items?.map((contact: UnifiedContact) => (
-                <tr key={contact.id} className="hover:bg-slate-elevated/30 transition-colors">
+                <tr
+                  key={contact.id}
+                  className="hover:bg-slate-elevated/30 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/contacts/${contact.id}`)}
+                >
                   <td className="px-4 py-4">
                     <div>
                       <p className="text-white font-medium">{contact.name}</p>

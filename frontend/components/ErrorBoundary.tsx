@@ -142,4 +142,32 @@ export function withErrorBoundary<P extends object>(
   return ComponentWithErrorBoundary;
 }
 
+/**
+ * Hook to programmatically trigger error boundary.
+ * Useful for handling async errors in event handlers.
+ *
+ * @example
+ * function MyComponent() {
+ *   const throwError = useErrorHandler();
+ *
+ *   const handleClick = async () => {
+ *     try {
+ *       await riskyOperation();
+ *     } catch (err) {
+ *       throwError(err);
+ *     }
+ *   };
+ * }
+ */
+export function useErrorHandler(): (error: unknown) => void {
+  const [, setError] = React.useState<Error | null>(null);
+
+  return React.useCallback((error: unknown) => {
+    setError(() => {
+      // This will trigger the error boundary
+      throw error instanceof Error ? error : new Error(String(error));
+    });
+  }, []);
+}
+
 export default ErrorBoundary;

@@ -44,6 +44,7 @@ from .ap_payments import router as ap_payments_router
 from .ar_payments import router as ar_payments_router
 from .notes import router as notes_router
 from .attachments import router as attachments_router
+from .payment_modes import router as payment_modes_router
 
 router = APIRouter(tags=["accounting"])
 
@@ -65,6 +66,7 @@ router.include_router(ap_payments_router, tags=["Accounting - AP Payments"])
 router.include_router(ar_payments_router, tags=["Accounting - AR Payments"])
 router.include_router(notes_router, tags=["Accounting - Credit/Debit Notes"])
 router.include_router(attachments_router, tags=["Accounting - Attachments"])
+router.include_router(payment_modes_router, tags=["Accounting - Payment Modes"])
 
 # Re-export common items for convenience
 from .helpers import (

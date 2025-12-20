@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { ErrorDisplay } from '@/components/insights/shared';
+import { DashboardSkeleton } from '@/components/PageSkeleton';
 import {
   DollarSign,
   TrendingUp,
@@ -29,7 +30,9 @@ import {
   Users,
   Landmark,
   FileText,
+  ChevronRight,
 } from 'lucide-react';
+import Link from 'next/link';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -58,27 +61,57 @@ interface MetricCardProps {
   icon: React.ElementType;
   colorClass?: string;
   loading?: boolean;
+  href?: string;
+  onClick?: () => void;
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading }: MetricCardProps) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-        </div>
+function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href, onClick }: MetricCardProps) {
+  const isClickable = Boolean(href || onClick);
+
+  const content = (
+    <div className="flex items-start justify-between">
+      <div className="space-y-1">
+        <p className="text-slate-muted text-sm">{title}</p>
+        {loading ? (
+          <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
+        ) : (
+          <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
+        )}
+        {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
+      </div>
+      <div className="flex items-center gap-2">
         <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
           <Icon className={cn('w-5 h-5', colorClass)} />
         </div>
+        {isClickable && (
+          <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all duration-200" />
+        )}
       </div>
     </div>
   );
+
+  const cardClasses = cn(
+    'bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors group',
+    isClickable && 'cursor-pointer hover:bg-slate-card/80'
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cn(cardClasses, 'block')}>
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full text-left')}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cardClasses}>{content}</div>;
 }
 
 interface RatioCardProps {
@@ -120,7 +153,8 @@ export default function AccountingDashboardPage() {
   const { data: receivables } = useAccountingReceivables();
   const { data: fiscalYears } = useAccountingFiscalYears();
 
-  const loading = bsLoading || isLoading || dashboardLoading;
+  const hasCoreData = Boolean(dashboard || balanceSheet || incomeStatement);
+  const loading = (bsLoading || isLoading || dashboardLoading) && !hasCoreData;
   const error = dashboardError || bsError || isError;
   const handleRetry = () => {
     retryDashboard();
@@ -168,13 +202,16 @@ export default function AccountingDashboardPage() {
   const ledgerEntryCount = ledger?.total || 0;
   const fiscalYearCount = fiscalYears?.total || 0;
 
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <DashboardShell
-      isLoading={loading && !dashboard && !balanceSheet}
+      isLoading={false}
       error={error}
       onRetry={handleRetry}
       loadingMessage="Loading accounting data..."
-      errorMessage="Failed to load accounting data"
       softError
     >
       <div className="space-y-6">
@@ -193,6 +230,7 @@ export default function AccountingDashboardPage() {
             icon={Building2}
             colorClass="text-blue-400"
             loading={loading}
+            href="/books/chart-of-accounts?type=asset"
           />
           <MetricCard
             title="Total Liabilities"
@@ -200,6 +238,7 @@ export default function AccountingDashboardPage() {
             icon={CreditCard}
             colorClass="text-red-400"
             loading={loading}
+            href="/books/chart-of-accounts?type=liability"
           />
           <MetricCard
             title="Total Equity"
@@ -207,6 +246,7 @@ export default function AccountingDashboardPage() {
             icon={PiggyBank}
             colorClass="text-green-400"
             loading={loading}
+            href="/books/chart-of-accounts?type=equity"
           />
           <MetricCard
             title="Net Income (YTD)"
@@ -214,6 +254,7 @@ export default function AccountingDashboardPage() {
             icon={TrendingUp}
             colorClass="text-teal-electric"
             loading={loading}
+            href="/reports?report=income-statement"
           />
         </div>
 
@@ -225,6 +266,7 @@ export default function AccountingDashboardPage() {
           subtitle={`${bankAccountCount} bank accounts`}
           icon={Wallet}
           colorClass="text-emerald-400"
+          href="/books/bank-accounts"
         />
         <MetricCard
           title="Accounts Receivable"
@@ -232,6 +274,7 @@ export default function AccountingDashboardPage() {
           subtitle="Outstanding AR"
           icon={ArrowUpRight}
           colorClass="text-blue-400"
+          href="/books/invoices?status=unpaid"
         />
         <MetricCard
           title="Revenue (YTD)"
@@ -240,6 +283,7 @@ export default function AccountingDashboardPage() {
           icon={DollarSign}
           colorClass="text-green-400"
           loading={loading}
+          href="/reports?report=income-statement"
         />
       </div>
 
@@ -305,26 +349,26 @@ export default function AccountingDashboardPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+        <Link href="/books/ledger" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <BookOpen className="w-6 h-6 text-teal-electric mx-auto mb-2" />
           <p className="text-2xl font-bold text-white">{formatNumber(ledgerEntryCount)}</p>
-          <p className="text-slate-muted text-sm">Ledger Entries</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Ledger Entries</p>
+        </Link>
+        <Link href="/books/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <Users className="w-6 h-6 text-orange-400 mx-auto mb-2" />
           <p className="text-2xl font-bold text-white">{formatNumber(supplierCount)}</p>
-          <p className="text-slate-muted text-sm">Suppliers</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Suppliers</p>
+        </Link>
+        <Link href="/books/bank-accounts" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <Landmark className="w-6 h-6 text-blue-400 mx-auto mb-2" />
           <p className="text-2xl font-bold text-white">{formatNumber(bankAccountCount)}</p>
-          <p className="text-slate-muted text-sm">Bank Accounts</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Bank Accounts</p>
+        </Link>
+        <Link href="/books/settings/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <FileText className="w-6 h-6 text-purple-400 mx-auto mb-2" />
           <p className="text-2xl font-bold text-white">{formatNumber(fiscalYearCount)}</p>
-          <p className="text-slate-muted text-sm">Fiscal Years</p>
-        </div>
+          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Fiscal Years</p>
+        </Link>
       </div>
 
       {/* Balance Sheet Summary */}

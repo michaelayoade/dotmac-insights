@@ -371,14 +371,14 @@ export default function SupportDashboardPage() {
             <h3 className="text-white font-semibold">By Type (30d)</h3>
           </div>
           {categoryChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart margin={{ top: 8, right: 8, bottom: 24, left: 8 }}>
                 <Pie
                   data={categoryChartData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={40}
-                  outerRadius={70}
+                  innerRadius={34}
+                  outerRadius={64}
                   paddingAngle={3}
                   dataKey="value"
                 >
@@ -391,11 +391,12 @@ export default function SupportDashboardPage() {
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
                   iconType="circle"
                   iconSize={8}
+                  wrapperStyle={{ paddingTop: '8px' }}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No category data</div>
+            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">No category data</div>
           )}
         </div>
 

@@ -315,22 +315,22 @@ export default function InboxAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <h3 className="text-white font-semibold mb-4">Channel Breakdown</h3>
           {summaryLoading ? (
-            <ChartSkeleton height={200} />
+            <ChartSkeleton height={220} />
           ) : summaryError ? (
             <ChartErrorState message="Failed to load data" onRetry={() => refreshSummary()} />
           ) : channelBreakdown.length === 0 ? (
-            <div className="flex items-center justify-center h-[200px] text-slate-muted">
+            <div className="flex items-center justify-center h-[220px] text-slate-muted">
               <p className="text-sm">No channel data</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
                   data={channelBreakdown}
                   cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+                  cy="40%"
+                  innerRadius={40}
+                  outerRadius={65}
                   paddingAngle={3}
                   dataKey="value"
                 >
@@ -346,6 +346,7 @@ export default function InboxAnalyticsPage() {
                   formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
                   iconType="circle"
                   iconSize={8}
+                  wrapperStyle={{ paddingTop: '10px' }}
                 />
               </PieChart>
             </ResponsiveContainer>

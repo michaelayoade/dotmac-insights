@@ -63,7 +63,6 @@ export default function ReportsOverviewPage() {
       error={error}
       onRetry={handleRetry}
       loadingMessage="Loading reports data..."
-      errorMessage="Failed to load reports data"
       softError
     >
       <div className="space-y-6">

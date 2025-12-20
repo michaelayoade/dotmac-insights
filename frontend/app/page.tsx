@@ -57,8 +57,14 @@ export default function HomePage() {
 
   const handleSetDefault = (key: string) => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(DEFAULT_KEY, key);
-    setDefaultModuleKey(key);
+    // Toggle: if already default, unset it
+    if (defaultModuleKey === key) {
+      localStorage.removeItem(DEFAULT_KEY);
+      setDefaultModuleKey(null);
+    } else {
+      localStorage.setItem(DEFAULT_KEY, key);
+      setDefaultModuleKey(key);
+    }
   };
 
   const handleResetDefault = () => {
@@ -222,8 +228,14 @@ export default function HomePage() {
                         className={cn(
                           'group rounded-2xl border bg-slate-card p-5 flex flex-col gap-4 transition-all hover:shadow-lg',
                           isDefault ? `${accent.border} ${accent.bg}` : 'border-slate-border hover:border-slate-border/80',
-                          locked && 'opacity-70'
+                          locked && 'opacity-70',
+                          !module.stub && !locked && 'cursor-pointer'
                         )}
+                        onClick={() => {
+                          if (!module.stub && !locked) {
+                            router.push(module.href);
+                          }
+                        }}
                       >
                         <div className="flex items-start justify-between">
                       <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center', accent.icon, locked && 'grayscale')}>
@@ -255,7 +267,7 @@ export default function HomePage() {
                           <p className="text-sm text-slate-muted line-clamp-2">{module.description}</p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                           {module.stub ? (
                             <span className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-xl bg-slate-elevated text-slate-muted cursor-not-allowed flex-1 justify-center">
                               Coming Soon

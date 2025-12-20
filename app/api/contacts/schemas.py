@@ -361,18 +361,29 @@ class UnifiedContactSummary(BaseModel):
     category: ContactCategoryEnum
     status: ContactStatusEnum
     name: str
+    is_organization: Optional[bool]
+    is_primary_contact: Optional[bool]
+    is_billing_contact: Optional[bool]
+    is_decision_maker: Optional[bool]
+    designation: Optional[str]
+    department: Optional[str]
     company_name: Optional[str]
     email: Optional[str]
     phone: Optional[str]
+    mobile: Optional[str]
+    website: Optional[str]
     city: Optional[str]
     state: Optional[str]
     territory: Optional[str]
     owner_id: Optional[int]
     lead_qualification: Optional[LeadQualificationEnum]
     lead_score: Optional[int]
+    source: Optional[str]
     mrr: Optional[Decimal]
     outstanding_balance: Optional[Decimal]
     last_contact_date: Optional[datetime]
+    cancellation_date: Optional[datetime]
+    churn_reason: Optional[str]
     tags: Optional[List[str]]
     created_at: datetime
 
