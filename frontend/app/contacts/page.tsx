@@ -14,6 +14,7 @@ import {
   type UnifiedContactsResponse,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 import {
   Users,
   UserPlus,
@@ -119,6 +120,8 @@ const qualificationColors: Record<string, string> = {
 export default function ContactsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const initializedFromQuery = useRef(false);
   const [params, setParams] = useState<UnifiedContactsParams>({
     page: 1,
@@ -141,6 +144,7 @@ export default function ContactsPage() {
     const tag = searchParams.get('tag');
     const org = searchParams.get('org');
     const search = searchParams.get('search');
+    const qualityIssue = searchParams.get('quality_issue') as UnifiedContactsParams['quality_issue'] | null;
 
     if (type) nextParams.contact_type = type;
     if (status) nextParams.status = status;
@@ -150,6 +154,7 @@ export default function ContactsPage() {
     if (tag) nextParams.tag = tag;
     if (org === '1') nextParams.is_organization = true;
     if (org === '0') nextParams.is_organization = false;
+    if (qualityIssue) nextParams.quality_issue = qualityIssue;
 
     if (search) {
       nextParams.search = search;
@@ -204,13 +209,15 @@ export default function ContactsPage() {
         icon={Users}
         iconClassName="bg-teal-500/10 border border-teal-500/30"
         actions={
-          <Link
-            href="/contacts/new"
-            className="flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg hover:bg-teal-glow transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Contact
-          </Link>
+          canWrite ? (
+            <Link
+              href="/contacts/new"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg hover:bg-teal-glow transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Contact
+            </Link>
+          ) : null
         }
       />
 

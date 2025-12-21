@@ -22,6 +22,7 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 function formatCurrency(value: number | null | undefined, currency = 'NGN'): string {
   if (value === null || value === undefined) return '-';
@@ -57,6 +58,8 @@ const categoryColors: Record<string, string> = {
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
@@ -77,7 +80,7 @@ export default function CustomersPage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContactCustomers(params);
-  const customers = data?.items || data?.data || [];
+  const customers = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {
@@ -120,14 +123,17 @@ export default function CustomersPage() {
     {
       key: 'category',
       header: 'Category',
-      render: (item: UnifiedContact) => (
-        <span className={cn(
-          'px-2 py-1 rounded-full text-xs font-medium',
-          categoryColors[item.category] || 'bg-slate-500/20 text-slate-400'
-        )}>
-          {item.category}
-        </span>
-      ),
+      render: (item: UnifiedContact) => {
+        const categoryKey = item.category || 'unknown';
+        return (
+          <span className={cn(
+            'px-2 py-1 rounded-full text-xs font-medium',
+            categoryColors[categoryKey] || 'bg-slate-500/20 text-slate-400'
+          )}>
+            {item.category || 'Unknown'}
+          </span>
+        );
+      },
     },
     {
       key: 'status',
@@ -203,13 +209,15 @@ export default function CustomersPage() {
         icon={Building2}
         iconClassName="bg-emerald-500/10 border border-emerald-500/30"
         actions={
-          <Link
-            href="/contacts/new?type=customer"
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Customer
-          </Link>
+          canWrite ? (
+            <Link
+              href="/contacts/new?type=customer"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Customer
+            </Link>
+          ) : null
         }
       />
 

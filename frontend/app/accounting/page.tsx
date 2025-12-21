@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  useAccountingBalanceSheet,
-  useAccountingIncomeStatement,
-  useAccountingSuppliers,
-  useAccountingBankAccounts,
-  useAccountingGeneralLedger,
-  useAccountingReceivables,
-  useAccountingFiscalYears,
-  useAccountingDashboard,
-} from '@/hooks/useApi';
+import { useConsolidatedAccountingDashboard } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { ErrorDisplay } from '@/components/insights/shared';
@@ -143,64 +134,38 @@ function RatioCard({ title, value, description, status }: RatioCardProps) {
 }
 
 export default function AccountingDashboardPage() {
-  // Fetch data from multiple endpoints
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: retryDashboard } = useAccountingDashboard();
-  const { data: balanceSheet, isLoading: bsLoading, error: bsError, mutate: retryBs } = useAccountingBalanceSheet();
-  const { data: incomeStatement, isLoading: isLoading, error: isError, mutate: retryIs } = useAccountingIncomeStatement();
-  const { data: suppliers } = useAccountingSuppliers({ limit: 1 });
-  const { data: bankAccounts } = useAccountingBankAccounts();
-  const { data: ledger } = useAccountingGeneralLedger({ limit: 1 });
-  const { data: receivables } = useAccountingReceivables();
-  const { data: fiscalYears } = useAccountingFiscalYears();
+  const currency = 'NGN';
+  const { data, isLoading, error, mutate } = useConsolidatedAccountingDashboard(currency);
 
-  const hasCoreData = Boolean(dashboard || balanceSheet || incomeStatement);
-  const loading = (bsLoading || isLoading || dashboardLoading) && !hasCoreData;
-  const error = dashboardError || bsError || isError;
-  const handleRetry = () => {
-    retryDashboard();
-    retryBs();
-    retryIs();
-  };
+  const hasCoreData = Boolean(data);
+  const loading = isLoading && !hasCoreData;
+  const handleRetry = () => mutate();
 
-  // Extract key metrics with dashboard as primary source and statements as fallback
-  const totalAssets = dashboard?.summary?.total_assets ?? balanceSheet?.assets?.total ?? 0;
-  const totalLiabilities = dashboard?.summary?.total_liabilities ?? balanceSheet?.liabilities?.total ?? 0;
-  const totalEquity = dashboard?.summary?.total_equity ?? balanceSheet?.equity?.total ?? 0;
+  const totalAssets = data?.balance_sheet?.total_assets ?? 0;
+  const totalLiabilities = data?.balance_sheet?.total_liabilities ?? 0;
+  const totalEquity = data?.balance_sheet?.total_equity ?? 0;
+  const netWorth = data?.balance_sheet?.net_worth ?? 0;
 
-  // Extract from income statement
-  const totalRevenue = incomeStatement?.revenue?.total || 0;
-  const totalExpenses = (incomeStatement?.cost_of_goods_sold?.total || 0)
-    + (incomeStatement?.operating_expenses?.total || 0)
-    + (incomeStatement?.other_expenses?.total || 0);
-  const netIncome = dashboard?.summary?.net_income_ytd ?? incomeStatement?.net_income ?? 0;
-  const profitMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
+  const totalRevenue = data?.income_statement?.total_income ?? 0;
+  const totalExpenses = data?.income_statement?.total_expenses ?? 0;
+  const netIncome = data?.income_statement?.net_income ?? 0;
+  const profitMargin = data?.ratios?.profit_margin ?? 0;
 
-  // Calculate cash balance from bank accounts
-  const bankAccountsList = bankAccounts?.accounts || [];
-  const cashBalanceFromAccounts = bankAccountsList.reduce((sum: number, acc: any) => {
-    // Only count actual bank accounts (not payables)
-    const balance = acc.balance || acc.current_balance || 0;
-    return sum + balance;
-  }, 0);
-  const cashBalance = dashboard?.summary?.cash_balance ?? cashBalanceFromAccounts;
+  const bankAccountsList = data?.cash?.bank_accounts ?? [];
+  const cashBalance = data?.cash?.total ?? 0;
+  const accountsReceivable = data?.receivables?.total ?? 0;
 
-  // Get AR total
-  const accountsReceivable = dashboard?.summary?.accounts_receivable ?? receivables?.total_receivable ?? 0;
+  const currentRatio = data?.ratios?.current_ratio ?? 0;
+  const debtToEquity = data?.ratios?.debt_to_equity ?? 0;
 
-  // Calculate financial ratios
-  const currentRatio = totalLiabilities > 0 ? totalAssets / totalLiabilities : 0;
-  const debtToEquity = totalEquity > 0 ? totalLiabilities / totalEquity : 0;
-
-  // Determine ratio health status
   const currentRatioStatus = currentRatio >= 1.5 ? 'good' : currentRatio >= 1 ? 'warning' : 'bad';
   const debtEquityStatus = debtToEquity <= 1 ? 'good' : debtToEquity <= 2 ? 'warning' : 'bad';
   const marginStatus = profitMargin >= 20 ? 'good' : profitMargin >= 10 ? 'warning' : 'bad';
 
-  // Counts
-  const supplierCount = suppliers?.total || 0;
-  const bankAccountCount = bankAccounts?.total || bankAccountsList.length || 0;
-  const ledgerEntryCount = ledger?.total || 0;
-  const fiscalYearCount = fiscalYears?.total || 0;
+  const supplierCount = data?.counts?.suppliers ?? 0;
+  const bankAccountCount = bankAccountsList.length;
+  const ledgerEntryCount = data?.counts?.gl_entries ?? 0;
+  const fiscalYearCount = data?.fiscal_years?.length ?? 0;
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -372,50 +337,33 @@ export default function AccountingDashboardPage() {
       </div>
 
       {/* Balance Sheet Summary */}
-      {balanceSheet && !bsLoading && (
+      {data?.balance_sheet && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-teal-electric" />
             <h2 className="text-lg font-semibold text-white">Balance Sheet Summary</h2>
             <span className="text-slate-muted text-sm ml-auto">
-              As of {typeof balanceSheet.as_of_date === 'string'
-                ? balanceSheet.as_of_date
-                : (() => {
-                  const asOf: any = balanceSheet.as_of_date;
-                  return asOf?.end_date || asOf?.start_date || '-';
-                })()}
+              As of {data.fiscal_year?.end || data.generated_at}
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <p className="text-slate-muted text-sm mb-2">Assets {((balanceSheet as any)?.assets?.accounts?.length || 0) ? `(${(balanceSheet as any).assets.accounts.length} accounts)` : ''}</p>
-              <p className="text-2xl font-bold text-blue-400">{formatCurrency((balanceSheet as any)?.total_assets || balanceSheet.assets?.total || 0)}</p>
+              <p className="text-slate-muted text-sm mb-2">Assets</p>
+              <p className="text-2xl font-bold text-blue-400">{formatCurrency(totalAssets)}</p>
             </div>
             <div>
-              <p className="text-slate-muted text-sm mb-2">Liabilities {((balanceSheet as any)?.liabilities?.accounts?.length || 0) ? `(${(balanceSheet as any).liabilities.accounts.length} accounts)` : ''}</p>
-              <p className="text-2xl font-bold text-red-400">{formatCurrency((balanceSheet as any)?.liabilities?.total || 0)}</p>
+              <p className="text-slate-muted text-sm mb-2">Liabilities</p>
+              <p className="text-2xl font-bold text-red-400">{formatCurrency(totalLiabilities)}</p>
             </div>
             <div>
-              <p className="text-slate-muted text-sm mb-2">Equity + Retained Earnings</p>
-              <p className="text-2xl font-bold text-green-400">{formatCurrency(totalEquity)}</p>
+              <p className="text-slate-muted text-sm mb-2">Net Worth</p>
+              <p className="text-2xl font-bold text-green-400">{formatCurrency(netWorth)}</p>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-slate-border">
             <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Accounting Equation Balance</span>
-              <span className={cn(
-                'px-3 py-1 rounded-full text-xs font-medium',
-                balanceSheet.is_balanced
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-yellow-500/20 text-yellow-400'
-              )}>
-                {balanceSheet.is_balanced
-                  ? 'Balanced'
-                  : (() => {
-                    const totals: any = balanceSheet;
-                    return `Difference: ${formatCurrency(Math.abs((totals.total_assets || totals.assets?.total || 0) - (totals.total_liabilities_equity || totals.liabilities?.total || 0)))}`;
-                  })()}
-              </span>
+              <span className="text-slate-muted">Equity</span>
+              <span className="text-white font-medium">{formatCurrency(totalEquity)}</span>
             </div>
           </div>
         </div>

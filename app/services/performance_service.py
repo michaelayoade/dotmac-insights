@@ -680,7 +680,8 @@ class PerformanceService:
         if not policy:
             return []
 
-        score_bands: List[Dict[str, Any]] = policy.score_bands or []
+        raw_score_bands: Any = policy.score_bands or []
+        score_bands: List[Dict[str, Any]] = raw_score_bands if isinstance(raw_score_bands, list) else []
 
         # Get finalized scorecards
         scorecards = self.db.query(EmployeeScorecardInstance).filter(

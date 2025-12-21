@@ -6,7 +6,7 @@ Import, bulk update, merge duplicates, bulk assign
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 
 from app.database import get_db
@@ -62,9 +62,13 @@ async def bulk_update_contacts(payload: BulkUpdateRequest, db: Session = Depends
 
     update_data["updated_at"] = datetime.utcnow()
 
+    update_mappings = {
+        getattr(UnifiedContact, key): value
+        for key, value in update_data.items()
+    }
     updated = db.query(UnifiedContact).filter(
         UnifiedContact.id.in_(payload.contact_ids)
-    ).update(update_data, synchronize_session="fetch")
+    ).update(update_mappings, synchronize_session="fetch")
 
     db.commit()
 
@@ -312,6 +316,7 @@ async def find_duplicate_contacts(
     if contact_type:
         query = query.filter(UnifiedContact.contact_type == ContactType(contact_type.value))
 
+    duplicates: List[Any] = []
     # Find duplicates based on field
     if field == "email":
         duplicates = db.query(
@@ -354,8 +359,8 @@ async def find_duplicate_contacts(
         "duplicate_groups": [
             {
                 "value": d[0],
-                "count": d.count,
-                "contact_ids": d.ids,
+                "count": int(d._mapping["count"]),
+                "contact_ids": d._mapping["ids"],
             }
             for d in duplicates
         ],

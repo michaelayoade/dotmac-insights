@@ -20,6 +20,7 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 function formatDate(value?: string | null): string {
   if (!value) return '-';
@@ -32,6 +33,8 @@ function formatDate(value?: string | null): string {
 
 export default function PeoplePage() {
   const router = useRouter();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
@@ -47,7 +50,7 @@ export default function PeoplePage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContacts(params);
-  const people = data?.items || data?.data || [];
+  const people = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {
@@ -187,13 +190,15 @@ export default function PeoplePage() {
         icon={UserCircle}
         iconClassName="bg-purple-500/10 border border-purple-500/30"
         actions={
-          <Link
-            href="/contacts/new?type=person"
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Person
-          </Link>
+          canWrite ? (
+            <Link
+              href="/contacts/new?type=person"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Person
+            </Link>
+          ) : null
         }
       />
 

@@ -21,7 +21,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { useSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary } from '@/hooks/useApi';
+import { useConsolidatedSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
@@ -170,8 +170,12 @@ export default function SupportTicketsPage() {
     offset,
   });
 
-  const { data: supportDashboard } = useSupportDashboard();
+  const { data: supportDashboard } = useConsolidatedSupportDashboard();
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
+  const openTickets = supportDashboard?.summary?.open_tickets ?? 0;
+  const resolvedTickets = supportDashboard?.summary?.resolved_tickets ?? 0;
+  const totalTickets = openTickets + resolvedTickets;
+  const slaAttainment = supportDashboard?.summary?.sla_attainment ?? 0;
 
   const tickets = data?.tickets || [];
   const total = data?.total || 0;
@@ -318,12 +322,12 @@ export default function SupportTicketsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <StatCard
             label="Total"
-            value={supportDashboard.tickets.total}
+            value={totalTickets}
             icon={Inbox}
           />
           <StatCard
             label="Open"
-            value={supportDashboard.tickets.open}
+            value={openTickets}
             icon={AlertTriangle}
             variant="info"
             onClick={() => handleQuickFilter('open')}
@@ -331,26 +335,26 @@ export default function SupportTicketsPage() {
           />
           <StatCard
             label="Resolved"
-            value={supportDashboard.tickets.resolved}
+            value={resolvedTickets}
             icon={CheckCircle}
             variant="success"
             onClick={() => handleQuickFilter('resolved')}
             active={quickFilter === 'resolved'}
           />
           <StatCard
-            label="SLA Met"
-            value={supportDashboard.sla.met}
+            label="SLA Attainment"
+            value={`${slaAttainment.toFixed(0)}%`}
             icon={Target}
           />
           <StatCard
             label="Overdue"
-            value={slaBreach?.currently_overdue ?? supportDashboard.metrics.overdue_tickets}
+            value={slaBreach?.currently_overdue ?? supportDashboard.summary.overdue_tickets}
             icon={XCircle}
             variant="warning"
           />
           <StatCard
             label="Unassigned"
-            value={supportDashboard.metrics.unassigned_tickets}
+            value={supportDashboard.summary.unassigned_tickets}
             icon={Users}
           />
         </div>

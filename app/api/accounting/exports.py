@@ -47,6 +47,7 @@ async def get_accounting_cache_metadata() -> Dict[str, Any]:
     """
     cache_keys = [
         {"key": "accounting-dashboard", "ttl_seconds": 60},
+        {"key": "accounting-dashboard-bundle", "ttl_seconds": 60},
         {"key": "trial-balance", "ttl_seconds": 60},
         {"key": "balance-sheet", "ttl_seconds": 60},
         {"key": "income-statement", "ttl_seconds": 60},

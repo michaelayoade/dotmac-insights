@@ -20,7 +20,7 @@ import {
   Square,
 } from 'lucide-react';
 import useSWR from 'swr';
-import { apiFetch, useUnifiedContacts, type UnifiedContact } from '@/hooks/useApi';
+import { apiFetch, useUnifiedContacts, type UnifiedContact, type UnifiedContactsParams } from '@/hooks/useApi';
 import { API_BASE } from '@/lib/api/core';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
@@ -87,6 +87,9 @@ const EXPORT_FIELDS: ExportField[] = [
 ];
 
 const FIELD_GROUPS = ['Basic', 'Classification', 'Address', 'Segmentation', 'Financial', 'Acquisition', 'Dates', 'Other'];
+const CONTACT_TYPES: UnifiedContactsParams['contact_type'][] = ['lead', 'prospect', 'customer', 'churned', 'person'];
+const CATEGORIES: UnifiedContactsParams['category'][] = ['residential', 'business', 'enterprise', 'government', 'non_profit'];
+const STATUSES: UnifiedContactsParams['status'][] = ['active', 'inactive', 'suspended', 'do_not_contact'];
 
 export default function ExportPage() {
   const [selectedFields, setSelectedFields] = useState<Set<string>>(
@@ -102,15 +105,25 @@ export default function ExportPage() {
   const [status, setStatus] = useState<string>('');
 
   // Fetch contacts
+  const contactTypeValue = CONTACT_TYPES.includes(contactType as UnifiedContactsParams['contact_type'])
+    ? (contactType as UnifiedContactsParams['contact_type'])
+    : undefined;
+  const categoryValue = CATEGORIES.includes(category as UnifiedContactsParams['category'])
+    ? (category as UnifiedContactsParams['category'])
+    : undefined;
+  const statusValue = STATUSES.includes(status as UnifiedContactsParams['status'])
+    ? (status as UnifiedContactsParams['status'])
+    : undefined;
+
   const { data, isLoading, error, mutate } = useUnifiedContacts({
     page: 1,
     page_size: 1000,
-    contact_type: contactType || undefined,
-    category: category || undefined,
-    status: status || undefined,
+    contact_type: contactTypeValue,
+    category: categoryValue,
+    status: statusValue,
   });
 
-  const contacts = data?.items || data?.data || [];
+  const contacts = data?.items || [];
   const totalContacts = data?.total || contacts.length;
 
   const toggleField = (key: string) => {

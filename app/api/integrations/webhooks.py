@@ -469,8 +469,6 @@ async def replay_webhook_event(
         provider_map = {
             "paystack": PaymentProvider.PAYSTACK,
             "flutterwave": PaymentProvider.FLUTTERWAVE,
-            "mono": PaymentProvider.MONO,
-            "okra": PaymentProvider.OKRA,
         }
         provider = provider_map.get(event.provider)
         if not provider:

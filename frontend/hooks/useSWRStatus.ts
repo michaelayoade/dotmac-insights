@@ -3,8 +3,6 @@
  * Simplifies loading/error handling across dashboards
  */
 
-import { SWRResponse } from 'swr';
-
 export interface SWRStatusResult {
   /** True if any hook is in initial loading state */
   isLoading: boolean;
@@ -60,8 +58,16 @@ function isDataEmpty(data: unknown): boolean {
  * if (error) return <ErrorDisplay error={error} onRetry={retry} />;
  * if (isEmpty) return <EmptyState />;
  */
+type SWRStateLike = {
+  isLoading?: boolean;
+  isValidating?: boolean;
+  error?: unknown;
+  data?: unknown;
+  mutate?: unknown;
+};
+
 export function useSWRStatus(
-  ...responses: SWRResponse<unknown, unknown>[]
+  ...responses: SWRStateLike[]
 ): SWRStatusResult {
   const isLoading = responses.some((r) => r.isLoading);
   const isValidating = responses.some((r) => r.isValidating);
@@ -76,8 +82,8 @@ export function useSWRStatus(
 
   const retry = () => {
     responses.forEach((r) => {
-      if (r.mutate) {
-        r.mutate();
+      if (typeof r.mutate === 'function') {
+        (r.mutate as () => void)();
       }
     });
   };
@@ -86,8 +92,8 @@ export function useSWRStatus(
     responses
       .filter((r) => r.error)
       .forEach((r) => {
-        if (r.mutate) {
-          r.mutate();
+        if (typeof r.mutate === 'function') {
+          (r.mutate as () => void)();
         }
       });
   };

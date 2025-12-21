@@ -23,6 +23,7 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 function formatDate(value?: string | null): string {
   if (!value) return '-';
@@ -48,6 +49,8 @@ const qualificationColors: Record<string, { bg: string; text: string; icon: type
 
 export default function LeadsPage() {
   const router = useRouter();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
@@ -66,7 +69,7 @@ export default function LeadsPage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContactLeads(params);
-  const leads = data?.items || data?.data || [];
+  const leads = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {
@@ -214,13 +217,15 @@ export default function LeadsPage() {
         icon={Target}
         iconClassName="bg-violet-500/10 border border-violet-500/30"
         actions={
-          <Link
-            href="/contacts/new?type=lead"
-            className="flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-400 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Lead
-          </Link>
+          canWrite ? (
+            <Link
+              href="/contacts/new?type=lead"
+              className="flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-400 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Lead
+            </Link>
+          ) : null
         }
       />
 

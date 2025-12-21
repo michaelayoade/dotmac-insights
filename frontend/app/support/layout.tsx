@@ -13,7 +13,7 @@ import {
   Headphones,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useSupportDashboard, useSupportSlaBreachesSummary } from '@/hooks/useApi';
+import { useConsolidatedSupportDashboard, useSupportSlaBreachesSummary } from '@/hooks/useApi';
 import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
@@ -99,12 +99,12 @@ function getWorkflowPhase(sectionKey: string | null): string {
 
 // Live metrics component for header
 function LiveMetrics() {
-  const { data: dashboard } = useSupportDashboard();
+  const { data: dashboard } = useConsolidatedSupportDashboard();
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
 
-  const overdueCount = slaBreach?.currently_overdue ?? dashboard?.metrics?.overdue_tickets ?? 0;
-  const openCount = dashboard?.tickets?.open ?? 0;
-  const slaAttainment = dashboard?.sla?.attainment_rate ?? 0;
+  const overdueCount = slaBreach?.currently_overdue ?? dashboard?.summary?.overdue_tickets ?? 0;
+  const openCount = dashboard?.summary?.open_tickets ?? 0;
+  const slaAttainment = dashboard?.summary?.sla_attainment ?? 0;
 
   return (
     <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 bg-slate-elevated rounded-lg mr-2">
@@ -133,9 +133,9 @@ function LiveMetrics() {
 
 // Mobile overdue badge
 function MobileOverdueBadge() {
-  const { data: dashboard } = useSupportDashboard();
+  const { data: dashboard } = useConsolidatedSupportDashboard();
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
-  const overdueCount = slaBreach?.currently_overdue ?? dashboard?.metrics?.overdue_tickets ?? 0;
+  const overdueCount = slaBreach?.currently_overdue ?? dashboard?.summary?.overdue_tickets ?? 0;
 
   if (overdueCount === 0) return null;
 

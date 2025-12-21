@@ -101,7 +101,9 @@ export interface VehicleListParams {
 export const fleetApi = {
   // List vehicles with filtering and pagination
   getVehicles: (params?: VehicleListParams) =>
-    fetchApi<VehicleListResponse>('/v1/vehicles', { params }),
+    fetchApi<VehicleListResponse>('/v1/vehicles', {
+      params: params as Record<string, unknown> | undefined,
+    }),
 
   // Get fleet summary statistics
   getVehicleSummary: () =>

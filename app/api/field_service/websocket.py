@@ -15,7 +15,7 @@ router = APIRouter()
 class FieldServiceConnectionManager:
     """Manages WebSocket connections for field service real-time updates."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Connections grouped by channel
         self.active_connections: Dict[str, List[WebSocket]] = {
             "dispatch": [],  # Dispatch board updates
@@ -33,7 +33,7 @@ class FieldServiceConnectionManager:
         channel: str,
         user_id: Optional[str] = None,
         team_id: Optional[int] = None,
-    ):
+    ) -> None:
         """Accept a new WebSocket connection."""
         await websocket.accept()
 
@@ -57,7 +57,7 @@ class FieldServiceConnectionManager:
         channel: str,
         user_id: Optional[str] = None,
         team_id: Optional[int] = None,
-    ):
+    ) -> None:
         """Remove a WebSocket connection."""
         if channel in self.active_connections:
             if websocket in self.active_connections[channel]:
@@ -70,7 +70,7 @@ class FieldServiceConnectionManager:
             if websocket in self.team_connections[team_id]:
                 self.team_connections[team_id].remove(websocket)
 
-    async def broadcast_to_channel(self, channel: str, message: Dict[str, Any]):
+    async def broadcast_to_channel(self, channel: str, message: Dict[str, Any]) -> None:
         """Broadcast message to all connections in a channel."""
         if channel not in self.active_connections:
             return
@@ -86,7 +86,7 @@ class FieldServiceConnectionManager:
         for conn in disconnected:
             self.active_connections[channel].remove(conn)
 
-    async def broadcast_to_team(self, team_id: int, message: Dict[str, Any]):
+    async def broadcast_to_team(self, team_id: int, message: Dict[str, Any]) -> None:
         """Broadcast message to all connections for a specific team."""
         if team_id not in self.team_connections:
             return
@@ -101,7 +101,7 @@ class FieldServiceConnectionManager:
         for conn in disconnected:
             self.team_connections[team_id].remove(conn)
 
-    async def send_to_user(self, user_id: str, message: Dict[str, Any]):
+    async def send_to_user(self, user_id: str, message: Dict[str, Any]) -> None:
         """Send message to a specific user."""
         if user_id in self.user_connections:
             try:

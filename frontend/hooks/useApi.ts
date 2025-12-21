@@ -61,7 +61,7 @@ import {
   AccountingBankTransactionDetail,
   PurchasingSupplierDetail,
 } from '@/lib/api';
-import { crmApi } from '@/lib/api/domains';
+import { crmApi, dashboardsApi } from '@/lib/api/domains';
 
 type ApiGroup = Record<string, (...args: any[]) => any>;
 
@@ -4769,6 +4769,7 @@ export interface UnifiedContactsParams {
   is_organization?: boolean;
   has_outstanding?: boolean;
   tag?: string;
+  quality_issue?: 'missing_email' | 'missing_phone' | 'missing_address' | 'missing_name' | 'invalid_email';
   sort_by?: 'name' | 'created_at' | 'last_contact_date' | 'mrr' | 'lead_score';
   sort_order?: 'asc' | 'desc';
 }
@@ -4911,7 +4912,7 @@ export function useUnifiedContactLeads(params?: UnifiedContactsParams, config?: 
       }
       const queryString = queryParams.toString();
       const endpoint = queryString ? `/contacts/leads?${queryString}` : '/contacts/leads';
-      return apiFetch(endpoint);
+      return apiFetch<UnifiedContactsResponse>(endpoint);
     },
     config
   );
@@ -4931,7 +4932,7 @@ export function useUnifiedContactCustomers(params?: UnifiedContactsParams, confi
       }
       const queryString = queryParams.toString();
       const endpoint = queryString ? `/contacts/customers?${queryString}` : '/contacts/customers';
-      return apiFetch(endpoint);
+      return apiFetch<UnifiedContactsResponse>(endpoint);
     },
     config
   );
@@ -5190,4 +5191,90 @@ export async function triggerSync(source: 'all' | 'splynx' | 'erpnext' | 'chatwo
   return api.triggerSync(source, fullSync);
 }
 
-export { ApiError };
+// =============================================================================
+// CONSOLIDATED DASHBOARD HOOKS (Single Payload - Performance Optimized)
+// =============================================================================
+
+/**
+ * Consolidated Sales Dashboard (13 API calls → 1)
+ * Returns: Finance metrics, aging, revenue trend, recent transactions, CRM data
+ */
+export function useConsolidatedSalesDashboard(currency?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['consolidated-sales-dashboard', currency],
+    () => dashboardsApi.getSalesDashboard(currency),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Purchasing Dashboard (8 API calls → 1)
+ * Returns: AP metrics, aging, top suppliers, recent bills/payments/orders
+ */
+export function useConsolidatedPurchasingDashboard(
+  currency?: string,
+  params?: { start_date?: string; end_date?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['consolidated-purchasing-dashboard', currency, params],
+    () => dashboardsApi.getPurchasingDashboard(currency, params),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Support Dashboard (7 API calls → 1)
+ * Returns: Ticket metrics, volume trend, SLA performance, queue health
+ */
+export function useConsolidatedSupportDashboard(
+  params?: { start_date?: string; end_date?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['consolidated-support-dashboard', params],
+    () => dashboardsApi.getSupportDashboard(params),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Field Service Dashboard (2 API calls → 1)
+ * Returns: Today's metrics, order schedule, status breakdown
+ */
+export function useConsolidatedFieldServiceDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-field-service-dashboard',
+    () => dashboardsApi.getFieldServiceDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Accounting Dashboard (11 API calls → 1)
+ * Returns: Balance sheet, income statement, bank accounts, AR/AP, ratios
+ */
+export function useConsolidatedAccountingDashboard(currency?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['consolidated-accounting-dashboard', currency],
+    () => dashboardsApi.getAccountingDashboard(currency),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+export { ApiError, apiFetch };

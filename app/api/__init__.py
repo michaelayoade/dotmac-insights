@@ -36,6 +36,7 @@ from app.api.platform import router as platform_router
 from app.api.payroll_config import router as payroll_config_router
 from app.api.tax_core import router as tax_core_router
 from app.api.vehicles import router as vehicles_router
+from app.api.dashboards import router as dashboards_router
 
 api_router = APIRouter()
 
@@ -85,6 +86,7 @@ api_router.include_router(entitlements.router, prefix="/v1")
 api_router.include_router(payroll_config_router, prefix="/v1")
 api_router.include_router(tax_core_router, prefix="/v1")
 api_router.include_router(vehicles_router, prefix="/v1", tags=["vehicles"])
+api_router.include_router(dashboards_router, prefix="/v1", tags=["dashboards"])
 api_router.include_router(zoho_import.router, prefix="/v1")
 api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(network.router, prefix="/network", tags=["network"])
@@ -120,6 +122,7 @@ api_router.include_router(entitlements.router)
 api_router.include_router(payroll_config_router)  # Generic payroll configuration
 api_router.include_router(tax_core_router)  # Generic tax configuration
 api_router.include_router(vehicles_router, tags=["vehicles"])  # Fleet/Vehicle management
+api_router.include_router(dashboards_router, tags=["dashboards"])  # Consolidated dashboards
 
 # Import routers
 api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix

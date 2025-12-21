@@ -6,7 +6,7 @@ from datetime import datetime, date
 from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, validator, Field, conlist
+from pydantic import BaseModel, validator, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
@@ -409,17 +409,15 @@ class CustomFieldUpdateRequest(BaseModel):
 # --- Ticket Tag/Watcher/Merge Models ---
 
 class TicketTagsRequest(BaseModel):
-    tags: conlist(str, min_length=1)
+    tags: List[str]
 
 
 class TicketWatchersRequest(BaseModel):
-    user_ids: conlist(int, min_length=1)
+    user_ids: List[int]
 
 
 class TicketMergeRequest(BaseModel):
-    source_ticket_ids: conlist(int, min_length=1) = Field(
-        ..., description="IDs of tickets to merge into this ticket"
-    )
+    source_ticket_ids: List[int]
     close_source_tickets: bool = True
 
 

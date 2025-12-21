@@ -49,15 +49,17 @@ class AutomationExecutor:
             Summary of rule executions
         """
         context = context or {}
-        results = {
+        errors: List[str] = []
+        executions: List[Dict[str, Any]] = []
+        results: Dict[str, Any] = {
             "trigger": trigger.value,
             "ticket_id": ticket.id,
             "rules_evaluated": 0,
             "rules_executed": 0,
             "actions_performed": 0,
             "stopped_early": False,
-            "errors": [],
-            "executions": [],
+            "errors": errors,
+            "executions": executions,
         }
 
         # Get active rules for this trigger, ordered by priority
@@ -109,7 +111,7 @@ class AutomationExecutor:
                 execution_time_ms=execution_time_ms,
             )
 
-            results["executions"].append({
+            executions.append({
                 "rule_id": rule.id,
                 "rule_name": rule.name,
                 "conditions_matched": conditions_result["matched"],
@@ -119,7 +121,7 @@ class AutomationExecutor:
             })
 
             if actions_result["errors"]:
-                results["errors"].extend(actions_result["errors"])
+                errors.extend(actions_result["errors"])
 
             # Update rule stats
             rule.execution_count += 1
@@ -163,7 +165,7 @@ class AutomationExecutor:
 
     def _evaluate_conditions(
         self,
-        conditions: Optional[List[dict]],
+        conditions: Optional[List[Dict[str, Any]] | Dict[str, Any]],
         ticket: Ticket,
         context: Dict[str, Any],
     ) -> Dict[str, Any]:
@@ -177,7 +179,7 @@ class AutomationExecutor:
         Returns:
             Evaluation results
         """
-        result = {
+        result: Dict[str, Any] = {
             "all_matched": True,
             "matched": [],
             "not_matched": [],
@@ -186,7 +188,13 @@ class AutomationExecutor:
         if not conditions:
             return result
 
-        for condition in conditions:
+        normalized_conditions: List[Dict[str, Any]]
+        if isinstance(conditions, dict):
+            normalized_conditions = [conditions]
+        else:
+            normalized_conditions = conditions
+
+        for condition in normalized_conditions:
             field = condition.get("field", "")
             operator = condition.get("operator", "")
             value = condition.get("value")
@@ -196,8 +204,8 @@ class AutomationExecutor:
                 actual_value = context.get(field[8:])
             else:
                 actual_value = getattr(ticket, field, None)
-                if hasattr(actual_value, "value"):
-                    actual_value = actual_value.value
+                if actual_value is not None and hasattr(actual_value, "value"):
+                    actual_value = getattr(actual_value, "value")
 
             matched = self._check_condition(actual_value, operator, value)
 
@@ -277,7 +285,7 @@ class AutomationExecutor:
 
     def _execute_actions(
         self,
-        actions: List[dict],
+        actions: Optional[List[Dict[str, Any]] | Dict[str, Any]],
         ticket: Ticket,
         context: Dict[str, Any],
     ) -> Dict[str, Any]:
@@ -291,26 +299,37 @@ class AutomationExecutor:
         Returns:
             Execution results
         """
-        result = {
+        errors: List[str] = []
+        changes: List[Dict[str, Any]] = []
+        result: Dict[str, Any] = {
             "success": True,
             "actions_executed": 0,
             "actions_failed": 0,
-            "errors": [],
-            "changes": [],
+            "errors": errors,
+            "changes": changes,
         }
 
-        for action in actions:
+        if not actions:
+            return result
+
+        normalized_actions: List[Dict[str, Any]]
+        if isinstance(actions, dict):
+            normalized_actions = [actions]
+        else:
+            normalized_actions = actions
+
+        for action in normalized_actions:
             action_type = action.get("type", "")
             params = action.get("params", {})
 
             try:
                 change = self._execute_action(action_type, params, ticket, context)
                 if change:
-                    result["changes"].append(change)
+                    changes.append(change)
                     result["actions_executed"] += 1
             except Exception as e:
                 result["actions_failed"] += 1
-                result["errors"].append(f"Action {action_type} failed: {str(e)}")
+                errors.append(f"Action {action_type} failed: {str(e)}")
                 logger.error(
                     "automation_action_failed",
                     action_type=action_type,
@@ -342,57 +361,58 @@ class AutomationExecutor:
             Description of change made, or None
         """
         if action_type == AutomationActionType.SET_PRIORITY.value:
-            old_value = ticket.priority.value if ticket.priority else None
+            old_priority = ticket.priority.value if ticket.priority else None
             new_value = params.get("priority")
             try:
                 ticket.priority = TicketPriority(new_value)
                 return {
                     "action": "set_priority",
-                    "old": old_value,
+                    "old": old_priority,
                     "new": new_value,
                 }
             except ValueError:
                 raise ValueError(f"Invalid priority: {new_value}")
 
         elif action_type == AutomationActionType.SET_STATUS.value:
-            old_value = ticket.status.value if ticket.status else None
+            old_status = ticket.status.value if ticket.status else None
             new_value = params.get("status")
             try:
                 ticket.status = TicketStatus(new_value)
                 return {
                     "action": "set_status",
-                    "old": old_value,
+                    "old": old_status,
                     "new": new_value,
                 }
             except ValueError:
                 raise ValueError(f"Invalid status: {new_value}")
 
         elif action_type == AutomationActionType.ASSIGN_AGENT.value:
-            old_value = ticket.assigned_to
+            old_assignee: Optional[str] = ticket.assigned_to
             agent_id = params.get("agent_id")
             agent = self.db.query(Agent).filter(Agent.id == agent_id).first()
             if not agent:
                 raise ValueError(f"Agent not found: {agent_id}")
-            ticket.assigned_to = agent.display_name or agent.email
+            ticket.assigned_to = agent.display_name or agent.email or f"agent-{agent.id}"
             return {
                 "action": "assign_agent",
-                "old": old_value,
+                "old": old_assignee,
                 "new": ticket.assigned_to,
                 "agent_id": agent_id,
             }
 
         elif action_type == AutomationActionType.ASSIGN_TEAM.value:
-            old_value = ticket.team_id
+            old_team: Optional[str] = ticket.resolution_team
             team_id = params.get("team_id")
             team = self.db.query(Team).filter(Team.id == team_id).first()
             if not team:
                 raise ValueError(f"Team not found: {team_id}")
-            ticket.team_id = team_id
+            team_name = team.name or f"team-{team.id}"
+            ticket.resolution_team = team_name
             return {
                 "action": "assign_team",
-                "old": old_value,
-                "new": team_id,
-                "team_name": team.name,
+                "old": old_team,
+                "new": team_name,
+                "team_name": team_name,
             }
 
         elif action_type == AutomationActionType.ADD_TAG.value:
@@ -550,8 +570,8 @@ class AutomationExecutor:
         return self.db.query(Ticket).filter(
             Ticket.status.in_([
                 TicketStatus.OPEN,
-                TicketStatus.IN_PROGRESS,
-                TicketStatus.PENDING,
+                TicketStatus.REPLIED,
+                TicketStatus.ON_HOLD,
             ]),
             Ticket.updated_at < threshold,
         ).order_by(Ticket.updated_at).limit(limit).all()
@@ -567,7 +587,7 @@ class AutomationExecutor:
         """
         tickets = self.find_idle_tickets(idle_hours)
 
-        results = {
+        results: Dict[str, Any] = {
             "idle_tickets_found": len(tickets),
             "automations_triggered": 0,
             "details": [],

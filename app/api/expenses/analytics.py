@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, Any, List
+from typing import Dict, Any, List, cast
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -317,7 +317,7 @@ def get_card_utilization(
         })
 
     # Sort by utilization descending
-    results.sort(key=lambda x: x["utilization_pct"], reverse=True)
+    results.sort(key=lambda x: float(cast(float | int, x.get("utilization_pct", 0.0))), reverse=True)
     return results
 
 

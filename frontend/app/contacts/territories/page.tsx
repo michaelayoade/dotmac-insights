@@ -160,8 +160,8 @@ export default function TerritoriesPage() {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-              <XAxis type="number" stroke={CHART_COLORS.text} fontSize={12} />
-              <YAxis type="category" dataKey="name" stroke={CHART_COLORS.text} fontSize={12} width={100} />
+              <XAxis type="number" stroke={CHART_COLORS.axis} fontSize={12} />
+              <YAxis type="category" dataKey="name" stroke={CHART_COLORS.axis} fontSize={12} width={100} />
               <Tooltip {...TOOLTIP_STYLE} />
               <Bar dataKey="contacts" fill={CHART_COLORS.palette[0]} radius={[0, 4, 4, 0]} />
             </BarChart>

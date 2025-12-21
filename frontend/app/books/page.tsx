@@ -14,25 +14,12 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import {
-  useAccountingBalanceSheet,
-  useAccountingIncomeStatement,
-  useAccountingSuppliers,
-  useAccountingBankAccounts,
-  useAccountingGeneralLedger,
-  useAccountingReceivables,
-  useAccountingFiscalYears,
-  useAccountingDashboard,
-  useAccountingReceivablesOutstanding,
-  useAccountingPayablesOutstanding,
-  useAccountingCashFlow,
-} from '@/hooks/useApi';
+import { useConsolidatedAccountingDashboard } from '@/hooks/useApi';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Wallet,
   CreditCard,
   Building2,
@@ -40,20 +27,17 @@ import {
   Scale,
   ArrowUpRight,
   ArrowDownRight,
-  AlertTriangle,
   Loader2,
-  Activity,
   BookOpen,
   Users,
   Landmark,
-  FileText,
-  Plus,
+  ArrowRight,
 } from 'lucide-react';
 import { ErrorDisplay } from '@/components/insights/shared';
 import { DashboardSkeleton } from '@/components/PageSkeleton';
+import { PageHeader } from '@/components/ui';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
-// Theme-aware tooltip styling using CSS variables
 const TOOLTIP_STYLE = {
   contentStyle: {
     backgroundColor: CHART_COLORS.tooltip.bg,
@@ -83,6 +67,13 @@ function formatRatio(value: number | undefined | null): string {
   return value.toFixed(2);
 }
 
+function formatCompactCurrency(value: number): string {
+  if (value >= 1000000000) return `₦${(value / 1000000000).toFixed(1)}B`;
+  if (value >= 1000000) return `₦${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `₦${(value / 1000).toFixed(0)}K`;
+  return `₦${value.toFixed(0)}`;
+}
+
 interface MetricCardProps {
   title: string;
   value: string;
@@ -90,11 +81,15 @@ interface MetricCardProps {
   icon: React.ElementType;
   colorClass?: string;
   loading?: boolean;
+  href?: string;
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading }: MetricCardProps) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
+function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href }: MetricCardProps) {
+  const content = (
+    <div className={cn(
+      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
+      href && 'hover:border-teal-electric/50 cursor-pointer'
+    )}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-slate-muted text-sm">{title}</p>
@@ -109,8 +104,19 @@ function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-tea
           <Icon className={cn('w-5 h-5', colorClass)} />
         </div>
       </div>
+      {href && (
+        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
+          <span>View details</span>
+          <ArrowRight className="w-3 h-3 ml-1" />
+        </div>
+      )}
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 interface RatioCardProps {
@@ -141,209 +147,122 @@ function RatioCard({ title, value, description, status }: RatioCardProps) {
   );
 }
 
-function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
+function ChartCard({ title, subtitle, icon: Icon, href, children }: { title: string; subtitle?: string; icon?: React.ElementType; href?: string; children: React.ReactNode }) {
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-      <div className="flex items-center gap-2 mb-4">
-        {Icon && <Icon className="w-5 h-5 text-teal-electric" />}
-        <div>
-          <h3 className="text-white font-semibold">{title}</h3>
-          {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-5 h-5 text-teal-electric" />}
+          <div>
+            <h3 className="text-white font-semibold">{title}</h3>
+            {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
+          </div>
         </div>
+        {href && (
+          <Link href={href} className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+            View Details <ArrowRight className="w-4 h-4" />
+          </Link>
+        )}
       </div>
       {children}
     </div>
   );
 }
 
-function formatCompactCurrency(value: number): string {
-  if (value >= 1000000000) return `₦${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `₦${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `₦${(value / 1000).toFixed(0)}K`;
-  return `₦${value.toFixed(0)}`;
-}
-
 export default function AccountingDashboardPage() {
   const currency = 'NGN';
-  // Fetch data from multiple endpoints
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useAccountingDashboard(currency);
-  const { data: balanceSheet, isLoading: bsLoading, error: bsError, mutate: refetchBalance } = useAccountingBalanceSheet({ currency });
-  const { data: incomeStatement, isLoading: incomeLoading, error: incomeError, mutate: refetchIncome } = useAccountingIncomeStatement({ currency });
-  const { data: suppliers, isLoading: suppliersLoading, error: suppliersError, mutate: refetchSuppliers } = useAccountingSuppliers({ limit: 1, currency });
-  const { data: bankAccounts, isLoading: bankLoading, error: bankError, mutate: refetchBank } = useAccountingBankAccounts();
-  const { data: ledger, isLoading: ledgerLoading, error: ledgerError, mutate: refetchLedger } = useAccountingGeneralLedger({ limit: 1, currency });
-  const { data: receivables, isLoading: receivablesLoading, error: receivablesError, mutate: refetchReceivables } = useAccountingReceivables({ currency });
-  const { data: fiscalYears, isLoading: fiscalLoading, error: fiscalError, mutate: refetchFiscal } = useAccountingFiscalYears();
-  const { data: receivablesOutstanding, isLoading: receivablesOutstandingLoading, error: receivablesOutstandingError, mutate: refetchReceivablesOutstanding } = useAccountingReceivablesOutstanding({ currency, top: 5 });
-  const { data: payablesOutstanding, isLoading: payablesOutstandingLoading, error: payablesOutstandingError, mutate: refetchPayablesOutstanding } = useAccountingPayablesOutstanding({ currency, top: 5 });
-  const { data: cashFlow, isLoading: cashFlowLoading, error: cashFlowError, mutate: refetchCashFlow } = useAccountingCashFlow();
+  const { data, isLoading, error, mutate } = useConsolidatedAccountingDashboard(currency);
 
-  const swrStates = [
-    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
-    { error: bsError, isLoading: bsLoading, mutate: refetchBalance },
-    { error: incomeError, isLoading: incomeLoading, mutate: refetchIncome },
-    { error: suppliersError, isLoading: suppliersLoading, mutate: refetchSuppliers },
-    { error: bankError, isLoading: bankLoading, mutate: refetchBank },
-    { error: ledgerError, isLoading: ledgerLoading, mutate: refetchLedger },
-    { error: receivablesError, isLoading: receivablesLoading, mutate: refetchReceivables },
-    { error: fiscalError, isLoading: fiscalLoading, mutate: refetchFiscal },
-    { error: receivablesOutstandingError, isLoading: receivablesOutstandingLoading, mutate: refetchReceivablesOutstanding },
-    { error: payablesOutstandingError, isLoading: payablesOutstandingLoading, mutate: refetchPayablesOutstanding },
-    { error: cashFlowError, isLoading: cashFlowLoading, mutate: refetchCashFlow },
-  ];
-
-  const firstError = swrStates.find((state) => state.error)?.error;
-  const loading = swrStates.some((state) => state.isLoading);
-  const hasCoreData = Boolean(dashboard || balanceSheet || incomeStatement);
-  const showSkeleton = !hasCoreData && loading;
-  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
-
-  // Extract key metrics with dashboard as primary source and statements as fallback
-  const totalAssets = dashboard?.summary?.total_assets ?? balanceSheet?.assets?.total ?? 0;
-  const totalLiabilities = dashboard?.summary?.total_liabilities ?? balanceSheet?.liabilities?.total ?? 0;
-  const totalEquity = dashboard?.summary?.total_equity ?? balanceSheet?.equity?.total ?? 0;
-
-  // Extract from income statement
-  const totalRevenue = incomeStatement?.revenue?.total || 0;
-  const totalExpenses = (incomeStatement?.cost_of_goods_sold?.total || 0)
-    + (incomeStatement?.operating_expenses?.total || 0)
-    + (incomeStatement?.other_expenses?.total || 0);
-  const netIncome = dashboard?.summary?.net_income_ytd ?? incomeStatement?.net_income ?? 0;
-  const profitMargin = totalRevenue > 0 ? (netIncome / totalRevenue) * 100 : 0;
-
-  // Calculate cash balance from bank accounts
-  const bankAccountsList = bankAccounts?.accounts || [];
-  const cashBalanceFromAccounts = bankAccountsList.reduce((sum: number, acc: any) => {
-    // Only count actual bank accounts (not payables)
-    const balance = acc.balance || acc.current_balance || 0;
-    return sum + balance;
-  }, 0);
-  const cashBalance = dashboard?.summary?.cash_balance ?? cashBalanceFromAccounts;
-
-  // Get AR total
-  const accountsReceivable = dashboard?.summary?.accounts_receivable ?? receivables?.total_receivable ?? 0;
-
-  // Calculate financial ratios
-  const currentRatio = totalLiabilities > 0 ? totalAssets / totalLiabilities : 0;
-  const debtToEquity = totalEquity > 0 ? totalLiabilities / totalEquity : 0;
-
-  // Determine ratio health status
-  const currentRatioStatus = currentRatio >= 1.5 ? 'good' : currentRatio >= 1 ? 'warning' : 'bad';
-  const debtEquityStatus = debtToEquity <= 1 ? 'good' : debtToEquity <= 2 ? 'warning' : 'bad';
-  const marginStatus = profitMargin >= 20 ? 'good' : profitMargin >= 10 ? 'warning' : 'bad';
-
-  // Counts
-  const supplierCount = suppliers?.total || 0;
-  const bankAccountCount = bankAccounts?.total || bankAccountsList.length || 0;
-  const ledgerEntryCount = ledger?.total || 0;
-  const fiscalYearCount = fiscalYears?.total || 0;
-  const arOutstanding = receivablesOutstanding?.total || 0;
-  const apOutstanding = payablesOutstanding?.total || 0;
-  const topCustomers = receivablesOutstanding?.top;
-  const topSuppliers = payablesOutstanding?.top;
-
-  // Chart data: Balance sheet composition - useMemo MUST be called unconditionally (before any returns)
+  // Chart data - must be called unconditionally
   const balanceSheetData = useMemo(() => {
+    if (!data) return [];
     return [
-      { name: 'Assets', value: totalAssets, color: CHART_COLORS.info },
-      { name: 'Liabilities', value: totalLiabilities, color: CHART_COLORS.danger },
-      { name: 'Equity', value: totalEquity, color: CHART_COLORS.success },
+      { name: 'Assets', value: data.balance_sheet?.total_assets || 0, color: CHART_COLORS.info },
+      { name: 'Liabilities', value: data.balance_sheet?.total_liabilities || 0, color: CHART_COLORS.danger },
+      { name: 'Equity', value: data.balance_sheet?.total_equity || 0, color: CHART_COLORS.success },
     ].filter(item => item.value > 0);
-  }, [totalAssets, totalLiabilities, totalEquity]);
+  }, [data]);
 
-  // Chart data: Revenue vs Expenses comparison
   const revenueExpenseData = useMemo(() => {
-    const cogs = incomeStatement?.cost_of_goods_sold?.total || 0;
-    const opex = incomeStatement?.operating_expenses?.total || 0;
-    const otherExp = incomeStatement?.other_expenses?.total || 0;
-    const otherInc = incomeStatement?.other_income?.total || 0;
-
+    if (!data) return [];
     return [
-      { name: 'Revenue', amount: totalRevenue, fill: CHART_COLORS.success },
-      { name: 'COGS', amount: cogs, fill: CHART_COLORS.warning },
-      { name: 'Operating', amount: opex, fill: CHART_COLORS.palette[2] },
-      { name: 'Other Exp', amount: otherExp, fill: CHART_COLORS.danger },
-      { name: 'Other Inc', amount: otherInc, fill: CHART_COLORS.primaryLight },
-      { name: 'Net Income', amount: netIncome, fill: netIncome >= 0 ? CHART_COLORS.success : CHART_COLORS.danger },
+      { name: 'Revenue', amount: data.income_statement?.total_income || 0, fill: CHART_COLORS.success },
+      { name: 'Expenses', amount: data.income_statement?.total_expenses || 0, fill: CHART_COLORS.warning },
+      { name: 'Net Income', amount: data.income_statement?.net_income || 0, fill: (data.income_statement?.net_income || 0) >= 0 ? CHART_COLORS.success : CHART_COLORS.danger },
     ];
-  }, [incomeStatement, totalRevenue, netIncome]);
+  }, [data]);
 
-  // Chart data: AR vs AP comparison
   const arApData = useMemo(() => {
+    if (!data) return [];
     return [
-      { name: 'Receivables', AR: arOutstanding || accountsReceivable, AP: 0 },
-      { name: 'Payables', AR: 0, AP: apOutstanding },
+      { name: 'Receivables', AR: data.receivables?.total || 0, AP: 0 },
+      { name: 'Payables', AR: 0, AP: data.payables?.total || 0 },
     ];
-  }, [arOutstanding, apOutstanding, accountsReceivable]);
+  }, [data]);
 
-  // Chart data: Top customers/suppliers for horizontal bar
-  const topPartiesData = useMemo(() => {
-    const customers = (topCustomers ?? []).slice(0, 5).map((c: any) => ({
-      name: (c.name || 'Customer').substring(0, 15),
-      amount: c.amount || 0,
-      type: 'AR',
-    }));
-    const suppliersArr = (topSuppliers ?? []).slice(0, 5).map((s: any) => ({
-      name: (s.name || 'Supplier').substring(0, 15),
-      amount: s.amount || 0,
-      type: 'AP',
-    }));
-    return [...customers, ...suppliersArr];
-  }, [topCustomers, topSuppliers]);
-
-  // Cash flow data
-  const cashFlowData = useMemo(() => {
-    if (!cashFlow) return [];
-    return [
-      { name: 'Operating', value: cashFlow.operating_activities?.net || 0, fill: CHART_COLORS.success },
-      { name: 'Investing', value: cashFlow.investing_activities?.net || 0, fill: CHART_COLORS.info },
-      { name: 'Financing', value: cashFlow.financing_activities?.net || 0, fill: CHART_COLORS.palette[2] },
-    ];
-  }, [cashFlow]);
-
-  // Early returns AFTER all hooks have been called
-  if (showSkeleton) {
+  if (isLoading) {
     return <DashboardSkeleton />;
   }
 
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load accounting dashboard data."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
+
+  if (!data) {
+    return <DashboardSkeleton />;
+  }
+
+  const { balance_sheet, income_statement, cash, receivables, payables, ratios, counts, fiscal_years } = data;
+
+  // Calculate ratio status
+  const currentRatioStatus = (ratios?.current_ratio || 0) >= 1.5 ? 'good' : (ratios?.current_ratio || 0) >= 1 ? 'warning' : 'bad';
+  const debtEquityStatus = (ratios?.debt_to_equity || 0) <= 1 ? 'good' : (ratios?.debt_to_equity || 0) <= 2 ? 'warning' : 'bad';
+  const marginStatus = (ratios?.profit_margin || 0) >= 20 ? 'good' : (ratios?.profit_margin || 0) >= 10 ? 'warning' : 'bad';
+
   return (
     <div className="space-y-6">
-      {firstError && (
-        <ErrorDisplay
-          message="Failed to load accounting dashboard data."
-          error={firstError as Error}
-          onRetry={retryAll}
-        />
-      )}
+      <PageHeader
+        title="Accounting Dashboard"
+        subtitle="Financial position, performance metrics, and key ratios"
+        icon={BookOpen}
+        iconClassName="bg-blue-500/10 border border-blue-500/30"
+      />
+
       {/* Key Financial Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Total Assets"
-          value={formatCurrency(totalAssets)}
+          value={formatCurrency(balance_sheet?.total_assets)}
           icon={Building2}
           colorClass="text-blue-400"
-          loading={showSkeleton}
+          href="/books/balance-sheet"
         />
         <MetricCard
           title="Total Liabilities"
-          value={formatCurrency(totalLiabilities)}
+          value={formatCurrency(balance_sheet?.total_liabilities)}
           icon={CreditCard}
           colorClass="text-red-400"
-          loading={showSkeleton}
+          href="/books/balance-sheet"
         />
         <MetricCard
           title="Total Equity"
-          value={formatCurrency(totalEquity)}
+          value={formatCurrency(balance_sheet?.total_equity)}
           icon={PiggyBank}
           colorClass="text-green-400"
-          loading={showSkeleton}
+          href="/books/balance-sheet"
         />
         <MetricCard
           title="Net Income (YTD)"
-          value={formatCurrency(netIncome)}
+          value={formatCurrency(income_statement?.net_income)}
           icon={TrendingUp}
           colorClass="text-teal-electric"
-          loading={showSkeleton}
+          href="/books/income-statement"
         />
       </div>
 
@@ -351,67 +270,76 @@ export default function AccountingDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MetricCard
           title="Cash & Bank"
-          value={formatCurrency(cashBalance)}
-          subtitle={`${bankAccountCount} bank accounts`}
+          value={formatCurrency(cash?.total)}
+          subtitle={`${cash?.bank_accounts?.length || 0} bank accounts`}
           icon={Wallet}
           colorClass="text-emerald-400"
+          href="/books/bank-accounts"
         />
         <MetricCard
           title="AR Outstanding"
-          value={formatCurrency(arOutstanding || accountsReceivable)}
+          value={formatCurrency(receivables?.total)}
           subtitle="Top customers below"
           icon={ArrowUpRight}
           colorClass="text-blue-400"
+          href="/books/receivables"
         />
         <MetricCard
           title="AP Outstanding"
-          value={formatCurrency(apOutstanding)}
+          value={formatCurrency(payables?.total)}
           subtitle="Top suppliers below"
           icon={ArrowDownRight}
           colorClass="text-amber-400"
+          href="/books/payables"
         />
         <MetricCard
           title="Revenue (YTD)"
-          value={formatCurrency(totalRevenue)}
-          subtitle={`${profitMargin.toFixed(1)}% profit margin`}
+          value={formatCurrency(income_statement?.total_income)}
+          subtitle={`${(ratios?.profit_margin || 0).toFixed(1)}% profit margin`}
           icon={DollarSign}
           colorClass="text-green-400"
-          loading={showSkeleton}
+          href="/books/income-statement"
         />
       </div>
 
       {/* Financial Ratios */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Scale className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Financial Ratios</h2>
+      <Link href="/books/ratios" className="block">
+        <div className="bg-slate-card border border-slate-border rounded-xl p-6 hover:border-teal-electric/50 transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Scale className="w-5 h-5 text-teal-electric" />
+              <h2 className="text-lg font-semibold text-white">Financial Ratios</h2>
+            </div>
+            <div className="text-teal-electric text-sm flex items-center gap-1">
+              View Analysis <ArrowRight className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <RatioCard
+              title="Current Ratio"
+              value={formatRatio(ratios?.current_ratio)}
+              description="Total Assets / Total Liabilities"
+              status={currentRatioStatus}
+            />
+            <RatioCard
+              title="Debt to Equity"
+              value={formatRatio(ratios?.debt_to_equity)}
+              description="Total Liabilities / Total Equity"
+              status={debtEquityStatus}
+            />
+            <RatioCard
+              title="Profit Margin"
+              value={`${(ratios?.profit_margin || 0).toFixed(1)}%`}
+              description="Net Income / Revenue"
+              status={marginStatus}
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <RatioCard
-            title="Current Ratio"
-            value={formatRatio(currentRatio)}
-            description="Total Assets / Total Liabilities"
-            status={currentRatioStatus}
-          />
-          <RatioCard
-            title="Debt to Equity"
-            value={formatRatio(debtToEquity)}
-            description="Total Liabilities / Total Equity"
-            status={debtEquityStatus}
-          />
-          <RatioCard
-            title="Profit Margin"
-            value={`${profitMargin.toFixed(1)}%`}
-            description="Net Income / Revenue"
-            status={marginStatus}
-          />
-        </div>
-      </div>
+      </Link>
 
       {/* Charts Row 1: Balance Sheet & Income Statement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Balance Sheet Composition */}
-        <ChartCard title="Balance Sheet Composition" subtitle="Assets, Liabilities & Equity" icon={Building2}>
+        <ChartCard title="Balance Sheet Composition" subtitle="Assets, Liabilities & Equity" icon={Building2} href="/books/balance-sheet">
           {balanceSheetData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -448,283 +376,185 @@ export default function AccountingDashboardPage() {
           )}
         </ChartCard>
 
-        {/* Income Statement Breakdown */}
-        <ChartCard title="Income Statement" subtitle="Revenue, expenses & net income" icon={TrendingUp}>
-          {revenueExpenseData.some(d => d.amount > 0) ? (
+        <ChartCard title="Income Statement" subtitle="Revenue vs Expenses" icon={TrendingUp} href="/books/income-statement">
+          {revenueExpenseData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={revenueExpenseData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 10 }}
-                  tickFormatter={(v) => formatCompactCurrency(v)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  stroke={CHART_COLORS.axis}
-                  tick={{ fontSize: 11 }}
-                  width={70}
-                />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                  {revenueExpenseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis type="number" tickFormatter={(val) => formatCompactCurrency(val)} tick={{ fill: 'var(--chart-muted)', fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fill: 'var(--chart-text)', fontSize: 11 }} width={80} />
+                <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCompactCurrency(value)} />
+                <Bar dataKey="amount" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
             <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">
-              No income statement data available
+              No income data available
             </div>
           )}
         </ChartCard>
       </div>
 
-      {/* Charts Row 2: AR/AP & Cash Flow */}
+      {/* Charts Row 2: AR/AP & Bank Accounts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* AR vs AP */}
-        <ChartCard title="Receivables vs Payables" subtitle="Outstanding amounts" icon={DollarSign}>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={arApData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-              <XAxis dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
-              <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
-              <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
-              <Bar dataKey="AR" name="Receivables" fill={CHART_COLORS.info} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="AP" name="Payables" fill={CHART_COLORS.warning} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-info" />
-                <span className="text-slate-muted">AR: {formatCurrency(arOutstanding || accountsReceivable)}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-warn" />
-                <span className="text-slate-muted">AP: {formatCurrency(apOutstanding)}</span>
-              </span>
-            </div>
-            <span className={cn(
-              'font-semibold',
-              (arOutstanding || accountsReceivable) > apOutstanding ? 'text-blue-info' : 'text-amber-warn'
-            )}>
-              Net: {formatCurrency((arOutstanding || accountsReceivable) - apOutstanding)}
-            </span>
-          </div>
-        </ChartCard>
-
-        {/* Cash Flow */}
-        <ChartCard title="Cash Flow" subtitle="Operating, investing & financing" icon={Wallet}>
-          {cashFlowData.length > 0 && cashFlowData.some(d => d.value !== 0) ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                  <XAxis dataKey="name" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
-                  <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 10 }} tickFormatter={(v) => formatCompactCurrency(v)} />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
-                    {cashFlowData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-2 pt-2 border-t border-slate-border flex items-center justify-between text-sm">
-                <span className="text-slate-muted">Net Change in Cash</span>
-                <span className={cn(
-                  'font-bold',
-                  (cashFlow?.net_change_in_cash || 0) >= 0 ? 'text-teal-electric' : 'text-coral-alert'
-                )}>
-                  {formatCurrency(cashFlow?.net_change_in_cash || 0)}
-                </span>
-              </div>
-            </>
+        <ChartCard title="Receivables vs Payables" subtitle="AR/AP Outstanding" icon={Scale} href="/books/receivables">
+          {arApData.length > 0 && (arApData[0].AR > 0 || arApData[1].AP > 0) ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={arApData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="name" tick={{ fill: 'var(--chart-text)', fontSize: 11 }} />
+                <YAxis tickFormatter={(val) => formatCompactCurrency(val)} tick={{ fill: 'var(--chart-muted)', fontSize: 10 }} />
+                <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => formatCompactCurrency(value)} />
+                <Bar dataKey="AR" fill={CHART_COLORS.success} name="Receivables" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="AP" fill={CHART_COLORS.warning} name="Payables" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="h-[200px] flex items-center justify-center text-slate-muted text-sm">
-              No cash flow data available
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">
+              No AR/AP data available
             </div>
           )}
         </ChartCard>
-      </div>
 
-      {/* Revenue & Expenses Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-green-400" />
-            <h2 className="text-lg font-semibold text-white">Revenue (YTD)</h2>
-          </div>
-          {showSkeleton ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <>
-              <p className="text-3xl font-bold text-green-400">{formatCurrency(totalRevenue)}</p>
-              <p className="text-slate-muted text-sm mt-2">Total revenue for current year</p>
-            </>
-          )}
-        </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingDown className="w-5 h-5 text-red-400" />
-            <h2 className="text-lg font-semibold text-white">Expenses (YTD)</h2>
-          </div>
-          {showSkeleton ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <>
-              <p className="text-3xl font-bold text-red-400">{formatCurrency(totalExpenses)}</p>
-              <p className="text-slate-muted text-sm mt-2">Total expenses for current year</p>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Outstanding detail */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Bank Accounts */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ArrowUpRight className="w-4 h-4 text-blue-400" />
+              <Landmark className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">Bank Accounts</h3>
+            </div>
+            <Link href="/books/bank-accounts" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          {cash?.bank_accounts && cash.bank_accounts.length > 0 ? (
+            <div className="space-y-3">
+              {cash.bank_accounts.map((account, index) => (
+                <Link
+                  key={account.id || index}
+                  href={`/books/bank-accounts/${account.id}`}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
+                >
+                  <div>
+                    <p className="text-white text-sm font-medium">{account.account_name}</p>
+                    <p className="text-slate-muted text-xs">{account.bank_name} •••• {account.account_number}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white font-mono text-sm">{formatCurrency(account.balance, account.currency)}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="h-[120px] flex items-center justify-center text-slate-muted text-sm">
+              No bank accounts configured
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Top Customers & Suppliers */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <ArrowUpRight className="w-5 h-5 text-blue-400" />
               <h3 className="text-white font-semibold">Top Customers (Outstanding)</h3>
             </div>
-            <span className="text-slate-muted text-xs">AR detail</span>
+            <Link href="/books/receivables" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          {topCustomers?.length ? (
+          {receivables?.top_customers && receivables.top_customers.length > 0 ? (
             <div className="space-y-2">
-              {topCustomers.map((c: any) => (
-                <div key={c.id || c.name} className="flex items-center justify-between text-sm">
-                  <div className="text-white truncate max-w-[220px]">{c.name || 'Unknown Customer'}</div>
-                  <div className="font-mono text-slate-muted">{formatCurrency(c.amount || 0, c.currency || currency)}</div>
-                </div>
+              {receivables.top_customers.map((customer, index) => (
+                <Link
+                  key={index}
+                  href={`/customers?search=${encodeURIComponent(customer.customer_name)}`}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-xs font-bold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium truncate max-w-[180px]">{customer.customer_name}</p>
+                      <p className="text-slate-muted text-xs">{customer.invoice_count} invoices</p>
+                    </div>
+                  </div>
+                  <p className="text-white font-mono text-sm">{formatCurrency(customer.outstanding)}</p>
+                </Link>
               ))}
             </div>
           ) : (
-            <p className="text-slate-muted text-sm">No outstanding customers</p>
+            <div className="h-[120px] flex items-center justify-center text-slate-muted text-sm">
+              No outstanding receivables
+            </div>
           )}
         </div>
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
+
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <ArrowDownRight className="w-4 h-4 text-amber-400" />
+              <ArrowDownRight className="w-5 h-5 text-amber-400" />
               <h3 className="text-white font-semibold">Top Suppliers (Outstanding)</h3>
             </div>
-            <span className="text-slate-muted text-xs">AP detail</span>
+            <Link href="/books/payables" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          {topSuppliers?.length ? (
+          {payables?.top_suppliers && payables.top_suppliers.length > 0 ? (
             <div className="space-y-2">
-              {topSuppliers.map((s: any) => (
-                <div key={s.id || s.name} className="flex items-center justify-between text-sm">
-                  <div className="text-white truncate max-w-[220px]">{s.name || 'Unknown Supplier'}</div>
-                  <div className="font-mono text-slate-muted">{formatCurrency(s.amount || 0, s.currency || currency)}</div>
-                </div>
+              {payables.top_suppliers.map((supplier, index) => (
+                <Link
+                  key={index}
+                  href={`/purchasing/suppliers?search=${encodeURIComponent(supplier.supplier_name)}`}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium truncate max-w-[180px]">{supplier.supplier_name}</p>
+                      <p className="text-slate-muted text-xs">{supplier.bill_count} bills</p>
+                    </div>
+                  </div>
+                  <p className="text-white font-mono text-sm">{formatCurrency(supplier.outstanding)}</p>
+                </Link>
               ))}
             </div>
           ) : (
-            <p className="text-slate-muted text-sm">No outstanding suppliers</p>
+            <div className="h-[120px] flex items-center justify-center text-slate-muted text-sm">
+              No outstanding payables
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { href: '/books/accounts-receivable/invoices/new', label: 'New Invoice' },
-          { href: '/books/accounts-receivable/payments/new', label: 'New Payment' },
-        ].map((action) => (
-          <Link
-            key={action.href}
-            href={action.href}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
-          >
-            <Plus className="w-4 h-4" />
-            {action.label}
-          </Link>
-        ))}
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
-          <BookOpen className="w-6 h-6 text-teal-electric mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(ledgerEntryCount)}</p>
-          <p className="text-slate-muted text-sm">Ledger Entries</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
-          <Users className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(supplierCount)}</p>
+        <Link href="/purchasing/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
+          <Users className="w-6 h-6 text-teal-electric mx-auto mb-2" />
+          <p className="text-2xl font-bold text-white">{formatNumber(counts?.suppliers)}</p>
           <p className="text-slate-muted text-sm">Suppliers</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
-          <Landmark className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(bankAccountCount)}</p>
+        </Link>
+        <Link href="/books/general-ledger" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
+          <BookOpen className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+          <p className="text-2xl font-bold text-white">{formatNumber(counts?.gl_entries)}</p>
+          <p className="text-slate-muted text-sm">GL Entries (YTD)</p>
+        </Link>
+        <Link href="/books/bank-accounts" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
+          <Landmark className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
+          <p className="text-2xl font-bold text-white">{formatNumber(cash?.bank_accounts?.length)}</p>
           <p className="text-slate-muted text-sm">Bank Accounts</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
-          <FileText className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(fiscalYearCount)}</p>
+        </Link>
+        <Link href="/books/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
+          <Scale className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+          <p className="text-2xl font-bold text-white">{formatNumber(fiscal_years?.length)}</p>
           <p className="text-slate-muted text-sm">Fiscal Years</p>
-        </div>
+        </Link>
       </div>
-
-      {/* Balance Sheet Summary */}
-      {balanceSheet && !bsLoading && (
-        <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">Balance Sheet Summary</h2>
-            <span className="text-slate-muted text-sm ml-auto">
-              As of {typeof balanceSheet.as_of_date === 'string'
-                ? balanceSheet.as_of_date
-                : (() => {
-                  const asOf: any = balanceSheet.as_of_date;
-                  return asOf?.end_date || asOf?.start_date || '-';
-                })()}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <p className="text-slate-muted text-sm mb-2">Assets {((balanceSheet as any)?.assets?.accounts?.length || 0) ? `(${(balanceSheet as any).assets.accounts.length} accounts)` : ''}</p>
-              <p className="text-2xl font-bold text-blue-400">{formatCurrency((balanceSheet as any)?.total_assets || (balanceSheet as any)?.assets?.total || 0)}</p>
-            </div>
-            <div>
-              <p className="text-slate-muted text-sm mb-2">Liabilities {((balanceSheet as any)?.liabilities?.accounts?.length || 0) ? `(${(balanceSheet as any).liabilities.accounts.length} accounts)` : ''}</p>
-              <p className="text-2xl font-bold text-red-400">{formatCurrency((balanceSheet as any)?.liabilities?.total || 0)}</p>
-            </div>
-            <div>
-              <p className="text-slate-muted text-sm mb-2">Equity + Retained Earnings</p>
-              <p className="text-2xl font-bold text-green-400">{formatCurrency(totalEquity)}</p>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-slate-border">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-muted">Accounting Equation Balance</span>
-              <span
-                className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium',
-                  balanceSheet.is_balanced
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-yellow-500/20 text-yellow-400'
-                )}
-              >
-                {balanceSheet.is_balanced
-                  ? 'Balanced'
-                  : (() => {
-                    const totals: any = balanceSheet;
-                    return `Difference: ${formatCurrency(Math.abs((totals.total_assets || totals.assets?.total || 0) - (totals.total_liabilities_equity || totals.liabilities?.total || 0)))}`;
-                  })()}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

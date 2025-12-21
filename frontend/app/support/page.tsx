@@ -15,16 +15,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import {
-  useSupportDashboard,
-  useSupportAnalyticsVolumeTrend,
-  useSupportAnalyticsSlaPerformance,
-  useSupportAnalyticsByCategory,
-  useSupportRoutingQueueHealth,
-  useSupportSlaBreachesSummary,
-  useSupportTeams,
-  useSupportAgents,
-} from '@/hooks/useApi';
+import { useConsolidatedSupportDashboard } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import {
   Ticket,
@@ -42,9 +33,9 @@ import {
   Zap,
   Shield,
   Activity,
-  RefreshCw,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { PageHeader } from '@/components/ui';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
 const CHART_PALETTE = CHART_COLORS.palette;
@@ -65,6 +56,7 @@ function MetricCard({
   trendLabel,
   colorClass = 'text-teal-electric',
   loading,
+  href,
 }: {
   label: string;
   value: string | number;
@@ -73,9 +65,13 @@ function MetricCard({
   trendLabel?: string;
   colorClass?: string;
   loading?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
+  const content = (
+    <div className={cn(
+      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
+      href && 'hover:border-teal-electric/50 cursor-pointer'
+    )}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
@@ -98,8 +94,19 @@ function MetricCard({
           <Icon className={cn('w-6 h-6', colorClass)} />
         </div>
       </div>
+      {href && (
+        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
+          <span>View details</span>
+          <ArrowRight className="w-3 h-3 ml-1" />
+        </div>
+      )}
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 function QuickActionCard({
@@ -149,422 +156,360 @@ function SlaGauge({ attainment }: { attainment: number }) {
           fill="none"
           stroke={color}
           strokeWidth="10"
-          strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
+          strokeLinecap="round"
           className="transition-all duration-500"
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-bold text-white">{attainment.toFixed(0)}%</span>
-        <span className="text-xs text-slate-muted">SLA</span>
+        <span className="text-2xl font-bold text-white">{attainment.toFixed(0)}%</span>
+        <span className="text-xs text-slate-muted">SLA Met</span>
       </div>
     </div>
   );
 }
 
 export default function SupportDashboardPage() {
-  // Fetch dashboard data
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useSupportDashboard();
-  const { data: volumeTrend, error: volumeError, isLoading: volumeLoading, mutate: refetchVolume } = useSupportAnalyticsVolumeTrend({ months: 6 });
-  const { data: slaPerformance, error: slaError, isLoading: slaLoading, mutate: refetchSla } = useSupportAnalyticsSlaPerformance({ months: 6 });
-  const { data: categoryBreakdown, error: categoryError, isLoading: categoryLoading, mutate: refetchCategory } = useSupportAnalyticsByCategory({ days: 30 });
-  const { data: queueHealth, error: queueError, isLoading: queueLoading, mutate: refetchQueue } = useSupportRoutingQueueHealth();
-  const { data: slaBreach, error: breachError, isLoading: breachLoading, mutate: refetchBreach } = useSupportSlaBreachesSummary({ days: 30 });
-  const { data: teamsData, error: teamsError, isLoading: teamsLoading, mutate: refetchTeams } = useSupportTeams();
-  const { data: agentsData, error: agentsError, isLoading: agentsLoading, mutate: refetchAgents } = useSupportAgents();
+  const { data, isLoading, error, mutate } = useConsolidatedSupportDashboard();
 
-  const swrStates = [
-    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
-    { error: volumeError, isLoading: volumeLoading, mutate: refetchVolume },
-    { error: slaError, isLoading: slaLoading, mutate: refetchSla },
-    { error: categoryError, isLoading: categoryLoading, mutate: refetchCategory },
-    { error: queueError, isLoading: queueLoading, mutate: refetchQueue },
-    { error: breachError, isLoading: breachLoading, mutate: refetchBreach },
-    { error: teamsError, isLoading: teamsLoading, mutate: refetchTeams },
-    { error: agentsError, isLoading: agentsLoading, mutate: refetchAgents },
-  ];
-
-  const firstError = swrStates.find((state) => state.error)?.error;
-  const isDataLoading = swrStates.some((state) => state.isLoading);
-  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
-
-  // Memoized chart data - must be called unconditionally before early returns
-  const volumeChartData = useMemo(() => {
-    if (!volumeTrend) return [];
-    return volumeTrend.map((v: any) => ({
-      period: v.period,
-      total: v.total,
-      resolved: v.resolved,
+  // Chart data must be computed unconditionally
+  const volumeTrendData = useMemo(() => {
+    if (!data?.volume_trend) return [];
+    return data.volume_trend.map((item) => ({
+      period: item.period,
+      tickets: item.count,
     }));
-  }, [volumeTrend]);
+  }, [data?.volume_trend]);
 
-  // Format category breakdown for pie chart
-  const categoryChartData = useMemo(() => {
-    if (!categoryBreakdown?.by_ticket_type) return [];
-    return categoryBreakdown.by_ticket_type.slice(0, 5).map((c: any, idx: number) => ({
-      name: c.type || 'Other',
-      value: c.count,
-      color: CHART_PALETTE[idx % CHART_PALETTE.length],
+  const categoryData = useMemo(() => {
+    if (!data?.by_category) return [];
+    return data.by_category.map((item, index) => ({
+      name: item.category,
+      value: item.count,
+      color: CHART_PALETTE[index % CHART_PALETTE.length],
     }));
-  }, [categoryBreakdown]);
+  }, [data?.by_category]);
 
-  // Early returns after all hooks
-  if (isDataLoading) {
+  const slaPerformanceData = useMemo(() => {
+    if (!data?.sla_performance) return [];
+    return data.sla_performance.map((item) => ({
+      period: item.period,
+      met: item.met,
+      breached: item.breached,
+      rate: item.rate,
+    }));
+  }, [data?.sla_performance]);
+
+  if (isLoading) {
     return <LoadingState />;
   }
 
-  const teams = teamsData?.teams || [];
-  const agents = agentsData?.agents || [];
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load support dashboard data."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
 
-  // Calculate SLA trend
-  const latestSla = slaPerformance?.[slaPerformance.length - 1];
-  const prevSla = slaPerformance?.[slaPerformance.length - 2];
-  const slaTrend = latestSla && prevSla ? latestSla.attainment_rate - prevSla.attainment_rate : 0;
+  if (!data) {
+    return <LoadingState />;
+  }
+
+  const { summary, queue_health, sla_breaches } = data;
+  const slaAttainment = summary?.sla_attainment ?? 100;
 
   return (
     <div className="space-y-6">
-      {firstError && (
-        <ErrorDisplay
-          message="Failed to load support dashboard data."
-          error={firstError as Error}
-          onRetry={retryAll}
-        />
-      )}
-      {/* Header */}
-      <div className="bg-gradient-to-br from-teal-500/10 via-amber-500/5 to-slate-card border border-teal-500/20 rounded-2xl p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
-              <Headphones className="w-6 h-6 text-teal-electric" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Support Dashboard</h1>
-              <p className="text-slate-muted text-sm">Ticket management, SLA tracking, and team performance</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/support/tickets/new"
-              className="px-4 py-2 bg-teal-electric text-slate-950 rounded-lg text-sm font-semibold hover:bg-teal-electric/90 transition-colors"
-            >
-              New Ticket
-            </Link>
-            <Link
-              href="/support/analytics"
-              className="px-4 py-2 bg-slate-elevated text-white rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
-            >
-              View Analytics
-            </Link>
-          </div>
-        </div>
+      <PageHeader
+        title="Support Dashboard"
+        subtitle="Ticket management, SLA performance, and team metrics"
+        icon={Headphones}
+        iconClassName="bg-purple-500/10 border border-purple-500/30"
+      />
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          <MetricCard
-            label="Open Tickets"
-            value={dashboard?.tickets?.open ?? 0}
-            icon={Ticket}
-            colorClass="text-amber-400"
-            loading={dashboardLoading}
-          />
-          <MetricCard
-            label="Resolved"
-            value={dashboard?.tickets?.resolved ?? 0}
-            icon={CheckCircle2}
-            colorClass="text-emerald-400"
-            loading={dashboardLoading}
-          />
-          <MetricCard
-            label="Overdue"
-            value={dashboard?.metrics?.overdue_tickets ?? slaBreach?.currently_overdue ?? 0}
-            icon={AlertTriangle}
-            colorClass="text-rose-400"
-            loading={dashboardLoading}
-          />
-          <MetricCard
-            label="Avg Resolution"
-            value={`${(dashboard?.metrics?.avg_resolution_hours ?? 0).toFixed(1)}h`}
-            icon={Clock}
-            colorClass="text-violet-400"
-            loading={dashboardLoading}
-          />
-          <MetricCard
-            label="Unassigned"
-            value={dashboard?.metrics?.unassigned_tickets ?? queueHealth?.unassigned_tickets ?? 0}
-            icon={Users}
-            colorClass="text-cyan-400"
-            loading={dashboardLoading}
-          />
-        </div>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          label="Open Tickets"
+          value={summary?.open_tickets ?? 0}
+          icon={Ticket}
+          colorClass="text-blue-400"
+          href="/support/tickets?status=open"
+        />
+        <MetricCard
+          label="Resolved Tickets"
+          value={summary?.resolved_tickets ?? 0}
+          icon={CheckCircle2}
+          colorClass="text-emerald-400"
+          href="/support/tickets?status=resolved"
+        />
+        <MetricCard
+          label="Overdue Tickets"
+          value={summary?.overdue_tickets ?? 0}
+          icon={AlertTriangle}
+          colorClass={summary?.overdue_tickets ? 'text-rose-400' : 'text-slate-muted'}
+          trend={summary?.overdue_tickets ? 'down' : 'neutral'}
+          trendLabel={summary?.overdue_tickets ? 'Action needed' : 'All on track'}
+          href="/support/tickets?overdue=true"
+        />
+        <MetricCard
+          label="Avg Resolution Time"
+          value={`${(summary?.avg_resolution_hours ?? 0).toFixed(1)}h`}
+          icon={Clock}
+          colorClass="text-amber-400"
+          href="/support/analytics"
+        />
       </div>
 
-      {/* SLA & Volume Row */}
+      {/* SLA & Queue Health Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* SLA Gauge */}
+        {/* SLA Attainment Gauge */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Target className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">SLA Attainment</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">SLA Attainment</h3>
+            </div>
+            <Link href="/support/sla" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Details <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          <SlaGauge attainment={dashboard?.sla?.attainment_rate ?? 0} />
+          <SlaGauge attainment={slaAttainment} />
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-xs text-slate-muted">Met</p>
-              <p className="text-lg font-bold text-emerald-400">{latestSla?.met ?? 0}</p>
+            <div className="bg-slate-elevated/50 rounded-lg p-2">
+              <p className="text-emerald-400 font-bold">{sla_breaches?.total ? (summary?.resolved_tickets || 0) - sla_breaches.total : summary?.resolved_tickets || 0}</p>
+              <p className="text-slate-muted text-xs">SLA Met</p>
             </div>
-            <div>
-              <p className="text-xs text-slate-muted">Breached</p>
-              <p className="text-lg font-bold text-rose-400">{latestSla?.breached ?? 0}</p>
+            <div className="bg-slate-elevated/50 rounded-lg p-2">
+              <p className="text-rose-400 font-bold">{sla_breaches?.total ?? 0}</p>
+              <p className="text-slate-muted text-xs">SLA Breached</p>
             </div>
           </div>
-          {slaTrend !== 0 && (
-            <div className={cn('mt-3 text-xs text-center flex items-center justify-center gap-1', slaTrend > 0 ? 'text-emerald-400' : 'text-rose-400')}>
-              {slaTrend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              <span>{Math.abs(slaTrend).toFixed(1)}% vs prev month</span>
+        </div>
+
+        {/* Queue Health */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">Queue Health</h3>
+            </div>
+            <Link href="/support/routing" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Queues <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-muted text-sm">Unassigned</span>
+              <span className={cn('font-bold', (queue_health?.unassigned_count || 0) > 0 ? 'text-amber-400' : 'text-emerald-400')}>
+                {queue_health?.unassigned_count ?? summary?.unassigned_tickets ?? 0}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-muted text-sm">Avg Wait Time</span>
+              <span className="text-white font-bold">{(queue_health?.avg_wait_hours ?? 0).toFixed(1)}h</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-muted text-sm">Agent Capacity</span>
+              <span className="text-white font-bold">{queue_health?.total_agents ?? summary?.agent_count ?? 0} agents</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-muted text-sm">Current Load</span>
+              <span className={cn('font-bold', (queue_health?.current_load || 0) > 10 ? 'text-rose-400' : 'text-emerald-400')}>
+                {(queue_health?.current_load ?? 0).toFixed(1)} tickets/agent
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Team Stats */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">Team Overview</h3>
+            </div>
+            <Link href="/support/teams" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Teams <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Link href="/support/teams" className="bg-slate-elevated/50 rounded-lg p-4 text-center hover:bg-slate-elevated transition-colors">
+              <Users className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{summary?.team_count ?? 0}</p>
+              <p className="text-slate-muted text-xs">Teams</p>
+            </Link>
+            <Link href="/support/agents" className="bg-slate-elevated/50 rounded-lg p-4 text-center hover:bg-slate-elevated transition-colors">
+              <Headphones className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
+              <p className="text-2xl font-bold text-white">{summary?.agent_count ?? 0}</p>
+              <p className="text-slate-muted text-xs">Active Agents</p>
+            </Link>
+          </div>
+          {sla_breaches?.by_priority && Object.keys(sla_breaches.by_priority).length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-border">
+              <p className="text-slate-muted text-xs mb-2">SLA Breaches by Priority (30d)</p>
+              <div className="flex gap-2 flex-wrap">
+                {Object.entries(sla_breaches.by_priority).map(([priority, count]) => (
+                  <span
+                    key={priority}
+                    className={cn(
+                      'text-xs px-2 py-1 rounded-full',
+                      priority === 'high' || priority === 'urgent' ? 'bg-rose-500/20 text-rose-400' :
+                      priority === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-slate-500/20 text-slate-400'
+                    )}
+                  >
+                    {priority}: {count}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Volume Trend */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 lg:col-span-2">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Ticket Volume Trend */}
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-400" />
-              <h3 className="text-white font-semibold">Ticket Volume Trend</h3>
+              <BarChart3 className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">Ticket Volume (6 Months)</h3>
             </div>
-            <span className="text-xs text-slate-muted">Last 6 months</span>
+            <Link href="/support/analytics" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Analytics <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          {volumeChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={volumeChartData}>
+          {volumeTrendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={volumeTrendData}>
                 <defs>
-                  <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="resolvedGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
-                    <stop offset="100%" stopColor={CHART_COLORS.success} stopOpacity={0} />
+                  <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
-                <XAxis dataKey="period" tick={{ fill: CHART_COLORS.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: CHART_COLORS.axis, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+                <XAxis dataKey="period" tick={{ fill: CHART_COLORS.label, fontSize: 10 }} />
+                <YAxis tick={{ fill: CHART_COLORS.label, fontSize: 10 }} />
                 <Tooltip {...TOOLTIP_STYLE} />
-                <Area type="monotone" dataKey="total" stroke={CHART_COLORS.primary} fill="url(#totalGradient)" strokeWidth={2} name="Total" />
-                <Area type="monotone" dataKey="resolved" stroke={CHART_COLORS.success} fill="url(#resolvedGradient)" strokeWidth={2} name="Resolved" />
+                <Area
+                  type="monotone"
+                  dataKey="tickets"
+                  stroke={CHART_COLORS.primary}
+                  fill="url(#volumeGradient)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No volume data</div>
+            <div className="h-[200px] flex items-center justify-center text-slate-muted text-sm">
+              No volume data available
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Category Breakdown & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Category Breakdown */}
+        {/* Ticket by Category */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">By Type (30d)</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">Tickets by Category (30 Days)</h3>
+            </div>
+            <Link href="/support/analytics?tab=categories" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          {categoryChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart margin={{ top: 8, right: 8, bottom: 24, left: 8 }}>
+          {categoryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
                 <Pie
-                  data={categoryChartData}
+                  data={categoryData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={34}
-                  outerRadius={64}
-                  paddingAngle={3}
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
                   dataKey="value"
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
                 >
-                  {categoryChartData.map((entry: any, index: number) => (
+                  {categoryData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip {...TOOLTIP_STYLE} />
-                <Legend
-                  formatter={(value) => <span className="text-slate-muted text-xs">{value}</span>}
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ paddingTop: '8px' }}
-                />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-slate-muted text-sm">No category data</div>
+            <div className="h-[200px] flex items-center justify-center text-slate-muted text-sm">
+              No category data available
+            </div>
           )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5 lg:col-span-2">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Quick Actions</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <QuickActionCard
-              title="View Tickets"
-              description="Browse and manage all tickets"
-              href="/support/tickets"
-              icon={Ticket}
-              colorClass="text-teal-electric"
-            />
-            <QuickActionCard
-              title="Analytics"
-              description="Trends, SLA, and performance"
-              href="/support/analytics"
-              icon={BarChart3}
-              colorClass="text-amber-400"
-            />
-            <QuickActionCard
-              title="Manage Teams"
-              description={`${teams.length} teams configured`}
-              href="/support/teams"
-              icon={Shield}
-              colorClass="text-violet-400"
-            />
-            <QuickActionCard
-              title="Manage Agents"
-              description={`${agents.filter((a: any) => a.is_active).length} active agents`}
-              href="/support/agents"
-              icon={Users}
-              colorClass="text-cyan-400"
-            />
-          </div>
         </div>
       </div>
 
-      {/* Queue Health & Overdue Tickets */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Queue Health */}
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Queue Health</h3>
-          </div>
-          {queueHealth ? (
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className={cn(
-                  'text-2xl font-bold',
-                  (queueHealth.unassigned_tickets ?? 0) > 10 ? 'text-rose-400' :
-                  (queueHealth.unassigned_tickets ?? 0) > 5 ? 'text-amber-400' : 'text-white'
-                )}>
-                  {queueHealth.unassigned_tickets ?? 0}
-                </p>
-                <p className="text-xs text-slate-muted">Unassigned</p>
-              </div>
-              <div className="text-center">
-                <p className={cn(
-                  'text-2xl font-bold',
-                  (queueHealth.avg_wait_hours ?? 0) > 4 ? 'text-rose-400' :
-                  (queueHealth.avg_wait_hours ?? 0) > 2 ? 'text-amber-400' : 'text-emerald-400'
-                )}>
-                  {(queueHealth.avg_wait_hours ?? 0).toFixed(1)}h
-                </p>
-                <p className="text-xs text-slate-muted">Avg Wait</p>
-              </div>
-              <div className="text-center">
-                <p className={cn(
-                  'text-2xl font-bold',
-                  (queueHealth.overall_utilization_pct ?? 0) > 90 ? 'text-rose-400' :
-                  (queueHealth.overall_utilization_pct ?? 0) > 70 ? 'text-amber-400' : 'text-teal-electric'
-                )}>
-                  {(queueHealth.overall_utilization_pct ?? 0).toFixed(0)}%
-                </p>
-                <p className="text-xs text-slate-muted">Utilization</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-400">{queueHealth.total_agents ?? 0}</p>
-                <p className="text-xs text-slate-muted">Agents</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-emerald-400">{queueHealth.total_capacity ?? 0}</p>
-                <p className="text-xs text-slate-muted">Capacity</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-violet-400">{queueHealth.total_load ?? 0}</p>
-                <p className="text-xs text-slate-muted">Current Load</p>
-              </div>
-            </div>
-          ) : (
-            <div className="h-[100px] flex items-center justify-center text-slate-muted text-sm">Loading queue health...</div>
-          )}
-        </div>
-
-        {/* Overdue Tickets */}
+      {/* SLA Performance Chart */}
+      {slaPerformanceData.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
-              <h3 className="text-white font-semibold">Overdue Tickets</h3>
+              <Shield className="w-5 h-5 text-teal-electric" />
+              <h3 className="text-white font-semibold">SLA Performance (6 Months)</h3>
             </div>
-            <Link href="/support/tickets?status=overdue" className="text-xs text-teal-electric hover:underline">
-              View all
+            <Link href="/support/sla" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View SLA Details <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          {(dashboard?.metrics?.overdue_tickets ?? 0) > 0 ? (
-            <div className="h-[150px] flex flex-col items-center justify-center">
-              <div className="text-center">
-                <p className="text-4xl font-bold text-rose-400 mb-2">{dashboard?.metrics?.overdue_tickets ?? 0}</p>
-                <p className="text-slate-muted text-sm">tickets need attention</p>
-                <Link
-                  href="/support/tickets?status=overdue"
-                  className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-rose-500/20 text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-500/30 transition-colors"
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  Review Overdue
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="h-[150px] flex items-center justify-center text-slate-muted text-sm">
-              <div className="text-center">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                <p>No overdue tickets</p>
-              </div>
-            </div>
-          )}
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={slaPerformanceData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
+              <XAxis dataKey="period" tick={{ fill: CHART_COLORS.label, fontSize: 10 }} />
+              <YAxis tick={{ fill: CHART_COLORS.label, fontSize: 10 }} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              <Legend />
+              <Area type="monotone" dataKey="met" name="SLA Met" stroke={CHART_COLORS.success} fill={CHART_COLORS.success} fillOpacity={0.3} />
+              <Area type="monotone" dataKey="breached" name="SLA Breached" stroke={CHART_COLORS.danger} fill={CHART_COLORS.danger} fillOpacity={0.3} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-      </div>
+      )}
 
-      {/* Resource Links */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <MessageSquare className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-white font-semibold">Resources</h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <Link href="/support/kb" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">Knowledge Base</p>
-            <p className="text-slate-muted text-xs">Articles & docs</p>
-          </Link>
-          <Link href="/support/canned-responses" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">Canned Responses</p>
-            <p className="text-slate-muted text-xs">Templates</p>
-          </Link>
-          <Link href="/support/automation" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">Automation</p>
-            <p className="text-slate-muted text-xs">Rules & workflows</p>
-          </Link>
-          <Link href="/support/sla" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">SLA Policies</p>
-            <p className="text-slate-muted text-xs">Response times</p>
-          </Link>
-          <Link href="/support/routing" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">Routing</p>
-            <p className="text-slate-muted text-xs">Assignment rules</p>
-          </Link>
-          <Link href="/support/settings" className="p-3 rounded-lg border border-slate-border hover:border-teal-electric/50 text-center transition-colors">
-            <p className="text-white text-sm font-medium">Settings</p>
-            <p className="text-slate-muted text-xs">Configuration</p>
-          </Link>
-        </div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <QuickActionCard
+          title="New Ticket"
+          description="Create a support ticket"
+          href="/support/tickets/new"
+          icon={Ticket}
+          colorClass="text-blue-400"
+        />
+        <QuickActionCard
+          title="Ticket Queue"
+          description="View all open tickets"
+          href="/support/tickets"
+          icon={MessageSquare}
+          colorClass="text-emerald-400"
+        />
+        <QuickActionCard
+          title="Analytics"
+          description="Performance metrics"
+          href="/support/analytics"
+          icon={BarChart3}
+          colorClass="text-amber-400"
+        />
+        <QuickActionCard
+          title="SLA Policies"
+          description="Manage SLA rules"
+          href="/support/sla"
+          icon={Zap}
+          colorClass="text-purple-400"
+        />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import {
-  usePurchasingDashboard,
+  useConsolidatedPurchasingDashboard,
   usePurchasingBySupplier,
   usePurchasingByCostCenter,
   usePurchasingExpenseTrend,
@@ -96,10 +96,9 @@ export default function PurchasingAnalyticsPage() {
   const { start_date, end_date } = useMemo(() => getDateRange(dateRange), [dateRange]);
   const { months, interval } = useMemo(() => getTrendParams(dateRange), [dateRange]);
 
-  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = usePurchasingDashboard({
+  const { data: dashboardData, error: dashboardError } = useConsolidatedPurchasingDashboard(currency, {
     start_date,
     end_date,
-    currency,
   });
   const { data: supplierData, isLoading: supplierLoading } = usePurchasingBySupplier({
     start_date,
@@ -121,11 +120,11 @@ export default function PurchasingAnalyticsPage() {
   const topSuppliers = supplierData?.suppliers || [];
   const costCenters = costCenterData?.cost_centers || [];
   const expenseTrend = trendData?.trend || [];
-  const totalOutstanding = dashboardData?.total_outstanding || 0;
-  const totalOverdue = dashboardData?.total_overdue || 0;
-  const supplierCount = dashboardData?.supplier_count || 0;
-  const dueThisWeek = dashboardData?.due_this_week?.total || 0;
-  const dueThisWeekCount = dashboardData?.due_this_week?.count || 0;
+  const totalOutstanding = dashboardData?.summary?.total_outstanding || 0;
+  const totalOverdue = dashboardData?.summary?.total_overdue || 0;
+  const supplierCount = dashboardData?.summary?.supplier_count || 0;
+  const dueThisWeek = dashboardData?.summary?.due_this_week?.total || 0;
+  const dueThisWeekCount = dashboardData?.summary?.due_this_week?.count || 0;
 
   // Calculate totals for percentage calculations
   const totalSupplierSpend = topSuppliers.reduce(
@@ -162,7 +161,7 @@ export default function PurchasingAnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-white">Purchasing Analytics</h2>
-          <p className="text-slate-muted text-sm">Spending insights and trends</p>
+          <p className="text-slate-muted text-sm">Spending insights and trends ({start_date} → {end_date})</p>
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-muted" />

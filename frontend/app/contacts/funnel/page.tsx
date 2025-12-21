@@ -55,7 +55,7 @@ export default function ContactsFunnelPage() {
 
   return (
     <div className="space-y-6">
-      {error && (
+      {Boolean(error) && (
         <ErrorDisplay
           message="Failed to load funnel analytics"
           error={error as Error}

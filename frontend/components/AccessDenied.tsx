@@ -6,10 +6,12 @@ import { cn } from '@/lib/utils';
 
 interface AccessDeniedProps {
   message?: string;
+  backHref?: string;
+  backLabel?: string;
   className?: string;
 }
 
-export function AccessDenied({ message, className }: AccessDeniedProps) {
+export function AccessDenied({ message, backHref, backLabel, className }: AccessDeniedProps) {
   return (
     <div
       className={cn(
@@ -27,6 +29,14 @@ export function AccessDenied({ message, className }: AccessDeniedProps) {
         </p>
       </div>
       <div className="flex gap-3 mt-2">
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-white hover:bg-slate-elevated/80 transition-colors"
+          >
+            {backLabel || 'Back'}
+          </Link>
+        ) : null}
         <Link
           href="/"
           className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-white hover:bg-slate-elevated/80 transition-colors"

@@ -169,15 +169,21 @@ export default function ERPNextExpenseDetailPage() {
   };
 
   if (isLoading) {
-    return <DashboardShell loading title="Loading..." />;
+    return (
+      <DashboardShell isLoading loadingMessage="Loading...">
+        <div />
+      </DashboardShell>
+    );
   }
 
   if (error || !expense) {
     return (
       <DashboardShell
-        error={error instanceof Error ? error.message : 'Expense claim not found'}
-        title="Error"
-      />
+        isLoading={false}
+        error={error instanceof Error ? error : { message: 'Expense claim not found' }}
+      >
+        <div />
+      </DashboardShell>
     );
   }
 

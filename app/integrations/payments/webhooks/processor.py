@@ -15,7 +15,7 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, Dict, Any, Callable, Awaitable
+from typing import Optional, Dict, Any, Callable, Awaitable, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +50,7 @@ class WebhookProcessor:
     - Automatic transaction status updates
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._paystack_client: Optional[PaystackClient] = None
         self._flutterwave_client: Optional[FlutterwaveClient] = None
 
@@ -456,7 +456,7 @@ class WebhookProcessor:
         result = await db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
-        transfer = result.scalar_one_or_none()
+        transfer = cast(Optional[Transfer], result.scalar_one_or_none())
 
         if transfer:
             transfer.status = TransferStatus.SUCCESS
@@ -469,7 +469,7 @@ class WebhookProcessor:
                 result = await db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
-                claim = result.scalar_one_or_none()
+                claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
                 if claim:
                     payable = claim.total_reimbursable or claim.total_sanctioned_amount or claim.total_claimed_amount
                     payable = Decimal(str(payable or 0))
@@ -499,7 +499,7 @@ class WebhookProcessor:
         result = await db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
-        transfer = result.scalar_one_or_none()
+        transfer = cast(Optional[Transfer], result.scalar_one_or_none())
 
         if transfer:
             transfer.status = TransferStatus.FAILED
@@ -511,7 +511,7 @@ class WebhookProcessor:
                 result = await db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
-                claim = result.scalar_one_or_none()
+                claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
                 if claim:
                     claim.payment_status = "failed"
 
@@ -529,7 +529,7 @@ class WebhookProcessor:
         result = await db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
-        transfer = result.scalar_one_or_none()
+        transfer = cast(Optional[Transfer], result.scalar_one_or_none())
 
         if transfer:
             transfer.status = TransferStatus.REVERSED
@@ -541,7 +541,7 @@ class WebhookProcessor:
                 result = await db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
-                claim = result.scalar_one_or_none()
+                claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
                 if claim:
                     claim.payment_status = "reversed"
 

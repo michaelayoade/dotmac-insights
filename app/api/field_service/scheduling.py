@@ -6,7 +6,7 @@ Calendar views, availability checking, and bulk operations.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 from datetime import datetime, date, time, timedelta
 from pydantic import BaseModel
 
@@ -365,7 +365,7 @@ async def get_available_technicians(
             })
 
     # Sort by available hours (most available first)
-    available.sort(key=lambda x: x["available_hours"], reverse=True)
+    available.sort(key=lambda x: float(cast(float | int, x.get("available_hours", 0.0))), reverse=True)
 
     return {
         "date": date_param,

@@ -42,14 +42,10 @@ export default function GeneralLedgerPage() {
     offset,
   });
 
-  if (isLoading && !data) {
-    return <PageSkeleton showHeader={false} showStats statsCount={4} />;
-  }
-
-  const entries = data?.entries;
+  const entries = useMemo(() => data?.entries ?? [], [data?.entries]);
   const totals = useMemo(
     () =>
-      (entries ?? []).reduce(
+      entries.reduce(
         (acc, entry) => ({
           total_debit: acc.total_debit + (entry.debit || 0),
           total_credit: acc.total_credit + (entry.credit || 0),
@@ -58,6 +54,10 @@ export default function GeneralLedgerPage() {
       ),
     [entries]
   );
+
+  if (isLoading && !data) {
+    return <PageSkeleton showHeader={false} showStats statsCount={4} />;
+  }
 
   const columns = [
     {

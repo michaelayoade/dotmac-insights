@@ -387,8 +387,11 @@ async def get_dashboard(db: Session = Depends(get_db)) -> Dict[str, Any]:
         func.count(ServiceOrder.id).label("count")
     ).group_by(ServiceOrder.status).all()
 
-    status_counts = {s.status.value: s.count for s in by_status}
-    total_orders = sum(int(value) for value in status_counts.values())
+    status_counts = {
+        s._mapping["status"].value: int(s._mapping["count"])
+        for s in by_status
+    }
+    total_orders = sum(status_counts.values())
 
     # Today's orders
     today_orders = db.query(func.count(ServiceOrder.id)).filter(

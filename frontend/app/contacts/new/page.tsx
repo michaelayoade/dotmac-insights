@@ -150,6 +150,18 @@ export default function NewContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
+  // Set initial type from URL params
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    if (typeParam && ['lead', 'prospect', 'customer', 'person'].includes(typeParam)) {
+      setFormData((prev) => ({
+        ...prev,
+        contact_type: typeParam as ContactType,
+        is_organization: typeParam === 'customer',
+      }));
+    }
+  }, [searchParams]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-deep flex justify-center items-center">
@@ -165,18 +177,6 @@ export default function NewContactPage() {
       </div>
     );
   }
-
-  // Set initial type from URL params
-  useEffect(() => {
-    const typeParam = searchParams.get('type');
-    if (typeParam && ['lead', 'prospect', 'customer', 'person'].includes(typeParam)) {
-      setFormData((prev) => ({
-        ...prev,
-        contact_type: typeParam as ContactType,
-        is_organization: typeParam === 'customer',
-      }));
-    }
-  }, [searchParams]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

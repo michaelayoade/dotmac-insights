@@ -88,6 +88,13 @@ def _parse_decimal(value: Any, default: Decimal = Decimal("0")) -> Decimal:
         return default
 
 
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _map_salary_component_type(value: Any) -> SalaryComponentType:
     if value and "deduction" in str(value).strip().lower():
         return SalaryComponentType.DEDUCTION
@@ -216,17 +223,13 @@ async def sync_employees(
                 existing.employment_type = emp_data.get("employment_type")
                 existing.last_synced_at = datetime.utcnow()
 
-                if emp_data.get("date_of_joining"):
-                    try:
-                        existing.date_of_joining = datetime.fromisoformat(emp_data["date_of_joining"]).date()
-                    except (ValueError, TypeError):
-                        pass
+                join_date = _parse_datetime(emp_data.get("date_of_joining"))
+                if join_date:
+                    existing.date_of_joining = join_date
 
-                if emp_data.get("relieving_date"):
-                    try:
-                        existing.date_of_leaving = datetime.fromisoformat(emp_data["relieving_date"]).date()
-                    except (ValueError, TypeError):
-                        pass
+                leave_date = _parse_datetime(emp_data.get("relieving_date"))
+                if leave_date:
+                    existing.date_of_leaving = leave_date
 
                 sync_client.increment_updated()
             else:
@@ -242,17 +245,13 @@ async def sync_employees(
                     employment_type=emp_data.get("employment_type"),
                 )
 
-                if emp_data.get("date_of_joining"):
-                    try:
-                        employee.date_of_joining = datetime.fromisoformat(emp_data["date_of_joining"]).date()
-                    except (ValueError, TypeError):
-                        pass
+                join_date = _parse_datetime(emp_data.get("date_of_joining"))
+                if join_date:
+                    employee.date_of_joining = join_date
 
-                if emp_data.get("relieving_date"):
-                    try:
-                        employee.date_of_leaving = datetime.fromisoformat(emp_data["relieving_date"]).date()
-                    except (ValueError, TypeError):
-                        pass
+                leave_date = _parse_datetime(emp_data.get("relieving_date"))
+                if leave_date:
+                    employee.date_of_leaving = leave_date
 
                 sync_client.db.add(employee)
                 sync_client.increment_created()
@@ -906,6 +905,7 @@ async def sync_salary_slips(
         employees_by_erpnext_id: Dict[str, int] = {
             e.erpnext_id: e.id
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+            if e.erpnext_id
         }
 
         for slip_data in slips:
@@ -1100,11 +1100,8 @@ async def sync_leave_types(
                 existing.erpnext_id = erpnext_id
                 existing.leave_type_name = leave_type_name
                 existing.max_leaves_allowed = int(lt_data.get("max_leaves_allowed") or 0)
-                existing.max_continuous_days_allowed = (
-                    int(lt_data.get("max_continuous_days_allowed"))
-                    if lt_data.get("max_continuous_days_allowed") is not None
-                    else None
-                )
+                max_continuous_raw = lt_data.get("max_continuous_days_allowed")
+                existing.max_continuous_days_allowed = _safe_int(max_continuous_raw)
                 existing.is_carry_forward = _coerce_bool(lt_data.get("is_carry_forward"))
                 existing.is_lwp = _coerce_bool(lt_data.get("is_lwp"))
                 existing.is_optional_leave = _coerce_bool(lt_data.get("is_optional_leave"))
@@ -1121,11 +1118,7 @@ async def sync_leave_types(
                     erpnext_id=erpnext_id,
                     leave_type_name=leave_type_name,
                     max_leaves_allowed=int(lt_data.get("max_leaves_allowed") or 0),
-                    max_continuous_days_allowed=(
-                        int(lt_data.get("max_continuous_days_allowed"))
-                        if lt_data.get("max_continuous_days_allowed") is not None
-                        else None
-                    ),
+                    max_continuous_days_allowed=_safe_int(max_continuous_raw),
                     is_carry_forward=_coerce_bool(lt_data.get("is_carry_forward")),
                     is_lwp=_coerce_bool(lt_data.get("is_lwp")),
                     is_optional_leave=_coerce_bool(lt_data.get("is_optional_leave")),
@@ -1181,14 +1174,17 @@ async def sync_leave_allocations(
         employees_by_erpnext_id: Dict[str, int] = {
             e.erpnext_id: e.id
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+            if e.erpnext_id
         }
         leave_types_by_name: Dict[str, int] = {
             lt.leave_type_name: lt.id
             for lt in sync_client.db.query(LeaveType).all()
+            if lt.leave_type_name
         }
         leave_types_by_erpnext: Dict[str, int] = {
             lt.erpnext_id: lt.id
             for lt in sync_client.db.query(LeaveType).filter(LeaveType.erpnext_id.isnot(None)).all()
+            if lt.erpnext_id
         }
 
         for alloc_data in allocations:
@@ -1308,14 +1304,17 @@ async def sync_leave_applications(
         employees_by_erpnext_id: Dict[str, int] = {
             e.erpnext_id: e.id
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+            if e.erpnext_id
         }
         leave_types_by_name: Dict[str, int] = {
             lt.leave_type_name: lt.id
             for lt in sync_client.db.query(LeaveType).all()
+            if lt.leave_type_name
         }
         leave_types_by_erpnext: Dict[str, int] = {
             lt.erpnext_id: lt.id
             for lt in sync_client.db.query(LeaveType).filter(LeaveType.erpnext_id.isnot(None)).all()
+            if lt.erpnext_id
         }
 
         for app_data in applications:
@@ -1433,6 +1432,7 @@ async def sync_attendances(
         employees_by_erpnext_id: Dict[str, int] = {
             e.erpnext_id: e.id
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+            if e.erpnext_id
         }
 
         # Track pending additions to handle duplicates in same batch

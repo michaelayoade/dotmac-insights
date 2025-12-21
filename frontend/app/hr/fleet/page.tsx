@@ -38,6 +38,7 @@ import {
 import { DataTable, Pagination } from '@/components/DataTable';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { cn } from '@/lib/utils';
+import type { Vehicle } from '@/lib/api/domains/fleet';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
 function formatCurrency(value: number | null | undefined, currency = 'NGN'): string {
@@ -127,9 +128,9 @@ export default function FleetPage() {
   });
 
   const { data: summary, isLoading: summaryLoading } = useFleetSummary();
-  const { data: expiringInsurance } = useFleetInsuranceExpiring(30);
-  const { data: makes } = useFleetMakes();
-  const { data: fuelTypes } = useFleetFuelTypes();
+  const { data: expiringInsurance } = useFleetInsuranceExpiring(30) as { data?: Vehicle[] };
+  const { data: makes } = useFleetMakes() as { data?: string[] };
+  const { data: fuelTypes } = useFleetFuelTypes() as { data?: string[] };
 
   const vehicles = vehiclesData?.items || [];
   const total = vehiclesData?.total || 0;
@@ -413,7 +414,7 @@ export default function FleetPage() {
           </div>
           <div className="space-y-2 max-h-[180px] overflow-y-auto">
             {expiringInsurance && expiringInsurance.length > 0 ? (
-              expiringInsurance.slice(0, 5).map((vehicle) => {
+              expiringInsurance.slice(0, 5).map((vehicle: Vehicle) => {
                 const days = daysUntil(vehicle.insurance_end_date);
                 return (
                   <Link
@@ -473,7 +474,7 @@ export default function FleetPage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             <option value="">All Makes</option>
-            {makes?.map((make) => (
+            {makes?.map((make: string) => (
               <option key={make} value={make}>{make}</option>
             ))}
           </select>
@@ -483,7 +484,7 @@ export default function FleetPage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             <option value="">All Fuel Types</option>
-            {fuelTypes?.map((fuel) => (
+            {fuelTypes?.map((fuel: string) => (
               <option key={fuel} value={fuel}>{fuel}</option>
             ))}
           </select>

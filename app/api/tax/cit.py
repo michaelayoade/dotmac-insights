@@ -20,6 +20,8 @@ from app.api.tax.schemas import (
     CITAssessmentCreate,
     CITAssessmentResponse,
     CITComputationResponse,
+    CITMinimumTaxComputation,
+    CITPaymentStatus,
     PaginatedResponse,
 )
 from app.api.tax.helpers import get_cit_rate, TET_RATE, MINIMUM_TAX_RATE
@@ -152,19 +154,19 @@ def get_cit_computation(
             "assessable_profit": assessment.assessable_profit,
             "tet_amount": assessment.tet_amount,
         },
-        minimum_tax_computation={
-            "rate": MINIMUM_TAX_RATE,
-            "gross_turnover": assessment.gross_turnover,
-            "minimum_tax": assessment.minimum_tax,
-            "is_applicable": assessment.is_minimum_tax_applicable,
-        },
+        minimum_tax_computation=CITMinimumTaxComputation(
+            rate=MINIMUM_TAX_RATE,
+            gross_turnover=assessment.gross_turnover,
+            minimum_tax=assessment.minimum_tax,
+            is_applicable=assessment.is_minimum_tax_applicable,
+        ),
         total_tax_liability=assessment.total_tax_liability,
-        payment_status={
-            "amount_paid": assessment.amount_paid,
-            "balance_due": assessment.balance_due,
-            "due_date": assessment.due_date,
-            "is_filed": assessment.is_filed,
-        },
+        payment_status=CITPaymentStatus(
+            amount_paid=assessment.amount_paid,
+            balance_due=assessment.balance_due,
+            due_date=assessment.due_date,
+            is_filed=assessment.is_filed,
+        ),
     )
 
 

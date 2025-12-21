@@ -70,7 +70,7 @@ export default function TagsPage() {
   const contacts = contactsResponse?.data || contactsResponse?.items || [];
 
   // Use analytics data for tag counts
-  const tagCounts = analytics?.tags || [];
+  const tagCounts = useMemo(() => analytics?.tags || [], [analytics?.tags]);
 
   // Filter tags by search
   const filteredTags = useMemo(() => {

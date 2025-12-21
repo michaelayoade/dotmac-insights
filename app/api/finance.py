@@ -13,7 +13,7 @@ Provides all finance-related endpoints:
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract, and_, or_, distinct
-from typing import Dict, Any, Optional, List, Iterable
+from typing import Dict, Any, Optional, List, Iterable, cast
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -58,7 +58,7 @@ def _resolve_currency_or_raise(db: Session, column, requested: Optional[str]) ->
             status_code=400,
             detail="Multiple currencies detected; please provide the 'currency' query parameter to avoid mixed-currency aggregates.",
         )
-    return currencies[0]
+    return cast(Optional[str], currencies[0])
 
 
 # =============================================================================

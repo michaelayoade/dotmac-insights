@@ -223,7 +223,12 @@ async def get_vehicle_summary(db: Session = Depends(get_db)):
             func.coalesce(func.sum(Vehicle.vehicle_value), 0),
             func.coalesce(func.avg(Vehicle.odometer_value), 0),
         )
-    ).first()
+    ).one_or_none()
+    if totals is None:
+        total_value = 0
+        avg_odometer = 0
+    else:
+        total_value, avg_odometer = totals
 
     return VehicleSummary(
         total_vehicles=total,
@@ -232,8 +237,8 @@ async def get_vehicle_summary(db: Session = Depends(get_db)):
         by_fuel_type=by_fuel_type,
         by_make=by_make,
         insurance_expiring_soon=insurance_expiring,
-        total_value=Decimal(str(totals[0])),
-        avg_odometer=Decimal(str(round(totals[1], 2))),
+        total_value=Decimal(str(total_value)),
+        avg_odometer=Decimal(str(round(float(avg_odometer), 2))),
     )
 
 

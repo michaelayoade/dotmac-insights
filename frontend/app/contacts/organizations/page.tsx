@@ -19,6 +19,7 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 function formatCurrency(value: number | null | undefined, currency = 'NGN'): string {
   if (value === null || value === undefined) return '-';
@@ -55,6 +56,8 @@ const categoryColors: Record<string, string> = {
 
 export default function OrganizationsPage() {
   const router = useRouter();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
@@ -74,7 +77,7 @@ export default function OrganizationsPage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContacts(params);
-  const organizations = data?.items || data?.data || [];
+  const organizations = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {
@@ -133,9 +136,9 @@ export default function OrganizationsPage() {
       render: (item: UnifiedContact) => (
         <span className={cn(
           'px-2 py-1 rounded-full text-xs font-medium',
-          categoryColors[item.category] || 'bg-slate-500/20 text-slate-400'
+          categoryColors[item.category ?? ''] || 'bg-slate-500/20 text-slate-400'
         )}>
-          {item.category}
+          {item.category || 'unknown'}
         </span>
       ),
     },
@@ -188,13 +191,15 @@ export default function OrganizationsPage() {
         icon={Building2}
         iconClassName="bg-cyan-500/10 border border-cyan-500/30"
         actions={
-          <Link
-            href="/contacts/new?org=1"
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Add Organization
-          </Link>
+          canWrite ? (
+            <Link
+              href="/contacts/new?org=1"
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Add Organization
+            </Link>
+          ) : null
         }
       />
 

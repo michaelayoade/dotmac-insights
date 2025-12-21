@@ -36,7 +36,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import {
-  useSupportDashboard,
+  useConsolidatedSupportDashboard,
   useSupportAnalyticsVolumeTrend,
   useSupportAnalyticsResolutionTime,
   useSupportAnalyticsByCategory,
@@ -47,7 +47,7 @@ import {
   useSupportRoutingQueueHealth,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { PageHeader, Select } from '@/components/ui';
+import { PageHeader } from '@/components/ui';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
 // Chart styling constants
@@ -179,9 +179,21 @@ function HeatmapCell({ value, max }: { value: number; max: number }) {
 export default function SupportAnalyticsPage() {
   const [months, setMonths] = useState(6);
   const [days, setDays] = useState(30);
+  const { rangeStart, rangeEnd } = useMemo(() => {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - days);
+    return {
+      rangeStart: start.toISOString().split('T')[0],
+      rangeEnd: end.toISOString().split('T')[0],
+    };
+  }, [days]);
 
   // Fetch all analytics data
-  const { data: dashboard, isLoading: dashboardLoading } = useSupportDashboard();
+  const { data: dashboard, isLoading: dashboardLoading } = useConsolidatedSupportDashboard({
+    start_date: rangeStart,
+    end_date: rangeEnd,
+  });
   const { data: volumeTrend } = useSupportAnalyticsVolumeTrend({ months });
   const { data: resolutionTrend } = useSupportAnalyticsResolutionTime({ months });
   const { data: categoryBreakdown } = useSupportAnalyticsByCategory({ days });
@@ -191,7 +203,6 @@ export default function SupportAnalyticsPage() {
   const { data: slaBreach } = useSupportSlaBreachesSummary({ days });
   const { data: queueHealth } = useSupportRoutingQueueHealth();
   const qh = (queueHealth || {}) as any;
-  const overdueDetail = (dashboard as any)?.overdue_detail || [];
 
   // Calculate trends
   const latestSla = slaPerformance?.[slaPerformance.length - 1];
@@ -203,6 +214,14 @@ export default function SupportAnalyticsPage() {
   const volumeTrendPct = latestVolume && prevVolume && prevVolume.total > 0
     ? ((latestVolume.total - prevVolume.total) / prevVolume.total) * 100
     : 0;
+  const summary = dashboard?.summary;
+  const totalTickets = latestVolume?.total ?? (summary?.open_tickets ?? 0) + (summary?.resolved_tickets ?? 0);
+  const openTickets = summary?.open_tickets ?? 0;
+  const resolvedTickets = summary?.resolved_tickets ?? 0;
+  const overdueTickets = summary?.overdue_tickets ?? 0;
+  const unassignedTickets = summary?.unassigned_tickets ?? 0;
+  const slaAttainment = summary?.sla_attainment ?? 0;
+  const avgResolutionHours = summary?.avg_resolution_hours ?? 0;
 
   // Peak hour analysis
   const peakHour = patterns?.peak_hours?.[0];
@@ -257,7 +276,8 @@ export default function SupportAnalyticsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <MetricCard
           title="Total Tickets"
-          value={dashboard?.tickets?.total ?? 0}
+          value={totalTickets}
+          subtitle={`${days}d window`}
           icon={Activity}
           colorClass="text-blue-400"
           loading={dashboardLoading}
@@ -265,22 +285,23 @@ export default function SupportAnalyticsPage() {
         />
         <MetricCard
           title="Open"
-          value={dashboard?.tickets?.open ?? 0}
-          subtitle={`${dashboard?.tickets?.on_hold ?? 0} on hold`}
+          value={openTickets}
+          subtitle={`Avg res ${avgResolutionHours.toFixed(1)}h`}
           icon={AlertTriangle}
           colorClass="text-amber-400"
           loading={dashboardLoading}
         />
         <MetricCard
           title="Resolved"
-          value={dashboard?.tickets?.resolved ?? 0}
+          value={resolvedTickets}
+          subtitle={`${days}d window`}
           icon={CheckCircle2}
           colorClass="text-emerald-400"
           loading={dashboardLoading}
         />
         <MetricCard
           title="Overdue"
-          value={dashboard?.metrics?.overdue_tickets ?? slaBreach?.currently_overdue ?? 0}
+          value={slaBreach?.currently_overdue ?? overdueTickets}
           subtitle={`${slaBreach?.total_breaches ?? 0} breached (${days}d)`}
           icon={XCircle}
           colorClass="text-rose-400"
@@ -288,8 +309,8 @@ export default function SupportAnalyticsPage() {
         />
         <MetricCard
           title="Unassigned"
-          value={dashboard?.metrics?.unassigned_tickets ?? queueHealth?.unassigned_tickets ?? 0}
-          subtitle={`${queueHealth?.total_agents ?? 0} agents`}
+          value={unassignedTickets || queueHealth?.unassigned_tickets || 0}
+          subtitle={`${summary?.agent_count ?? queueHealth?.total_agents ?? 0} agents`}
           icon={Users}
           colorClass="text-violet-400"
           loading={dashboardLoading}
@@ -304,7 +325,7 @@ export default function SupportAnalyticsPage() {
             <Target className="w-4 h-4 text-teal-electric" />
             <h3 className="text-white font-semibold">SLA Attainment</h3>
           </div>
-          <SlaGauge attainment={dashboard?.sla?.attainment_rate ?? 0} />
+          <SlaGauge attainment={slaAttainment} />
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
             <div>
               <p className="text-xs text-slate-muted">Met</p>
@@ -630,47 +651,6 @@ export default function SupportAnalyticsPage() {
         </div>
       )}
 
-      {/* Overdue Detail */}
-      {overdueDetail.length ? (
-        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
-            <h3 className="text-white font-semibold">Overdue Tickets</h3>
-            <span className="text-xs text-slate-muted ml-auto">{overdueDetail.length} tickets</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-slate-muted text-left">
-                  <th className="pb-2">Ticket</th>
-                  <th className="pb-2">Priority</th>
-                  <th className="pb-2">Assigned</th>
-                  <th className="pb-2 text-right">Age (hours)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overdueDetail.slice(0, 10).map((ticket: any) => (
-                  <tr key={ticket.id} className="border-t border-slate-border/40">
-                    <td className="py-2 text-white font-mono">{ticket.ticket_number || `#${ticket.id}`}</td>
-                    <td className="py-2">
-                      <span className={cn(
-                        'px-2 py-0.5 rounded-full text-xs font-medium',
-                        ticket.priority === 'urgent' ? 'bg-rose-500/20 text-rose-400' :
-                        ticket.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                        'bg-slate-elevated text-slate-muted'
-                      )}>
-                        {ticket.priority}
-                      </span>
-                    </td>
-                    <td className="py-2 text-slate-muted">{ticket.assigned_to || 'Unassigned'}</td>
-                    <td className="py-2 text-right font-mono text-rose-400">{ticket.age_hours?.toFixed(1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

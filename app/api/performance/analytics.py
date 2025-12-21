@@ -4,7 +4,7 @@ Performance Analytics API - Dashboards and reporting
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast
 from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel
@@ -311,11 +311,16 @@ async def get_score_distribution(
         ).scalar() or 0
 
         percentage = (count / total_scored * 100) if total_scored > 0 else 0
+        min_value = cast(float | int | Decimal | str, band.get("min", 0))
+        max_value = cast(float | int | Decimal | str, band.get("max", 0))
+        min_score = float(min_value)
+        max_score = float(max_value)
+        rating = str(band["rating"])
 
         results.append(ScoreDistribution(
-            rating=str(band.get("rating", "")),
-            min_score=float(band.get("min", 0)),
-            max_score=float(band.get("max", 0)),
+            rating=rating,
+            min_score=min_score,
+            max_score=max_score,
             count=count,
             percentage=round(percentage, 1),
         ))
@@ -339,7 +344,8 @@ async def get_bonus_eligibility(
     if not policy:
         raise HTTPException(status_code=404, detail="No active bonus policy found")
 
-    score_bands: List[Dict[str, Any]] = policy.score_bands or []
+    raw_bands: Any = policy.score_bands or []
+    score_bands: List[Dict[str, Any]] = raw_bands if isinstance(raw_bands, list) else []
 
     # Get finalized scorecards
     scorecards = db.query(EmployeeScorecardInstance).filter(

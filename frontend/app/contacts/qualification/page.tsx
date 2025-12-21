@@ -66,7 +66,7 @@ export default function ContactsQualificationPage() {
 
   return (
     <div className="space-y-6">
-      {error && (
+      {Boolean(error) && (
         <ErrorDisplay
           message="Failed to load qualification analytics"
           error={error as Error}

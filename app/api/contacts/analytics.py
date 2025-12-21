@@ -584,11 +584,11 @@ def get_quality_analytics(db: Session = Depends(get_db)):
         (UnifiedContact.tags.is_(None)) | (func.array_length(UnifiedContact.tags, 1).is_(None))
     ).scalar() or 0
 
-    # Invalid email (simple check - missing @)
+    # Invalid email (simple check - missing @ or .)
     invalid_email = db.query(func.count(UnifiedContact.id)).filter(
         UnifiedContact.email.isnot(None),
         UnifiedContact.email != "",
-        ~UnifiedContact.email.contains("@")
+        (~UnifiedContact.email.contains("@")) | (~UnifiedContact.email.contains("."))
     ).scalar() or 0
 
     # Complete contacts (have email, phone, and address)
@@ -630,7 +630,7 @@ def get_quality_analytics(db: Session = Depends(get_db)):
     if missing_company > 0:
         issues.append({
             "field": "company",
-            "label": "Missing Company Name",
+            "label": "Missing Company Name (orgs only)",
             "count": missing_company,
             "percentage": round(missing_company / total * 100, 1),
             "severity": "medium"
@@ -669,10 +669,11 @@ def get_quality_analytics(db: Session = Depends(get_db)):
         })
 
     # Calculate quality score (weighted penalties)
-    penalty = 0
+    penalty = 0.0
     for issue in issues:
         weight = 3 if issue["severity"] == "high" else 2 if issue["severity"] == "medium" else 1
-        penalty += (issue["count"] / total) * weight * 10
+        count = int(issue.get("count") or 0)
+        penalty += (count / total) * weight * 10
 
     quality_score = max(0, round(100 - penalty))
     completeness_rate = round(complete / total * 100, 1) if total > 0 else 100

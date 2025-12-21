@@ -94,7 +94,7 @@ class Principal(BaseModel):
 class JWKSCache:
     """Caches JWKS keys with TTL to avoid repeated fetches."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._keys: dict = {}
         self._fetched_at: float = 0
         self._ttl: int = settings.jwks_cache_ttl
@@ -135,7 +135,7 @@ class JWKSCache:
                 return self._keys
             return {}
 
-    def invalidate(self):
+    def invalidate(self) -> None:
         """Force cache invalidation."""
         self._fetched_at = 0
 

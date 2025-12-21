@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class LicenseCache:
     """In-memory cache for license validation with grace period tracking."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.valid_until: float = 0
         self.last_checked: float = 0
         self.last_result: bool = True
@@ -180,7 +180,7 @@ def get_license_status() -> dict:
 class FeatureFlagsCache:
     """Cache for feature flags with last-known-good fallback."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.last_known_good: dict = {}
         self.last_refresh: float = 0
         self.last_error: Optional[str] = None

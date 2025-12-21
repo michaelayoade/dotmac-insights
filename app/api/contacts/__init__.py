@@ -57,6 +57,7 @@ from .lifecycle import router as lifecycle_router
 from .bulk import router as bulk_router
 from .analytics import router as analytics_router
 from .reconciliation import router as reconciliation_router
+from .lists import router as lists_router
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
@@ -71,6 +72,9 @@ router.include_router(bulk_router)
 
 # Analytics
 router.include_router(analytics_router)
+
+# Custom contact lists
+router.include_router(lists_router)
 
 # Reconciliation dashboard
 router.include_router(reconciliation_router, prefix="/reconciliation")

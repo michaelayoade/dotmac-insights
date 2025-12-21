@@ -55,7 +55,7 @@ class SettingsCache:
 
     TTL = 60  # seconds
 
-    def __init__(self, redis_client=None):
+    def __init__(self, redis_client=None) -> None:
         self.redis = redis_client
         self._local: dict[str, tuple[dict, float]] = {}  # group -> (data, expires_at)
 
@@ -81,7 +81,7 @@ class SettingsCache:
 
         return None
 
-    async def set(self, group: str, data: dict):
+    async def set(self, group: str, data: dict) -> None:
         """Cache settings for a group."""
         self._local[group] = (data, time.time() + self.TTL)
 
@@ -97,7 +97,7 @@ class SettingsCache:
             except Exception as e:
                 logger.warning("redis_cache_set_error", group=group, error=str(e))
 
-    async def invalidate(self, group: str):
+    async def invalidate(self, group: str) -> None:
         """Invalidate cache for a group."""
         self._local.pop(group, None)
 
@@ -108,7 +108,7 @@ class SettingsCache:
             except Exception as e:
                 logger.warning("redis_cache_invalidate_error", group=group, error=str(e))
 
-    def invalidate_local(self, group: str):
+    def invalidate_local(self, group: str) -> None:
         """Invalidate local cache only (called from pub/sub listener)."""
         self._local.pop(group, None)
 

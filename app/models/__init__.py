@@ -211,6 +211,7 @@ from app.models.unified_contact import (
     BillingType as UnifiedBillingType,
     LeadQualification,
 )
+from app.models.contact_list import ContactList
 from app.models.performance import (
     EvaluationPeriod,
     EvaluationPeriodType,

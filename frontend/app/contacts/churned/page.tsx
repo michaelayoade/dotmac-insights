@@ -98,7 +98,7 @@ export default function ChurnedPage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContacts(params);
-  const churned = data?.items || data?.data || [];
+  const churned = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {
@@ -343,8 +343,8 @@ export default function ChurnedPage() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                <XAxis dataKey="month" tick={{ fill: CHART_COLORS.text, fontSize: 10 }} />
-                <YAxis tick={{ fill: CHART_COLORS.text, fontSize: 10 }} allowDecimals={false} />
+                <XAxis dataKey="month" tick={{ fill: CHART_COLORS.label, fontSize: 10 }} />
+                <YAxis tick={{ fill: CHART_COLORS.label, fontSize: 10 }} allowDecimals={false} />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Bar dataKey="count" fill={CHART_COLORS.palette[0]} radius={[4, 4, 0, 0]} />
               </BarChart>

@@ -35,7 +35,7 @@ export default function SupplierDetailPage() {
   useEffect(() => {
     if (supplier) {
       setForm({
-        supplier_name: supplier.name || supplier.supplier_name,
+        supplier_name: supplier.name ?? supplier.supplier_name ?? undefined,
         supplier_code: supplier.code || (supplier as any).supplier_code,
         supplier_type: (supplier as any).supplier_type,
         supplier_group: (supplier as any).supplier_group,
@@ -91,7 +91,7 @@ export default function SupplierDetailPage() {
     setActionError(null);
     if (supplier) {
       setForm({
-        supplier_name: supplier.name || supplier.supplier_name,
+        supplier_name: supplier.name ?? supplier.supplier_name ?? undefined,
         supplier_code: supplier.code || (supplier as any).supplier_code,
         supplier_type: (supplier as any).supplier_type,
         supplier_group: (supplier as any).supplier_group,

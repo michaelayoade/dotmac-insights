@@ -327,7 +327,7 @@ async def sync_assets(
                     AssetDepreciationSchedule.asset_id == asset.id
                 ).delete()
                 for idx, sch in enumerate(schedules):
-                    child = AssetDepreciationSchedule(
+                    schedule_entry = AssetDepreciationSchedule(
                         asset_id=asset.id,
                         finance_book=sch.get("finance_book"),
                         schedule_date=_parse_date(sch.get("schedule_date")),
@@ -338,7 +338,7 @@ async def sync_assets(
                         idx=idx,
                         erpnext_name=sch.get("name"),
                     )
-                    sync_client.db.add(child)
+                    sync_client.db.add(schedule_entry)
 
             except Exception as e:
                 logger.warning("asset_children_failed", asset=erpnext_id, error=str(e))
@@ -377,6 +377,7 @@ async def sync_vehicles(
         employees_by_erpnext_id: Dict[str, int] = {
             e.erpnext_id: e.id
             for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+            if e.erpnext_id
         }
 
         for vehicle_ref in vehicles:

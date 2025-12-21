@@ -6,7 +6,7 @@ Performance metrics, completion rates, and utilization reports.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract, and_
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
@@ -456,7 +456,7 @@ async def get_technician_performance(
         })
 
     # Sort by completion rate
-    performance.sort(key=lambda x: x["completion_rate"], reverse=True)
+    performance.sort(key=lambda x: float(cast(float | int, x.get("completion_rate", 0.0))), reverse=True)
 
     return {
         "period": {

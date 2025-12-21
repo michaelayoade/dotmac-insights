@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, type LucideIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui';
 import { EmptyState } from '@/components/insights/shared';
 
@@ -9,7 +9,7 @@ interface PlaceholderPageProps {
   title: string;
   subtitle?: string;
   message: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   backHref?: string;
   backLabel?: string;
 }
@@ -27,7 +27,7 @@ export function PlaceholderPage({
       <PageHeader
         title={title}
         subtitle={subtitle}
-        icon={Icon}
+        icon={Icon as LucideIcon}
         iconClassName="bg-slate-elevated border border-slate-border"
         actions={
           backHref ? (

@@ -1,7 +1,7 @@
 """Expense claim endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Any, cast
 from datetime import datetime
 from decimal import Decimal
 
@@ -28,12 +28,13 @@ router = APIRouter()
 def _attach_transfer_details(claim: ExpenseClaim, transfer: Optional[Transfer]) -> ExpenseClaim:
     if not transfer:
         return claim
-    claim.transfer_reference = transfer.reference
-    claim.transfer_status = transfer.status.value if transfer.status else None
-    claim.transfer_provider = transfer.provider.value if transfer.provider else None
-    claim.transfer_amount = transfer.amount
-    claim.transfer_fee = transfer.fee
-    claim.transfer_created_at = transfer.created_at
+    claim_any = cast(Any, claim)
+    claim_any.transfer_reference = transfer.reference
+    claim_any.transfer_status = transfer.status.value if transfer.status else None
+    claim_any.transfer_provider = transfer.provider.value if transfer.provider else None
+    claim_any.transfer_amount = transfer.amount
+    claim_any.transfer_fee = transfer.fee
+    claim_any.transfer_created_at = transfer.created_at
     return claim
 
 
@@ -60,7 +61,8 @@ def list_claims(
         for t in db.query(Transfer).filter(Transfer.reference.in_(refs)).all():
             transfers[t.reference] = t
         for claim in claims:
-            _attach_transfer_details(claim, transfers.get(claim.payment_reference))
+            if claim.payment_reference:
+                _attach_transfer_details(claim, transfers.get(claim.payment_reference))
     return claims
 
 
@@ -331,6 +333,7 @@ async def pay_claim_now(
 
     settings = get_payment_settings()
     provider_value = (payload.provider or settings.default_transfer_provider).lower()
+    client: FlutterwaveClient | PaystackClient
     if provider_value == GatewayProvider.FLUTTERWAVE.value:
         client = FlutterwaveClient()
         provider_enum = GatewayProvider.FLUTTERWAVE
@@ -430,6 +433,7 @@ async def verify_claim_transfer(
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
+    client: FlutterwaveClient | PaystackClient
     if transfer.provider == GatewayProvider.FLUTTERWAVE:
         client = FlutterwaveClient()
         provider_enum = GatewayProvider.FLUTTERWAVE
@@ -477,4 +481,3 @@ async def verify_claim_transfer(
     db.refresh(claim)
     _attach_transfer_details(claim, transfer)
     return claim
-

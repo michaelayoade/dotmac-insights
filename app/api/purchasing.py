@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, extract
-from typing import Dict, Any, Optional, List, TypedDict
+from typing import Dict, Any, Optional, List, TypedDict, cast
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
@@ -1331,7 +1331,8 @@ async def get_ap_aging(
 
         bucket_data = buckets[bucket]
         bucket_data["count"] += 1
-        bucket_data["total"] += float(inv.outstanding_amount or 0)
+        bucket_total = cast(Decimal, bucket_data["total"])
+        bucket_data["total"] = bucket_total + (inv.outstanding_amount or Decimal("0"))
         bucket_data["invoices"].append({
             "id": inv.id,
             "invoice_no": inv.erpnext_id,

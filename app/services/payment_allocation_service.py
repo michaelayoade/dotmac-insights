@@ -262,19 +262,25 @@ class PaymentAllocationService:
         """
         # Get payment and party
         payment: Optional[Payment | SupplierPayment] = None
+        supplier_payment: Optional[SupplierPayment] = None
+        customer_payment: Optional[Payment] = None
         party_type: Literal["customer", "supplier"]
         if is_supplier_payment:
-            payment = self.db.query(SupplierPayment).filter(
+            supplier_payment = self.db.query(SupplierPayment).filter(
                 SupplierPayment.id == payment_id
             ).first()
+            payment = supplier_payment
             party_type = "supplier"
         else:
-            payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+            customer_payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+            payment = customer_payment
             party_type = "customer"
 
         party_id = None
-        if payment:
-            party_id = payment.supplier_id if is_supplier_payment else payment.customer_id
+        if is_supplier_payment:
+            party_id = supplier_payment.supplier_id if supplier_payment else None
+        else:
+            party_id = customer_payment.customer_id if customer_payment else None
 
         if not payment or not party_id:
             raise PaymentAllocationError("Payment not found or no party linked")

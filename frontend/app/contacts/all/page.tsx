@@ -68,7 +68,7 @@ export default function AllContactsPage() {
   };
 
   const { data, isLoading, error, mutate } = useUnifiedContacts(params);
-  const contacts = data?.items || data?.data || [];
+  const contacts = data?.items || [];
   const total = data?.total || 0;
 
   const handleSearch = (e: React.FormEvent) => {

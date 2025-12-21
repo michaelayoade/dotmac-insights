@@ -96,7 +96,7 @@ export default function ContactsAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {(dashboardError || funnelError) && (
+      {Boolean(dashboardError || funnelError) && (
         <ErrorDisplay
           message="Failed to load contact analytics"
           error={(dashboardError || funnelError) as Error}

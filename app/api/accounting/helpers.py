@@ -171,6 +171,7 @@ AMORTIZATION_TYPES = {
 
 REPORT_CACHE_KEYS = [
     "accounting-dashboard",
+    "accounting-dashboard-bundle",
     "trial-balance",
     "balance-sheet",
     "income-statement",

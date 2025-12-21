@@ -5,11 +5,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
+from app.cache import cached
 from app.database import get_db
 from app.models.accounting import (
     Account,
@@ -22,6 +23,10 @@ from app.models.accounting import (
 from app.models.invoice import Invoice, InvoiceStatus
 
 from .helpers import parse_date, get_effective_root_type
+from .reports import get_balance_sheet, get_income_statement, get_cash_flow
+from .receivables import get_receivables_outstanding
+from .payables import get_payables_outstanding
+from .banking import get_bank_accounts
 
 router = APIRouter()
 
@@ -171,4 +176,56 @@ def get_accounting_dashboard(
             "gl_entries_count": recent_gl_count,
             "bank_transactions_count": recent_bank_txn_count,
         },
+    }
+
+
+@router.get("/dashboard/bundle", dependencies=[Depends(Require("accounting:read"))])
+@cached("accounting-dashboard-bundle", ttl=60, include_principal=True)
+async def get_accounting_dashboard_bundle(
+    currency: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    as_of_date: Optional[str] = None,
+    top: int = Query(default=5, le=25),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """Get a bundled accounting dashboard payload for core cards.
+
+    Returns dashboard, balance sheet, income statement, cash flow,
+    bank accounts, and receivables/payables summaries in one call.
+    """
+    _ = principal
+    effective_as_of = as_of_date or end_date
+
+    dashboard = get_accounting_dashboard(start_date=start_date, end_date=end_date, db=db)
+    balance_sheet = get_balance_sheet(
+        as_of_date=effective_as_of,
+        currency=currency,
+        db=db,
+    )
+    income_statement = get_income_statement(
+        start_date=start_date,
+        end_date=end_date,
+        db=db,
+    )
+    cash_flow = get_cash_flow(
+        start_date=start_date,
+        end_date=end_date,
+        currency=currency,
+        db=db,
+    )
+    receivables = get_receivables_outstanding(currency=currency, top=top, db=db)
+    payables = get_payables_outstanding(currency=currency, top=top, db=db)
+    bank_accounts = get_bank_accounts(as_of_date=effective_as_of, db=db)
+
+    return {
+        "currency": currency,
+        "dashboard": dashboard,
+        "balance_sheet": balance_sheet,
+        "income_statement": income_statement,
+        "cash_flow": cash_flow,
+        "receivables_outstanding": receivables,
+        "payables_outstanding": payables,
+        "bank_accounts": bank_accounts,
     }

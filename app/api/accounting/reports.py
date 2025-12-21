@@ -1890,10 +1890,14 @@ def get_cash_flow(
     # Add prior period and variance if available
     if include_prior_period and prior_period_data:
         result["prior_period"] = prior_period_data
+        prior_net_change: float | int | Decimal | str = 0.0
+        if isinstance(prior_period_data, dict):
+            prior_net_change_raw = prior_period_data.get("net_change_in_cash", 0) or 0
+            prior_net_change = cast(float | int | Decimal | str, prior_net_change_raw)
         result["variance"] = {
             "net_change_in_cash": calculate_variance(
                 actual_change,
-                float(prior_period_data.get("net_change_in_cash", 0) or 0),
+                float(prior_net_change),
             ),
         }
 

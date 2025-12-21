@@ -23,6 +23,7 @@ import { fetchApi } from '@/lib/api/core';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 interface DuplicateGroup {
   value: string;
@@ -47,6 +48,8 @@ function formatDate(value?: string | null): string {
 
 export default function DuplicatesPage() {
   const router = useRouter();
+  const { hasScope } = useAuth();
+  const canWrite = hasScope('contacts:write');
   const [field, setField] = useState<'email' | 'phone' | 'name'>('email');
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedPrimary, setSelectedPrimary] = useState<Record<string, number>>({});
@@ -245,6 +248,7 @@ export default function DuplicatesPage() {
             }
             onMerge={() => handleMerge(group)}
             merging={merging}
+            canWrite={canWrite}
           />
         ))}
       </div>
@@ -271,6 +275,7 @@ function DuplicateGroupCard({
   onSelectPrimary,
   onMerge,
   merging,
+  canWrite,
 }: {
   group: DuplicateGroup;
   field: string;
@@ -280,6 +285,7 @@ function DuplicateGroupCard({
   onSelectPrimary: (id: number) => void;
   onMerge: () => void;
   merging: boolean;
+  canWrite: boolean;
 }) {
   // Fetch contact details when expanded
   const { data } = useSWR<{ items: UnifiedContact[] }>(
@@ -327,14 +333,17 @@ function DuplicateGroupCard({
         <div className="border-t border-slate-border p-4 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-muted">
-              Select the primary contact to keep. Other records will be merged into it.
+              {canWrite
+                ? 'Select the primary contact to keep. Other records will be merged into it.'
+                : 'You need contacts:write permission to merge duplicates.'}
             </p>
             <button
               onClick={onMerge}
-              disabled={!selectedPrimary || merging}
+              disabled={!canWrite || !selectedPrimary || merging}
+              title={!canWrite ? 'You need contacts:write permission to merge duplicates' : undefined}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                selectedPrimary
+                canWrite && selectedPrimary
                   ? 'bg-emerald-500 text-white hover:bg-emerald-400'
                   : 'bg-slate-elevated text-slate-muted cursor-not-allowed'
               )}

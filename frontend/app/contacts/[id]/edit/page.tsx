@@ -18,9 +18,15 @@ import {
   AlertCircle,
   Check,
   Loader2,
+  Trash2,
+  Archive,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { useUnifiedContact, useUnifiedContactMutations } from '@/hooks/useApi';
 import type { Contact as CRMContact } from '@/lib/api';
+import { useRequireScope, useAuth } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type ContactType = 'lead' | 'prospect' | 'customer' | 'person' | 'churned';
 type ContactCategory = 'residential' | 'business' | 'enterprise' | 'government' | 'nonprofit';
@@ -141,9 +147,14 @@ export default function EditContactPage() {
   const params = useParams();
   const contactId = Number(params.id);
 
+  // RBAC check - require write permission to edit contacts
+  const { hasAccess, isLoading: authLoading } = useRequireScope('contacts:write');
+  const { hasAnyScope } = useAuth();
+  const canHardDelete = hasAnyScope(['admin:write', '*']);
+
   const { data: contactData, isLoading: isLoadingContact, error: loadError } = useUnifiedContact(contactId);
   const contact = useMemo(() => (contactData as CRMContact | undefined) || ({} as CRMContact), [contactData]);
-  const { updateContact, isLoading: isUpdating, error: updateError } = useUnifiedContactMutations();
+  const { updateContact, deleteContact, isLoading: isUpdating, error: updateError } = useUnifiedContactMutations();
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [newTag, setNewTag] = useState('');
@@ -151,6 +162,10 @@ export default function EditContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load contact data into form
   useEffect(() => {
@@ -292,11 +307,51 @@ export default function EditContactPage() {
     }
   };
 
-  if (isLoadingContact) {
+  const handleArchive = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteContact(contactId, false);
+      router.push('/contacts');
+    } catch (err) {
+      console.error('Failed to archive contact:', err);
+      setDeleteError('Failed to archive contact. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowArchiveDialog(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteContact(contactId, true);
+      router.push('/contacts');
+    } catch (err) {
+      console.error('Failed to delete contact:', err);
+      setDeleteError('Failed to permanently delete contact. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  if (authLoading || isLoadingContact) {
     return (
       <div className="p-6 flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400" />
       </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDenied
+        message="You need contacts:write permission to edit contacts."
+        backHref={`/contacts/${contactId}`}
+        backLabel="Back to Contact"
+      />
     );
   }
 
@@ -902,6 +957,64 @@ export default function EditContactPage() {
           />
         </div>
 
+        {/* Danger Zone */}
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6 mt-8">
+          <h2 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Danger Zone
+          </h2>
+          <p className="text-slate-400 text-sm mb-4">
+            Actions here cannot be easily undone. Please proceed with caution.
+          </p>
+
+          {deleteError && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400" />
+              <span className="text-red-300 text-sm">{deleteError}</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Archive (Soft Delete) */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+              <div>
+                <h3 className="text-white font-medium">Archive Contact</h3>
+                <p className="text-slate-400 text-sm">
+                  Mark this contact as inactive. They will be hidden from active lists but can be restored.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchiveDialog(true)}
+                className="px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 transition-colors flex items-center gap-2"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
+              </button>
+            </div>
+
+            {/* Permanent Delete - Admin Only */}
+            {canHardDelete && (
+              <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-red-500/20">
+                <div>
+                  <h3 className="text-white font-medium">Permanently Delete</h3>
+                  <p className="text-slate-400 text-sm">
+                    Permanently remove this contact and all associated data. This action cannot be undone.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Submit Buttons */}
         <div className="flex justify-between items-center">
           <div>
@@ -941,6 +1054,111 @@ export default function EditContactPage() {
           </div>
         </div>
       </form>
+
+      {/* Archive Confirmation Dialog */}
+      {showArchiveDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowArchiveDialog(false)} />
+          <div className="relative bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-400" />
+                Archive Contact
+              </h3>
+              <button
+                onClick={() => setShowArchiveDialog(false)}
+                className="p-1 rounded hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to archive <strong>{contact.name}</strong>?
+              The contact will be marked as inactive and hidden from active lists, but can be restored later.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowArchiveDialog(false)}
+                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Archiving...
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-4 h-4" />
+                    Archive Contact
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowDeleteDialog(false)} />
+          <div className="relative bg-slate-800 border border-red-500/30 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-red-400 flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                Permanently Delete Contact
+              </h3>
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                className="p-1 rounded hover:bg-slate-700 transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg mb-4">
+              <p className="text-red-300 text-sm flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                This action cannot be undone. All data associated with this contact will be permanently deleted.
+              </p>
+            </div>
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to permanently delete <strong>{contact.name}</strong>?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePermanentDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Permanently
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

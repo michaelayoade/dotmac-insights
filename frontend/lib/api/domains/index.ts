@@ -214,7 +214,6 @@ export type {
   SupportTicketCreateResponse,
   SupportOverviewRequest,
   SupportOverviewResponse,
-  SupportDashboardResponse,
   SupportAgent,
   SupportAgentPayload,
   SupportTeam,
@@ -704,3 +703,13 @@ export type {
   VehicleUpdatePayload,
   VehicleListParams,
 } from './fleet';
+
+// Consolidated Dashboards Domain (Single-Payload Dashboards)
+export { dashboardsApi } from './dashboards';
+export type {
+  SalesDashboardResponse,
+  PurchasingDashboardResponse,
+  SupportDashboardResponse as SupportDashboardAggregateResponse,
+  FieldServiceDashboardResponse,
+  AccountingDashboardResponse,
+} from './dashboards';

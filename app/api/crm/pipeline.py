@@ -198,7 +198,7 @@ async def get_kanban_view(
 
     columns = []
     total_count = 0
-    total_value = 0
+    total_value = 0.0
 
     for stage in stages:
         query = db.query(Opportunity).filter(

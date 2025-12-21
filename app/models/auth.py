@@ -12,9 +12,12 @@ from __future__ import annotations
 from sqlalchemy import String, Boolean, ForeignKey, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from app.database import Base
 from app.utils.datetime_utils import utc_now
+
+if TYPE_CHECKING:
+    from app.models.contact_list import ContactList
 
 
 class User(Base):
@@ -54,6 +57,10 @@ class User(Base):
     service_tokens: Mapped[List["ServiceToken"]] = relationship(
         back_populates="created_by_user",
         foreign_keys="[ServiceToken.created_by_id]"
+    )
+    contact_lists: Mapped[List["ContactList"]] = relationship(
+        back_populates="owner",
+        foreign_keys="[ContactList.owner_id]"
     )
 
     def __repr__(self) -> str:

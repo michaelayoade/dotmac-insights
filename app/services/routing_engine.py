@@ -318,7 +318,8 @@ class RoutingEngine:
 
         ticket_counts: Dict[int, int] = {}
         for agent in agents:
-            name = agent.display_name or agent.email
+            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
+            name = str(name)
             count = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
                 Ticket.status.in_([
@@ -390,7 +391,7 @@ class RoutingEngine:
 
         for agent in agents:
             capacity = agent.capacity or 10
-            name = agent.display_name or agent.email
+            name = agent.display_name or agent.email or f"agent-{agent.id}"
 
             current_load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -440,7 +441,7 @@ class RoutingEngine:
 
         for agent in agents:
             capacity = agent.capacity or 10
-            name = agent.display_name or agent.email
+            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
 
             load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -510,7 +511,7 @@ class RoutingEngine:
         # Calculate current workloads
         workloads: Dict[int, WorkloadEntry] = {}
         for agent in agents:
-            name = agent.display_name or agent.email
+            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
             capacity = agent.capacity or 10
 
             load = self.db.query(func.count(Ticket.id)).filter(

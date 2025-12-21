@@ -196,6 +196,7 @@ async def list_contacts(
     is_organization: Optional[bool] = None,
     has_outstanding: Optional[bool] = None,
     tag: Optional[str] = None,
+    quality_issue: Optional[str] = Query(None, description="Filter by quality issue: missing_email, missing_phone, missing_address, missing_name, missing_company, invalid_email"),
     sort_by: str = Query("created_at", pattern="^(name|created_at|last_contact_date|mrr|lead_score)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
@@ -214,6 +215,7 @@ async def list_contacts(
     - is_organization: True for orgs, False for individuals
     - has_outstanding: True to filter contacts with outstanding balance
     - tag: Filter by tag
+    - quality_issue: Filter by data quality issue (missing_email, missing_phone, missing_address, missing_name, missing_company, invalid_email)
     """
     query = db.query(UnifiedContact)
 
@@ -267,6 +269,47 @@ async def list_contacts(
     # Tag filter
     if tag:
         query = query.filter(UnifiedContact.tags.contains([tag]))
+
+    # Quality issue filter
+    if quality_issue:
+        if quality_issue == "missing_email":
+            query = query.filter(or_(
+                UnifiedContact.email.is_(None),
+                UnifiedContact.email == ""
+            ))
+        elif quality_issue == "missing_phone":
+            query = query.filter(and_(
+                or_(UnifiedContact.phone.is_(None), UnifiedContact.phone == ""),
+                or_(UnifiedContact.mobile.is_(None), UnifiedContact.mobile == "")
+            ))
+        elif quality_issue == "missing_address":
+            query = query.filter(and_(
+                or_(UnifiedContact.address_line1.is_(None), UnifiedContact.address_line1 == ""),
+                or_(UnifiedContact.city.is_(None), UnifiedContact.city == "")
+            ))
+        elif quality_issue == "missing_name":
+            query = query.filter(or_(
+                UnifiedContact.name.is_(None),
+                UnifiedContact.name == ""
+            ))
+        elif quality_issue == "missing_company":
+            query = query.filter(
+                UnifiedContact.is_organization == True,
+                or_(
+                    UnifiedContact.company_name.is_(None),
+                    UnifiedContact.company_name == ""
+                )
+            )
+        elif quality_issue == "invalid_email":
+            # Basic email validation - must contain @ and .
+            query = query.filter(
+                UnifiedContact.email.isnot(None),
+                UnifiedContact.email != "",
+                or_(
+                    ~UnifiedContact.email.contains("@"),
+                    ~UnifiedContact.email.contains(".")
+                )
+            )
 
     # Count total
     total = query.count()

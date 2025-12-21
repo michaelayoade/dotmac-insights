@@ -19,7 +19,7 @@ export default function ModesOfPaymentPage() {
 
   const modesRes = useSWR('accounting-modes-of-payment', () => accountingApi.getModesOfPayment());
   const { isLoading, error, retry } = useSWRStatus(modesRes);
-  const modes = modesRes.data?.modes_of_payment || [];
+  const modes = modesRes.data?.items || [];
 
   const handleCreate = async () => {
     if (!formData.mode_of_payment.trim()) return;

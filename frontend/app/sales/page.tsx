@@ -1,22 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  useFinanceDashboard,
-  useFinanceAging,
-  useFinanceRevenueTrend,
-  useFinanceInvoices,
-  useFinancePayments,
-  useFinanceCreditNotes,
-  usePurchasingBills,
-  usePurchasingPayments,
-  useLeadsSummary,
-  usePipelineSummary,
-  usePipelineView,
-  useUpcomingActivities,
-  useOverdueActivities,
-} from '@/hooks/useApi';
-import type { FinanceAgingAnalytics } from '@/lib/api';
+import { useConsolidatedSalesDashboard } from '@/hooks/useApi';
+import type { SalesDashboardResponse } from '@/lib/api/domains/dashboards';
 import { cn } from '@/lib/utils';
 import {
   TrendingUp,
@@ -33,6 +19,8 @@ import {
   Calendar,
   ArrowRight,
   BarChart3,
+  Users,
+  Activity,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
@@ -67,11 +55,16 @@ interface StatCardProps {
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   className?: string;
+  href?: string;
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, className }: StatCardProps) {
-  return (
-    <div className={cn('bg-slate-card rounded-xl border border-slate-border p-6', className)}>
+function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, className, href }: StatCardProps) {
+  const content = (
+    <div className={cn(
+      'bg-slate-card rounded-xl border border-slate-border p-6',
+      href && 'hover:border-teal-electric/50 hover:bg-slate-elevated/50 transition-all cursor-pointer',
+      className
+    )}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-slate-muted text-sm font-medium">{title}</p>
@@ -94,11 +87,30 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, class
           <Icon className="w-6 h-6 text-teal-electric" />
         </div>
       </div>
+      {href && (
+        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
+          <span>View details</span>
+          <ArrowRight className="w-3 h-3 ml-1" />
+        </div>
+      )}
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
-function AgingChart({ buckets }: { buckets: FinanceAgingAnalytics['buckets'] }) {
+interface AgingBuckets {
+  current: { count: number; total: number };
+  '1_30': { count: number; total: number };
+  '31_60': { count: number; total: number };
+  '61_90': { count: number; total: number };
+  over_90: { count: number; total: number };
+}
+
+function AgingChart({ buckets }: { buckets: AgingBuckets }) {
   if (!buckets) return null;
 
   const colorMap: Record<string, string> = {
@@ -121,7 +133,12 @@ function AgingChart({ buckets }: { buckets: FinanceAgingAnalytics['buckets'] }) 
 
   return (
     <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-      <h3 className="text-lg font-semibold text-white mb-4">Invoice Aging</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-white">Invoice Aging</h3>
+        <Link href="/sales/invoices?overdue_only=true" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+          View Overdue <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
       <div className="space-y-3">
         {entries.map((bucket) => {
           const amount = bucket.total || 0;
@@ -158,74 +175,35 @@ function AgingChart({ buckets }: { buckets: FinanceAgingAnalytics['buckets'] }) 
 
 export default function SalesDashboardPage() {
   const currency = 'NGN';
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = useFinanceDashboard(currency);
-  const { data: aging, isLoading: agingLoading, error: agingError, mutate: refetchAging } = useFinanceAging({ currency });
-  const { data: revenueTrend, isLoading: trendLoading, error: trendError, mutate: refetchTrend } = useFinanceRevenueTrend({ currency, interval: 'month' });
-  const { data: recentInvoices, error: invoicesError, mutate: refetchInvoices, isLoading: invoicesLoading } = useFinanceInvoices({
-    currency,
-    page: 1,
-    page_size: 5,
-    sort_by: 'invoice_date',
-    sort_order: 'desc',
-  });
-  const { data: recentPayments, error: paymentsError, mutate: refetchPayments, isLoading: paymentsLoading } = useFinancePayments({
-    currency,
-    page: 1,
-    page_size: 5,
-    sort_by: 'payment_date',
-    sort_order: 'desc',
-  });
-  const { data: recentCredits, error: creditsError, mutate: refetchCredits, isLoading: creditsLoading } = useFinanceCreditNotes({
-    currency,
-    page: 1,
-    page_size: 5,
-    sort_by: 'issue_date',
-    sort_order: 'desc',
-  });
-  const { data: recentBills, error: billsError, mutate: refetchBills, isLoading: billsLoading } = usePurchasingBills({ currency, limit: 5, sort_by: 'posting_date', sort_dir: 'desc' });
-  const { data: recentPurchasePayments, error: purchasePaymentsError, mutate: refetchPurchasePayments, isLoading: purchasePaymentsLoading } = usePurchasingPayments({ currency, limit: 5 });
+  const { data, isLoading, error, mutate } = useConsolidatedSalesDashboard(currency);
 
-  // CRM Data
-  const { data: leadsSummary, isLoading: leadsLoading } = useLeadsSummary();
-  const { data: pipelineSummary, isLoading: pipelineLoading } = usePipelineSummary();
-  const { data: pipelineView, isLoading: pipelineViewLoading } = usePipelineView();
-  const { data: upcomingActivities, isLoading: activitiesLoading } = useUpcomingActivities(5);
-  const { data: overdueActivities } = useOverdueActivities();
-
-  const swrStates = [
-    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
-    { error: agingError, isLoading: agingLoading, mutate: refetchAging },
-    { error: trendError, isLoading: trendLoading, mutate: refetchTrend },
-    { error: invoicesError, isLoading: invoicesLoading, mutate: refetchInvoices },
-    { error: paymentsError, isLoading: paymentsLoading, mutate: refetchPayments },
-    { error: creditsError, isLoading: creditsLoading, mutate: refetchCredits },
-    { error: billsError, isLoading: billsLoading, mutate: refetchBills },
-    { error: purchasePaymentsError, isLoading: purchasePaymentsLoading, mutate: refetchPurchasePayments },
-  ];
-
-  const firstError = swrStates.find((state) => state.error)?.error;
-  const isDataLoading = swrStates.some((state) => state.isLoading);
-  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
-
-  if (isDataLoading) {
+  if (isLoading) {
     return <LoadingState />;
   }
 
-  const collectionRate = dashboard?.collections?.collection_rate ?? 0;
-  const outstandingTotal = dashboard?.outstanding?.total ?? 0;
-  const overdueTotal = dashboard?.outstanding?.overdue ?? 0;
-  const invoiced30d = dashboard?.collections?.invoiced_30_days ?? 0;
-  const collected30d = dashboard?.collections?.last_30_days ?? 0;
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load sales dashboard data."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
+
+  if (!data) {
+    return <LoadingState />;
+  }
+
+  const { finance, aging, revenue_trend, recent, crm } = data;
+  const collectionRate = finance?.collections?.collection_rate ?? 0;
+  const outstandingTotal = finance?.outstanding?.total ?? 0;
+  const overdueTotal = finance?.outstanding?.overdue ?? 0;
+  const invoiced30d = finance?.collections?.invoiced_30_days ?? 0;
+  const collected30d = finance?.collections?.last_30_days ?? 0;
 
   return (
     <div className="space-y-6">
-      {firstError && (
-        <ErrorDisplay
-          message="Failed to load sales dashboard data."
-          error={firstError as Error}
-          onRetry={retryAll}
-        />
-      )}
       <PageHeader
         title="Sales Dashboard"
         subtitle="CRM pipeline, revenue metrics, and financial performance"
@@ -237,36 +215,40 @@ export default function SalesDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Pipeline Value"
-          value={formatCurrency(pipelineSummary?.total_value || 0, currency)}
-          subtitle={`Weighted: ${formatCurrency(pipelineSummary?.weighted_value || 0, currency)}`}
+          value={formatCurrency(crm?.pipeline?.total_value || 0, currency)}
+          subtitle={`Weighted: ${formatCurrency(crm?.pipeline?.weighted_value || 0, currency)}`}
           icon={Target}
+          href="/sales/pipeline"
         />
         <StatCard
           title="Open Opportunities"
-          value={formatNumber(pipelineSummary?.open_count || 0)}
-          subtitle={`Win Rate: ${((pipelineSummary?.win_rate || 0) * 100).toFixed(0)}%`}
+          value={formatNumber(crm?.pipeline?.open_count || 0)}
+          subtitle={`Win Rate: ${((crm?.pipeline?.win_rate || 0) * 100).toFixed(0)}%`}
           icon={TrendingUp}
-          trend={pipelineSummary?.win_rate >= 0.3 ? 'up' : 'down'}
-          trendValue={pipelineSummary?.win_rate >= 0.3 ? 'Above Target' : 'Below Target'}
+          trend={(crm?.pipeline?.win_rate || 0) >= 0.3 ? 'up' : 'down'}
+          trendValue={(crm?.pipeline?.win_rate || 0) >= 0.3 ? 'Above Target' : 'Below Target'}
+          href="/sales/opportunities"
         />
         <StatCard
           title="Active Leads"
-          value={formatNumber((leadsSummary?.new || 0) + (leadsSummary?.contacted || 0) + (leadsSummary?.qualified || 0))}
-          subtitle={`New: ${leadsSummary?.new || 0} | Qualified: ${leadsSummary?.qualified || 0}`}
+          value={formatNumber((crm?.leads?.new || 0) + (crm?.leads?.contacted || 0) + (crm?.leads?.qualified || 0))}
+          subtitle={`New: ${crm?.leads?.new || 0} | Qualified: ${crm?.leads?.qualified || 0}`}
           icon={UserPlus}
+          href="/sales/leads"
         />
         <StatCard
           title="Activities"
-          value={formatNumber(upcomingActivities?.items?.length || 0)}
-          subtitle={overdueActivities?.items?.length ? `${overdueActivities.items.length} overdue` : 'All on track'}
+          value={formatNumber(crm?.upcoming_activities?.length || 0)}
+          subtitle={crm?.overdue_activities?.length ? `${crm.overdue_activities.length} overdue` : 'All on track'}
           icon={Calendar}
-          trend={overdueActivities?.items?.length ? 'down' : 'up'}
-          trendValue={overdueActivities?.items?.length ? 'Action needed' : 'Healthy'}
+          trend={crm?.overdue_activities?.length ? 'down' : 'up'}
+          trendValue={crm?.overdue_activities?.length ? 'Action needed' : 'Healthy'}
+          href="/sales/activities"
         />
       </div>
 
       {/* Pipeline Stages Overview */}
-      {pipelineView && pipelineView.stages?.length > 0 && (
+      {crm?.stages && crm.stages.length > 0 && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">Sales Pipeline</h3>
@@ -275,12 +257,16 @@ export default function SalesDashboardPage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {pipelineView.stages.filter((s: any) => !s.is_won && !s.is_lost).map((stage: any) => (
-              <div key={stage.id} className="bg-slate-elevated/50 rounded-lg p-3 border border-slate-border/50">
+            {crm.stages.filter((s) => !s.is_won && !s.is_lost).map((stage) => (
+              <Link
+                key={stage.id}
+                href={`/sales/opportunities?stage=${stage.id}`}
+                className="bg-slate-elevated/50 rounded-lg p-3 border border-slate-border/50 hover:border-teal-electric/50 transition-all"
+              >
                 <div className="text-xs text-slate-muted mb-1">{stage.name}</div>
                 <div className="text-lg font-semibold text-white">{stage.opportunity_count}</div>
                 <div className="text-xs text-teal-electric">{formatCurrency(stage.opportunity_value || 0, currency)}</div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -290,91 +276,82 @@ export default function SalesDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Monthly Recurring Revenue"
-          value={formatCurrency(dashboard?.revenue?.mrr || 0, dashboard?.currency || currency)}
-          subtitle={`ARR: ${formatCurrency(dashboard?.revenue?.arr || 0, dashboard?.currency || currency)}`}
+          value={formatCurrency(finance?.revenue?.mrr || 0, currency)}
+          subtitle={`ARR: ${formatCurrency(finance?.revenue?.arr || 0, currency)}`}
           icon={TrendingUp}
+          href="/sales/subscriptions"
         />
         <StatCard
           title="Invoiced (30d)"
-          value={formatCurrency(invoiced30d, dashboard?.currency || currency)}
+          value={formatCurrency(invoiced30d, currency)}
           subtitle="Last 30 days"
           icon={FileText}
+          href="/sales/invoices"
         />
         <StatCard
           title="Collected (30d)"
-          value={formatCurrency(collected30d, dashboard?.currency || currency)}
+          value={formatCurrency(collected30d, currency)}
           subtitle={`Collection Rate: ${(collectionRate * 100).toFixed(1)}%`}
           icon={CreditCard}
           trend={collectionRate >= 0.8 ? 'up' : 'down'}
           trendValue={collectionRate >= 0.8 ? 'Healthy' : 'Below Target'}
+          href="/sales/payments"
         />
         <StatCard
           title="Outstanding"
-          value={formatCurrency(outstandingTotal, dashboard?.currency || currency)}
-          subtitle={`Overdue: ${formatCurrency(overdueTotal, dashboard?.currency || currency)}`}
+          value={formatCurrency(outstandingTotal, currency)}
+          subtitle={`Overdue: ${formatCurrency(overdueTotal, currency)}`}
           icon={Clock}
+          href="/sales/invoices?status=overdue"
         />
       </div>
 
       {/* DSO and Collection Health */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Days Sales Outstanding (DSO)</h3>
-          <div className="flex items-center justify-center py-8">
-            <div className="text-center">
-              <p className="text-5xl font-bold text-teal-electric">{dashboard?.metrics?.dso?.toFixed(0) || '-'}</p>
-              <p className="text-slate-muted mt-2">days</p>
+        <Link href="/sales/analytics" className="block">
+          <div className="bg-slate-card rounded-xl border border-slate-border p-6 hover:border-teal-electric/50 transition-all">
+            <h3 className="text-lg font-semibold text-white mb-4">Days Sales Outstanding (DSO)</h3>
+            <div className="flex items-center justify-center py-8">
+              <div className="text-center">
+                <p className="text-5xl font-bold text-teal-electric">{finance?.metrics?.dso?.toFixed(0) || '-'}</p>
+                <p className="text-slate-muted mt-2">days</p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-border">
+              <div className="flex items-center justify-center gap-4 text-sm">
+                {(finance?.metrics?.dso || 0) <= 30 ? (
+                  <>
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    <span className="text-green-400">Excellent - Below 30 days</span>
+                  </>
+                ) : (finance?.metrics?.dso || 0) <= 45 ? (
+                  <>
+                    <CheckCircle className="w-5 h-5 text-yellow-400" />
+                    <span className="text-yellow-400">Good - Monitor closely</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                    <span className="text-red-400">High - Action needed</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-slate-border">
-            <div className="flex items-center justify-center gap-4 text-sm">
-              {(dashboard?.metrics?.dso || 0) <= 30 ? (
-                <>
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                  <span className="text-green-400">Excellent - Below 30 days</span>
-                </>
-              ) : (dashboard?.metrics?.dso || 0) <= 45 ? (
-                <>
-                  <CheckCircle className="w-5 h-5 text-yellow-400" />
-                  <span className="text-yellow-400">Good - Monitor closely</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                  <span className="text-red-400">High - Action needed</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        </Link>
 
-        {/* Aging Chart */}
-        {agingLoading ? (
-          <div className="bg-slate-card rounded-xl border border-slate-border p-6 animate-pulse">
-            <div className="h-6 bg-slate-elevated rounded w-1/3 mb-4" />
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i}>
-                  <div className="h-4 bg-slate-elevated rounded w-full mb-2" />
-                  <div className="h-2 bg-slate-elevated rounded" />
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <AgingChart buckets={aging?.buckets as any} />
-        )}
+        <AgingChart buckets={aging?.buckets as AgingBuckets} />
       </div>
 
       {/* Revenue Trend */}
-      {trendLoading ? (
-        <div className="bg-slate-card rounded-xl border border-slate-border p-6 animate-pulse">
-          <div className="h-6 bg-slate-elevated rounded w-1/4 mb-4" />
-          <div className="h-48 bg-slate-elevated rounded" />
-        </div>
-      ) : revenueTrend && revenueTrend.length > 0 ? (
+      {revenue_trend && revenue_trend.length > 0 && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Revenue Trend (12 Months)</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Revenue Trend (6 Months)</h3>
+            <Link href="/sales/analytics" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Analytics <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -385,10 +362,10 @@ export default function SalesDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {revenueTrend.slice(-6).map((item: any, i: number) => (
+                {revenue_trend.slice(-6).map((item, i: number) => (
                   <tr key={i} className="border-b border-slate-border/50 hover:bg-slate-elevated/30">
                     <td className="py-3 px-2 text-white">{item.period}</td>
-                    <td className="py-3 px-2 text-right font-mono text-white">{formatCurrency(item.revenue, dashboard?.currency || currency)}</td>
+                    <td className="py-3 px-2 text-right font-mono text-white">{formatCurrency(item.revenue, currency)}</td>
                     <td className="py-3 px-2 text-right font-mono text-teal-electric">{(item.payment_count ?? 0).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -396,13 +373,6 @@ export default function SalesDashboardPage() {
             </table>
           </div>
         </div>
-      ) : null}
-
-      {/* Period Info */}
-      {dashboard?.period && (
-        <p className="text-xs text-slate-muted text-center">
-          Data period: {dashboard.period.start} to {dashboard.period.end}
-        </p>
       )}
 
       {/* Sales quick lists */}
@@ -413,15 +383,15 @@ export default function SalesDashboardPage() {
               <FileText className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Invoices</h3>
             </div>
-            <Link href="/sales/invoices" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/sales/invoices" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentInvoices?.invoices?.length ? (
+          {recent?.invoices?.length ? (
             <div className="space-y-2">
-              {recentInvoices.invoices.map((inv: any) => (
+              {recent.invoices.map((inv) => (
                 <Link
                   key={inv.id}
                   href={`/sales/invoices/${inv.id}`}
-                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-slate-border"
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">
@@ -449,15 +419,15 @@ export default function SalesDashboardPage() {
               <CreditCard className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Payments</h3>
             </div>
-            <Link href="/sales/payments" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/sales/payments" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentPayments?.payments?.length ? (
+          {recent?.payments?.length ? (
             <div className="space-y-2">
-              {recentPayments.payments.map((pay: any) => (
+              {recent.payments.map((pay) => (
                 <Link
                   key={pay.id}
                   href={`/sales/payments/${pay.id}`}
-                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-slate-border"
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">
@@ -487,15 +457,15 @@ export default function SalesDashboardPage() {
               <Receipt className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Credit Notes</h3>
             </div>
-            <Link href="/sales/credit-notes" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/sales/credit-notes" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentCredits?.credit_notes?.length ? (
+          {recent?.credit_notes?.length ? (
             <div className="space-y-2">
-              {recentCredits.credit_notes.map((note: any) => (
+              {recent.credit_notes.map((note) => (
                 <Link
                   key={note.id}
                   href={`/sales/credit-notes/${note.id}`}
-                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-slate-border"
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">
@@ -529,33 +499,36 @@ export default function SalesDashboardPage() {
               <Link href="/purchasing/payments" className="text-teal-electric hover:text-teal-glow">Payments</Link>
             </div>
           </div>
-          {(recentBills?.bills?.length || recentPurchasePayments?.payments?.length) ? (
+          {(recent?.bills?.length || recent?.purchase_payments?.length) ? (
             <div className="space-y-3">
-              {recentBills?.bills?.slice(0, 3).map((bill: any) => (
-                <div key={`bill-${bill.id}`} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
+              {recent?.bills?.slice(0, 3).map((bill) => (
+                <Link
+                  key={`bill-${bill.id}`}
+                  href={`/purchasing/bills/${bill.id}`}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
+                >
                   <div>
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {bill.supplier_name || bill.supplier || 'Unknown'} • {formatDate(bill.posting_date)}
+                      {bill.supplier_name || 'Unknown'} • {formatDate(bill.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
                     <p className="text-white font-mono">{formatCurrency(bill.grand_total || 0, bill.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{bill.status}</p>
                   </div>
-                </div>
+                </Link>
               ))}
-              {recentPurchasePayments?.payments?.slice(0, 2).map((pay: any) => (
+              {recent?.purchase_payments?.slice(0, 2).map((pay) => (
                 <div key={`pay-${pay.id}`} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div>
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {(pay as any).supplier || (pay as any).customer || 'Unknown'} • {formatDate((pay as any).posting_date || (pay as any).payment_date)}
+                      {pay.supplier || 'Unknown'} • {formatDate(pay.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(pay.amount || 0, pay.currency || currency)}</p>
-                    <p className="text-slate-muted text-xs capitalize">{pay.status}</p>
+                    <p className="text-white font-mono">{formatCurrency(pay.amount || 0, currency)}</p>
                   </div>
                 </div>
               ))}

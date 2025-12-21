@@ -18,6 +18,9 @@ import {
 import { fetchApi } from '@/lib/api/core';
 import { PageHeader } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { LoadingState } from '@/components/insights/shared';
 
 type ImportStep = 'upload' | 'preview' | 'mapping' | 'importing' | 'complete';
 
@@ -60,6 +63,8 @@ const OPTIONAL_FIELDS = [
 ];
 
 export default function ImportPage() {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('contacts:write');
+
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
@@ -218,6 +223,18 @@ export default function ImportPage() {
     setResult(null);
     setError(null);
   };
+
+  if (authLoading) {
+    return <LoadingState />;
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <AccessDenied message="You need contacts:write permission to import contacts." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

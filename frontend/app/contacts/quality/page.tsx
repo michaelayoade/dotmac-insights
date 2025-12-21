@@ -66,6 +66,15 @@ const ISSUE_ICONS: Record<string, typeof Mail> = {
   invalid_email: XCircle,
 };
 
+// Map issue field names to quality_issue filter values
+const ISSUE_FILTER_MAP: Record<string, string> = {
+  email: 'missing_email',
+  phone: 'missing_phone',
+  address: 'missing_address',
+  company: 'missing_company',
+  invalid_email: 'invalid_email',
+};
+
 const TOOLTIP_STYLE = {
   contentStyle: {
     backgroundColor: CHART_COLORS.tooltip.bg,
@@ -89,7 +98,7 @@ export default function QualityPage() {
   const qualityScore = analytics?.quality_score || 100;
   const completeContacts = analytics?.complete_contacts || 0;
   const completenessRate = analytics?.completeness_rate || 100;
-  const qualityIssues = analytics?.issues || [];
+  const qualityIssues = useMemo(() => analytics?.issues || [], [analytics?.issues]);
 
   // Chart data
   const issuesByType = useMemo(() => {
@@ -116,10 +125,11 @@ export default function QualityPage() {
     return <LoadingState />;
   }
 
-  // View specific issue contacts
+  // View specific issue contacts - redirect to filtered contacts list
   if (viewIssue) {
     const issue = qualityIssues.find((i) => i.field === viewIssue);
     const Icon = ISSUE_ICONS[viewIssue] || AlertTriangle;
+    const filterParam = ISSUE_FILTER_MAP[viewIssue];
 
     if (issue) {
       return (
@@ -148,17 +158,24 @@ export default function QualityPage() {
           />
 
           <div className="bg-slate-card rounded-xl border border-slate-border p-6 text-center">
-            <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-            <h3 className="text-white font-semibold mb-2">Detailed View Coming Soon</h3>
+            <Icon className={cn(
+              'w-12 h-12 mx-auto mb-4',
+              issue.severity === 'high'
+                ? 'text-red-400'
+                : issue.severity === 'medium'
+                  ? 'text-amber-400'
+                  : 'text-slate-400'
+            )} />
+            <h3 className="text-white font-semibold mb-2">{issue.count} Contacts Affected</h3>
             <p className="text-slate-muted text-sm mb-4">
-              {issue.count} contacts have this issue. Use the filter on the All Contacts page to view them.
+              Click below to view and fix contacts with this data quality issue.
             </p>
             <Link
-              href={`/contacts/all`}
+              href={filterParam ? `/contacts?quality_issue=${filterParam}` : '/contacts'}
               className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-400 transition-colors"
             >
-              <Users className="w-4 h-4" />
-              Browse All Contacts
+              <Eye className="w-4 h-4" />
+              View Affected Contacts
             </Link>
           </div>
         </div>
@@ -284,11 +301,11 @@ export default function QualityPage() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={issuesByType.slice(0, 6)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} />
-                <XAxis type="number" stroke={CHART_COLORS.text} fontSize={12} />
+                <XAxis type="number" stroke={CHART_COLORS.axis} fontSize={12} />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  stroke={CHART_COLORS.text}
+                  stroke={CHART_COLORS.axis}
                   fontSize={10}
                   width={100}
                   tickFormatter={(value) => value.length > 15 ? value.substring(0, 15) + '...' : value}

@@ -1,21 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  usePurchasingDashboard,
-  usePurchasingSuppliers,
-  usePurchasingBills,
-  usePurchasingAging,
-  usePurchasingBySupplier,
-  usePurchasingPayments,
-  usePurchasingOrders,
-  usePurchasingDebitNotes,
-} from '@/hooks/useApi';
+import { useConsolidatedPurchasingDashboard } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import {
   DollarSign,
-  TrendingDown,
   Users,
   FileText,
   Calendar,
@@ -27,8 +16,10 @@ import {
   ArrowDownRight,
   ShoppingCart,
   ArrowLeftRight,
+  ArrowRight,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { PageHeader } from '@/components/ui';
 
 function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
   if (value === undefined || value === null) return '₦0';
@@ -67,11 +58,15 @@ interface MetricCardProps {
   icon: React.ElementType;
   colorClass?: string;
   loading?: boolean;
+  href?: string;
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading }: MetricCardProps) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
+function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href }: MetricCardProps) {
+  const content = (
+    <div className={cn(
+      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
+      href && 'hover:border-teal-electric/50 cursor-pointer'
+    )}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-slate-muted text-sm">{title}</p>
@@ -86,19 +81,33 @@ function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-tea
           <Icon className={cn('w-5 h-5', colorClass)} />
         </div>
       </div>
+      {href && (
+        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
+          <span>View details</span>
+          <ArrowRight className="w-3 h-3 ml-1" />
+        </div>
+      )}
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 interface StatusBadgeProps {
   status: string;
   count: number;
   total: number;
+  href?: string;
 }
 
-function StatusBadge({ status, count, total }: StatusBadgeProps) {
+function StatusBadge({ status, count, total, href }: StatusBadgeProps) {
   const statusColors: Record<string, string> = {
     open: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    submitted: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    unpaid: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
     paid: 'bg-green-500/20 text-green-400 border-green-500/30',
     overdue: 'bg-red-500/20 text-red-400 border-red-500/30',
     partially_paid: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -107,131 +116,125 @@ function StatusBadge({ status, count, total }: StatusBadgeProps) {
 
   const colorClass = statusColors[status.toLowerCase()] || statusColors.draft;
 
-  return (
-    <div className={cn('rounded-lg px-3 py-2 border', colorClass)}>
+  const content = (
+    <div className={cn(
+      'rounded-lg px-3 py-2 border transition-all',
+      colorClass,
+      href && 'hover:opacity-80 cursor-pointer'
+    )}>
       <p className="text-xs font-medium capitalize">{status.replace('_', ' ')}</p>
       <p className="text-lg font-bold">{count}</p>
       <p className="text-xs opacity-75">{formatCurrency(total)}</p>
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 export default function PurchasingDashboardPage() {
-  const router = useRouter();
   const currency = 'NGN';
-  const { data: dashboard, isLoading: dashboardLoading, error: dashboardError, mutate: refetchDashboard } = usePurchasingDashboard({ currency });
-  const { data: suppliers, isLoading: suppliersLoading, error: suppliersError, mutate: refetchSuppliers } = usePurchasingSuppliers({ limit: 1, offset: 0 });
-  const { data: bills, isLoading: billsLoading, error: billsError, mutate: refetchBills } = usePurchasingBills({ limit: 1, offset: 0, currency });
-  const { data: aging, isLoading: agingLoading, error: agingError, mutate: refetchAging } = usePurchasingAging({ currency });
-  const { data: bySupplier, isLoading: bySupplierLoading, error: bySupplierError, mutate: refetchBySupplier } = usePurchasingBySupplier({ limit: 5, currency });
-  const { data: recentBills, isLoading: recentBillsLoading, error: recentBillsError, mutate: refetchRecentBills } = usePurchasingBills({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
-  const { data: recentPayments, isLoading: recentPaymentsLoading, error: recentPaymentsError, mutate: refetchRecentPayments } = usePurchasingPayments({ limit: 5, currency });
-  const { data: recentOrders, isLoading: recentOrdersLoading, error: recentOrdersError, mutate: refetchRecentOrders } = usePurchasingOrders({ limit: 5, currency, sort_by: 'transaction_date', sort_dir: 'desc' });
-  const { data: recentDebitNotes, isLoading: recentDebitNotesLoading, error: recentDebitNotesError, mutate: refetchRecentDebitNotes } = usePurchasingDebitNotes({ limit: 5, currency, sort_by: 'posting_date', sort_dir: 'desc' });
+  const { data, isLoading, error, mutate } = useConsolidatedPurchasingDashboard(currency);
 
-  const swrStates = [
-    { error: dashboardError, isLoading: dashboardLoading, mutate: refetchDashboard },
-    { error: suppliersError, isLoading: suppliersLoading, mutate: refetchSuppliers },
-    { error: billsError, isLoading: billsLoading, mutate: refetchBills },
-    { error: agingError, isLoading: agingLoading, mutate: refetchAging },
-    { error: bySupplierError, isLoading: bySupplierLoading, mutate: refetchBySupplier },
-    { error: recentBillsError, isLoading: recentBillsLoading, mutate: refetchRecentBills },
-    { error: recentPaymentsError, isLoading: recentPaymentsLoading, mutate: refetchRecentPayments },
-    { error: recentOrdersError, isLoading: recentOrdersLoading, mutate: refetchRecentOrders },
-    { error: recentDebitNotesError, isLoading: recentDebitNotesLoading, mutate: refetchRecentDebitNotes },
-  ];
-
-  const firstError = swrStates.find((state) => state.error)?.error;
-  const isDataLoading = swrStates.some((state) => state.isLoading);
-  const retryAll = () => swrStates.forEach((state) => state.mutate?.());
-
-  if (isDataLoading) {
+  if (isLoading) {
     return <LoadingState />;
   }
 
-  const loading = dashboardLoading;
+  if (error) {
+    return (
+      <ErrorDisplay
+        message="Failed to load purchasing dashboard data."
+        error={error as Error}
+        onRetry={() => mutate()}
+      />
+    );
+  }
 
-  // Extract key metrics
-  const totalOutstanding = dashboard?.total_outstanding ?? 0;
-  const totalOverdue = dashboard?.total_overdue ?? 0;
-  const overduePercentage = dashboard?.overdue_percentage ?? 0;
-  const supplierCount = dashboard?.supplier_count ?? suppliers?.total ?? 0;
-  const statusBreakdown = dashboard?.status_breakdown ?? {};
-  const dueThisWeek = dashboard?.due_this_week ?? { count: 0, total: 0 };
-  const topSuppliers = dashboard?.top_suppliers ?? [];
+  if (!data) {
+    return <LoadingState />;
+  }
+
+  const { summary, aging, top_suppliers, recent } = data;
 
   // Aging buckets
-  const agingBuckets = aging
-    ? Object.entries(aging.aging || {}).map(([bucket, value]: any) => ({
-        bucket: bucket.replace('_', '-'),
-        total: value.total,
-        count: value.count,
-      }))
+  const agingBuckets = aging?.buckets
+    ? [
+        { bucket: 'Current', ...aging.buckets.current },
+        { bucket: '1-30', ...aging.buckets['1_30'] },
+        { bucket: '31-60', ...aging.buckets['31_60'] },
+        { bucket: '61-90', ...aging.buckets['61_90'] },
+        { bucket: 'Over 90', ...aging.buckets.over_90 },
+      ]
     : [];
-  const agingTotal = aging?.total_payable ?? 0;
-
-  // Top suppliers by spend
-  const topSuppliersList = bySupplier?.suppliers ?? [];
+  const agingTotal = agingBuckets.reduce((sum, b) => sum + (b.total || 0), 0);
 
   return (
     <div className="space-y-6">
-      {firstError && (
-        <ErrorDisplay
-          message="Failed to load purchasing dashboard data."
-          error={firstError as Error}
-          onRetry={retryAll}
-        />
-      )}
+      <PageHeader
+        title="Purchasing Dashboard"
+        subtitle="Accounts payable, supplier management, and procurement overview"
+        icon={ShoppingCart}
+        iconClassName="bg-orange-500/10 border border-orange-500/30"
+      />
+
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
+          value={formatCurrency(summary?.total_outstanding)}
           subtitle="All unpaid bills"
           icon={DollarSign}
           colorClass="text-blue-400"
-          loading={loading}
+          href="/purchasing/bills?status=unpaid"
         />
         <MetricCard
           title="Total Overdue"
-          value={formatCurrency(totalOverdue)}
-          subtitle={formatPercent(overduePercentage) + ' of outstanding'}
+          value={formatCurrency(summary?.total_overdue)}
+          subtitle={formatPercent(summary?.overdue_percentage) + ' of outstanding'}
           icon={AlertTriangle}
           colorClass="text-red-400"
-          loading={loading}
+          href="/purchasing/bills?status=overdue"
         />
         <MetricCard
           title="Due This Week"
-          value={formatCurrency(dueThisWeek.total)}
-          subtitle={`${dueThisWeek.count} bills due`}
+          value={formatCurrency(summary?.due_this_week?.total)}
+          subtitle={`${summary?.due_this_week?.count || 0} bills due`}
           icon={Calendar}
           colorClass="text-yellow-400"
-          loading={loading}
+          href="/purchasing/bills?due_this_week=true"
         />
         <MetricCard
           title="Active Suppliers"
-          value={formatNumber(supplierCount)}
+          value={formatNumber(summary?.supplier_count)}
           subtitle="With outstanding balance"
           icon={Users}
           colorClass="text-teal-electric"
-          loading={loading}
+          href="/purchasing/suppliers"
         />
       </div>
 
       {/* Status Breakdown */}
-      {Object.keys(statusBreakdown).length > 0 && (
+      {summary?.status_breakdown && Object.keys(summary.status_breakdown).length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">Bills by Status</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-teal-electric" />
+              <h2 className="text-lg font-semibold text-white">Bills by Status</h2>
+            </div>
+            <Link href="/purchasing/bills" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All Bills <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {Object.entries(statusBreakdown).map(([status, data]: [string, any]) => (
+            {Object.entries(summary.status_breakdown).map(([status, data]: [string, any]) => (
               <StatusBadge
                 key={status}
                 status={status}
                 count={data.count}
                 total={data.total}
+                href={`/purchasing/bills?status=${status}`}
               />
             ))}
           </div>
@@ -242,13 +245,18 @@ export default function PurchasingDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* AP Aging Summary */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">AP Aging Summary</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-teal-electric" />
+              <h2 className="text-lg font-semibold text-white">AP Aging Summary</h2>
+            </div>
+            <Link href="/purchasing/aging" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View Details <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
           {agingBuckets.length > 0 ? (
             <div className="space-y-3">
-              {agingBuckets.map((bucket: any, index: number) => {
+              {agingBuckets.map((bucket, index) => {
                 const percent = agingTotal > 0 ? (bucket.total / agingTotal) * 100 : 0;
                 const barColors = [
                   'bg-green-500',
@@ -258,7 +266,7 @@ export default function PurchasingDashboardPage() {
                   'bg-red-700',
                 ];
                 return (
-                  <div key={bucket.bucket || index}>
+                  <div key={bucket.bucket}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-muted">{bucket.bucket}</span>
                       <span className="text-white font-medium">{formatCurrency(bucket.total)}</span>
@@ -266,7 +274,7 @@ export default function PurchasingDashboardPage() {
                     <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
                       <div
                         className={cn('h-full rounded-full transition-all', barColors[index] || 'bg-slate-500')}
-                        style={{ width: `${percent}%` }}
+                        style={{ width: `${Math.max(percent, percent > 0 ? 2 : 0)}%` }}
                       />
                     </div>
                     <div className="flex justify-between text-xs mt-1">
@@ -290,14 +298,23 @@ export default function PurchasingDashboardPage() {
 
         {/* Top Suppliers */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Building2 className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">Top Suppliers by Outstanding</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-teal-electric" />
+              <h2 className="text-lg font-semibold text-white">Top Suppliers by Outstanding</h2>
+            </div>
+            <Link href="/purchasing/suppliers" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
+              View All <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          {topSuppliers.length > 0 ? (
+          {top_suppliers && top_suppliers.length > 0 ? (
             <div className="space-y-3">
-              {topSuppliers.slice(0, 5).map((supplier: any, index: number) => (
-                <div key={supplier.name || index} className="flex items-center justify-between">
+              {top_suppliers.map((supplier, index) => (
+                <Link
+                  key={supplier.name || index}
+                  href={`/purchasing/suppliers?search=${encodeURIComponent(supplier.name || '')}`}
+                  className="flex items-center justify-between hover:bg-slate-elevated/50 rounded-lg p-2 -mx-2 transition-colors"
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-elevated flex items-center justify-center text-sm font-medium text-white">
                       {index + 1}
@@ -308,24 +325,7 @@ export default function PurchasingDashboardPage() {
                     </div>
                   </div>
                   <p className="text-white font-medium">{formatCurrency(supplier.outstanding)}</p>
-                </div>
-              ))}
-            </div>
-          ) : topSuppliersList.length > 0 ? (
-            <div className="space-y-3">
-              {topSuppliersList.slice(0, 5).map((supplier: any, index: number) => (
-                <div key={supplier.supplier_name || index} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-elevated flex items-center justify-center text-sm font-medium text-white">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="text-white text-sm font-medium truncate max-w-[200px]">{supplier.supplier_name}</p>
-                      <p className="text-slate-muted text-xs">{supplier.bill_count} bills</p>
-                    </div>
-                  </div>
-                  <p className="text-white font-medium">{formatCurrency(supplier.total_amount)}</p>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -336,26 +336,26 @@ export default function PurchasingDashboardPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+        <Link href="/purchasing/bills" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <FileText className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(bills?.total)}</p>
+          <p className="text-2xl font-bold text-white">{formatNumber(summary?.total_bills)}</p>
           <p className="text-slate-muted text-sm">Total Bills</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+        </Link>
+        <Link href="/purchasing/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Users className="w-6 h-6 text-green-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(suppliers?.total)}</p>
+          <p className="text-2xl font-bold text-white">{formatNumber(summary?.supplier_count)}</p>
           <p className="text-slate-muted text-sm">Total Suppliers</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+        </Link>
+        <Link href="/purchasing/bills?status=paid" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <CreditCard className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(statusBreakdown?.paid?.count || 0)}</p>
+          <p className="text-2xl font-bold text-white">{formatNumber(summary?.status_breakdown?.paid?.count || 0)}</p>
           <p className="text-slate-muted text-sm">Paid Bills</p>
-        </div>
-        <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center">
+        </Link>
+        <Link href="/purchasing/bills?status=overdue" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <ArrowDownRight className="w-6 h-6 text-red-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(statusBreakdown?.overdue?.count || 0)}</p>
+          <p className="text-2xl font-bold text-white">{formatNumber(summary?.status_breakdown?.overdue?.count || 0)}</p>
           <p className="text-slate-muted text-sm">Overdue Bills</p>
-        </div>
+        </Link>
       </div>
 
       {/* Quick lists */}
@@ -366,27 +366,27 @@ export default function PurchasingDashboardPage() {
               <FileText className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Bills</h3>
             </div>
-            <Link href="/purchasing/bills" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/purchasing/bills" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentBills?.bills?.length ? (
+          {recent?.bills?.length ? (
             <div className="space-y-2">
-              {recentBills.bills.map((bill: any) => (
-                <div
+              {recent.bills.map((bill) => (
+                <Link
                   key={bill.id}
-                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 cursor-pointer hover:border-slate-border transition-colors"
-                  onClick={() => router.push(`/purchasing/bills/${bill.id}`)}
+                  href={`/purchasing/bills/${bill.id}`}
+                  className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {bill.supplier_name || bill.supplier || 'Unknown'} • {formatDate((bill as any).posting_date || (bill as any).invoice_date)}
+                      {bill.supplier_name || 'Unknown'} • {formatDate(bill.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency((bill as any).grand_total || (bill as any).total_amount || 0, bill.currency || currency)}</p>
+                    <p className="text-white font-mono">{formatCurrency(bill.grand_total, bill.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{bill.status}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -400,21 +400,20 @@ export default function PurchasingDashboardPage() {
               <CreditCard className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Payments</h3>
             </div>
-            <Link href="/purchasing/payments" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/purchasing/payments" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentPayments?.payments?.length ? (
+          {recent?.payments?.length ? (
             <div className="space-y-2">
-              {recentPayments.payments.map((pay: any) => (
+              {recent.payments.map((pay) => (
                 <div key={pay.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {(pay as any).supplier || (pay as any).party || 'Unknown'} • {formatDate((pay as any).posting_date || pay.payment_date)}
+                      {pay.supplier || 'Unknown'} • {formatDate(pay.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(pay.amount || 0, pay.currency || currency)}</p>
-                    <p className="text-slate-muted text-xs capitalize">{(pay as any).status || 'processed'}</p>
+                    <p className="text-white font-mono">{formatCurrency(pay.amount, currency)}</p>
                   </div>
                 </div>
               ))}
@@ -432,21 +431,20 @@ export default function PurchasingDashboardPage() {
               <ShoppingCart className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Orders</h3>
             </div>
-            <Link href="/purchasing/orders" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/purchasing/orders" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentOrders?.orders?.length ? (
+          {recent?.orders?.length ? (
             <div className="space-y-2">
-              {recentOrders.orders.map((order: any) => (
-                <div key={order.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
+              {recent.orders.map((order) => (
+                <div key={order.order_no} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">PO #{order.id}</p>
+                    <p className="text-white text-sm font-medium">PO {order.order_no}</p>
                     <p className="text-xs text-slate-muted">
-                      {order.supplier || 'Unknown'} • {formatDate((order as any).date || (order as any).transaction_date)}
+                      {order.supplier || 'Unknown'} • {formatDate(order.date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency((order as any).total || order.grand_total || 0, order.currency || currency)}</p>
-                    <p className="text-slate-muted text-xs capitalize">{order.status || 'draft'}</p>
+                    <p className="text-white font-mono">{formatCurrency(order.total, currency)}</p>
                   </div>
                 </div>
               ))}
@@ -462,21 +460,21 @@ export default function PurchasingDashboardPage() {
               <ArrowLeftRight className="w-4 h-4 text-teal-electric" />
               <h3 className="text-white font-semibold text-sm">Recent Debit Notes</h3>
             </div>
-            <Link href="/purchasing/debit-notes" className="text-teal-electric text-xs hover:text-teal-glow">Open list</Link>
+            <Link href="/purchasing/debit-notes" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
-          {recentDebitNotes?.debit_notes?.length ? (
+          {recent?.debit_notes?.length ? (
             <div className="space-y-2">
-              {recentDebitNotes.debit_notes.map((note: any) => (
+              {recent.debit_notes.map((note) => (
                 <div key={note.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
                     <p className="text-white text-sm font-medium">Debit #{note.id}</p>
                     <p className="text-xs text-slate-muted">
-                      {note.supplier || 'Unknown'} • {formatDate((note as any).posting_date || (note as any).issue_date)}
+                      {note.supplier || 'Unknown'} • {formatDate(note.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency((note as any).grand_total || (note as any).amount || 0, (note as any).currency || currency)}</p>
-                    <p className="text-slate-muted text-xs capitalize">{note.status || 'draft'}</p>
+                    <p className="text-white font-mono">{formatCurrency(note.grand_total, currency)}</p>
+                    <p className="text-slate-muted text-xs capitalize">{note.status}</p>
                   </div>
                 </div>
               ))}
