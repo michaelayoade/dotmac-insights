@@ -38,7 +38,11 @@ from app.models.document_lines import (
     BillLine,
     CreditNoteLine,
     DebitNoteLine,
+    SalesOrderItem,
+    QuotationItem,
+    PurchaseOrderItem,
 )
+from app.models.purchasing_order import PurchaseOrder, PurchaseOrderStatus
 from app.models.books_settings import DebitNote, DebitNoteStatus
 from app.models.customer_note import CustomerNote
 from app.models.administrator import Administrator
@@ -352,6 +356,11 @@ __all__ = [
     "BillLine",
     "CreditNoteLine",
     "DebitNoteLine",
+    "SalesOrderItem",
+    "QuotationItem",
+    "PurchaseOrderItem",
+    "PurchaseOrder",
+    "PurchaseOrderStatus",
     "DebitNote",
     "DebitNoteStatus",
     "CustomerNote",

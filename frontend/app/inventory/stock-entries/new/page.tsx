@@ -65,12 +65,12 @@ export default function InventoryStockEntryCreatePage() {
       <div className="flex items-center gap-3">
         <Link
           href="/inventory"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
-        <h1 className="text-xl font-semibold text-white">New Stock Entry</h1>
+        <h1 className="text-xl font-semibold text-foreground">New Stock Entry</h1>
       </div>
 
       {error && (
@@ -93,7 +93,7 @@ export default function InventoryStockEntryCreatePage() {
             <select
               value={entryType}
               onChange={(e) => setEntryType(e.target.value as typeof entryType)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value="material_receipt">Material Receipt</option>
               <option value="material_issue">Material Issue</option>
@@ -106,7 +106,7 @@ export default function InventoryStockEntryCreatePage() {
               type="date"
               value={postingDate}
               onChange={(e) => setPostingDate(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <div className="space-y-1">
@@ -114,7 +114,7 @@ export default function InventoryStockEntryCreatePage() {
             <input
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <div className="space-y-1 md:col-span-3">
@@ -122,18 +122,18 @@ export default function InventoryStockEntryCreatePage() {
             <input
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
         </div>
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-semibold">Lines</h3>
+            <h3 className="text-foreground font-semibold">Lines</h3>
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Plus className="w-4 h-4" />
               Add Line
@@ -146,7 +146,7 @@ export default function InventoryStockEntryCreatePage() {
                   placeholder="Item Code"
                   value={line.item_code}
                   onChange={(e) => updateLine(idx, 'item_code', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   required
                 />
                 <input
@@ -154,39 +154,39 @@ export default function InventoryStockEntryCreatePage() {
                   placeholder="Qty"
                   value={line.qty}
                   onChange={(e) => updateLine(idx, 'qty', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   required
                 />
                 <input
                   placeholder="UOM"
                   value={line.uom}
                   onChange={(e) => updateLine(idx, 'uom', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   required
                 />
                 <input
                   placeholder="Source Warehouse"
                   value={line.s_warehouse}
                   onChange={(e) => updateLine(idx, 's_warehouse', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
                 <input
                   placeholder="Target Warehouse"
                   value={line.t_warehouse}
                   onChange={(e) => updateLine(idx, 't_warehouse', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
                 <input
                   placeholder="Rate"
                   value={line.rate}
                   onChange={(e) => updateLine(idx, 'rate', e.target.value)}
-                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
                 <input
                   placeholder="Serial Nos (comma separated)"
                   value={line.serial_nos}
                   onChange={(e) => updateLine(idx, 'serial_nos', e.target.value)}
-                  className="md:col-span-3 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="md:col-span-3 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             ))}

@@ -79,12 +79,12 @@ export default function PaymentCreatePage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/payments"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to payments
           </Link>
-          <h1 className="text-xl font-semibold text-white">New Payment</h1>
+          <h1 className="text-xl font-semibold text-foreground">New Payment</h1>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default function PaymentCreatePage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-teal-electric" />
             Payment Details
           </h3>
@@ -108,7 +108,7 @@ export default function PaymentCreatePage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.customerId && 'border-red-500/60'
                 )}
               >
@@ -127,7 +127,7 @@ export default function PaymentCreatePage() {
                 type="number"
                 value={invoiceId}
                 onChange={(e) => setInvoiceId(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function PaymentCreatePage() {
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.amount && 'border-red-500/60'
                 )}
               />
@@ -151,7 +151,7 @@ export default function PaymentCreatePage() {
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="bank_transfer">Bank Transfer</option>
                 <option value="card">Card</option>
@@ -167,7 +167,7 @@ export default function PaymentCreatePage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
@@ -184,7 +184,7 @@ export default function PaymentCreatePage() {
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.paymentDate && 'border-red-500/60'
                 )}
               />
@@ -196,7 +196,7 @@ export default function PaymentCreatePage() {
                 type="text"
                 value={receiptNumber}
                 onChange={(e) => setReceiptNumber(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -206,7 +206,7 @@ export default function PaymentCreatePage() {
                 type="text"
                 value={transactionRef}
                 onChange={(e) => setTransactionRef(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -217,7 +217,7 @@ export default function PaymentCreatePage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="Optional notes"
             />
           </div>
@@ -225,13 +225,13 @@ export default function PaymentCreatePage() {
 
         <div className="flex items-center justify-between">
           <div className="text-sm text-slate-muted">
-            Total: <span className="text-white font-mono">{formatCurrency(amount, currency)}</span>
+            Total: <span className="text-foreground font-mono">{formatCurrency(amount, currency)}</span>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               disabled={submitting}
             >
               Cancel

@@ -34,7 +34,7 @@ export default function BooksApPaymentsPage() {
       header: 'Payment',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="font-mono text-white">{item.receipt_number || `#${item.id}`}</span>
+          <span className="font-mono text-foreground">{item.receipt_number || `#${item.id}`}</span>
           <span className="text-slate-muted text-sm">{formatDate(item.payment_date)}</span>
         </div>
       ),
@@ -55,7 +55,7 @@ export default function BooksApPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-white font-mono">{formatCurrency(item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatCurrency(item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">{item.payment_method || '—'}</div>
         </div>
       ),
@@ -76,7 +76,7 @@ export default function BooksApPaymentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AP Payments</h1>
+          <h1 className="text-2xl font-bold text-foreground">AP Payments</h1>
           <p className="text-slate-muted text-sm">Vendor payments</p>
         </div>
         <Link
@@ -90,7 +90,7 @@ export default function BooksApPaymentsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input

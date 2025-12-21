@@ -31,7 +31,7 @@ export default function LandedCostVouchersPage() {
       key: 'total_taxes_and_charges',
       header: 'Total',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.total_taxes_and_charges ?? item.total ?? 0}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.total_taxes_and_charges ?? item.total ?? 0}</span>,
     },
     {
       key: 'actions',
@@ -64,7 +64,7 @@ export default function LandedCostVouchersPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Boxes className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-2xl font-bold text-white">Landed Cost Vouchers</h1>
+          <h1 className="text-2xl font-bold text-foreground">Landed Cost Vouchers</h1>
         </div>
       </div>
 

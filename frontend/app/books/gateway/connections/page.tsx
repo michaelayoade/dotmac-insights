@@ -82,7 +82,7 @@ export default function OpenBankingConnectionsPage() {
       header: 'Bank Account',
       render: (item: any) => (
         <div>
-          <div className="text-white font-medium">{item.bank_name}</div>
+          <div className="text-foreground font-medium">{item.bank_name}</div>
           <div className="text-xs text-slate-muted font-mono">{item.account_number}</div>
         </div>
       ),
@@ -105,7 +105,7 @@ export default function OpenBankingConnectionsPage() {
         <div className="text-right">
           {item.balance != null ? (
             <>
-              <span className="font-mono text-white">{formatCurrency(item.balance, item.currency)}</span>
+              <span className="font-mono text-foreground">{formatCurrency(item.balance, item.currency)}</span>
               {item.balance_updated_at && (
                 <div className="text-xs text-slate-muted">Updated {formatDate(item.balance_updated_at)}</div>
               )}
@@ -168,11 +168,11 @@ export default function OpenBankingConnectionsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Building2 className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Open Banking Connections</h1>
+          <h1 className="text-xl font-semibold text-foreground">Open Banking Connections</h1>
         </div>
         <button
           onClick={() => mutate()}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-muted transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -237,7 +237,7 @@ export default function OpenBankingConnectionsPage() {
         return connections.length ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{connections.length}</div>
+            <div className="text-2xl font-bold text-foreground">{connections.length}</div>
             <div className="text-sm text-slate-muted">Total Connections</div>
           </div>
           <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
@@ -266,9 +266,9 @@ export default function OpenBankingConnectionsPage() {
       {showUnlinkModal && selectedConnection && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowUnlinkModal(false)}>
           <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 border border-slate-border" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-4">Unlink Account</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Unlink Account</h3>
             <p className="text-slate-muted mb-4">
-              Are you sure you want to unlink <span className="text-white">{selectedConnection.bank_name}</span> account ending in <span className="font-mono text-teal-electric">{selectedConnection.account_number?.slice(-4)}</span>?
+              Are you sure you want to unlink <span className="text-foreground">{selectedConnection.bank_name}</span> account ending in <span className="font-mono text-teal-electric">{selectedConnection.account_number?.slice(-4)}</span>?
             </p>
             <p className="text-sm text-yellow-400 mb-4">
               This will revoke access to transaction data from this account.
@@ -276,13 +276,13 @@ export default function OpenBankingConnectionsPage() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowUnlinkModal(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleUnlink(selectedConnection.id)}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+                className="px-4 py-2 rounded-lg bg-red-500 text-foreground font-semibold hover:bg-red-600 transition-colors"
               >
                 Unlink
               </button>
@@ -330,12 +330,12 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
       <div className="bg-slate-800 rounded-xl p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col border border-slate-border" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">{connection.bank_name} Transactions</h3>
+            <h3 className="text-lg font-semibold text-foreground">{connection.bank_name} Transactions</h3>
             <p className="text-sm text-slate-muted font-mono">{connection.account_number}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-700 text-slate-muted hover:text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-700 text-slate-muted hover:text-foreground transition-colors"
           >
             <XCircle className="w-5 h-5" />
           </button>
@@ -355,7 +355,7 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
               {transactions.map((tx: any, idx: number) => (
                 <div key={tx.transaction_id || idx} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-white truncate">{tx.narration}</div>
+                    <div className="text-sm text-foreground truncate">{tx.narration}</div>
                     <div className="text-xs text-slate-muted">
                       {new Date(tx.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                       {tx.category && <span className="ml-2 text-purple-400">{tx.category}</span>}

@@ -88,7 +88,7 @@ export default function EInvoicePage() {
       key: 'invoice_number',
       header: 'Invoice #',
       render: (item: any) => (
-        <span className="text-white font-medium font-mono">{item.invoice_number}</span>
+        <span className="text-foreground font-medium font-mono">{item.invoice_number}</span>
       ),
     },
     {
@@ -103,7 +103,7 @@ export default function EInvoicePage() {
     {
       key: 'customer_name',
       header: 'Customer',
-      render: (item: any) => <span className="text-white">{item.customer_name}</span>,
+      render: (item: any) => <span className="text-foreground">{item.customer_name}</span>,
     },
     {
       key: 'customer_tin',
@@ -119,7 +119,7 @@ export default function EInvoicePage() {
       header: 'Total',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total, item.currency || 'NGN')}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total, item.currency || 'NGN')}</span>
       ),
     },
     {
@@ -210,14 +210,14 @@ export default function EInvoicePage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">E-Invoice (FIRS BIS 3.0)</h1>
+            <h1 className="text-xl font-semibold text-foreground">E-Invoice (FIRS BIS 3.0)</h1>
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function EInvoicePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total E-Invoices</p>
-          <p className="text-2xl font-semibold text-white font-mono mt-1">{stats.total}</p>
+          <p className="text-2xl font-semibold text-foreground font-mono mt-1">{stats.total}</p>
         </div>
         <div className="bg-slate-card border border-emerald-500/30 rounded-xl p-4">
           <p className="text-slate-muted text-sm">Validated</p>
@@ -284,7 +284,7 @@ export default function EInvoicePage() {
         {(search || statusFilter) && (
           <button
             onClick={() => setFilters((prev) => ({ ...prev, search: '', statusFilter: '', page: 1 }))}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Reset
           </button>
@@ -311,13 +311,13 @@ export default function EInvoicePage() {
 
       {/* E-Invoice Requirements */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-teal-electric" />
           E-Invoice Requirements
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h4 className="text-white text-sm font-medium mb-2">Required Fields</h4>
+            <h4 className="text-foreground text-sm font-medium mb-2">Required Fields</h4>
             <ul className="text-sm text-slate-muted space-y-1">
               <li>• Seller TIN (your company)</li>
               <li>• Buyer TIN (if registered taxpayer)</li>
@@ -328,7 +328,7 @@ export default function EInvoicePage() {
             </ul>
           </div>
           <div>
-            <h4 className="text-white text-sm font-medium mb-2">Status Flow</h4>
+            <h4 className="text-foreground text-sm font-medium mb-2">Status Flow</h4>
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <span className="w-20 text-slate-muted">Draft</span>

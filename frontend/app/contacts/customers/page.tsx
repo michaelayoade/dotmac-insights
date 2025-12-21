@@ -104,7 +104,7 @@ export default function CustomersPage() {
             <Building2 className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
-            <p className="text-white font-medium">{item.name}</p>
+            <p className="text-foreground font-medium">{item.name}</p>
             {item.company_name && item.company_name !== item.name && (
               <p className="text-slate-muted text-xs">{item.company_name}</p>
             )}
@@ -152,7 +152,7 @@ export default function CustomersPage() {
       header: 'Location',
       render: (item: UnifiedContact) => (
         item.city || item.state ? (
-          <span className="flex items-center gap-1 text-sm text-slate-300">
+          <span className="flex items-center gap-1 text-sm text-foreground-secondary">
             <MapPin className="w-3 h-3 text-slate-muted" />
             {[item.city, item.state].filter(Boolean).join(', ')}
           </span>
@@ -164,7 +164,7 @@ export default function CustomersPage() {
       header: 'MRR',
       align: 'right' as const,
       render: (item: UnifiedContact) => (
-        <span className="font-mono text-white">{formatCurrency(item.mrr)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.mrr)}</span>
       ),
     },
     {
@@ -212,7 +212,7 @@ export default function CustomersPage() {
           canWrite ? (
             <Link
               href="/contacts/new?type=customer"
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-foreground rounded-lg hover:bg-emerald-400 transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               Add Customer
@@ -229,7 +229,7 @@ export default function CustomersPage() {
               <Users className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{total}</p>
+              <p className="text-2xl font-bold text-foreground">{total}</p>
               <p className="text-xs text-slate-muted">Total Customers</p>
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function CustomersPage() {
               <TrendingUp className="w-5 h-5 text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{activeCount}</p>
+              <p className="text-2xl font-bold text-foreground">{activeCount}</p>
               <p className="text-xs text-slate-muted">Active</p>
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function CustomersPage() {
               <DollarSign className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalMrr)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrr)}</p>
               <p className="text-xs text-slate-muted">Total MRR</p>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function CustomersPage() {
               <AlertCircle className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{withOutstanding}</p>
+              <p className="text-2xl font-bold text-foreground">{withOutstanding}</p>
               <p className="text-xs text-slate-muted">With Balance</p>
             </div>
           </div>
@@ -273,7 +273,7 @@ export default function CustomersPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-emerald-400" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 min-w-[200px] max-w-md relative">
@@ -283,13 +283,13 @@ export default function CustomersPage() {
               placeholder="Search customers..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
           </form>
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
@@ -299,7 +299,7 @@ export default function CustomersPage() {
           <select
             value={categoryFilter}
             onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           >
             <option value="">All Categories</option>
             <option value="residential">Residential</option>
@@ -314,7 +314,7 @@ export default function CustomersPage() {
               onChange={(e) => { setHasOutstanding(e.target.checked ? true : undefined); setPage(1); }}
               className="w-4 h-4 rounded border-slate-border bg-slate-elevated text-emerald-500"
             />
-            <span className="text-sm text-slate-300">With Outstanding</span>
+            <span className="text-sm text-foreground-secondary">With Outstanding</span>
           </label>
           {(search || statusFilter || categoryFilter || hasOutstanding) && (
             <button
@@ -326,7 +326,7 @@ export default function CustomersPage() {
                 setHasOutstanding(undefined);
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

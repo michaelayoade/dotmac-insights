@@ -32,13 +32,13 @@ function getEntryIcon(entryType: string) {
 function getStatusBadge(docstatus: number | undefined) {
   switch (docstatus) {
     case 0:
-      return { label: "Draft", className: "bg-slate-500/20 text-slate-300" };
+      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary" };
     case 1:
       return { label: "Submitted", className: "bg-emerald-500/20 text-emerald-300" };
     case 2:
       return { label: "Cancelled", className: "bg-red-500/20 text-red-300" };
     default:
-      return { label: "Unknown", className: "bg-slate-500/20 text-slate-300" };
+      return { label: "Unknown", className: "bg-slate-500/20 text-foreground-secondary" };
   }
 }
 
@@ -57,7 +57,7 @@ export default function StockEntriesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Stock Entries</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Stock Entries</h1>
           <p className="text-slate-muted text-sm">View and manage stock transactions</p>
         </div>
         <Link
@@ -74,7 +74,7 @@ export default function StockEntriesPage() {
           <select
             value={entryType}
             onChange={(e) => setEntryType(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             {ENTRY_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
@@ -85,7 +85,7 @@ export default function StockEntriesPage() {
           <select
             value={docstatus ?? ""}
             onChange={(e) => setDocstatus(e.target.value === "" ? undefined : Number(e.target.value))}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.label} value={opt.value ?? ""}>
@@ -151,7 +151,7 @@ export default function StockEntriesPage() {
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-slate-muted" />
-                          <span className="text-white">{entry.stock_entry_type}</span>
+                          <span className="text-foreground">{entry.stock_entry_type}</span>
                         </div>
                       </td>
                       <td className="py-3">
@@ -170,7 +170,7 @@ export default function StockEntriesPage() {
                       <td className="py-3 text-slate-muted">
                         {entry.to_warehouse || "-"}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(entry.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3">

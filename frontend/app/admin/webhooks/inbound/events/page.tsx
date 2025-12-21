@@ -31,7 +31,7 @@ export default function InboundEventsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inbound Webhook Events</h1>
+          <h1 className="text-2xl font-bold text-foreground">Inbound Webhook Events</h1>
           <p className="text-slate-muted">Audit inbound events and replay failures.</p>
         </div>
         <div className="flex gap-2">
@@ -39,11 +39,11 @@ export default function InboundEventsPage() {
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
             placeholder="Filter by provider"
-            className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:border-teal-electric focus:outline-none"
+            className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none"
           />
           <button
             onClick={() => mutate()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -70,7 +70,7 @@ export default function InboundEventsPage() {
           <tbody className="divide-y divide-slate-border">
             {events.map((event: any) => (
               <tr key={event.id}>
-                <td className="px-4 py-3 text-white">{event.id}</td>
+                <td className="px-4 py-3 text-foreground">{event.id}</td>
                 <td className="px-4 py-3 text-slate-muted">{event.provider}</td>
                 <td className="px-4 py-3 text-slate-muted">{event.event_type}</td>
                 <td className="px-4 py-3">
@@ -92,7 +92,7 @@ export default function InboundEventsPage() {
                   <div className="flex items-center justify-end gap-2">
                     <Link
                       href={`/admin/webhooks/inbound/events/${event.id}`}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white text-xs hover:bg-slate-border"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground text-xs hover:bg-slate-border"
                     >
                       Details
                     </Link>

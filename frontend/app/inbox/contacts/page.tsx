@@ -249,11 +249,11 @@ export default function ContactsPage() {
                 <tr key={contact.id} className="border-b border-slate-border/50 hover:bg-slate-elevated/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-foreground font-semibold">
                         {contact.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-white font-medium">{contact.name}</p>
+                        <p className="text-foreground font-medium">{contact.name}</p>
                         <p className="text-sm text-slate-muted">{contact.email || contact.phone || '-'}</p>
                       </div>
                     </div>
@@ -285,7 +285,7 @@ export default function ContactsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-white font-medium">{contact.total_conversations || 0}</span>
+                    <span className="text-foreground font-medium">{contact.total_conversations || 0}</span>
                   </td>
                   <td className="px-4 py-3 text-slate-muted text-sm hidden md:table-cell">
                     {formatTimeAgo(contact.last_contact_at)}
@@ -293,14 +293,14 @@ export default function ContactsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Send message"
                         aria-label={`Send message to ${contact.name}`}
                       >
                         <MessageSquare className="w-4 h-4" />
                       </button>
                       <button
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Edit contact"
                         aria-label={`Edit ${contact.name}`}
                       >

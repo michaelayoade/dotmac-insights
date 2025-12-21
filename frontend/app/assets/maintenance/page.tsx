@@ -33,7 +33,7 @@ export default function MaintenanceDuePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Maintenance Due</h1>
+          <h1 className="text-2xl font-bold text-foreground">Maintenance Due</h1>
           <p className="text-sm text-slate-muted mt-1">
             Assets requiring or currently in maintenance
           </p>
@@ -42,7 +42,7 @@ export default function MaintenanceDuePage() {
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
@@ -62,7 +62,7 @@ export default function MaintenanceDuePage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-muted">Warranty Expiring</p>
-              <p className="text-lg font-bold text-white">Check Alerts</p>
+              <p className="text-lg font-bold text-foreground">Check Alerts</p>
             </div>
             <ArrowRight className="w-5 h-5 text-slate-muted" />
           </div>
@@ -78,7 +78,7 @@ export default function MaintenanceDuePage() {
       ) : maintenanceAssets.length === 0 ? (
         <div className="bg-slate-card border border-slate-border rounded-xl p-12 text-center">
           <CheckCircle className="w-8 h-8 mx-auto mb-3 text-emerald-400" />
-          <p className="font-medium text-white">No Maintenance Due</p>
+          <p className="font-medium text-foreground">No Maintenance Due</p>
           <p className="text-sm text-slate-muted mt-1">All assets are in good standing</p>
         </div>
       ) : (
@@ -101,7 +101,7 @@ export default function MaintenanceDuePage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/assets/list/${asset.id}`}
-                        className="font-medium text-white hover:text-indigo-300 transition-colors"
+                        className="font-medium text-foreground hover:text-indigo-300 transition-colors"
                       >
                         {asset.asset_name}
                       </Link>
@@ -120,7 +120,7 @@ export default function MaintenanceDuePage() {
                         Maintenance Due
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-medium text-white">
+                    <td className="px-4 py-3 text-right text-sm font-medium text-foreground">
                       {formatCurrency(asset.asset_value ?? 0)}
                     </td>
                     <td className="px-4 py-3">
@@ -150,7 +150,7 @@ export default function MaintenanceDuePage() {
 
       {/* Quick Links */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4">Related</h3>
+        <h3 className="font-semibold text-foreground mb-4">Related</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/assets/maintenance/warranty"

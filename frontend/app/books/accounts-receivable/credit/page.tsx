@@ -35,7 +35,7 @@ export default function CreditManagementPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AR Credit Management</h1>
+          <h1 className="text-2xl font-bold text-foreground">AR Credit Management</h1>
           <p className="text-slate-muted text-sm">Manage credit limits and holds for customers.</p>
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function CreditManagementPage() {
           <div className="flex gap-2">
             <button
               onClick={() => onToggleHold(true)}
-              className="px-3 py-2 rounded-lg border border-slate-border text-white text-sm hover:bg-slate-elevated"
+              className="px-3 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
             >
               <Lock className="w-4 h-4 inline" /> Place Hold
             </button>

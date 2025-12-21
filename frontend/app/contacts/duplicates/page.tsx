@@ -144,7 +144,7 @@ export default function DuplicatesPage() {
               <Copy className="w-5 h-5 text-orange-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalGroups}</p>
+              <p className="text-2xl font-bold text-foreground">{totalGroups}</p>
               <p className="text-xs text-slate-muted">Duplicate Groups</p>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function DuplicatesPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {totalDuplicates - totalGroups}
               </p>
               <p className="text-xs text-slate-muted">To Remove</p>
@@ -179,7 +179,7 @@ export default function DuplicatesPage() {
               <Merge className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {Object.keys(selectedPrimary).length}
               </p>
               <p className="text-xs text-slate-muted">Ready to Merge</p>
@@ -191,7 +191,7 @@ export default function DuplicatesPage() {
       {/* Field Selection */}
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
         <div className="flex items-center gap-4">
-          <span className="text-white text-sm font-medium">Find duplicates by:</span>
+          <span className="text-foreground text-sm font-medium">Find duplicates by:</span>
           <div className="flex gap-2">
             <button
               onClick={() => setField('email')}
@@ -199,7 +199,7 @@ export default function DuplicatesPage() {
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 field === 'email'
                   ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                  : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                  : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
               )}
             >
               <Mail className="w-4 h-4" />
@@ -211,7 +211,7 @@ export default function DuplicatesPage() {
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 field === 'phone'
                   ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                  : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                  : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
               )}
             >
               <Phone className="w-4 h-4" />
@@ -223,7 +223,7 @@ export default function DuplicatesPage() {
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 field === 'name'
                   ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                  : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                  : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
               )}
             >
               <User className="w-4 h-4" />
@@ -256,7 +256,7 @@ export default function DuplicatesPage() {
       {duplicateGroups.length === 0 && !isLoading && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-8 text-center">
           <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-          <h3 className="text-white font-semibold mb-2">No Duplicates Found</h3>
+          <h3 className="text-foreground font-semibold mb-2">No Duplicates Found</h3>
           <p className="text-slate-muted text-sm">
             No duplicate contacts were found based on {field}. Your data looks clean!
           </p>
@@ -313,7 +313,7 @@ function DuplicateGroupCard({
             )}
           </div>
           <div className="text-left">
-            <p className="text-white font-medium">{group.value || '(Empty)'}</p>
+            <p className="text-foreground font-medium">{group.value || '(Empty)'}</p>
             <p className="text-sm text-slate-muted">{group.count} duplicate contacts</p>
           </div>
         </div>
@@ -344,7 +344,7 @@ function DuplicateGroupCard({
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                 canWrite && selectedPrimary
-                  ? 'bg-emerald-500 text-white hover:bg-emerald-400'
+                  ? 'bg-emerald-500 text-foreground hover:bg-emerald-400'
                   : 'bg-slate-elevated text-slate-muted cursor-not-allowed'
               )}
             >
@@ -378,10 +378,10 @@ function DuplicateGroupCard({
                           : 'border-slate-muted'
                       )}
                     >
-                      {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                      {isSelected && <CheckCircle className="w-3 h-3 text-foreground" />}
                     </div>
                     <div>
-                      <p className="text-white font-medium">
+                      <p className="text-foreground font-medium">
                         {contact?.name || `Contact #${contactId}`}
                       </p>
                       <div className="flex items-center gap-3 text-xs text-slate-muted">
@@ -401,7 +401,7 @@ function DuplicateGroupCard({
                         e.stopPropagation();
                         window.open(`/contacts/${contactId}`, '_blank');
                       }}
-                      className="p-2 text-slate-muted hover:text-white transition-colors"
+                      className="p-2 text-slate-muted hover:text-foreground transition-colors"
                       title="View contact"
                     >
                       <Eye className="w-4 h-4" />

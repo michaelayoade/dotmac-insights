@@ -50,7 +50,7 @@ export default function SalesPaymentDetailPage() {
         <p className="text-red-400">Failed to load payment</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -74,14 +74,14 @@ export default function SalesPaymentDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/payments"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to payments
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Payment</p>
-            <h1 className="text-xl font-semibold text-white">{data.receipt_number || `Payment #${data.id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{data.receipt_number || `Payment #${data.id}`}</h1>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function SalesPaymentDetailPage() {
         {summary.map((row) => (
           <div key={row.label}>
             <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className="text-white font-semibold break-all">{row.value}</p>
+            <p className="text-foreground font-semibold break-all">{row.value}</p>
           </div>
         ))}
       </div>
@@ -99,12 +99,12 @@ export default function SalesPaymentDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Customer</h3>
+            <h3 className="text-foreground font-semibold">Customer</h3>
           </div>
           {data.customer ? (
             <div className="text-sm text-slate-200 space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-white">{data.customer.name || `Customer ${data.customer.id}`}</span>
+                <span className="font-semibold text-foreground">{data.customer.name || `Customer ${data.customer.id}`}</span>
                 {data.customer.id && (
                   <span className="text-xs text-slate-muted font-mono">#{data.customer.id}</span>
                 )}
@@ -130,7 +130,7 @@ export default function SalesPaymentDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Notes</h3>
+            <h3 className="text-foreground font-semibold">Notes</h3>
           </div>
           <p className="text-slate-muted text-sm">
             {data.notes || 'No notes provided'}
@@ -148,7 +148,7 @@ export default function SalesPaymentDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Allocations</h3>
+            <h3 className="text-foreground font-semibold">Allocations</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -173,7 +173,7 @@ export default function SalesPaymentDetailPage() {
                     <td className="px-2 py-2 text-right text-slate-200">
                       {formatCurrency(ref.outstanding_amount ?? 0, data.currency || 'NGN')}
                     </td>
-                    <td className="px-2 py-2 text-right text-white font-mono">
+                    <td className="px-2 py-2 text-right text-foreground font-mono">
                       {formatCurrency(ref.allocated_amount ?? 0, data.currency || 'NGN')}
                     </td>
                     <td className="px-2 py-2 text-slate-200">{formatDate(ref.due_date)}</td>

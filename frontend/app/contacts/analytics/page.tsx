@@ -48,7 +48,7 @@ function StatCard({ title, value, subtitle, icon: Icon, className }: StatCardPro
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
         </div>
         <div className="p-3 bg-slate-elevated rounded-lg">
@@ -153,7 +153,7 @@ export default function ContactsAnalyticsPage() {
 
       {/* Status Distribution */}
       <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Status Distribution</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">Status Distribution</h3>
         {statusTotal > 0 ? (
           <div className="space-y-3">
             {[
@@ -166,7 +166,7 @@ export default function ContactsAnalyticsPage() {
                 <div key={item.label} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-muted">{item.label}</span>
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {formatNumber(item.value)} ({formatPercent(pct)})
                     </span>
                   </div>
@@ -184,18 +184,18 @@ export default function ContactsAnalyticsPage() {
 
       {/* Funnel */}
       <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Funnel (30d)</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">Funnel (30d)</h3>
         {(funnelCounts.leads_created || funnelCounts.prospects_qualified || funnelCounts.customers_converted) ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-elevated rounded-lg p-4">
               <p className="text-slate-muted text-sm">Leads Created</p>
-              <p className="text-2xl font-bold text-white mt-1">
+              <p className="text-2xl font-bold text-foreground mt-1">
                 {formatNumber(funnelCounts.leads_created || 0)}
               </p>
             </div>
             <div className="bg-slate-elevated rounded-lg p-4">
               <p className="text-slate-muted text-sm">Prospects Qualified</p>
-              <p className="text-2xl font-bold text-white mt-1">
+              <p className="text-2xl font-bold text-foreground mt-1">
                 {formatNumber(funnelCounts.prospects_qualified || 0)}
               </p>
               <p className="text-xs text-slate-muted mt-2">
@@ -204,7 +204,7 @@ export default function ContactsAnalyticsPage() {
             </div>
             <div className="bg-slate-elevated rounded-lg p-4">
               <p className="text-slate-muted text-sm">Customers Converted</p>
-              <p className="text-2xl font-bold text-white mt-1">
+              <p className="text-2xl font-bold text-foreground mt-1">
                 {formatNumber(funnelCounts.customers_converted || 0)}
               </p>
               <p className="text-xs text-slate-muted mt-2">

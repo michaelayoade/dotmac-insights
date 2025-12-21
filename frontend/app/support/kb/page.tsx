@@ -75,7 +75,7 @@ export default function SupportKnowledgeBasePage() {
           <BookOpen className="w-5 h-5 text-blue-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>
+          <h1 className="text-2xl font-bold text-foreground">Knowledge Base</h1>
           <p className="text-slate-muted text-sm">Categories, articles, and documentation</p>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function SupportKnowledgeBasePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
@@ -113,14 +113,14 @@ export default function SupportKnowledgeBasePage() {
               placeholder="Search articles..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           {/* Category */}
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
             {(cats ?? []).map((c: any) => (
@@ -131,7 +131,7 @@ export default function SupportKnowledgeBasePage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All statuses</option>
             <option value="published">Published</option>
@@ -142,7 +142,7 @@ export default function SupportKnowledgeBasePage() {
           <select
             value={visibilityFilter}
             onChange={(e) => setVisibilityFilter(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All visibility</option>
             <option value="public">Public</option>
@@ -159,7 +159,7 @@ export default function SupportKnowledgeBasePage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-white font-semibold">Categories</h3>
+              <h3 className="text-foreground font-semibold">Categories</h3>
             </div>
             <span className="text-xs text-slate-muted">{(cats ?? []).length} categories</span>
           </div>
@@ -178,7 +178,7 @@ export default function SupportKnowledgeBasePage() {
                       : 'border-slate-border hover:border-slate-border/80 hover:bg-slate-elevated/50'
                   )}
                 >
-                  <p className={cn('font-semibold', categoryId === String(cat.id) ? 'text-teal-electric' : 'text-white')}>
+                  <p className={cn('font-semibold', categoryId === String(cat.id) ? 'text-teal-electric' : 'text-foreground')}>
                     {cat.name}
                   </p>
                   <p className="text-slate-muted text-xs line-clamp-1">{cat.description || 'No description'}</p>
@@ -193,7 +193,7 @@ export default function SupportKnowledgeBasePage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-blue-400" />
-              <h3 className="text-white font-semibold">Articles</h3>
+              <h3 className="text-foreground font-semibold">Articles</h3>
             </div>
             <span className="text-xs text-slate-muted">{(articlesList ?? []).length} articles</span>
           </div>
@@ -211,7 +211,7 @@ export default function SupportKnowledgeBasePage() {
                 <div key={article.id} className="border border-slate-border rounded-lg p-4 hover:border-slate-border/80 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold">{article.title}</p>
+                      <p className="text-foreground font-semibold">{article.title}</p>
                       <p className="text-slate-muted text-sm line-clamp-2 mt-1">{article.excerpt || article.content || 'No content preview'}</p>
                     </div>
                     <div className="flex flex-col gap-1 items-end">

@@ -61,13 +61,13 @@ export default function GatewayBanksPage() {
       )}
       <div className="flex items-center gap-2">
         <Landmark className="w-5 h-5 text-teal-electric" />
-        <h1 className="text-xl font-semibold text-white">Banks & NUBAN Lookup</h1>
+        <h1 className="text-xl font-semibold text-foreground">Banks & NUBAN Lookup</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Account Resolution */}
         <div className="bg-slate-800/50 border border-slate-border rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Search className="w-5 h-5 text-teal-electric" />
             Account Name Lookup
           </h2>
@@ -120,15 +120,15 @@ export default function GatewayBanksPage() {
                 <div className="space-y-2 text-sm">
                   <div>
                     <span className="text-slate-muted">Account Name:</span>
-                    <span className="text-white ml-2 font-medium">{resolveResult.account_name}</span>
+                    <span className="text-foreground ml-2 font-medium">{resolveResult.account_name}</span>
                   </div>
                   <div>
                     <span className="text-slate-muted">Account Number:</span>
-                    <span className="text-white ml-2 font-mono">{resolveResult.account_number}</span>
+                    <span className="text-foreground ml-2 font-mono">{resolveResult.account_number}</span>
                   </div>
                   <div>
                     <span className="text-slate-muted">Bank:</span>
-                    <span className="text-white ml-2">{selectedBankInfo?.name || resolveResult.bank_code}</span>
+                    <span className="text-foreground ml-2">{selectedBankInfo?.name || resolveResult.bank_code}</span>
                   </div>
                 </div>
               </div>
@@ -147,7 +147,7 @@ export default function GatewayBanksPage() {
 
         {/* Bank Directory */}
         <div className="bg-slate-800/50 border border-slate-border rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-teal-electric" />
             Bank Directory
           </h2>
@@ -182,7 +182,7 @@ export default function GatewayBanksPage() {
                     }`}
                   >
                     <div>
-                      <div className={`text-sm font-medium ${selectedBank === bank.code ? 'text-teal-electric' : 'text-white'}`}>
+                      <div className={`text-sm font-medium ${selectedBank === bank.code ? 'text-teal-electric' : 'text-foreground'}`}>
                         {bank.name}
                       </div>
                       <div className="text-xs text-slate-muted">
@@ -209,19 +209,19 @@ export default function GatewayBanksPage() {
       {/* Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-white mb-2">What is NUBAN?</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-2">What is NUBAN?</h3>
           <p className="text-xs text-slate-muted">
             Nigeria Uniform Bank Account Number (NUBAN) is a 10-digit unique bank account identification system used by all Nigerian banks.
           </p>
         </div>
         <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-white mb-2">Account Verification</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-2">Account Verification</h3>
           <p className="text-xs text-slate-muted">
             Verify account details before making transfers to ensure funds are sent to the correct recipient.
           </p>
         </div>
         <div className="bg-slate-800/50 border border-slate-border rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-white mb-2">Supported Banks</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-2">Supported Banks</h3>
           <p className="text-xs text-slate-muted">
             We support all CBN-licensed commercial banks, microfinance banks, and mobile money operators in Nigeria.
           </p>

@@ -14,7 +14,7 @@ const STATUS_COLORS: Record<CorporateCardStatus, { bg: string; text: string; lab
 };
 
 const TXN_STATUS_COLORS: Record<CardTransactionStatus, { bg: string; text: string }> = {
-  imported: { bg: 'bg-slate-500/15', text: 'text-slate-300' },
+  imported: { bg: 'bg-slate-500/15', text: 'text-foreground-secondary' },
   matched: { bg: 'bg-emerald-500/15', text: 'text-emerald-300' },
   unmatched: { bg: 'bg-amber-500/15', text: 'text-amber-300' },
   disputed: { bg: 'bg-red-500/15', text: 'text-red-300' },
@@ -30,7 +30,7 @@ function InfoItem({ icon: Icon, label, value }: { icon: React.ElementType; label
       </div>
       <div>
         <p className="text-slate-muted text-xs">{label}</p>
-        <p className="text-white font-medium">{value || '-'}</p>
+        <p className="text-foreground font-medium">{value || '-'}</p>
       </div>
     </div>
   );
@@ -73,12 +73,12 @@ export default function CardDetailPage() {
   if (!card) {
     return (
       <div className="space-y-4">
-        <Link href="/expenses/cards" className="inline-flex items-center gap-2 text-slate-muted hover:text-white transition-colors">
+        <Link href="/expenses/cards" className="inline-flex items-center gap-2 text-slate-muted hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Back to cards
         </Link>
         <div className="text-center py-12 bg-slate-card border border-slate-border rounded-2xl">
-          <p className="text-white font-semibold">Card not found</p>
+          <p className="text-foreground font-semibold">Card not found</p>
         </div>
       </div>
     );
@@ -89,7 +89,7 @@ export default function CardDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back link */}
-      <Link href="/expenses/cards" className="inline-flex items-center gap-2 text-slate-muted hover:text-white transition-colors">
+      <Link href="/expenses/cards" className="inline-flex items-center gap-2 text-slate-muted hover:text-foreground transition-colors">
         <ArrowLeft className="w-4 h-4" />
         Back to cards
       </Link>
@@ -103,7 +103,7 @@ export default function CardDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white">{card.card_name}</h1>
+                <h1 className="text-2xl font-bold text-foreground">{card.card_name}</h1>
                 <span className={cn('inline-flex items-center px-3 py-1 rounded-full text-sm font-medium', statusStyle.bg, statusStyle.text)}>
                   {statusStyle.label}
                 </span>
@@ -149,7 +149,7 @@ export default function CardDetailPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Limits */}
         <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Limits</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Limits</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoItem icon={Wallet} label="Credit Limit" value={`${card.credit_limit.toLocaleString()} ${card.currency}`} />
             <InfoItem icon={Wallet} label="Single Transaction" value={card.single_transaction_limit ? `${card.single_transaction_limit.toLocaleString()} ${card.currency}` : 'No limit'} />
@@ -160,7 +160,7 @@ export default function CardDetailPage() {
 
         {/* Details */}
         <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Details</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoItem icon={CreditCard} label="Card Type" value={card.card_type} />
             <InfoItem icon={Building2} label="Bank / Provider" value={card.bank_name || card.card_provider} />
@@ -175,7 +175,7 @@ export default function CardDetailPage() {
       {/* Recent transactions */}
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Recent Transactions</h2>
+          <h2 className="text-lg font-semibold text-foreground">Recent Transactions</h2>
           <Link
             href={`/expenses/transactions?card_id=${cardId}`}
             className="text-violet-300 text-sm hover:text-violet-200 transition-colors"
@@ -202,12 +202,12 @@ export default function CardDetailPage() {
                       <Receipt className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-white text-sm font-medium">{txn.merchant_name || 'Unknown merchant'}</p>
+                      <p className="text-foreground text-sm font-medium">{txn.merchant_name || 'Unknown merchant'}</p>
                       <p className="text-slate-muted text-xs">{txn.transaction_date}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-semibold">{txn.amount.toLocaleString()} {txn.currency}</p>
+                    <p className="text-foreground font-semibold">{txn.amount.toLocaleString()} {txn.currency}</p>
                     <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs', statusStyle.bg, statusStyle.text)}>
                       {txn.status}
                     </span>

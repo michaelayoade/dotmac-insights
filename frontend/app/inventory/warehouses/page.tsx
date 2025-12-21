@@ -21,7 +21,7 @@ export default function InventoryWarehousesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Warehouses</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Warehouses</h1>
           <p className="text-slate-muted text-sm">Manage storage locations</p>
         </div>
         <Link
@@ -42,7 +42,7 @@ export default function InventoryWarehousesPage() {
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors",
                 isGroupFilter === true
                   ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated"
+                  : "border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               )}
             >
               <FolderTree className="w-4 h-4" />
@@ -54,7 +54,7 @@ export default function InventoryWarehousesPage() {
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors",
                 isGroupFilter === false
                   ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated"
+                  : "border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               )}
             >
               <Warehouse className="w-4 h-4" />
@@ -66,7 +66,7 @@ export default function InventoryWarehousesPage() {
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
                 includeDisabled
                   ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated"
+                  : "border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               )}
             >
               Include Disabled
@@ -125,7 +125,7 @@ export default function InventoryWarehousesPage() {
                         ) : (
                           <Warehouse className="w-4 h-4 text-slate-muted" />
                         )}
-                        <span className="text-white font-medium">{wh.warehouse_name}</span>
+                        <span className="text-foreground font-medium">{wh.warehouse_name}</span>
                       </div>
                     </td>
                     <td className="py-3 text-slate-muted">{wh.parent_warehouse || "-"}</td>

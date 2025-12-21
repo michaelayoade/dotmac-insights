@@ -8,6 +8,7 @@ import {
   useHrTrainingResults,
   useHrTrainingEventMutations,
   useHrTrainingResultMutations,
+  useEmployees,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { GraduationCap, MapPin, Users, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
@@ -36,7 +37,7 @@ function StatusBadge({ status, type = 'event' }: { status: string; type?: 'event
       failed: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
       'in-progress': { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
     };
-    const config = resultConfig[normalizedStatus] || { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <AlertCircle className="w-3 h-3" /> };
+    const config = resultConfig[normalizedStatus] || { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <AlertCircle className="w-3 h-3" /> };
     return (
       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', config.bg, config.border, config.text)}>
         {config.icon}
@@ -75,7 +76,7 @@ function StatCard({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
       <div>
         <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
       </div>
       <div className="p-2 rounded-lg bg-slate-elevated">
         <Icon className={cn('w-5 h-5', tone)} />
@@ -115,8 +116,8 @@ export default function HrTrainingPage() {
     offset: resultOffset,
     employee_id: undefined,
   });
-  // TODO: Add useHrEmployees hook when employees API is available
-  const employees = { data: [], total: 0 };
+  const { data: employeesData } = useEmployees({ limit: 500 });
+  const employees = { data: employeesData?.items || [], total: employeesData?.total ?? 0 };
   const eventMutations = useHrTrainingEventMutations();
   const resultMutations = useHrTrainingResultMutations();
 
@@ -208,7 +209,7 @@ export default function HrTrainingPage() {
                 setStatus(e.target.value);
                 setEventOffset(0);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             >
               <option value="">All statuses</option>
               <option value="scheduled">Scheduled</option>
@@ -223,13 +224,13 @@ export default function HrTrainingPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Enroll Participants */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <p className="text-white font-semibold">Enroll Participants</p>
+          <p className="text-foreground font-semibold">Enroll Participants</p>
           <div>
             <FormLabel required>Training Event</FormLabel>
             <select
               value={enrollEventId}
               onChange={(e) => setEnrollEventId(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             >
               <option value="">Select event...</option>
               {(eventList.items || []).filter((e: any) => e.status !== 'completed' && e.status !== 'cancelled').map((event: any) => (
@@ -281,14 +282,14 @@ export default function HrTrainingPage() {
 
           {/* Mark Complete Section */}
           <div className="pt-3 border-t border-slate-border space-y-3">
-            <p className="text-white font-medium text-sm">Mark Event Complete</p>
+            <p className="text-foreground font-medium text-sm">Mark Event Complete</p>
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <FormLabel required>Select Event</FormLabel>
                 <select
                   value={completeEventId}
                   onChange={(e) => setCompleteEventId(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 >
                   <option value="">Select event...</option>
                   {(eventList.items || []).filter((e: any) => e.status === 'scheduled').map((event: any) => (
@@ -311,14 +312,14 @@ export default function HrTrainingPage() {
 
         {/* Record Training Result */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <p className="text-white font-semibold">Record Training Result</p>
+          <p className="text-foreground font-semibold">Record Training Result</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <FormLabel required>Employee</FormLabel>
               <select
                 value={resultForm.employeeId}
                 onChange={(e) => setResultForm({ ...resultForm, employeeId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select employee...</option>
                 {(employeeList.items || []).map((emp: any) => (
@@ -333,7 +334,7 @@ export default function HrTrainingPage() {
               <select
                 value={resultForm.trainingEventId}
                 onChange={(e) => setResultForm({ ...resultForm, trainingEventId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select event...</option>
                 {(eventList.items || []).map((event: any) => (
@@ -350,7 +351,7 @@ export default function HrTrainingPage() {
               <select
                 value={resultForm.result}
                 onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="passed">Passed</option>
                 <option value="failed">Failed</option>
@@ -366,7 +367,7 @@ export default function HrTrainingPage() {
                 max="100"
                 value={resultForm.score}
                 onChange={(e) => setResultForm({ ...resultForm, score: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               />
             </div>
           </div>
@@ -389,11 +390,11 @@ export default function HrTrainingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <GraduationCap className="w-4 h-4 text-amber-400" />
-          <h3 className="text-white font-semibold">Training Programs</h3>
+          <h3 className="text-foreground font-semibold">Training Programs</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'program_name', header: 'Program Name', render: (item: any) => <span className="text-white font-medium">{item.program_name}</span> },
+            { key: 'program_name', header: 'Program Name', render: (item: any) => <span className="text-foreground font-medium">{item.program_name}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             { key: 'description', header: 'Description', render: (item: any) => <span className="text-slate-muted text-sm truncate max-w-[200px] block">{item.description || '—'}</span> },
           ]}
@@ -408,11 +409,11 @@ export default function HrTrainingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-violet-400" />
-          <h3 className="text-white font-semibold">Training Events</h3>
+          <h3 className="text-foreground font-semibold">Training Events</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'training_event_name', header: 'Event Name', render: (item: any) => <span className="text-white font-medium">{item.training_event_name}</span> },
+            { key: 'training_event_name', header: 'Event Name', render: (item: any) => <span className="text-foreground font-medium">{item.training_event_name}</span> },
             { key: 'training_program', header: 'Program', render: (item: any) => <span className="text-slate-muted text-sm">{item.training_program}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             {
@@ -430,7 +431,7 @@ export default function HrTrainingPage() {
               header: 'Participants',
               align: 'right' as const,
               render: (item: any) => (
-                <span className="inline-flex items-center gap-1 text-white">
+                <span className="inline-flex items-center gap-1 text-foreground">
                   <Users className="w-3 h-3 text-slate-muted" />
                   {item.employees?.length ?? 0}
                 </span>
@@ -465,11 +466,11 @@ export default function HrTrainingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Training Results</h3>
+          <h3 className="text-foreground font-semibold">Training Results</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
             { key: 'training_event', header: 'Training Event', render: (item: any) => <span className="text-slate-muted text-sm">{item.training_event}</span> },
             { key: 'result', header: 'Result', render: (item: any) => <StatusBadge status={item.result} type="result" /> },
             {

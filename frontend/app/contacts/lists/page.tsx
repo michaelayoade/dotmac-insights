@@ -135,7 +135,7 @@ export default function ListsPage() {
         actions={
           canWrite ? (
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-foreground rounded-lg hover:bg-indigo-400 transition-colors"
               onClick={() => setShowCreateModal(true)}
             >
               <Plus className="w-4 h-4" />
@@ -153,7 +153,7 @@ export default function ListsPage() {
               <ListChecks className="w-5 h-5 text-indigo-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalLists}</p>
+              <p className="text-2xl font-bold text-foreground">{totalLists}</p>
               <p className="text-xs text-slate-muted">Total Lists</p>
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function ListsPage() {
               <Star className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{favoriteLists}</p>
+              <p className="text-2xl font-bold text-foreground">{favoriteLists}</p>
               <p className="text-xs text-slate-muted">Favorites</p>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function ListsPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
               <p className="text-xs text-slate-muted">Total Contacts</p>
             </div>
           </div>
@@ -186,7 +186,7 @@ export default function ListsPage() {
               <Clock className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalLists > 0 ? Math.round(totalContacts / totalLists) : 0}</p>
+              <p className="text-2xl font-bold text-foreground">{totalLists > 0 ? Math.round(totalContacts / totalLists) : 0}</p>
               <p className="text-xs text-slate-muted">Avg per List</p>
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function ListsPage() {
               'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
               filter === 'all'
                 ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
             )}
           >
             All Lists ({totalLists})
@@ -213,7 +213,7 @@ export default function ListsPage() {
               'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
               filter === 'favorites'
                 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
             )}
           >
             <Star className="w-4 h-4" />
@@ -259,7 +259,7 @@ export default function ListsPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-white font-semibold">{list.name}</h3>
+                      <h3 className="text-foreground font-semibold">{list.name}</h3>
                       {list.is_favorite && (
                         <Star className="w-4 h-4 text-amber-400" fill="currentColor" />
                       )}
@@ -321,7 +321,7 @@ export default function ListsPage() {
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1 text-slate-muted">
                   <Users className="w-4 h-4" />
-                  <span><span className="text-white font-medium">{list.contact_count}</span> contacts</span>
+                  <span><span className="text-foreground font-medium">{list.contact_count}</span> contacts</span>
                 </div>
                 <div className="flex items-center gap-1 text-slate-muted">
                   <Calendar className="w-4 h-4" />
@@ -350,7 +350,7 @@ export default function ListsPage() {
       {lists.length === 0 && !isLoading && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-8 text-center">
           <Bookmark className="w-12 h-12 text-slate-muted mx-auto mb-4" />
-          <h3 className="text-white font-semibold mb-2">No lists found</h3>
+          <h3 className="text-foreground font-semibold mb-2">No lists found</h3>
           <p className="text-slate-muted text-sm mb-4">
             {filter === 'favorites'
               ? "You haven't favorited any lists yet"
@@ -358,7 +358,7 @@ export default function ListsPage() {
           </p>
           {canWrite && (
             <button
-              className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-400 transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 bg-indigo-500 text-foreground rounded-lg hover:bg-indigo-400 transition-colors inline-flex items-center gap-2"
               onClick={() => setShowCreateModal(true)}
             >
               <Plus className="w-4 h-4" />
@@ -370,7 +370,7 @@ export default function ListsPage() {
 
       {/* Quick Links */}
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
-        <h3 className="text-white font-semibold mb-3">Quick Filters</h3>
+        <h3 className="text-foreground font-semibold mb-3">Quick Filters</h3>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/contacts?type=customer"
@@ -489,7 +489,7 @@ function ListModal({
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             {list ? 'Edit List' : 'Create New List'}
           </h3>
           <button
@@ -508,7 +508,7 @@ function ListModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">
               Name *
             </label>
             <input
@@ -516,12 +516,12 @@ function ListModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., VIP Customers"
-              className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">
               Description
             </label>
             <input
@@ -529,13 +529,13 @@ function ListModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
-              className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Color
               </label>
               <div className="flex items-center gap-2">
@@ -556,20 +556,20 @@ function ListModal({
                   onChange={(e) => setIsShared(e.target.checked)}
                   className="w-5 h-5 rounded border-slate-600 bg-slate-900/50 text-indigo-500 focus:ring-indigo-500"
                 />
-                <span className="text-slate-300">Share with team</span>
+                <span className="text-foreground-secondary">Share with team</span>
               </label>
             </div>
           </div>
 
           <div className="border-t border-slate-700 pt-4">
-            <h4 className="text-white font-medium mb-3">Filter Criteria</h4>
+            <h4 className="text-foreground font-medium mb-3">Filter Criteria</h4>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Contact Type</label>
                 <select
                   value={contactType}
                   onChange={(e) => setContactType(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">Any</option>
                   <option value="lead">Lead</option>
@@ -583,7 +583,7 @@ function ListModal({
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">Any</option>
                   <option value="residential">Residential</option>
@@ -597,7 +597,7 @@ function ListModal({
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">Any</option>
                   <option value="active">Active</option>
@@ -612,7 +612,7 @@ function ListModal({
                   value={territory}
                   onChange={(e) => setTerritory(e.target.value)}
                   placeholder="e.g., Lagos"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
               <div className="col-span-2">
@@ -622,7 +622,7 @@ function ListModal({
                   value={tag}
                   onChange={(e) => setTag(e.target.value)}
                   placeholder="e.g., vip"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -632,14 +632,14 @@ function ListModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+              className="px-4 py-2 rounded-lg border border-slate-600 text-foreground-secondary hover:bg-slate-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 rounded-lg bg-indigo-500 text-foreground hover:bg-indigo-400 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? (
                 <>

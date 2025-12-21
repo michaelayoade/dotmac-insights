@@ -97,7 +97,7 @@ function MetricCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-3xl font-bold text-white mt-1">{value}</p>
+          <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
           {trendLabel && (
             <div className="flex items-center gap-1 mt-2">
               {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
@@ -120,7 +120,7 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl p-5">
       <div className="mb-4">
-        <h3 className="text-white font-semibold">{title}</h3>
+        <h3 className="text-foreground font-semibold">{title}</h3>
         {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
       </div>
       {children}
@@ -159,14 +159,14 @@ function WorkflowStep({
             'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
             status === 'active' && 'bg-amber-500 text-slate-900',
             status === 'pending' && 'bg-slate-elevated text-slate-muted',
-            status === 'complete' && 'bg-emerald-500 text-white'
+            status === 'complete' && 'bg-emerald-500 text-foreground'
           )}
         >
           {status === 'complete' ? <CheckCircle2 className="w-4 h-4" /> : step}
         </div>
         <Icon className={cn('w-5 h-5', status === 'active' ? 'text-amber-400' : status === 'complete' ? 'text-emerald-400' : 'text-slate-muted')} />
       </div>
-      <h4 className="text-white font-medium text-sm">{title}</h4>
+      <h4 className="text-foreground font-medium text-sm">{title}</h4>
       <p className="text-slate-muted text-xs mt-1">{description}</p>
       <ArrowRight className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted opacity-0 group-hover:opacity-100 transition-opacity" />
     </Link>
@@ -210,7 +210,7 @@ function ActionItem({
             )}
           />
         </div>
-        <span className="text-sm text-white">{title}</span>
+        <span className="text-sm text-foreground">{title}</span>
       </div>
       <div className="flex items-center gap-2">
         <span
@@ -338,7 +338,7 @@ export default function HrOverviewPage() {
         <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-white">Overview</h2>
+              <h2 className="text-xl font-bold text-foreground">Overview</h2>
               <p className="text-slate-muted text-sm mt-1">People operations at a glance</p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -396,7 +396,7 @@ export default function HrOverviewPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-white font-semibold">People Workflow</h3>
+            <h3 className="text-foreground font-semibold">People Workflow</h3>
             <p className="text-slate-muted text-sm">Employee lifecycle management</p>
           </div>
         </div>
@@ -447,7 +447,7 @@ export default function HrOverviewPage() {
       {/* Pending Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-3">Pending Actions</h3>
+          <h3 className="text-foreground font-semibold mb-3">Pending Actions</h3>
           <div className="space-y-2">
             <ActionItem
               icon={CalendarClock}
@@ -482,12 +482,12 @@ export default function HrOverviewPage() {
 
         {/* Payroll Summary */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-1">Payroll (Last 30 Days)</h3>
+          <h3 className="text-foreground font-semibold mb-1">Payroll (Last 30 Days)</h3>
           <p className="text-slate-muted text-sm mb-4">{payroll30d.slip_count || 0} salary slips processed</p>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
               <span className="text-slate-muted text-sm">Gross Pay</span>
-              <span className="text-white font-mono font-medium">
+              <span className="text-foreground font-mono font-medium">
                 {formatCurrency(payroll30d.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })}
               </span>
             </div>
@@ -628,7 +628,7 @@ export default function HrOverviewPage() {
                     }}
                   />
                 </div>
-                <span className="text-2xl font-bold text-white mt-2">{stage.value}</span>
+                <span className="text-2xl font-bold text-foreground mt-2">{stage.value}</span>
                 <span className="text-xs text-slate-muted text-center">{stage.name}</span>
               </div>
             );
@@ -645,19 +645,19 @@ export default function HrOverviewPage() {
       {/* Quick Stats Footer */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{leaveTypeList.total}</p>
+          <p className="text-3xl font-bold text-foreground">{leaveTypeList.total}</p>
           <p className="text-slate-muted text-sm">Leave Types</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{shiftAssignmentList.total}</p>
+          <p className="text-3xl font-bold text-foreground">{shiftAssignmentList.total}</p>
           <p className="text-slate-muted text-sm">Shift Assignments</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{payrollEntryList.total}</p>
+          <p className="text-3xl font-bold text-foreground">{payrollEntryList.total}</p>
           <p className="text-slate-muted text-sm">Payroll Runs</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-white">{attendanceStatus.present || attendanceStatus.Present || 0}</p>
+          <p className="text-3xl font-bold text-foreground">{attendanceStatus.present || attendanceStatus.Present || 0}</p>
           <p className="text-slate-muted text-sm">Present Today</p>
         </div>
       </div>

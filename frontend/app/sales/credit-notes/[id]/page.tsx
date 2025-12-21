@@ -33,7 +33,7 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
     expired: 'bg-red-500/20 text-red-400 border-red-500/30',
   };
-  const color = colors[status?.toLowerCase()] || 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+  const color = colors[status?.toLowerCase()] || 'bg-slate-500/20 text-foreground-secondary border-slate-500/30';
   return <span className={cn('px-2 py-1 rounded-full text-xs font-medium border', color)}>{status || 'Unknown'}</span>;
 }
 
@@ -64,7 +64,7 @@ export default function CreditNoteDetailPage() {
         <p className="text-red-400">Failed to load credit note</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -79,7 +79,7 @@ export default function CreditNoteDetailPage() {
     <div className="space-y-6">
       <button
         onClick={() => router.back()}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
       >
         <ArrowLeft className="w-4 h-4" />
         Back
@@ -87,7 +87,7 @@ export default function CreditNoteDetailPage() {
       <div className="flex items-center gap-2">
         <Link
           href="/sales/credit-notes"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <Receipt className="w-4 h-4" />
           Back to list
@@ -101,18 +101,18 @@ export default function CreditNoteDetailPage() {
         </Link>
       </div>
       <div className="flex items-center gap-2 text-sm text-slate-muted">
-        <Link href="/sales" className="hover:text-white">Sales</Link>
+        <Link href="/sales" className="hover:text-foreground">Sales</Link>
         <span>/</span>
-        <Link href="/sales/credit-notes" className="hover:text-white">Credit Notes</Link>
+        <Link href="/sales/credit-notes" className="hover:text-foreground">Credit Notes</Link>
         <span>/</span>
-        <span className="text-white">{data.credit_number || `#${data.id}`}</span>
+        <span className="text-foreground">{data.credit_number || `#${data.id}`}</span>
       </div>
 
       <div className="bg-slate-card rounded-xl border border-slate-border p-6">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-slate-muted text-sm">Credit Note</p>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               {data.credit_number || `#${data.id}`}
               <StatusBadge status={data.status} />
             </h2>
@@ -120,19 +120,19 @@ export default function CreditNoteDetailPage() {
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-muted">Amount</p>
-            <p className="text-3xl font-bold text-white">-{formatCurrency(data.amount, currentCurrency)}</p>
+            <p className="text-3xl font-bold text-foreground">-{formatCurrency(data.amount, currentCurrency)}</p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-muted">
-          <div>Issue Date: <span className="text-white">{formatDate(data.issue_date)}</span></div>
-          <div>Applied: <span className="text-white">{formatDate(data.applied_date)}</span></div>
+          <div>Issue Date: <span className="text-foreground">{formatDate(data.issue_date)}</span></div>
+          <div>Applied: <span className="text-foreground">{formatDate(data.applied_date)}</span></div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-muted">
           <div>
             <p className="text-xs uppercase mb-1">Customer</p>
-            <p className="text-white">
+            <p className="text-foreground">
               {data.customer_name || 'Unknown'}
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function CreditNoteDetailPage() {
 
         <div className="mt-4 text-sm text-slate-muted">
           <p className="text-xs uppercase mb-1">Description</p>
-          <p className="text-white">{data.description || 'No description'}</p>
+          <p className="text-foreground">{data.description || 'No description'}</p>
         </div>
       </div>
     </div>

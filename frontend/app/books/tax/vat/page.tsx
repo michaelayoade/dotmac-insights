@@ -70,13 +70,13 @@ export default function VATPage() {
         </span>
       ),
     },
-    { key: 'party_name', header: 'Party', render: (item: any) => <span className="text-white">{item.party_name}</span> },
+    { key: 'party_name', header: 'Party', render: (item: any) => <span className="text-foreground">{item.party_name}</span> },
     { key: 'party_tin', header: 'TIN', render: (item: any) => <span className="text-slate-muted font-mono text-xs">{item.party_tin || '-'}</span> },
     {
       key: 'gross_amount',
       header: 'Gross',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.gross_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_amount, 'NGN')}</span>,
     },
     {
       key: 'vat_amount',
@@ -117,20 +117,20 @@ export default function VATPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Percent className="w-5 h-5 text-blue-400" />
-            <h1 className="text-xl font-semibold text-white">Value Added Tax (VAT)</h1>
+            <h1 className="text-xl font-semibold text-foreground">Value Added Tax (VAT)</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowInputForm(!showInputForm)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <TrendingDown className="w-4 h-4 text-emerald-400" />
             Record Input
@@ -274,11 +274,11 @@ function VATOutputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
   return (
     <form onSubmit={handleSubmit} className="bg-slate-card border border-blue-500/30 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-blue-400" />
           Record Output VAT
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-white text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -318,7 +318,7 @@ function VATOutputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
       <button
         type="button"
         onClick={() => setShowMore(!showMore)}
-        className="flex items-center gap-2 text-sm text-slate-muted hover:text-white"
+        className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options
@@ -418,11 +418,11 @@ function VATInputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promise
   return (
     <form onSubmit={handleSubmit} className="bg-slate-card border border-emerald-500/30 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <TrendingDown className="w-4 h-4 text-emerald-400" />
           Record Input VAT
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-white text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -473,7 +473,7 @@ function VATInputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promise
       <button
         type="button"
         onClick={() => setShowMore(!showMore)}
-        className="flex items-center gap-2 text-sm text-slate-muted hover:text-white"
+        className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options

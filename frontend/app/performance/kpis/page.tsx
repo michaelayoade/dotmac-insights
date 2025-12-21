@@ -41,7 +41,7 @@ export default function KPIsPage() {
       render: (item: KPIDefinition) => (
         <div>
           <p className="text-violet-400 font-mono text-sm">{item.code}</p>
-          <p className="text-white font-medium">{item.name}</p>
+          <p className="text-foreground font-medium">{item.name}</p>
         </div>
       ),
     },
@@ -62,7 +62,7 @@ export default function KPIsPage() {
       header: 'Scoring',
       render: (item: KPIDefinition) => (
         <div className="text-sm">
-          <p className="text-slate-300 capitalize">{item.scoring_method}</p>
+          <p className="text-foreground-secondary capitalize">{item.scoring_method}</p>
           <p className="text-slate-500 text-xs">
             {item.higher_is_better ? 'Higher is better' : 'Lower is better'}
           </p>
@@ -74,7 +74,7 @@ export default function KPIsPage() {
       header: 'Target',
       align: 'right' as const,
       render: (item: KPIDefinition) => (
-        <span className="text-white font-mono">
+        <span className="text-foreground font-mono">
           {item.target_value !== null ? item.target_value : '-'}
         </span>
       ),
@@ -94,7 +94,7 @@ export default function KPIsPage() {
       render: (item: KPIDefinition) => (
         <Link
           href={`/performance/kpis/${item.id}`}
-          className="text-slate-400 hover:text-white p-1"
+          className="text-slate-400 hover:text-foreground p-1"
         >
           <ChevronRight className="w-4 h-4" />
         </Link>
@@ -118,14 +118,14 @@ export default function KPIsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">KPI Definitions</h1>
+          <h1 className="text-xl font-semibold text-foreground">KPI Definitions</h1>
           <p className="text-sm text-slate-400 mt-1">
             Key Performance Indicators and scoring rules
           </p>
         </div>
         <Link
           href="/performance/kpis/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New KPI
@@ -144,7 +144,7 @@ export default function KPIsPage() {
               setSearch(e.target.value);
               setOffset(0);
             }}
-            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
           />
         </div>
         <select
@@ -153,7 +153,7 @@ export default function KPIsPage() {
             setDataSourceFilter(e.target.value as DataSource | '');
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Sources</option>
           <option value="ticketing">Ticketing</option>
@@ -183,7 +183,7 @@ export default function KPIsPage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors',
                 dataSourceFilter === item.source
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-white'
+                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-foreground'
               )}
             >
               <item.icon className="w-3.5 h-3.5" />

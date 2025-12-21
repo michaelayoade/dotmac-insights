@@ -52,7 +52,7 @@ export function CSVPreview({ csvData, mapping, onMappingChange, previewCount = 5
     <div className="space-y-6">
       {/* Column Mapping */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-medium mb-4">Column Mapping</h3>
+        <h3 className="text-foreground font-medium mb-4">Column Mapping</h3>
         <p className="text-slate-muted text-sm mb-4">
           Map your CSV columns to transaction fields. Found {rowCount} rows.
         </p>
@@ -195,7 +195,7 @@ export function CSVPreview({ csvData, mapping, onMappingChange, previewCount = 5
       {validation.valid && previewTransactions.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
           <div className="p-4 border-b border-slate-border">
-            <h3 className="text-white font-medium">Preview</h3>
+            <h3 className="text-foreground font-medium">Preview</h3>
             <p className="text-slate-muted text-sm">
               Showing first {previewTransactions.length} of {rowCount} transactions
             </p>
@@ -215,7 +215,7 @@ export function CSVPreview({ csvData, mapping, onMappingChange, previewCount = 5
               <tbody>
                 {previewTransactions.map((tx, index) => (
                   <tr key={index} className="border-t border-slate-border">
-                    <td className="px-4 py-3 text-white">{tx.transaction_date}</td>
+                    <td className="px-4 py-3 text-foreground">{tx.transaction_date}</td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(
@@ -248,7 +248,7 @@ export function CSVPreview({ csvData, mapping, onMappingChange, previewCount = 5
 
       {/* Raw Data Preview */}
       <details className="bg-slate-card border border-slate-border rounded-xl">
-        <summary className="p-4 cursor-pointer text-slate-muted text-sm hover:text-white transition-colors">
+        <summary className="p-4 cursor-pointer text-slate-muted text-sm hover:text-foreground transition-colors">
           View raw CSV data ({headers.length} columns)
         </summary>
         <div className="p-4 pt-0 overflow-x-auto">

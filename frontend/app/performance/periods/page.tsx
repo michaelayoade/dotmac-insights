@@ -69,7 +69,7 @@ export default function PeriodsPage() {
       key: 'type',
       header: 'Type',
       render: (item: EvaluationPeriod) => (
-        <span className="text-slate-300 capitalize">
+        <span className="text-foreground-secondary capitalize">
           {item.period_type.replace('_', ' ')}
         </span>
       ),
@@ -79,9 +79,9 @@ export default function PeriodsPage() {
       header: 'Date Range',
       render: (item: EvaluationPeriod) => (
         <div className="text-sm">
-          <span className="text-slate-300">{formatDate(item.start_date)}</span>
+          <span className="text-foreground-secondary">{formatDate(item.start_date)}</span>
           <span className="text-slate-500 mx-1">to</span>
-          <span className="text-slate-300">{formatDate(item.end_date)}</span>
+          <span className="text-foreground-secondary">{formatDate(item.end_date)}</span>
         </div>
       ),
     },
@@ -102,7 +102,7 @@ export default function PeriodsPage() {
       header: 'Scorecards',
       render: (item: EvaluationPeriod) => (
         <div className="text-sm">
-          <span className="text-white font-medium">{item.scorecard_count}</span>
+          <span className="text-foreground font-medium">{item.scorecard_count}</span>
           <span className="text-slate-500 ml-1">total</span>
           {item.scorecard_count > 0 && (
             <div className="text-xs text-slate-400 mt-1">
@@ -119,7 +119,7 @@ export default function PeriodsPage() {
       render: (item: EvaluationPeriod) => (
         <Link
           href={`/performance/periods/${item.id}`}
-          className="text-slate-400 hover:text-white p-1"
+          className="text-slate-400 hover:text-foreground p-1"
         >
           <ChevronRight className="w-4 h-4" />
         </Link>
@@ -143,14 +143,14 @@ export default function PeriodsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Evaluation Periods</h1>
+          <h1 className="text-xl font-semibold text-foreground">Evaluation Periods</h1>
           <p className="text-sm text-slate-400 mt-1">
             Manage performance evaluation cycles
           </p>
         </div>
         <Link
           href="/performance/periods/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Period
@@ -165,7 +165,7 @@ export default function PeriodsPage() {
             setStatusFilter(e.target.value as PeriodStatus | '');
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
@@ -181,7 +181,7 @@ export default function PeriodsPage() {
               setStatusFilter('');
               setOffset(0);
             }}
-            className="text-slate-400 text-sm hover:text-white transition-colors"
+            className="text-slate-400 text-sm hover:text-foreground transition-colors"
           >
             Clear filter
           </button>
@@ -206,7 +206,7 @@ export default function PeriodsPage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors',
                 statusFilter === item.status
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-white'
+                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-foreground'
               )}
             >
               <item.icon className="w-3.5 h-3.5" />

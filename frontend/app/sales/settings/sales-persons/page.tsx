@@ -96,12 +96,12 @@ export default function SalesPersonsPage() {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             autoFocus
           />
         ) : (
           <div className="flex flex-col">
-            <span className="text-white font-medium">{item.name}</span>
+            <span className="text-foreground font-medium">{item.name}</span>
             {item.employee_name && (
               <span className="text-xs text-slate-muted">{item.employee_name}</span>
             )}
@@ -116,7 +116,7 @@ export default function SalesPersonsPage() {
           <select
             value={formData.parent_sales_person || ''}
             onChange={(e) => setFormData({ ...formData, parent_sales_person: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           >
             <option value="">None</option>
             {persons.filter((p) => p.id !== item.id).map((p) => (
@@ -137,7 +137,7 @@ export default function SalesPersonsPage() {
             step="0.1"
             value={formData.commission_rate ?? ''}
             onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value ? Number(e.target.value) : null })}
-            className="w-20 bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-20 bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             placeholder="0"
           />
         ) : (
@@ -215,7 +215,7 @@ export default function SalesPersonsPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -240,7 +240,7 @@ export default function SalesPersonsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Sales Persons</h1>
+            <h1 className="text-xl font-semibold text-foreground">Sales Persons</h1>
           </div>
           {!isCreating && (
             <button
@@ -262,7 +262,7 @@ export default function SalesPersonsPage() {
 
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Sales Person</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Sales Person</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Name *</label>
@@ -270,7 +270,7 @@ export default function SalesPersonsPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="Sales person name"
                   autoFocus
                 />
@@ -281,7 +281,7 @@ export default function SalesPersonsPage() {
                   type="text"
                   value={formData.employee || ''}
                   onChange={(e) => setFormData({ ...formData, employee: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="Link to employee"
                 />
               </div>
@@ -290,7 +290,7 @@ export default function SalesPersonsPage() {
                 <select
                   value={formData.parent_sales_person || ''}
                   onChange={(e) => setFormData({ ...formData, parent_sales_person: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="">None</option>
                   {persons.map((p) => (
@@ -305,7 +305,7 @@ export default function SalesPersonsPage() {
                   step="0.1"
                   value={formData.commission_rate ?? ''}
                   onChange={(e) => setFormData({ ...formData, commission_rate: e.target.value ? Number(e.target.value) : null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="0"
                 />
               </div>
@@ -314,7 +314,7 @@ export default function SalesPersonsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>

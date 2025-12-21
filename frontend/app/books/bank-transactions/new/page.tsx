@@ -118,12 +118,12 @@ export default function NewBankTransactionPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/books/bank-transactions"
-          className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+          className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">New Bank Transaction</h1>
+          <h1 className="text-2xl font-bold text-foreground">New Bank Transaction</h1>
           <p className="text-slate-muted text-sm">Record a manual bank transaction</p>
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function NewBankTransactionPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Details */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <h2 className="text-white font-medium flex items-center gap-2">
+          <h2 className="text-foreground font-medium flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-teal-electric" />
             Transaction Details
           </h2>
@@ -169,7 +169,7 @@ export default function NewBankTransactionPage() {
                     onChange={handleChange}
                     className="w-4 h-4 text-teal-electric"
                   />
-                  <span className="text-white">Deposit (Money In)</span>
+                  <span className="text-foreground">Deposit (Money In)</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -180,7 +180,7 @@ export default function NewBankTransactionPage() {
                     onChange={handleChange}
                     className="w-4 h-4 text-teal-electric"
                   />
-                  <span className="text-white">Withdrawal (Money Out)</span>
+                  <span className="text-foreground">Withdrawal (Money Out)</span>
                 </label>
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function NewBankTransactionPage() {
 
         {/* Additional Details */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <h2 className="text-white font-medium flex items-center gap-2">
+          <h2 className="text-foreground font-medium flex items-center gap-2">
             <FileText className="w-4 h-4 text-teal-electric" />
             Additional Details
           </h2>
@@ -230,7 +230,7 @@ export default function NewBankTransactionPage() {
 
         {/* Party Details */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <h2 className="text-white font-medium flex items-center gap-2">
+          <h2 className="text-foreground font-medium flex items-center gap-2">
             <User className="w-4 h-4 text-teal-electric" />
             Party Details (Optional)
           </h2>
@@ -273,7 +273,7 @@ export default function NewBankTransactionPage() {
         <div className="flex justify-end gap-3">
           <Link
             href="/books/bank-transactions"
-            className="px-4 py-2 text-slate-muted hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+            className="px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
           >
             Cancel
           </Link>

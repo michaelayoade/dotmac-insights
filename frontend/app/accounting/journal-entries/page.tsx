@@ -64,7 +64,7 @@ export default function JournalEntriesPage() {
       key: 'voucher_type',
       header: 'Type',
       render: (item: any) => (
-        <span className="text-white text-sm">
+        <span className="text-foreground text-sm">
           {item.voucher_type || '-'}
         </span>
       ),
@@ -112,7 +112,7 @@ export default function JournalEntriesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total Entries</p>
-          <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
+          <p className="text-2xl font-bold text-foreground">{data?.total || 0}</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Debit</p>
@@ -130,7 +130,7 @@ export default function JournalEntriesPage() {
           <select
             value={voucherType}
             onChange={(e) => { setVoucherType(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Types</option>
             <option value="Journal Entry">Journal Entry</option>
@@ -145,20 +145,20 @@ export default function JournalEntriesPage() {
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setOffset(0); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <span className="text-slate-muted">to</span>
           <input
             type="date"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setOffset(0); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         {(startDate || endDate || voucherType) && (
           <button
             onClick={() => { setStartDate(''); setEndDate(''); setVoucherType(''); setOffset(0); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>

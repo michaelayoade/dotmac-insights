@@ -20,6 +20,8 @@ from app.models.accounting import (
     AccountType,
 )
 from app.models.expense import Expense, ExpenseStatus
+from app.models.document_lines import BillLine
+from app.utils.company_context import get_company_context
 
 router = APIRouter()
 
@@ -398,11 +400,16 @@ async def get_bill_detail(
     bill_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Get detailed information for a specific bill with GL entries."""
+    """Get detailed information for a specific bill with line items and GL entries."""
     bill = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == bill_id).first()
 
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
+
+    # Get bill line items
+    bill_lines = db.query(BillLine).filter(
+        BillLine.purchase_invoice_id == bill.id
+    ).order_by(BillLine.idx).all()
 
     # Get related GL entries
     gl_entries = db.query(GLEntry).filter(
@@ -427,6 +434,29 @@ async def get_bill_detail(
         "cost_center": getattr(bill, "cost_center", None),
         "remarks": getattr(bill, "remarks", None),
         "is_overdue": bill.due_date.date() < date.today() if bill.due_date else False,
+        "items": [
+            {
+                "id": line.id,
+                "idx": line.idx,
+                "item_code": line.item_code,
+                "item_name": line.item_name,
+                "description": line.description,
+                "quantity": float(line.quantity),
+                "rate": float(line.rate),
+                "uom": line.uom,
+                "amount": float(line.amount),
+                "discount_percentage": float(line.discount_percentage),
+                "discount_amount": float(line.discount_amount),
+                "net_amount": float(line.net_amount),
+                "tax_rate": float(line.tax_rate),
+                "tax_amount": float(line.tax_amount),
+                "account": line.account,
+                "cost_center": line.cost_center,
+                "expense_type": line.expense_type,
+                "purchase_order_id": line.purchase_order_id,
+            }
+            for line in bill_lines
+        ],
         "gl_entries": [
             {
                 "id": e.id,
@@ -463,7 +493,7 @@ async def create_bill(
         supplier=payload.supplier,
         supplier_name=payload.supplier_name,
         supplier_id=payload.supplier_id,
-        company=payload.company,
+        company=payload.company or get_company_context(allow_null=True),
         supplier_tax_id=payload.supplier_tax_id,
         supplier_address=payload.supplier_address,
         posting_date=payload.posting_date,

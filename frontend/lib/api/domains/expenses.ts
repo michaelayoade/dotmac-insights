@@ -100,17 +100,6 @@ export interface CardTransactionsExportParams {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-function getAccessToken(): string {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('dotmac_access_token') || '';
-  }
-  return '';
-}
-
-// =============================================================================
 // API
 // =============================================================================
 
@@ -480,13 +469,12 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl(
       '/expenses/reports/claims',
       Object.fromEntries(searchParams.entries())
     );
     const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
@@ -497,13 +485,12 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl(
       '/expenses/reports/advances',
       Object.fromEntries(searchParams.entries())
     );
     const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
@@ -516,13 +503,12 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl(
       '/expenses/reports/transactions',
       Object.fromEntries(searchParams.entries())
     );
     const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
@@ -596,9 +582,8 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl('/expenses/reports/claims', Object.fromEntries(searchParams.entries()));
-    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
   },
@@ -607,9 +592,8 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl('/expenses/reports/advances', Object.fromEntries(searchParams.entries()));
-    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
   },
@@ -618,9 +602,8 @@ export const expensesApi = {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) searchParams.set(key, String(value));
     });
-    const token = getAccessToken();
     const url = buildApiUrl('/expenses/reports/transactions', Object.fromEntries(searchParams.entries()));
-    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(url, { credentials: 'include' });
     if (!res.ok) throw new Error('Export failed');
     return res.blob();
   },

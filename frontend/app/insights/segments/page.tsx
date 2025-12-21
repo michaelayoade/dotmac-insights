@@ -80,7 +80,7 @@ export default function SegmentsPage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeView === view.key
                 ? 'bg-teal-electric text-slate-deep'
-                : 'bg-slate-elevated text-slate-muted hover:text-white'
+                : 'bg-slate-elevated text-slate-muted hover:text-foreground'
             }`}
           >
             {view.label}
@@ -100,7 +100,7 @@ export default function SegmentsPage() {
               <div key={`${label}-${index}`} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between gap-3">
-                    <span className="text-sm font-medium text-white truncate">
+                    <span className="text-sm font-medium text-foreground truncate">
                       {label}
                     </span>
                     <div className="flex items-center gap-3 text-sm text-slate-muted">

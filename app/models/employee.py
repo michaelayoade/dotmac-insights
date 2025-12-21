@@ -15,6 +15,10 @@ if TYPE_CHECKING:
     from app.models.expense import Expense
     from app.models.hr import Department, Designation
     from app.models.expense_management import ExpenseClaim, CashAdvance, CorporateCard
+    from app.models.unified_ticket import UnifiedTicket
+    from app.models.field_service import (
+        ServiceOrder, FieldTeam, FieldTeamMember, TechnicianSkill, ServiceTimeEntry
+    )
 
 
 class EmploymentStatus(enum.Enum):
@@ -91,6 +95,52 @@ class Employee(Base):
         foreign_keys=[reports_to_id],
         remote_side="Employee.id",
         backref="direct_reports"
+    )
+
+    # Ticket assignments (back_populates for Ticket.assigned_employee)
+    assigned_tickets: Mapped[List["Ticket"]] = relationship(
+        "Ticket",
+        back_populates="assigned_employee",
+        foreign_keys="[Ticket.assigned_employee_id]"
+    )
+
+    # Unified ticket assignments
+    assigned_unified_tickets: Mapped[List["UnifiedTicket"]] = relationship(
+        "UnifiedTicket",
+        back_populates="assigned_to",
+        foreign_keys="[UnifiedTicket.assigned_to_id]"
+    )
+    created_unified_tickets: Mapped[List["UnifiedTicket"]] = relationship(
+        "UnifiedTicket",
+        back_populates="created_by",
+        foreign_keys="[UnifiedTicket.created_by_id]"
+    )
+
+    # Field service relationships
+    service_orders: Mapped[List["ServiceOrder"]] = relationship(
+        "ServiceOrder",
+        back_populates="technician",
+        foreign_keys="[ServiceOrder.assigned_technician_id]"
+    )
+    supervised_field_teams: Mapped[List["FieldTeam"]] = relationship(
+        "FieldTeam",
+        back_populates="supervisor",
+        foreign_keys="[FieldTeam.supervisor_id]"
+    )
+    field_team_memberships: Mapped[List["FieldTeamMember"]] = relationship(
+        "FieldTeamMember",
+        back_populates="employee",
+        foreign_keys="[FieldTeamMember.employee_id]"
+    )
+    technician_skills: Mapped[List["TechnicianSkill"]] = relationship(
+        "TechnicianSkill",
+        back_populates="employee",
+        foreign_keys="[TechnicianSkill.employee_id]"
+    )
+    service_time_entries: Mapped[List["ServiceTimeEntry"]] = relationship(
+        "ServiceTimeEntry",
+        back_populates="employee",
+        foreign_keys="[ServiceTimeEntry.employee_id]"
     )
 
     def __repr__(self) -> str:

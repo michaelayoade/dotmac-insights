@@ -79,12 +79,12 @@ export default function QuotationCreatePage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/quotations"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to quotations
           </Link>
-          <h1 className="text-xl font-semibold text-white">New Quotation</h1>
+          <h1 className="text-xl font-semibold text-foreground">New Quotation</h1>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default function QuotationCreatePage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <StickyNote className="w-4 h-4 text-teal-electric" />
             Quotation Details
           </h3>
@@ -108,7 +108,7 @@ export default function QuotationCreatePage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.customerId && 'border-red-500/60'
                 )}
               >
@@ -127,7 +127,7 @@ export default function QuotationCreatePage() {
                 type="text"
                 value={quotationNumber}
                 onChange={(e) => setQuotationNumber(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -138,7 +138,7 @@ export default function QuotationCreatePage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="draft">Draft</option>
                 <option value="open">Open</option>
@@ -156,7 +156,7 @@ export default function QuotationCreatePage() {
                 value={quotationDate}
                 onChange={(e) => setQuotationDate(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.quotationDate && 'border-red-500/60'
                 )}
               />
@@ -168,7 +168,7 @@ export default function QuotationCreatePage() {
                 type="date"
                 value={validTill}
                 onChange={(e) => setValidTill(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function QuotationCreatePage() {
                 value={totalAmount}
                 onChange={(e) => setTotalAmount(Number(e.target.value))}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.totalAmount && 'border-red-500/60'
                 )}
               />
@@ -193,7 +193,7 @@ export default function QuotationCreatePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional notes"
               />
             </div>
@@ -204,7 +204,7 @@ export default function QuotationCreatePage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel

@@ -113,14 +113,14 @@ export default function ItemDetailPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/inventory/items"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
             </Link>
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5 text-amber-500" />
-              <h1 className="text-xl font-semibold text-white">
+              <h1 className="text-xl font-semibold text-foreground">
                 {item?.item_code || 'Item Details'}
               </h1>
             </div>
@@ -130,7 +130,7 @@ export default function ItemDetailPage() {
               <>
                 <Link
                   href={`/inventory/valuation/${encodeURIComponent(item?.item_code || '')}`}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted text-sm hover:text-white hover:border-slate-border/70"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted text-sm hover:text-foreground hover:border-slate-border/70"
                 >
                   <BarChart3 className="w-4 h-4" />
                   Valuation
@@ -155,7 +155,7 @@ export default function ItemDetailPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save
@@ -185,7 +185,7 @@ export default function ItemDetailPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDelete}
-                  className="px-3 py-1.5 rounded-lg bg-coral-alert text-white text-sm font-medium hover:bg-coral-alert/80"
+                  className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
                 >
                   Yes, Delete
                 </button>
@@ -229,10 +229,10 @@ export default function ItemDetailPage() {
                         name="item_code"
                         value={form.item_code || ''}
                         onChange={handleChange}
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                     ) : (
-                      <p className="text-white font-mono">{item.item_code}</p>
+                      <p className="text-foreground font-mono">{item.item_code}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -242,10 +242,10 @@ export default function ItemDetailPage() {
                         name="item_name"
                         value={form.item_name || ''}
                         onChange={handleChange}
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                     ) : (
-                      <p className="text-white">{item.item_name}</p>
+                      <p className="text-foreground">{item.item_name}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -255,10 +255,10 @@ export default function ItemDetailPage() {
                         name="item_group"
                         value={form.item_group || ''}
                         onChange={handleChange}
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                     ) : (
-                      <p className="text-white">{item.item_group || '-'}</p>
+                      <p className="text-foreground">{item.item_group || '-'}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -268,10 +268,10 @@ export default function ItemDetailPage() {
                         name="uom"
                         value={form.uom || ''}
                         onChange={handleChange}
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                     ) : (
-                      <p className="text-white">{item.stock_uom || '-'}</p>
+                      <p className="text-foreground">{item.stock_uom || '-'}</p>
                     )}
                   </div>
                   <div className="space-y-1">
@@ -288,7 +288,7 @@ export default function ItemDetailPage() {
                         <span className="text-sm text-slate-muted">Track inventory</span>
                       </label>
                     ) : (
-                      <p className="text-white">
+                      <p className="text-foreground">
                         {item.is_stock_item ? (
                           <span className="text-emerald-success">Yes</span>
                         ) : (
@@ -306,10 +306,10 @@ export default function ItemDetailPage() {
                         step="0.01"
                         value={form.valuation_rate || ''}
                         onChange={handleChange}
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                     ) : (
-                      <p className="text-white font-mono">
+                      <p className="text-foreground font-mono">
                         {(item.valuation_rate ?? 0).toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -342,7 +342,7 @@ export default function ItemDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-muted">Total Stock Value</p>
-                    <p className="text-xl font-mono text-white">
+                    <p className="text-xl font-mono text-foreground">
                       {(
                         (item.total_stock_qty ?? 0) * (item.valuation_rate ?? 0)
                       ).toLocaleString(undefined, {

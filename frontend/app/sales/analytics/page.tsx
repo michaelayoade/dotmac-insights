@@ -26,7 +26,7 @@ export default function SalesAnalyticsPage() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Revenue Trend</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Revenue Trend</h2>
           {trendLoading ? (
             <div className="h-32 bg-slate-elevated rounded animate-pulse" />
           ) : latestTrend.length > 0 ? (
@@ -42,8 +42,8 @@ export default function SalesAnalyticsPage() {
                 <tbody>
                   {latestTrend.map((row: any, idx: number) => (
                     <tr key={idx} className="border-b border-slate-border/50">
-                      <td className="py-2 text-white">{row.period}</td>
-                      <td className="py-2 text-right font-mono text-white">{formatCurrency(row.revenue, currency)}</td>
+                      <td className="py-2 text-foreground">{row.period}</td>
+                      <td className="py-2 text-right font-mono text-foreground">{formatCurrency(row.revenue, currency)}</td>
                       <td className="py-2 text-right font-mono text-teal-electric">{(row.payment_count ?? 0).toLocaleString()}</td>
                     </tr>
                   ))}
@@ -56,7 +56,7 @@ export default function SalesAnalyticsPage() {
         </div>
 
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Collections</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Collections</h2>
           {collectionsLoading ? (
             <div className="h-32 bg-slate-elevated rounded animate-pulse" />
           ) : collections ? (
@@ -66,7 +66,7 @@ export default function SalesAnalyticsPage() {
                 <div className="space-y-2">
                   {collections.by_method.map((m: any) => (
                     <div key={m.method} className="flex items-center justify-between text-sm">
-                      <span className="text-white capitalize">{m.method || 'Unknown'}</span>
+                      <span className="text-foreground capitalize">{m.method || 'Unknown'}</span>
                       <span className="font-mono text-teal-electric">{formatCurrency(m.amount, currency)} ({m.count})</span>
                     </div>
                   ))}
@@ -75,9 +75,9 @@ export default function SalesAnalyticsPage() {
               <div>
                 <h3 className="text-sm text-slate-muted mb-2">Payment Timing</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-white">Early</span><span className="font-mono text-teal-electric">{collections.timing?.early ?? 0}</span></div>
-                  <div className="flex justify-between"><span className="text-white">On time</span><span className="font-mono text-teal-electric">{collections.timing?.on_time ?? 0}</span></div>
-                  <div className="flex justify-between"><span className="text-white">Late</span><span className="font-mono text-teal-electric">{collections.timing?.late ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground">Early</span><span className="font-mono text-teal-electric">{collections.timing?.early ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground">On time</span><span className="font-mono text-teal-electric">{collections.timing?.on_time ?? 0}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground">Late</span><span className="font-mono text-teal-electric">{collections.timing?.late ?? 0}</span></div>
                 </div>
               </div>
             </div>
@@ -89,7 +89,7 @@ export default function SalesAnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Aging</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Aging</h2>
           {agingLoading ? (
             <div className="h-40 bg-slate-elevated rounded animate-pulse" />
           ) : aging ? (
@@ -104,7 +104,7 @@ export default function SalesAnalyticsPage() {
                 <div key={b.key}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-muted capitalize">{b.label}</span>
-                    <span className="font-mono text-white">{formatCurrency(b.total, currency)} ({b.count})</span>
+                    <span className="font-mono text-foreground">{formatCurrency(b.total, currency)} ({b.count})</span>
                   </div>
                   <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
                     <div
@@ -121,7 +121,7 @@ export default function SalesAnalyticsPage() {
         </div>
 
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">By Currency</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">By Currency</h2>
           {currencyLoading ? (
             <div className="h-32 bg-slate-elevated rounded animate-pulse" />
           ) : byCurrency?.by_currency?.length ? (
@@ -138,9 +138,9 @@ export default function SalesAnalyticsPage() {
                 <tbody>
                   {byCurrency.by_currency.map((row: any) => (
                     <tr key={row.currency} className="border-b border-slate-border/50">
-                      <td className="py-2 text-white">{row.currency}</td>
-                    <td className="py-2 text-right font-mono text-white">{formatCurrency(row.mrr || 0, row.currency)}</td>
-                    <td className="py-2 text-right font-mono text-white">{formatCurrency(row.arr || 0, row.currency)}</td>
+                      <td className="py-2 text-foreground">{row.currency}</td>
+                    <td className="py-2 text-right font-mono text-foreground">{formatCurrency(row.mrr || 0, row.currency)}</td>
+                    <td className="py-2 text-right font-mono text-foreground">{formatCurrency(row.arr || 0, row.currency)}</td>
                     <td className="py-2 text-right font-mono text-teal-electric">{formatCurrency(row.outstanding || 0, row.currency)}</td>
                     </tr>
                   ))}

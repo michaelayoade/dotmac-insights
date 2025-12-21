@@ -114,7 +114,7 @@ export default function GatewayPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <span className="font-mono text-white">{formatCurrency(item.amount, item.currency)}</span>
+          <span className="font-mono text-foreground">{formatCurrency(item.amount, item.currency)}</span>
           {item.fees > 0 && (
             <div className="text-xs text-slate-muted">Fee: {formatCurrency(item.fees, item.currency)}</div>
           )}
@@ -166,7 +166,7 @@ export default function GatewayPaymentsPage() {
           )}
           <button
             onClick={() => router.push(`/books/gateway/payments/${item.reference}`)}
-            className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-white transition-colors"
+            className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-foreground transition-colors"
             title="View details"
           >
             <Eye className="w-4 h-4" />
@@ -187,11 +187,11 @@ export default function GatewayPaymentsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CreditCard className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Online Payments</h1>
+          <h1 className="text-xl font-semibold text-foreground">Online Payments</h1>
         </div>
         <button
           onClick={() => mutate()}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-muted transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -247,14 +247,14 @@ export default function GatewayPaymentsPage() {
       {showVerifyModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowVerifyModal(false)}>
           <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 border border-slate-border" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-4">Verify Payment</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Verify Payment</h3>
             <p className="text-slate-muted mb-4">
               Verify payment status with the provider for reference: <span className="text-teal-electric font-mono">{selectedPayment.reference}</span>
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowVerifyModal(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
@@ -273,24 +273,24 @@ export default function GatewayPaymentsPage() {
       {showRefundModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowRefundModal(false)}>
           <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 border border-slate-border" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-4">Refund Payment</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Refund Payment</h3>
             <p className="text-slate-muted mb-4">
               Refund payment <span className="text-teal-electric font-mono">{selectedPayment.reference}</span>
             </p>
             <div className="mb-4 p-3 bg-slate-900 rounded-lg">
               <div className="text-sm text-slate-muted">Amount</div>
-              <div className="text-lg font-mono text-white">{formatCurrency(selectedPayment.amount, selectedPayment.currency)}</div>
+              <div className="text-lg font-mono text-foreground">{formatCurrency(selectedPayment.amount, selectedPayment.currency)}</div>
             </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowRefundModal(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleRefund(selectedPayment.reference)}
-                className="px-4 py-2 rounded-lg bg-purple-500 text-white font-semibold hover:bg-purple-600 transition-colors"
+                className="px-4 py-2 rounded-lg bg-purple-500 text-foreground font-semibold hover:bg-purple-600 transition-colors"
               >
                 Full Refund
               </button>

@@ -98,7 +98,7 @@ function StatusBadge({ status, count, href }: { status: string; count: number; h
         <div className={cn('w-2 h-2 rounded-full', color)} />
         <span className="text-sm text-slate-muted capitalize">{label}</span>
       </div>
-      <span className="text-white font-semibold">{count}</span>
+      <span className="text-foreground font-semibold">{count}</span>
     </div>
   );
 
@@ -144,7 +144,7 @@ function OrderRow({ order }: { order: any }) {
         {order.priority || 'medium'}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-white font-medium truncate">{order.order_type || 'Service Order'}</p>
+        <p className="text-foreground font-medium truncate">{order.order_type || 'Service Order'}</p>
         <div className="flex items-center gap-3 text-xs text-slate-muted mt-1">
           <span>{order.order_number || `#${order.id}`}</span>
           {order.customer_address && (
@@ -196,7 +196,7 @@ function QuickActionCard({
           <Icon className={cn('w-5 h-5', colorClass)} />
         </div>
         <div>
-          <p className="text-white font-semibold">{title}</p>
+          <p className="text-foreground font-semibold">{title}</p>
           <p className="text-slate-muted text-sm">{description}</p>
         </div>
       </div>
@@ -283,7 +283,7 @@ export default function FieldServiceDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ClipboardList className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Orders by Status</h3>
+              <h3 className="text-foreground font-semibold">Orders by Status</h3>
             </div>
             <Link href="/field-service/orders" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -310,7 +310,7 @@ export default function FieldServiceDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">This Week</h3>
+              <h3 className="text-foreground font-semibold">This Week</h3>
             </div>
             <Link href="/field-service/analytics" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               Analytics <ArrowRight className="w-4 h-4" />
@@ -331,7 +331,7 @@ export default function FieldServiceDashboard() {
               <span className="text-slate-muted text-sm">Customer Satisfaction</span>
               <div className="flex items-center gap-1">
                 <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                <span className="text-white font-bold">{(summary?.avg_customer_rating ?? 0).toFixed(1)}</span>
+                <span className="text-foreground font-bold">{(summary?.avg_customer_rating ?? 0).toFixed(1)}</span>
               </div>
             </div>
           </div>
@@ -343,7 +343,7 @@ export default function FieldServiceDashboard() {
                   <Link
                     key={type}
                     href={`/field-service/orders?type=${type}`}
-                    className="text-xs px-2 py-1 rounded-full bg-slate-elevated text-slate-muted hover:text-white transition-colors"
+                    className="text-xs px-2 py-1 rounded-full bg-slate-elevated text-slate-muted hover:text-foreground transition-colors"
                   >
                     {type}: {count as number}
                   </Link>
@@ -357,7 +357,7 @@ export default function FieldServiceDashboard() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-teal-electric" />
-            <h3 className="text-white font-semibold">Quick Actions</h3>
+            <h3 className="text-foreground font-semibold">Quick Actions</h3>
           </div>
           <div className="space-y-3">
             <QuickActionCard
@@ -390,7 +390,7 @@ export default function FieldServiceDashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-electric" />
-            <h3 className="text-white font-semibold">Today's Schedule</h3>
+            <h3 className="text-foreground font-semibold">Today's Schedule</h3>
             <span className="text-slate-muted text-sm">({today_schedule?.length || 0} orders)</span>
           </div>
           <Link href="/field-service/orders?date=today" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">

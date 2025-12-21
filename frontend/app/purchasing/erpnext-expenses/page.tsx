@@ -183,7 +183,7 @@ export default function ERPNextExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Receipt className="w-4 h-4 text-teal-electric" />
-          <span className="font-mono text-white font-medium">#{item.id}</span>
+          <span className="font-mono text-foreground font-medium">#{item.id}</span>
         </div>
       ),
     },
@@ -193,7 +193,7 @@ export default function ERPNextExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <User className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[180px]">
+          <span className="text-foreground-secondary truncate max-w-[180px]">
             {item.employee_name || item.erpnext_employee || '-'}
           </span>
         </div>
@@ -205,7 +205,7 @@ export default function ERPNextExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[150px]">
+          <span className="text-foreground-secondary truncate max-w-[150px]">
             {item.expense_type || item.description || '-'}
           </span>
         </div>
@@ -217,7 +217,7 @@ export default function ERPNextExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3 text-slate-muted" />
-          <span className="text-slate-300">{formatDate(item.posting_date)}</span>
+          <span className="text-foreground-secondary">{formatDate(item.posting_date)}</span>
         </div>
       ),
     },
@@ -226,7 +226,7 @@ export default function ERPNextExpensesPage() {
       header: 'Claimed',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white font-medium">
+        <span className="font-mono text-foreground font-medium">
           {formatCurrency(item.total_claimed_amount || item.amount)}
         </span>
       ),
@@ -305,7 +305,7 @@ export default function ERPNextExpensesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">ERPNext Expense Claims</h1>
+          <h1 className="text-2xl font-bold text-foreground">ERPNext Expense Claims</h1>
           <p className="text-slate-muted text-sm">Manage expense claims synced from ERPNext</p>
         </div>
         <button
@@ -324,7 +324,7 @@ export default function ERPNextExpensesPage() {
             <Receipt className="w-4 h-4 text-teal-electric" />
             <p className="text-slate-muted text-sm">Total Claims</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(total)}</p>
         </div>
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -345,7 +345,7 @@ export default function ERPNextExpensesPage() {
             <Clock className="w-4 h-4 text-blue-400" />
             <p className="text-slate-muted text-sm">Pending</p>
           </div>
-          <p className="text-xl font-bold text-white">
+          <p className="text-xl font-bold text-foreground">
             {formatCurrency(totalClaimed - totalReimbursed)}
           </p>
         </div>
@@ -355,7 +355,7 @@ export default function ERPNextExpensesPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <select
@@ -364,7 +364,7 @@ export default function ERPNextExpensesPage() {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Status</option>
             <option value="draft">Draft</option>
@@ -379,7 +379,7 @@ export default function ERPNextExpensesPage() {
                 setStatus('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>
@@ -392,10 +392,10 @@ export default function ERPNextExpensesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-card border border-slate-border rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-slate-border">
-              <h2 className="text-lg font-semibold text-white">New Expense Claim</h2>
+              <h2 className="text-lg font-semibold text-foreground">New Expense Claim</h2>
               <button
                 onClick={() => setShowCreate(false)}
-                className="p-2 rounded-lg text-slate-muted hover:text-white hover:bg-slate-elevated"
+                className="p-2 rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -409,7 +409,7 @@ export default function ERPNextExpensesPage() {
                     value={form.employee_name || ''}
                     onChange={handleChange}
                     required
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -419,7 +419,7 @@ export default function ERPNextExpensesPage() {
                     value={form.expense_type || ''}
                     onChange={handleChange}
                     placeholder="e.g., Travel, Meals, Office Supplies"
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -429,7 +429,7 @@ export default function ERPNextExpensesPage() {
                     name="posting_date"
                     value={form.posting_date || ''}
                     onChange={handleChange}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -438,7 +438,7 @@ export default function ERPNextExpensesPage() {
                     name="status"
                     value={form.status || 'draft'}
                     onChange={handleChange}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   >
                     {EXPENSE_STATUSES.map((s) => (
                       <option key={s} value={s}>
@@ -456,7 +456,7 @@ export default function ERPNextExpensesPage() {
                     onChange={handleChange}
                     min={0}
                     step={0.01}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -468,7 +468,7 @@ export default function ERPNextExpensesPage() {
                     onChange={handleChange}
                     min={0}
                     step={0.01}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -478,7 +478,7 @@ export default function ERPNextExpensesPage() {
                     value={form.currency || 'NGN'}
                     onChange={handleChange}
                     maxLength={3}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
@@ -487,7 +487,7 @@ export default function ERPNextExpensesPage() {
                     name="cost_center"
                     value={form.cost_center || ''}
                     onChange={handleChange}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
               </div>
@@ -498,7 +498,7 @@ export default function ERPNextExpensesPage() {
                   value={form.description || ''}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
                 />
               </div>
               <div className="flex items-center gap-3 pt-2">
@@ -516,7 +516,7 @@ export default function ERPNextExpensesPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreate(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+                  className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
                 >
                   Cancel
                 </button>
@@ -535,7 +535,7 @@ export default function ERPNextExpensesPage() {
                 <AlertTriangle className="w-5 h-5 text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Delete Expense Claim</h3>
+                <h3 className="text-lg font-semibold text-foreground">Delete Expense Claim</h3>
                 <p className="text-sm text-slate-muted">This action cannot be undone.</p>
               </div>
             </div>
@@ -544,7 +544,7 @@ export default function ERPNextExpensesPage() {
                 onClick={handleDelete}
                 disabled={deleting}
                 className={cn(
-                  'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600',
+                  'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-foreground font-semibold hover:bg-red-600',
                   deleting && 'opacity-60 cursor-not-allowed'
                 )}
               >
@@ -553,7 +553,7 @@ export default function ERPNextExpensesPage() {
               </button>
               <button
                 onClick={() => setDeleteId(null)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               >
                 Cancel
               </button>

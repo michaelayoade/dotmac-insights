@@ -360,11 +360,11 @@ export default function EditContactPage() {
       <div className="p-6">
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Contact Not Found</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Contact Not Found</h2>
           <p className="text-slate-400 mb-4">The contact you are trying to edit does not exist.</p>
           <Link
             href="/contacts"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Contacts
@@ -385,7 +385,7 @@ export default function EditContactPage() {
           <ArrowLeft className="w-5 h-5 text-slate-400" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">Edit Contact</h1>
+          <h1 className="text-2xl font-bold text-foreground">Edit Contact</h1>
           <p className="text-slate-400 text-sm">Update {contact.name}</p>
         </div>
       </div>
@@ -409,7 +409,7 @@ export default function EditContactPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Type & Classification */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 text-cyan-400" />
             Classification
           </h2>
@@ -417,13 +417,13 @@ export default function EditContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Contact Type */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Contact Type
               </label>
               <select
                 value={formData.contact_type}
                 onChange={(e) => updateField('contact_type', e.target.value as ContactType)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-cyan-500"
               >
                 {Object.entries(contactTypeLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -435,11 +435,11 @@ export default function EditContactPage() {
 
             {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Category</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Category</label>
               <select
                 value={formData.category}
                 onChange={(e) => updateField('category', e.target.value as ContactCategory)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-cyan-500"
               >
                 {Object.entries(categoryLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -451,11 +451,11 @@ export default function EditContactPage() {
 
             {/* Status */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => updateField('status', e.target.value as ContactStatus)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground focus:outline-none focus:border-cyan-500"
               >
                 {Object.entries(statusLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -475,14 +475,14 @@ export default function EditContactPage() {
                 onChange={(e) => updateField('is_organization', e.target.checked)}
                 className="w-5 h-5 rounded border-slate-600 bg-slate-900/50 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-800"
               />
-              <span className="text-slate-300">This is an organization/company</span>
+              <span className="text-foreground-secondary">This is an organization/company</span>
             </label>
           </div>
         </div>
 
         {/* Basic Information */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             {formData.is_organization ? (
               <Building2 className="w-5 h-5 text-cyan-400" />
             ) : (
@@ -496,7 +496,7 @@ export default function EditContactPage() {
               <>
                 {/* Organization Name */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Organization Name *
                   </label>
                   <input
@@ -506,7 +506,7 @@ export default function EditContactPage() {
                     placeholder="Enter organization name"
                     className={`w-full px-3 py-2 rounded-lg bg-slate-900/50 border ${
                       validationErrors.name ? 'border-red-500' : 'border-slate-600'
-                    } text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
+                    } text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
                   />
                   {validationErrors.name && (
                     <p className="mt-1 text-sm text-red-400">{validationErrors.name}</p>
@@ -517,7 +517,7 @@ export default function EditContactPage() {
               <>
                 {/* First Name */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     First Name
                   </label>
                   <input
@@ -525,25 +525,25 @@ export default function EditContactPage() {
                     value={formData.first_name}
                     onChange={(e) => updateField('first_name', e.target.value)}
                     placeholder="First name"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
                 {/* Last Name */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Last Name</label>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Last Name</label>
                   <input
                     type="text"
                     value={formData.last_name}
                     onChange={(e) => updateField('last_name', e.target.value)}
                     placeholder="Last name"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
                 {/* Display Name */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Display Name *
                   </label>
                   <input
@@ -553,7 +553,7 @@ export default function EditContactPage() {
                     placeholder="Full name or display name"
                     className={`w-full px-3 py-2 rounded-lg bg-slate-900/50 border ${
                       validationErrors.name ? 'border-red-500' : 'border-slate-600'
-                    } text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
+                    } text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
                   />
                   {validationErrors.name && (
                     <p className="mt-1 text-sm text-red-400">{validationErrors.name}</p>
@@ -568,13 +568,13 @@ export default function EditContactPage() {
             {/* Company (for people) */}
             {!formData.is_organization && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Company</label>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Company</label>
                 <input
                   type="text"
                   value={formData.company_name}
                   onChange={(e) => updateField('company_name', e.target.value)}
                   placeholder="Company name"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             )}
@@ -582,13 +582,13 @@ export default function EditContactPage() {
             {/* Job Title / Designation */}
             {!formData.is_organization && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Job Title</label>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Job Title</label>
                 <input
                   type="text"
                   value={formData.designation}
                   onChange={(e) => updateField('designation', e.target.value)}
                   placeholder="Job title"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             )}
@@ -596,13 +596,13 @@ export default function EditContactPage() {
             {/* Department */}
             {!formData.is_organization && (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Department</label>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Department</label>
                 <input
                   type="text"
                   value={formData.department}
                   onChange={(e) => updateField('department', e.target.value)}
                   placeholder="Department"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             )}
@@ -611,7 +611,7 @@ export default function EditContactPage() {
 
         {/* Contact Information */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5 text-cyan-400" />
             Contact Information
           </h2>
@@ -619,7 +619,7 @@ export default function EditContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Email</label>
               <input
                 type="email"
                 value={formData.email}
@@ -627,7 +627,7 @@ export default function EditContactPage() {
                 placeholder="email@example.com"
                 className={`w-full px-3 py-2 rounded-lg bg-slate-900/50 border ${
                   validationErrors.email ? 'border-red-500' : 'border-slate-600'
-                } text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
+                } text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
               />
               {validationErrors.email && (
                 <p className="mt-1 text-sm text-red-400">{validationErrors.email}</p>
@@ -636,19 +636,19 @@ export default function EditContactPage() {
 
             {/* Billing Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Billing Email</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Billing Email</label>
               <input
                 type="email"
                 value={formData.billing_email}
                 onChange={(e) => updateField('billing_email', e.target.value)}
                 placeholder="billing@example.com"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Phone</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Phone</label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -656,7 +656,7 @@ export default function EditContactPage() {
                 placeholder="+234 xxx xxx xxxx"
                 className={`w-full px-3 py-2 rounded-lg bg-slate-900/50 border ${
                   validationErrors.phone ? 'border-red-500' : 'border-slate-600'
-                } text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
+                } text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500`}
               />
               {validationErrors.phone && (
                 <p className="mt-1 text-sm text-red-400">{validationErrors.phone}</p>
@@ -665,19 +665,19 @@ export default function EditContactPage() {
 
             {/* Mobile */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Mobile</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Mobile</label>
               <input
                 type="tel"
                 value={formData.mobile}
                 onChange={(e) => updateField('mobile', e.target.value)}
                 placeholder="+234 xxx xxx xxxx"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Secondary Phone */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Secondary Phone
               </label>
               <input
@@ -685,19 +685,19 @@ export default function EditContactPage() {
                 value={formData.phone_secondary}
                 onChange={(e) => updateField('phone_secondary', e.target.value)}
                 placeholder="+234 xxx xxx xxxx"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Website */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Website</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Website</label>
               <input
                 type="url"
                 value={formData.website}
                 onChange={(e) => updateField('website', e.target.value)}
                 placeholder="https://example.com"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -705,7 +705,7 @@ export default function EditContactPage() {
 
         {/* Address */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-cyan-400" />
             Address
           </h2>
@@ -713,7 +713,7 @@ export default function EditContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Address Line 1 */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Address Line 1
               </label>
               <input
@@ -721,13 +721,13 @@ export default function EditContactPage() {
                 value={formData.address_line1}
                 onChange={(e) => updateField('address_line1', e.target.value)}
                 placeholder="Street address"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Address Line 2 */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Address Line 2
               </label>
               <input
@@ -735,55 +735,55 @@ export default function EditContactPage() {
                 value={formData.address_line2}
                 onChange={(e) => updateField('address_line2', e.target.value)}
                 placeholder="Suite, unit, building, etc."
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* City */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">City</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">City</label>
               <input
                 type="text"
                 value={formData.city}
                 onChange={(e) => updateField('city', e.target.value)}
                 placeholder="City"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* State */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">State</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">State</label>
               <input
                 type="text"
                 value={formData.state}
                 onChange={(e) => updateField('state', e.target.value)}
                 placeholder="State"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Postal Code */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Postal Code</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Postal Code</label>
               <input
                 type="text"
                 value={formData.postal_code}
                 onChange={(e) => updateField('postal_code', e.target.value)}
                 placeholder="Postal code"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Country */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Country</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Country</label>
               <input
                 type="text"
                 value={formData.country}
                 onChange={(e) => updateField('country', e.target.value)}
                 placeholder="Country"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -791,7 +791,7 @@ export default function EditContactPage() {
 
         {/* Business Information */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-cyan-400" />
             Business Information
           </h2>
@@ -799,49 +799,49 @@ export default function EditContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Industry */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Industry</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Industry</label>
               <input
                 type="text"
                 value={formData.industry}
                 onChange={(e) => updateField('industry', e.target.value)}
                 placeholder="Industry"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Territory */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Territory</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Territory</label>
               <input
                 type="text"
                 value={formData.territory}
                 onChange={(e) => updateField('territory', e.target.value)}
                 placeholder="Territory / Region"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Source */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Lead Source</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Lead Source</label>
               <input
                 type="text"
                 value={formData.source}
                 onChange={(e) => updateField('source', e.target.value)}
                 placeholder="e.g., Website, Referral, Event"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Campaign */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Campaign</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Campaign</label>
               <input
                 type="text"
                 value={formData.source_campaign}
                 onChange={(e) => updateField('source_campaign', e.target.value)}
                 placeholder="Campaign name"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -849,7 +849,7 @@ export default function EditContactPage() {
 
         {/* Social Links */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Globe className="w-5 h-5 text-cyan-400" />
             Social Profiles
           </h2>
@@ -857,37 +857,37 @@ export default function EditContactPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* LinkedIn */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">LinkedIn</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">LinkedIn</label>
               <input
                 type="url"
                 value={formData.linkedin_url}
                 onChange={(e) => updateField('linkedin_url', e.target.value)}
                 placeholder="https://linkedin.com/in/..."
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Twitter */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Twitter</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Twitter</label>
               <input
                 type="text"
                 value={formData.twitter_handle}
                 onChange={(e) => updateField('twitter_handle', e.target.value)}
                 placeholder="@username"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
 
             {/* Facebook */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Facebook</label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Facebook</label>
               <input
                 type="url"
                 value={formData.facebook_url}
                 onChange={(e) => updateField('facebook_url', e.target.value)}
                 placeholder="https://facebook.com/..."
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -895,7 +895,7 @@ export default function EditContactPage() {
 
         {/* Tags */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <Tag className="w-5 h-5 text-cyan-400" />
             Tags
           </h2>
@@ -910,7 +910,7 @@ export default function EditContactPage() {
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
-                  className="hover:text-white transition-colors"
+                  className="hover:text-foreground transition-colors"
                 >
                   &times;
                 </button>
@@ -933,12 +933,12 @@ export default function EditContactPage() {
                 }
               }}
               placeholder="Add a tag..."
-              className="flex-1 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="flex-1 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500"
             />
             <button
               type="button"
               onClick={addTag}
-              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+              className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-foreground transition-colors"
             >
               Add
             </button>
@@ -947,13 +947,13 @@ export default function EditContactPage() {
 
         {/* Notes */}
         <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Notes</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Notes</h2>
           <textarea
             value={formData.notes}
             onChange={(e) => updateField('notes', e.target.value)}
             placeholder="Additional notes about this contact..."
             rows={4}
-            className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+            className="w-full px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-600 text-foreground placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
           />
         </div>
 
@@ -978,7 +978,7 @@ export default function EditContactPage() {
             {/* Archive (Soft Delete) */}
             <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-slate-700">
               <div>
-                <h3 className="text-white font-medium">Archive Contact</h3>
+                <h3 className="text-foreground font-medium">Archive Contact</h3>
                 <p className="text-slate-400 text-sm">
                   Mark this contact as inactive. They will be hidden from active lists but can be restored.
                 </p>
@@ -997,7 +997,7 @@ export default function EditContactPage() {
             {canHardDelete && (
               <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/50 border border-red-500/20">
                 <div>
-                  <h3 className="text-white font-medium">Permanently Delete</h3>
+                  <h3 className="text-foreground font-medium">Permanently Delete</h3>
                   <p className="text-slate-400 text-sm">
                     Permanently remove this contact and all associated data. This action cannot be undone.
                   </p>
@@ -1025,14 +1025,14 @@ export default function EditContactPage() {
           <div className="flex gap-4">
             <Link
               href={`/contacts/${contactId}`}
-              className="px-6 py-3 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 transition-colors"
+              className="px-6 py-3 rounded-lg border border-slate-600 text-foreground-secondary hover:bg-slate-800 transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={isSubmitting || submitSuccess || !hasChanges}
-              className="px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-6 py-3 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-foreground font-medium hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting ? (
                 <>
@@ -1061,7 +1061,7 @@ export default function EditContactPage() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowArchiveDialog(false)} />
           <div className="relative bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <Archive className="w-5 h-5 text-amber-400" />
                 Archive Contact
               </h3>
@@ -1072,21 +1072,21 @@ export default function EditContactPage() {
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
-            <p className="text-slate-300 mb-6">
+            <p className="text-foreground-secondary mb-6">
               Are you sure you want to archive <strong>{contact.name}</strong>?
               The contact will be marked as inactive and hidden from active lists, but can be restored later.
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowArchiveDialog(false)}
-                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-lg border border-slate-600 text-foreground-secondary hover:bg-slate-700 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleArchive}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-amber-500 text-foreground hover:bg-amber-400 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isDeleting ? (
                   <>
@@ -1128,20 +1128,20 @@ export default function EditContactPage() {
                 This action cannot be undone. All data associated with this contact will be permanently deleted.
               </p>
             </div>
-            <p className="text-slate-300 mb-6">
+            <p className="text-foreground-secondary mb-6">
               Are you sure you want to permanently delete <strong>{contact.name}</strong>?
             </p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteDialog(false)}
-                className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-lg border border-slate-600 text-foreground-secondary hover:bg-slate-700 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePermanentDelete}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-400 transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-red-500 text-foreground hover:bg-red-400 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {isDeleting ? (
                   <>

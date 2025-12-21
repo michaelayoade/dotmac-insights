@@ -47,7 +47,7 @@ interface LineItemProps {
   pct?: number;
 }
 
-function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white', pct }: LineItemProps) {
+function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-foreground', pct }: LineItemProps) {
   return (
     <div
       className={cn(
@@ -56,7 +56,7 @@ function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white', p
       )}
       style={{ paddingLeft: `${indent * 1.5}rem` }}
     >
-      <span className={bold ? colorClass : 'text-slate-300'}>{name}</span>
+      <span className={bold ? colorClass : 'text-foreground-secondary'}>{name}</span>
       <div className="flex items-center gap-4">
         {pct !== undefined && (
           <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
@@ -217,7 +217,7 @@ export default function IncomeStatementPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Statement of Profit or Loss</h2>
+          <h2 className="text-lg font-semibold text-foreground">Statement of Profit or Loss</h2>
           {data?.period && (
             <span className="text-slate-muted text-sm">
               {data.period.start_date} to {data.period.end_date}
@@ -268,7 +268,7 @@ export default function IncomeStatementPage() {
                 setCommonSize(false);
                 setBasis('');
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
             </button>
@@ -276,14 +276,14 @@ export default function IncomeStatementPage() {
           <div className="flex gap-2">
             <button
               onClick={() => exportStatement('csv')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
             </button>
             <button
               onClick={() => exportStatement('pdf')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
@@ -365,7 +365,7 @@ export default function IncomeStatementPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Calculator className="w-5 h-5 text-orange-400" />
-              <span className="text-white font-semibold">Gross Profit</span>
+              <span className="text-foreground font-semibold">Gross Profit</span>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-slate-muted text-sm">{formatPercent(grossMargin)}</span>
@@ -389,7 +389,7 @@ export default function IncomeStatementPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <BarChart2 className="w-5 h-5 text-blue-400" />
-              <span className="text-white font-semibold">Operating Income (EBIT)</span>
+              <span className="text-foreground font-semibold">Operating Income (EBIT)</span>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-slate-muted text-sm">{formatPercent(operatingMargin)}</span>
@@ -435,7 +435,7 @@ export default function IncomeStatementPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Calculator className="w-5 h-5 text-purple-400" />
-              <span className="text-white font-semibold">Profit Before Tax (EBT)</span>
+              <span className="text-foreground font-semibold">Profit Before Tax (EBT)</span>
             </div>
             <span className="font-mono font-bold text-purple-400">{formatCurrency(profitBeforeTax, currency)}</span>
           </div>
@@ -482,7 +482,7 @@ export default function IncomeStatementPage() {
 
       {/* Profitability Summary */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
           <Percent className="w-5 h-5 text-teal-electric" />
           Profitability Metrics (IAS 1)
         </h3>
@@ -503,7 +503,7 @@ export default function IncomeStatementPage() {
 
       {/* P&L Summary */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">P&L Waterfall</h3>
+        <h3 className="text-foreground font-semibold mb-4">P&L Waterfall</h3>
         <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Revenue</p>

@@ -37,7 +37,7 @@ function StatementRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-white font-semibold">
+            <p className="text-foreground font-semibold">
               {statement.period_start} to {statement.period_end}
             </p>
             <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyle.bg, statusStyle.text)}>
@@ -51,7 +51,7 @@ function StatementRow({
       </div>
       <div className="flex items-center gap-6">
         <div className="text-right hidden sm:block">
-          <p className="text-white font-semibold">{statement.total_amount.toLocaleString()}</p>
+          <p className="text-foreground font-semibold">{statement.total_amount.toLocaleString()}</p>
           <p className="text-slate-muted text-xs">Total amount</p>
         </div>
         <div className="text-right hidden md:block">
@@ -67,7 +67,7 @@ function StatementRow({
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/30 rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -78,7 +78,7 @@ function StatementRow({
                 <Link
                   href={`/expenses/transactions?statement_id=${statement.id}`}
                   onClick={() => setMenuOpen(false)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                 >
                   <Eye className="w-4 h-4" />
                   View transactions
@@ -96,7 +96,7 @@ function StatementRow({
                   <>
                     <button
                       onClick={() => { onAction('close', statement); setMenuOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                     >
                       <Lock className="w-4 h-4" />
                       Close statement
@@ -167,12 +167,12 @@ export default function StatementsPage() {
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Card Statements</h1>
+            <h1 className="text-xl font-bold text-foreground">Card Statements</h1>
             <p className="text-slate-muted text-sm mt-1">Import and reconcile corporate card statements</p>
           </div>
           <Link
             href="/expenses/statements/import"
-            className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-white font-semibold shadow hover:bg-sky-400 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-foreground font-semibold shadow hover:bg-sky-400 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Import Statement
@@ -185,7 +185,7 @@ export default function StatementsPage() {
         <select
           value={cardFilter}
           onChange={(e) => setCardFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:outline-none focus:border-sky-500"
+          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-sky-500"
         >
           <option value="">All cards</option>
           {cards?.map((card) => (
@@ -197,7 +197,7 @@ export default function StatementsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:outline-none focus:border-sky-500"
+          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-sky-500"
         >
           <option value="">All statuses</option>
           <option value="open">Open</option>
@@ -211,7 +211,7 @@ export default function StatementsPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-border bg-slate-card p-4">
             <p className="text-slate-muted text-sm">Open statements</p>
-            <p className="text-2xl font-bold text-white mt-1">
+            <p className="text-2xl font-bold text-foreground mt-1">
               {statements.filter((s) => s.status === 'open').length}
             </p>
           </div>
@@ -223,7 +223,7 @@ export default function StatementsPage() {
           </div>
           <div className="rounded-xl border border-slate-border bg-slate-card p-4">
             <p className="text-slate-muted text-sm">Total transactions</p>
-            <p className="text-2xl font-bold text-white mt-1">
+            <p className="text-2xl font-bold text-foreground mt-1">
               {statements.reduce((sum, s) => sum + s.transaction_count, 0)}
             </p>
           </div>
@@ -238,11 +238,11 @@ export default function StatementsPage() {
         {!isLoading && (!statements || statements.length === 0) && (
           <div className="text-center py-12 bg-slate-card border border-slate-border rounded-2xl">
             <FileSpreadsheet className="w-12 h-12 mx-auto text-slate-muted mb-3" />
-            <p className="text-white font-semibold">No statements found</p>
+            <p className="text-foreground font-semibold">No statements found</p>
             <p className="text-slate-muted text-sm mt-1">Import a statement to get started</p>
             <button
               onClick={() => handleInfo('Statement import wizard coming soon')}
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-sky-500 text-white font-semibold hover:bg-sky-400 transition-colors"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-sky-500 text-foreground font-semibold hover:bg-sky-400 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Import statement

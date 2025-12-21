@@ -227,7 +227,7 @@ export default function AnalyticsPage() {
                       'px-4 py-2 text-sm font-medium rounded-md transition-all',
                       timeRange === range
                         ? 'bg-teal-electric/20 text-teal-electric'
-                        : 'text-slate-muted hover:text-white'
+                        : 'text-slate-muted hover:text-foreground'
                     )}
                   >
                     {range}M
@@ -237,7 +237,7 @@ export default function AnalyticsPage() {
 
               <button
                 onClick={retryAll}
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Refresh data
@@ -299,8 +299,8 @@ export default function AnalyticsPage() {
             className={cn(
               'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all',
               activeTab === tab.id
-                ? 'bg-slate-card text-white'
-                : 'text-slate-muted hover:text-white'
+                ? 'bg-slate-card text-foreground'
+                : 'text-slate-muted hover:text-foreground'
             )}
           >
             <tab.icon className="w-4 h-4" />
@@ -436,7 +436,7 @@ export default function AnalyticsPage() {
                     header: 'Customer',
                     render: (item) => (
                       <div>
-                        <p className="text-white font-medium font-body">{item.name as string}</p>
+                        <p className="text-foreground font-medium font-body">{item.name as string}</p>
                         <p className="text-slate-muted text-xs">{String(item.account_number || '—')}</p>
                       </div>
                     ),
@@ -515,7 +515,7 @@ export default function AnalyticsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-slate-elevated/50 rounded-lg text-center">
                       <p className="text-slate-muted text-sm mb-1">Total Quotations</p>
-                      <p className="text-2xl font-bold font-mono text-white">
+                      <p className="text-2xl font-bold font-mono text-foreground">
                         {pipelineData.quotations.total.toLocaleString()}
                       </p>
                       <p className="text-teal-electric text-sm font-mono">
@@ -524,7 +524,7 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="p-4 bg-slate-elevated/50 rounded-lg text-center">
                       <p className="text-slate-muted text-sm mb-1">Total Orders</p>
-                      <p className="text-2xl font-bold font-mono text-white">
+                      <p className="text-2xl font-bold font-mono text-foreground">
                         {pipelineData.orders.total.toLocaleString()}
                       </p>
                       <p className="text-teal-electric text-sm font-mono">
@@ -534,7 +534,7 @@ export default function AnalyticsPage() {
                   </div>
 
                   <div className="pt-4 border-t border-slate-border">
-                    <h4 className="text-sm font-medium text-white mb-3">Quotations by Status</h4>
+                    <h4 className="text-sm font-medium text-foreground mb-3">Quotations by Status</h4>
                     <div className="space-y-2">
                       {(Object.entries(pipelineData.quotations.by_status) as Array<
                         [string, { count: number; value: number }]
@@ -542,7 +542,7 @@ export default function AnalyticsPage() {
                         <div key={status} className="flex items-center justify-between text-sm">
                           <span className="text-slate-muted capitalize">{status.replace(/_/g, ' ')}</span>
                           <div className="text-right">
-                            <span className="text-white font-mono">{data.count}</span>
+                            <span className="text-foreground font-mono">{data.count}</span>
                             <span className="text-slate-muted ml-2">
                               ({formatCurrency(data.value, currency)})
                             </span>
@@ -651,8 +651,8 @@ export default function AnalyticsPage() {
                     </p>
                   </div>
                   <div className="pt-4 border-t border-slate-border">
-                    <p className="text-slate-muted text-sm mb-3">Total Tickets: <span className="text-white font-mono">{slaData.total_tickets.toLocaleString()}</span></p>
-                    <p className="text-slate-muted text-sm">Period: <span className="text-white">{slaData.period_days} days</span></p>
+                    <p className="text-slate-muted text-sm mb-3">Total Tickets: <span className="text-foreground font-mono">{slaData.total_tickets.toLocaleString()}</span></p>
+                    <p className="text-slate-muted text-sm">Period: <span className="text-foreground">{slaData.period_days} days</span></p>
                   </div>
                 </div>
               ) : (
@@ -736,7 +736,7 @@ export default function AnalyticsPage() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-muted">{label}</span>
                           <div className="text-right">
-                            <span className="text-white font-mono">
+                            <span className="text-foreground font-mono">
                               {formatCurrency(bucket.amount, currency)}
                             </span>
                             <span className="text-slate-muted ml-2">
@@ -756,7 +756,7 @@ export default function AnalyticsPage() {
 
                   <div className="pt-4 mt-4 border-t border-slate-border">
                     <div className="flex items-center justify-between">
-                      <span className="text-white font-semibold">Total Outstanding</span>
+                      <span className="text-foreground font-semibold">Total Outstanding</span>
                       <span className="text-amber-warn font-mono font-bold">
                         {formatCurrency(invoiceAging.total_outstanding, currency)}
                       </span>
@@ -785,7 +785,7 @@ export default function AnalyticsPage() {
                   >).map(([segment, data]) => (
                     <div key={segment} className="p-4 bg-slate-elevated/50 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-white font-medium capitalize">{segment}</span>
+                        <span className="text-foreground font-medium capitalize">{segment}</span>
                         <span className="text-amber-warn font-mono font-bold">
                           {formatCurrency(data.total.amount, currency)}
                         </span>
@@ -815,7 +815,7 @@ export default function AnalyticsPage() {
 
                   <div className="pt-4 border-t border-slate-border">
                     <div className="flex items-center justify-between">
-                      <span className="text-white font-semibold">Total Outstanding</span>
+                      <span className="text-foreground font-semibold">Total Outstanding</span>
                       <span className="text-amber-warn font-mono font-bold">
                         {formatCurrency(agingBySegment.total_outstanding, currency)}
                       </span>
@@ -1098,7 +1098,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center p-4 bg-slate-elevated/50 rounded-lg">
               <p className="text-slate-muted text-sm mb-2">Active Customers</p>
-              <p className="text-3xl font-bold font-mono text-white">
+              <p className="text-3xl font-bold font-mono text-foreground">
                 {formatNumber(overview.customers.active)}
               </p>
               <p className="text-slate-muted text-xs mt-1">
@@ -1121,7 +1121,7 @@ export default function AnalyticsPage() {
               <p className={cn(
                 'text-3xl font-bold font-mono',
                 overview.customers.churn_rate > 5 ? 'text-coral-alert' :
-                overview.customers.churn_rate > 2 ? 'text-amber-warn' : 'text-white'
+                overview.customers.churn_rate > 2 ? 'text-amber-warn' : 'text-foreground'
               )}>
                 {formatPercent(overview.customers.churn_rate)}
               </p>
@@ -1132,7 +1132,7 @@ export default function AnalyticsPage() {
 
             <div className="text-center p-4 bg-slate-elevated/50 rounded-lg">
               <p className="text-slate-muted text-sm mb-2">ARPU</p>
-              <p className="text-3xl font-bold font-mono text-white">
+              <p className="text-3xl font-bold font-mono text-foreground">
                 {overview.customers.active > 0
                   ? formatCurrency(overview.revenue.mrr / overview.customers.active, currency)
                   : formatCurrency(0, currency)}

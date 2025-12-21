@@ -58,7 +58,7 @@ function PriorityBadge({ priority }: { priority: string }) {
     urgent: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
     high: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
     medium: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    low: 'bg-slate-500/10 text-slate-300 border-slate-500/30',
+    low: 'bg-slate-500/10 text-foreground-secondary border-slate-500/30',
   };
   const color = colors[priority] || colors.medium;
 
@@ -140,7 +140,7 @@ export default function SupportTicketDetailPage() {
         <p className="text-red-400">Failed to load ticket</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -254,7 +254,7 @@ export default function SupportTicketDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/support/tickets"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -265,7 +265,7 @@ export default function SupportTicketDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold text-white">
+                <h1 className="text-xl font-semibold text-foreground">
                   {ticket.ticket_number || `#${ticket.id}`}
                 </h1>
                 {isOverdue && (
@@ -288,12 +288,12 @@ export default function SupportTicketDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <User className="w-4 h-4 text-teal-electric" />
               Customer
             </h3>
             <div className="space-y-1">
-              <p className="text-white font-medium">{ticket.customer_name || 'Unknown'}</p>
+              <p className="text-foreground font-medium">{ticket.customer_name || 'Unknown'}</p>
               {ticket.customer_email && (
                 <p className="text-slate-muted text-sm">{ticket.customer_email}</p>
               )}
@@ -307,12 +307,12 @@ export default function SupportTicketDetailPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <Users className="w-4 h-4 text-teal-electric" />
               Assignment
             </h3>
             <div className="space-y-1">
-              <p className={cn('text-sm', ticket.assigned_to ? 'text-white' : 'text-amber-400')}>
+              <p className={cn('text-sm', ticket.assigned_to ? 'text-foreground' : 'text-amber-400')}>
                 {ticket.assigned_to || 'Unassigned'}
               </p>
               {ticket.resolution_team && (
@@ -325,7 +325,7 @@ export default function SupportTicketDetailPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <Tag className="w-4 h-4 text-teal-electric" />
               Details
             </h3>
@@ -343,7 +343,7 @@ export default function SupportTicketDetailPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <Clock className="w-4 h-4 text-teal-electric" />
               SLA & Dates
             </h3>
@@ -367,7 +367,7 @@ export default function SupportTicketDetailPage() {
 
         {ticket.description && (
           <div className="mt-4 pt-4 border-t border-slate-border">
-            <h3 className="text-white font-semibold mb-2">Description</h3>
+            <h3 className="text-foreground font-semibold mb-2">Description</h3>
             <p className="text-slate-200 text-sm whitespace-pre-line">{ticket.description}</p>
           </div>
         )}
@@ -411,7 +411,7 @@ export default function SupportTicketDetailPage() {
         renderRow={(c) => (
           <div className="flex flex-col gap-1 border-b border-slate-border/60 pb-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-white font-medium">{c.commented_by_name || c.commented_by || 'Unknown'}</span>
+              <span className="text-foreground font-medium">{c.commented_by_name || c.commented_by || 'Unknown'}</span>
               <div className="flex items-center gap-2">
                 <span className="text-slate-muted text-xs">{formatTimeAgo(c.comment_date || c.created_at)}</span>
                 <span className="text-slate-muted text-xs">{formatDate(c.comment_date || c.created_at)}</span>
@@ -435,7 +435,7 @@ export default function SupportTicketDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Send className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Add comment</h3>
+          <h3 className="text-foreground font-semibold">Add comment</h3>
         </div>
         {addError && <p className="text-red-400 text-sm">{addError}</p>}
         <form onSubmit={handleAddComment} className="space-y-3">
@@ -443,7 +443,7 @@ export default function SupportTicketDetailPage() {
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             rows={3}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             placeholder="Write a public comment..."
           />
           <div className="flex justify-end">
@@ -465,7 +465,7 @@ export default function SupportTicketDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Assign ticket</h3>
+            <h3 className="text-foreground font-semibold">Assign ticket</h3>
           </div>
           {assignError && <p className="text-red-400 text-sm">{assignError}</p>}
           <form onSubmit={handleAssign} className="space-y-3">
@@ -474,7 +474,7 @@ export default function SupportTicketDetailPage() {
               <select
                 value={assignForm.agent_id}
                 onChange={(e) => setAssignForm((f) => ({ ...f, agent_id: e.target.value }))}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="">-- Select an agent --</option>
                 {agents.filter((a: any) => a.is_active).map((agent: any) => (
@@ -489,7 +489,7 @@ export default function SupportTicketDetailPage() {
               <select
                 value={assignForm.team_id}
                 onChange={(e) => setAssignForm((f) => ({ ...f, team_id: e.target.value }))}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="">-- Select a team --</option>
                 {teams.map((team: any) => (
@@ -504,7 +504,7 @@ export default function SupportTicketDetailPage() {
               <input
                 value={assignForm.assigned_to}
                 onChange={(e) => setAssignForm((f) => ({ ...f, assigned_to: e.target.value }))}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Display name or email"
               />
             </div>
@@ -524,7 +524,7 @@ export default function SupportTicketDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">SLA override</h3>
+            <h3 className="text-foreground font-semibold">SLA override</h3>
           </div>
           {slaError && <p className="text-red-400 text-sm">{slaError}</p>}
           <form onSubmit={handleSlaSave} className="space-y-3">
@@ -535,7 +535,7 @@ export default function SupportTicketDetailPage() {
                   type="datetime-local"
                   value={slaForm.response_by}
                   onChange={(e) => setSlaForm((f) => ({ ...f, response_by: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -544,7 +544,7 @@ export default function SupportTicketDetailPage() {
                   type="datetime-local"
                   value={slaForm.resolution_by}
                   onChange={(e) => setSlaForm((f) => ({ ...f, resolution_by: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -554,7 +554,7 @@ export default function SupportTicketDetailPage() {
                 value={slaForm.reason}
                 onChange={(e) => setSlaForm((f) => ({ ...f, reason: e.target.value }))}
                 rows={2}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Why the SLA was adjusted"
               />
             </div>
@@ -575,13 +575,13 @@ export default function SupportTicketDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <ActivitySquare className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Log activity</h3>
+          <h3 className="text-foreground font-semibold">Log activity</h3>
         </div>
         <form onSubmit={handleAddActivity} className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select
             value={activityForm.activity_type}
             onChange={(e) => setActivityForm({ ...activityForm, activity_type: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="Status Change">Status Change</option>
             <option value="Update">Update</option>
@@ -591,7 +591,7 @@ export default function SupportTicketDetailPage() {
             value={activityForm.activity}
             onChange={(e) => setActivityForm({ ...activityForm, activity: e.target.value })}
             placeholder="Activity detail"
-            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <div className="md:col-span-3 flex justify-end">
             <button
@@ -608,19 +608,19 @@ export default function SupportTicketDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Add communication</h3>
+          <h3 className="text-foreground font-semibold">Add communication</h3>
         </div>
         <form onSubmit={handleAddCommunication} className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <input
             value={commForm.subject}
             onChange={(e) => setCommForm({ ...commForm, subject: e.target.value })}
             placeholder="Subject"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <select
             value={commForm.communication_type}
             onChange={(e) => setCommForm({ ...commForm, communication_type: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="Email">Email</option>
             <option value="Chat">Chat</option>
@@ -630,7 +630,7 @@ export default function SupportTicketDetailPage() {
             value={commForm.content}
             onChange={(e) => setCommForm({ ...commForm, content: e.target.value })}
             placeholder="Body/content"
-            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-h-[100px]"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-h-[100px]"
           />
           <div className="md:col-span-2 flex justify-end">
             <button
@@ -647,20 +647,20 @@ export default function SupportTicketDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Link2 className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Add dependency</h3>
+          <h3 className="text-foreground font-semibold">Add dependency</h3>
         </div>
         <form onSubmit={handleAddDependency} className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             value={depForm.depends_on_ticket_id}
             onChange={(e) => setDepForm({ ...depForm, depends_on_ticket_id: e.target.value })}
             placeholder="Depends on ticket ID"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <input
             value={depForm.depends_on_subject}
             onChange={(e) => setDepForm({ ...depForm, depends_on_subject: e.target.value })}
             placeholder="Subject/description"
-            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <div className="md:col-span-3 flex justify-end">
             <button
@@ -704,7 +704,7 @@ export default function SupportTicketDetailPage() {
         renderRow={(c) => (
           <div className="flex flex-col gap-1 border-b border-slate-border/60 pb-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-white font-semibold">{c.subject || c.communication_type || 'Communication'}</span>
+              <span className="text-foreground font-semibold">{c.subject || c.communication_type || 'Communication'}</span>
               <span className="text-slate-muted text-xs">{formatDate(c.communication_date)}</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
@@ -734,7 +734,7 @@ export default function SupportTicketDetailPage() {
         renderRow={(d) => (
           <div className="flex items-center justify-between border-b border-slate-border/60 pb-3">
             <div className="space-y-1">
-              <p className="text-white font-semibold">{d.depends_on_subject || `Ticket #${d.depends_on_ticket_id}`}</p>
+              <p className="text-foreground font-semibold">{d.depends_on_subject || `Ticket #${d.depends_on_ticket_id}`}</p>
               <p className="text-xs text-slate-muted">Status: {d.depends_on_status || '-'}</p>
             </div>
             <span className="text-slate-muted text-xs font-mono">{d.depends_on_erpnext_id || d.depends_on_ticket_id || ''}</span>
@@ -750,7 +750,7 @@ export default function SupportTicketDetailPage() {
         renderRow={(e) => (
           <div className="flex items-start justify-between border-b border-slate-border/60 pb-3">
             <div className="space-y-1">
-              <p className="text-white font-semibold">{e.expense_type || 'Expense'}</p>
+              <p className="text-foreground font-semibold">{e.expense_type || 'Expense'}</p>
               <p className="text-slate-200 text-sm">{e.description || '-'}</p>
               <div className="flex gap-3 text-xs text-slate-muted">
                 <span>Claimed: {e.total_claimed_amount ?? 0}</span>
@@ -784,7 +784,7 @@ function Section({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="text-white font-semibold">{title}</h3>
+          <h3 className="text-foreground font-semibold">{title}</h3>
         </div>
         <span className="text-xs text-slate-muted">{rows.length} items</span>
       </div>

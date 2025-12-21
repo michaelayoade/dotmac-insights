@@ -22,7 +22,7 @@ export default function DunningQueuePage() {
       key: 'balance',
       header: 'Balance',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.balance, item.currency || 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.balance, item.currency || 'NGN')}</span>,
     },
     { key: 'last_dunning_stage', header: 'Last Stage' },
   ];
@@ -38,7 +38,7 @@ export default function DunningQueuePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dunning Queue</h1>
+          <h1 className="text-2xl font-bold text-foreground">Dunning Queue</h1>
           <p className="text-slate-muted text-sm">Invoices ready for follow-up notices.</p>
         </div>
         <button

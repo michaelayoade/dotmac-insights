@@ -62,7 +62,7 @@ export default function WHTPage() {
         </span>
       ),
     },
-    { key: 'supplier_name', header: 'Supplier', render: (item: any) => <span className="text-white">{item.supplier_name}</span> },
+    { key: 'supplier_name', header: 'Supplier', render: (item: any) => <span className="text-foreground">{item.supplier_name}</span> },
     {
       key: 'supplier_tin',
       header: 'TIN',
@@ -76,7 +76,7 @@ export default function WHTPage() {
       key: 'gross_amount',
       header: 'Gross',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.gross_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_amount, 'NGN')}</span>,
     },
     {
       key: 'wht_rate',
@@ -122,14 +122,14 @@ export default function WHTPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-amber-400" />
-            <h1 className="text-xl font-semibold text-white">Withholding Tax (WHT)</h1>
+            <h1 className="text-xl font-semibold text-foreground">Withholding Tax (WHT)</h1>
           </div>
         </div>
         <button
@@ -160,7 +160,7 @@ export default function WHTPage() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xl font-semibold text-white font-mono">{formatCurrency(remittanceDue.total_deducted, 'NGN')}</p>
+              <p className="text-xl font-semibold text-foreground font-mono">{formatCurrency(remittanceDue.total_deducted, 'NGN')}</p>
               <p className="text-sm text-slate-muted">
                 Due: {formatDate(remittanceDue.deadline)}
                 {remittanceDue.is_overdue && (
@@ -214,7 +214,7 @@ export default function WHTPage() {
 
       {/* WHT Rate Guide */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-teal-electric" />
           WHT Rate Guide
         </h3>
@@ -271,11 +271,11 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
   return (
     <form onSubmit={handleSubmit} className="bg-slate-card border border-amber-500/30 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <Plus className="w-4 h-4 text-amber-400" />
           Deduct Withholding Tax
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-white text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -327,7 +327,7 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
       <button
         type="button"
         onClick={() => setShowMore(!showMore)}
-        className="flex items-center gap-2 text-sm text-slate-muted hover:text-white"
+        className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options
@@ -364,7 +364,7 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
         <div className="text-sm space-y-1">
           <div>
             <span className="text-slate-muted">WHT Rate: </span>
-            <span className={cn('font-mono', !hasTIN && form.gross_amount ? 'text-amber-400' : 'text-white')}>
+            <span className={cn('font-mono', !hasTIN && form.gross_amount ? 'text-amber-400' : 'text-foreground')}>
               {effectiveRate}%
             </span>
           </div>
@@ -374,7 +374,7 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
           </div>
           <div>
             <span className="text-slate-muted">Net Payment: </span>
-            <span className="text-white font-mono">{formatCurrency(Number(form.gross_amount || 0) - whtAmount, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatCurrency(Number(form.gross_amount || 0) - whtAmount, 'NGN')}</span>
           </div>
         </div>
         <button

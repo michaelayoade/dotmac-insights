@@ -103,14 +103,14 @@ export default function TaxSettingsPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-slate-muted" />
-            <h1 className="text-xl font-semibold text-white">Tax Settings</h1>
+            <h1 className="text-xl font-semibold text-foreground">Tax Settings</h1>
           </div>
         </div>
         {saved && (
@@ -126,7 +126,7 @@ export default function TaxSettingsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="w-5 h-5 text-purple-400" />
-            <h2 className="text-white font-semibold">Company Information</h2>
+            <h2 className="text-foreground font-semibold">Company Information</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -178,7 +178,7 @@ export default function TaxSettingsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-blue-400" />
-            <h2 className="text-white font-semibold">VAT Settings</h2>
+            <h2 className="text-foreground font-semibold">VAT Settings</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -189,7 +189,7 @@ export default function TaxSettingsPage() {
                   onChange={(e) => setForm({ ...form, vat_registered: e.target.checked })}
                   className="rounded border-slate-border bg-slate-elevated text-teal-electric focus:ring-teal-electric"
                 />
-                <span className="text-sm text-white">VAT Registered</span>
+                <span className="text-sm text-foreground">VAT Registered</span>
               </label>
               <p className="text-xs text-slate-muted ml-6">Check if your company is registered for VAT</p>
             </div>
@@ -226,7 +226,7 @@ export default function TaxSettingsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-white font-semibold">WHT & PAYE Settings</h2>
+            <h2 className="text-foreground font-semibold">WHT & PAYE Settings</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -237,7 +237,7 @@ export default function TaxSettingsPage() {
                   onChange={(e) => setForm({ ...form, auto_calculate_wht: e.target.checked })}
                   className="rounded border-slate-border bg-slate-elevated text-teal-electric focus:ring-teal-electric"
                 />
-                <span className="text-sm text-white">Auto-calculate WHT</span>
+                <span className="text-sm text-foreground">Auto-calculate WHT</span>
               </label>
               <p className="text-xs text-slate-muted ml-6">Automatically calculate WHT on applicable transactions</p>
             </div>
@@ -260,7 +260,7 @@ export default function TaxSettingsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="w-5 h-5 text-purple-400" />
-            <h2 className="text-white font-semibold">CIT Settings</h2>
+            <h2 className="text-foreground font-semibold">CIT Settings</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -296,7 +296,7 @@ export default function TaxSettingsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-white font-semibold">E-Invoice (FIRS BIS 3.0)</h2>
+            <h2 className="text-foreground font-semibold">E-Invoice (FIRS BIS 3.0)</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -307,7 +307,7 @@ export default function TaxSettingsPage() {
                   onChange={(e) => setForm({ ...form, einvoice_enabled: e.target.checked })}
                   className="rounded border-slate-border bg-slate-elevated text-teal-electric focus:ring-teal-electric"
                 />
-                <span className="text-sm text-white">Enable E-Invoicing</span>
+                <span className="text-sm text-foreground">Enable E-Invoicing</span>
               </label>
               <p className="text-xs text-slate-muted ml-6">Submit invoices to FIRS for validation</p>
             </div>
@@ -332,7 +332,7 @@ export default function TaxSettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-white font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
           >
             {saving ? (
               <>

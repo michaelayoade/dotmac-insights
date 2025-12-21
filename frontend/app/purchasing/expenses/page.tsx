@@ -123,7 +123,7 @@ export default function PurchasingExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Receipt className="w-4 h-4 text-teal-electric" />
-          <span className="font-mono text-white font-medium">
+          <span className="font-mono text-foreground font-medium">
             {item.voucher_no || `#${item.id}`}
           </span>
         </div>
@@ -135,7 +135,7 @@ export default function PurchasingExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <User className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[180px]">
+          <span className="text-foreground-secondary truncate max-w-[180px]">
             {item.party || item.employee_name || '-'}
           </span>
         </div>
@@ -147,7 +147,7 @@ export default function PurchasingExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[200px]">
+          <span className="text-foreground-secondary truncate max-w-[200px]">
             {item.purpose || item.account || '-'}
           </span>
         </div>
@@ -159,7 +159,7 @@ export default function PurchasingExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3 text-slate-muted" />
-          <span className="text-slate-300">{formatDate(item.posting_date)}</span>
+          <span className="text-foreground-secondary">{formatDate(item.posting_date)}</span>
         </div>
       ),
     },
@@ -168,7 +168,7 @@ export default function PurchasingExpensesPage() {
       header: 'Claimed',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white font-medium">
+        <span className="font-mono text-foreground font-medium">
           {formatCurrency(item.total_claimed_amount || item.amount)}
         </span>
       ),
@@ -223,7 +223,7 @@ export default function PurchasingExpensesPage() {
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Expenses</h1>
+          <h1 className="text-2xl font-bold text-foreground">Expenses</h1>
           <p className="text-slate-muted text-sm">Track expense claims, reimbursements, and approvals</p>
         </div>
         <button
@@ -242,7 +242,7 @@ export default function PurchasingExpensesPage() {
             <Receipt className="w-4 h-4 text-teal-electric" />
             <p className="text-slate-muted text-sm">Total Expenses</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(total)}</p>
         </div>
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -267,7 +267,7 @@ export default function PurchasingExpensesPage() {
             <Building2 className="w-4 h-4 text-violet-400" />
             <p className="text-slate-muted text-sm">Expense Types</p>
           </div>
-          <p className="text-xl font-bold text-white">
+          <p className="text-xl font-bold text-foreground">
             {formatNumber(expenseTypes.length)}
           </p>
         </div>
@@ -277,7 +277,7 @@ export default function PurchasingExpensesPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex-1 min-w-[200px] max-w-md relative">
@@ -290,7 +290,7 @@ export default function PurchasingExpensesPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <select
@@ -299,7 +299,7 @@ export default function PurchasingExpensesPage() {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Status</option>
             <option value="draft">Draft</option>
@@ -316,7 +316,7 @@ export default function PurchasingExpensesPage() {
                 setExpenseType(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
             >
               <option value="">All Types</option>
               {expenseTypes.map((type: any) => (
@@ -334,7 +334,7 @@ export default function PurchasingExpensesPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="Start date"
             />
             <span className="text-slate-muted">to</span>
@@ -345,7 +345,7 @@ export default function PurchasingExpensesPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="End date"
             />
           </div>
@@ -359,7 +359,7 @@ export default function PurchasingExpensesPage() {
                 setEndDate('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

@@ -75,7 +75,7 @@ export default function ReportsOverviewPage() {
         )}
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Reports</h1>
+          <h1 className="text-xl font-semibold text-foreground">Reports</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -89,7 +89,7 @@ export default function ReportsOverviewPage() {
                 <card.icon className="w-4 h-4 text-teal-electric" />
                 {card.title}
               </div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {card.loading ? '—' : formatCurrency(card.value || 0, 'NGN')}
               </p>
               <p className="text-slate-muted text-sm">{card.sub}</p>
@@ -104,7 +104,7 @@ export default function ReportsOverviewPage() {
           >
             <div>
               <p className="text-sm text-slate-muted">Revenue</p>
-              <p className="text-white font-semibold">Trends, customers, products</p>
+              <p className="text-foreground font-semibold">Trends, customers, products</p>
             </div>
             <TrendingUp className="w-5 h-5 text-teal-electric" />
           </Link>
@@ -114,7 +114,7 @@ export default function ReportsOverviewPage() {
           >
             <div>
               <p className="text-sm text-slate-muted">Expenses</p>
-              <p className="text-white font-semibold">Trend and vendor breakdown</p>
+              <p className="text-foreground font-semibold">Trend and vendor breakdown</p>
             </div>
             <FileText className="w-5 h-5 text-teal-electric" />
           </Link>
@@ -124,7 +124,7 @@ export default function ReportsOverviewPage() {
           >
             <div>
               <p className="text-sm text-slate-muted">Profitability</p>
-              <p className="text-white font-semibold">Margins and segments</p>
+              <p className="text-foreground font-semibold">Margins and segments</p>
             </div>
             <Calculator className="w-5 h-5 text-teal-electric" />
           </Link>
@@ -134,7 +134,7 @@ export default function ReportsOverviewPage() {
           >
             <div>
               <p className="text-sm text-slate-muted">Cash Position</p>
-              <p className="text-white font-semibold">Balances, forecast, runway</p>
+              <p className="text-foreground font-semibold">Balances, forecast, runway</p>
             </div>
             <CreditCard className="w-5 h-5 text-teal-electric" />
           </Link>

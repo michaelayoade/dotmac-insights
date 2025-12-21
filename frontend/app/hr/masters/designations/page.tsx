@@ -82,11 +82,11 @@ export default function DesignationsPage() {
             type="text"
             value={formData.designation_name}
             onChange={(e) => setFormData({ ...formData, designation_name: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             autoFocus
           />
         ) : (
-          <span className="text-white font-medium">{item.designation_name || item.name}</span>
+          <span className="text-foreground font-medium">{item.designation_name || item.name}</span>
         ),
     },
     {
@@ -98,7 +98,7 @@ export default function DesignationsPage() {
             type="text"
             value={formData.description || ''}
             onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             placeholder="Description"
           />
         ) : (
@@ -148,7 +148,7 @@ export default function DesignationsPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -173,7 +173,7 @@ export default function DesignationsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Designations</h1>
+            <h1 className="text-xl font-semibold text-foreground">Designations</h1>
           </div>
           {!isCreating && (
             <button
@@ -195,7 +195,7 @@ export default function DesignationsPage() {
 
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Designation</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Designation</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Designation Name *</label>
@@ -203,7 +203,7 @@ export default function DesignationsPage() {
                   type="text"
                   value={formData.designation_name}
                   onChange={(e) => setFormData({ ...formData, designation_name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   autoFocus
                 />
               </div>
@@ -213,7 +213,7 @@ export default function DesignationsPage() {
                   type="text"
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -221,7 +221,7 @@ export default function DesignationsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.designation_name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>

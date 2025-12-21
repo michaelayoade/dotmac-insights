@@ -50,7 +50,7 @@ export default function PurchasingPaymentDetailPage() {
         <p className="text-red-400">Failed to load payment</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -74,14 +74,14 @@ export default function PurchasingPaymentDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/purchasing/payments"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to payments
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Vendor Payment</p>
-            <h1 className="text-xl font-semibold text-white">{data.receipt_number || `Payment #${data.id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{data.receipt_number || `Payment #${data.id}`}</h1>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function PurchasingPaymentDetailPage() {
         {summary.map((row) => (
           <div key={row.label}>
             <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className="text-white font-semibold break-all">{row.value}</p>
+            <p className="text-foreground font-semibold break-all">{row.value}</p>
           </div>
         ))}
       </div>
@@ -99,7 +99,7 @@ export default function PurchasingPaymentDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Supplier</h3>
+            <h3 className="text-foreground font-semibold">Supplier</h3>
           </div>
           <p className="text-slate-200 text-sm">
             {data.supplier_name || (data as any).supplier || 'Unknown supplier'}
@@ -121,7 +121,7 @@ export default function PurchasingPaymentDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Receipt className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Notes</h3>
+            <h3 className="text-foreground font-semibold">Notes</h3>
           </div>
           <p className="text-slate-muted text-sm">{data.notes || 'No notes provided'}</p>
         </div>

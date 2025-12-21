@@ -79,7 +79,7 @@ export default function AccountsReceivablePage() {
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
           <div className="flex flex-col">
-            <span className="text-white text-sm">{item.customer_name || 'Customer'}</span>
+            <span className="text-foreground text-sm">{item.customer_name || 'Customer'}</span>
             <span className="text-xs text-slate-muted font-mono">#{item.customer_id}</span>
           </div>
         </div>
@@ -90,7 +90,7 @@ export default function AccountsReceivablePage() {
       header: 'Total Receivable',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total_receivable)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total_receivable)}</span>
       ),
     },
     {
@@ -129,7 +129,7 @@ export default function AccountsReceivablePage() {
       key: 'invoice_count',
       header: '# Invoices',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.invoice_count}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.invoice_count}</span>,
     },
     {
       key: 'oldest_invoice_date',
@@ -153,7 +153,7 @@ export default function AccountsReceivablePage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total AR</p>
-          <p className="text-2xl font-bold text-white">{formatCurrency(data?.total_receivable)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(data?.total_receivable)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Current</p>
@@ -181,13 +181,13 @@ export default function AccountsReceivablePage() {
             placeholder="Filter by customer id"
             value={customerId}
             onChange={(e) => { setCustomerId(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         {customerId && (
           <button
             onClick={() => { setCustomerId(''); setOffset(0); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>

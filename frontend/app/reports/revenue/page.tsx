@@ -24,7 +24,7 @@ export default function ReportsRevenuePage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <TrendingUp className="w-5 h-5 text-teal-electric" />
-        <h1 className="text-xl font-semibold text-white">Revenue Reports</h1>
+        <h1 className="text-xl font-semibold text-foreground">Revenue Reports</h1>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -36,7 +36,7 @@ export default function ReportsRevenuePage() {
         ].map((card) => (
           <div key={card.label} className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">{card.label}</p>
-            <p className="text-2xl font-bold text-white">
+            <p className="text-2xl font-bold text-foreground">
               {card.isPercent
                 ? `${card.value ?? 0}${card.suffix || ''}`
                 : formatCurrency(card.value || 0, summary.data?.currency || 'NGN')}
@@ -47,13 +47,13 @@ export default function ReportsRevenuePage() {
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-white font-semibold">Revenue Trend</h3>
+          <h3 className="text-foreground font-semibold">Revenue Trend</h3>
           <span className="text-slate-muted text-sm">{trend.data?.length || 0} periods</span>
         </div>
         <DataTable
           columns={[
-            { key: 'period', header: 'Period', render: (row: any) => <span className="text-white">{formatPeriod(row.period)}</span> },
-            { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
+            { key: 'period', header: 'Period', render: (row: any) => <span className="text-foreground">{formatPeriod(row.period)}</span> },
+            { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-foreground">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
             { key: 'mrr', header: 'MRR', align: 'right' as const, render: (row: any) => <span className="font-mono text-slate-200">{formatCurrency(row.mrr || 0, summary.data?.currency || 'NGN')}</span> },
             { key: 'arr', header: 'ARR', align: 'right' as const, render: (row: any) => <span className="font-mono text-slate-200">{formatCurrency(row.arr || 0, summary.data?.currency || 'NGN')}</span> },
           ]}
@@ -68,12 +68,12 @@ export default function ReportsRevenuePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Top Customers</h3>
+            <h3 className="text-foreground font-semibold">Top Customers</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'customer', header: 'Customer', render: (row: any) => <span className="text-white">{row.customer || `Customer #${row.customer_id}`}</span> },
-              { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
+              { key: 'customer', header: 'Customer', render: (row: any) => <span className="text-foreground">{row.customer || `Customer #${row.customer_id}`}</span> },
+              { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-foreground">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
             { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
           ]}
           data={byCustomer.data || []}
@@ -86,12 +86,12 @@ export default function ReportsRevenuePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">By Product</h3>
+            <h3 className="text-foreground font-semibold">By Product</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'product', header: 'Product', render: (row: any) => <span className="text-white">{row.product || '-'}</span> },
-              { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-white">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
+              { key: 'product', header: 'Product', render: (row: any) => <span className="text-foreground">{row.product || '-'}</span> },
+              { key: 'revenue', header: 'Revenue', align: 'right' as const, render: (row: any) => <span className="font-mono text-foreground">{formatCurrency(row.revenue, summary.data?.currency || 'NGN')}</span> },
             { key: 'growth_rate', header: 'Growth', render: (row: any) => <span className="text-slate-muted text-sm">{row.growth_rate ?? 0}%</span> },
           ]}
           data={byProduct.data || []}

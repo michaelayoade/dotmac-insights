@@ -84,11 +84,11 @@ export default function DepartmentsPage() {
             type="text"
             value={formData.department_name}
             onChange={(e) => setFormData({ ...formData, department_name: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             autoFocus
           />
         ) : (
-          <span className="text-white font-medium">{item.department_name || item.name}</span>
+          <span className="text-foreground font-medium">{item.department_name || item.name}</span>
         ),
     },
     {
@@ -99,7 +99,7 @@ export default function DepartmentsPage() {
           <select
             value={formData.parent_department || ''}
             onChange={(e) => setFormData({ ...formData, parent_department: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           >
             <option value="">None</option>
             {departments.filter((d) => d.id !== item.id).map((d) => (
@@ -119,7 +119,7 @@ export default function DepartmentsPage() {
             type="text"
             value={formData.company || ''}
             onChange={(e) => setFormData({ ...formData, company: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           />
         ) : (
           <span className="text-slate-muted text-sm">{item.company || '-'}</span>
@@ -168,7 +168,7 @@ export default function DepartmentsPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -193,7 +193,7 @@ export default function DepartmentsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Departments</h1>
+            <h1 className="text-xl font-semibold text-foreground">Departments</h1>
           </div>
           {!isCreating && (
             <button
@@ -215,7 +215,7 @@ export default function DepartmentsPage() {
 
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Department</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Department</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Department Name *</label>
@@ -223,7 +223,7 @@ export default function DepartmentsPage() {
                   type="text"
                   value={formData.department_name}
                   onChange={(e) => setFormData({ ...formData, department_name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   autoFocus
                 />
               </div>
@@ -232,7 +232,7 @@ export default function DepartmentsPage() {
                 <select
                   value={formData.parent_department || ''}
                   onChange={(e) => setFormData({ ...formData, parent_department: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="">None</option>
                   {departments.map((d) => (
@@ -246,7 +246,7 @@ export default function DepartmentsPage() {
                   type="text"
                   value={formData.company || ''}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -254,7 +254,7 @@ export default function DepartmentsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.department_name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>

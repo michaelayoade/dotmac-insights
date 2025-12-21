@@ -221,7 +221,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-teal-electric" />
-              <h2 className="text-lg font-semibold text-white">Bills by Status</h2>
+              <h2 className="text-lg font-semibold text-foreground">Bills by Status</h2>
             </div>
             <Link href="/purchasing/bills" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All Bills <ArrowRight className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Clock className="w-5 h-5 text-teal-electric" />
-              <h2 className="text-lg font-semibold text-white">AP Aging Summary</h2>
+              <h2 className="text-lg font-semibold text-foreground">AP Aging Summary</h2>
             </div>
             <Link href="/purchasing/aging" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Details <ArrowRight className="w-4 h-4" />
@@ -269,7 +269,7 @@ export default function PurchasingDashboardPage() {
                   <div key={bucket.bucket}>
                     <div className="flex justify-between text-sm mb-1">
                       <span className="text-slate-muted">{bucket.bucket}</span>
-                      <span className="text-white font-medium">{formatCurrency(bucket.total)}</span>
+                      <span className="text-foreground font-medium">{formatCurrency(bucket.total)}</span>
                     </div>
                     <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
                       <div
@@ -287,7 +287,7 @@ export default function PurchasingDashboardPage() {
               <div className="pt-3 border-t border-slate-border mt-4">
                 <div className="flex justify-between">
                   <span className="text-slate-muted">Total Outstanding</span>
-                  <span className="text-white font-bold">{formatCurrency(agingTotal)}</span>
+                  <span className="text-foreground font-bold">{formatCurrency(agingTotal)}</span>
                 </div>
               </div>
             </div>
@@ -301,7 +301,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-teal-electric" />
-              <h2 className="text-lg font-semibold text-white">Top Suppliers by Outstanding</h2>
+              <h2 className="text-lg font-semibold text-foreground">Top Suppliers by Outstanding</h2>
             </div>
             <Link href="/purchasing/suppliers" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -316,15 +316,15 @@ export default function PurchasingDashboardPage() {
                   className="flex items-center justify-between hover:bg-slate-elevated/50 rounded-lg p-2 -mx-2 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-elevated flex items-center justify-center text-sm font-medium text-white">
+                    <div className="w-8 h-8 rounded-full bg-slate-elevated flex items-center justify-center text-sm font-medium text-foreground">
                       {index + 1}
                     </div>
                     <div>
-                      <p className="text-white text-sm font-medium truncate max-w-[200px]">{supplier.name}</p>
+                      <p className="text-foreground text-sm font-medium truncate max-w-[200px]">{supplier.name}</p>
                       <p className="text-slate-muted text-xs">{supplier.bill_count} bills</p>
                     </div>
                   </div>
-                  <p className="text-white font-medium">{formatCurrency(supplier.outstanding)}</p>
+                  <p className="text-foreground font-medium">{formatCurrency(supplier.outstanding)}</p>
                 </Link>
               ))}
             </div>
@@ -338,22 +338,22 @@ export default function PurchasingDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Link href="/purchasing/bills" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <FileText className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(summary?.total_bills)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(summary?.total_bills)}</p>
           <p className="text-slate-muted text-sm">Total Bills</p>
         </Link>
         <Link href="/purchasing/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Users className="w-6 h-6 text-green-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(summary?.supplier_count)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(summary?.supplier_count)}</p>
           <p className="text-slate-muted text-sm">Total Suppliers</p>
         </Link>
         <Link href="/purchasing/bills?status=paid" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <CreditCard className="w-6 h-6 text-yellow-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(summary?.status_breakdown?.paid?.count || 0)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(summary?.status_breakdown?.paid?.count || 0)}</p>
           <p className="text-slate-muted text-sm">Paid Bills</p>
         </Link>
         <Link href="/purchasing/bills?status=overdue" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <ArrowDownRight className="w-6 h-6 text-red-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(summary?.status_breakdown?.overdue?.count || 0)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(summary?.status_breakdown?.overdue?.count || 0)}</p>
           <p className="text-slate-muted text-sm">Overdue Bills</p>
         </Link>
       </div>
@@ -364,7 +364,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Bills</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Bills</h3>
             </div>
             <Link href="/purchasing/bills" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -377,13 +377,13 @@ export default function PurchasingDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
+                    <p className="text-foreground text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">
                       {bill.supplier_name || 'Unknown'} • {formatDate(bill.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(bill.grand_total, bill.currency || currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(bill.grand_total, bill.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{bill.status}</p>
                   </div>
                 </Link>
@@ -398,7 +398,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Payments</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Payments</h3>
             </div>
             <Link href="/purchasing/payments" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -407,13 +407,13 @@ export default function PurchasingDashboardPage() {
               {recent.payments.map((pay) => (
                 <div key={pay.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
+                    <p className="text-foreground text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
                       {pay.supplier || 'Unknown'} • {formatDate(pay.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(pay.amount, currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(pay.amount, currency)}</p>
                   </div>
                 </div>
               ))}
@@ -429,7 +429,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Orders</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Orders</h3>
             </div>
             <Link href="/purchasing/orders" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -438,13 +438,13 @@ export default function PurchasingDashboardPage() {
               {recent.orders.map((order) => (
                 <div key={order.order_no} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">PO {order.order_no}</p>
+                    <p className="text-foreground text-sm font-medium">PO {order.order_no}</p>
                     <p className="text-xs text-slate-muted">
                       {order.supplier || 'Unknown'} • {formatDate(order.date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(order.total, currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(order.total, currency)}</p>
                   </div>
                 </div>
               ))}
@@ -458,7 +458,7 @@ export default function PurchasingDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Debit Notes</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Debit Notes</h3>
             </div>
             <Link href="/purchasing/debit-notes" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -467,13 +467,13 @@ export default function PurchasingDashboardPage() {
               {recent.debit_notes.map((note) => (
                 <div key={note.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">Debit #{note.id}</p>
+                    <p className="text-foreground text-sm font-medium">Debit #{note.id}</p>
                     <p className="text-xs text-slate-muted">
                       {note.supplier || 'Unknown'} • {formatDate(note.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(note.grand_total, currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(note.grand_total, currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{note.status}</p>
                   </div>
                 </div>

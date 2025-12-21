@@ -80,7 +80,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-6 h-6 text-coral-alert" />
             </div>
 
-            <h2 className="text-lg font-semibold text-white mb-2">Something went wrong</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Something went wrong</h2>
             <p className="text-slate-muted text-sm mb-4">
               An error occurred while rendering this component.
             </p>
@@ -97,14 +97,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex gap-2 justify-center">
               <button
                 onClick={this.handleReset}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-electric text-white rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-electric text-foreground rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Try again
               </button>
               <Link
                 href="/"
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-elevated text-white rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
               >
                 <Home className="w-3.5 h-3.5" />
                 Home

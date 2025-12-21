@@ -119,7 +119,7 @@ export default function RolesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Roles & Permissions</h1>
+          <h1 className="text-2xl font-bold text-foreground">Roles & Permissions</h1>
           <p className="text-slate-muted">Create roles and assign permission scopes for modular RBAC.</p>
         </div>
         <div className="flex gap-2">
@@ -128,14 +128,14 @@ export default function RolesPage() {
               setSelectedRoleId(null);
               setForm({ name: '', description: '', permissionIds: [] });
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Role
           </button>
           <button
             onClick={() => mutateRoles()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -168,7 +168,7 @@ export default function RolesPage() {
                   )}
                   onClick={() => setSelectedRoleId(role.id)}
                 >
-                  <td className="px-4 py-3 text-white font-medium flex items-center gap-2">
+                  <td className="px-4 py-3 text-foreground font-medium flex items-center gap-2">
                     <Shield className="w-4 h-4 text-teal-electric" />
                     {role.name}
                     {role.is_system && (
@@ -196,7 +196,7 @@ export default function RolesPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">{selectedRole ? 'Edit Role' : 'New Role'}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{selectedRole ? 'Edit Role' : 'New Role'}</h2>
               <p className="text-sm text-slate-muted">
                 {selectedRole ? 'Update role and permissions.' : 'Create a reusable role with scoped access.'}
               </p>
@@ -253,7 +253,7 @@ export default function RolesPage() {
                             className="mt-1 accent-teal-electric"
                           />
                           <div>
-                            <p className="text-sm text-white flex items-center gap-2">
+                            <p className="text-sm text-foreground flex items-center gap-2">
                               {perm.name}
                               {checked && <CheckCircle2 className="w-4 h-4 text-teal-electric" />}
                             </p>
@@ -299,7 +299,7 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: str
       <label className="text-sm text-slate-muted">{label}</label>
       <input
         {...inputProps}
-        className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:border-teal-electric focus:outline-none"
+        className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none"
       />
     </div>
   );

@@ -35,12 +35,12 @@ export function PageHeader({
               {crumb.href ? (
                 <Link
                   href={crumb.href}
-                  className="text-slate-muted hover:text-white transition-colors"
+                  className="text-slate-muted hover:text-foreground transition-colors"
                 >
                   {crumb.label}
                 </Link>
               ) : (
-                <span className="text-white">{crumb.label}</span>
+                <span className="text-foreground">{crumb.label}</span>
               )}
             </div>
           ))}
@@ -59,7 +59,7 @@ export function PageHeader({
             </div>
           )}
           <div>
-            <h1 className="text-2xl font-bold text-white">{title}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{title}</h1>
             {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
           </div>
         </div>
@@ -104,7 +104,7 @@ export function EmptyState({
     >
       <div className="flex flex-col items-center justify-center text-center">
         <Icon className="w-12 h-12 mb-3 text-slate-muted opacity-50" />
-        <p className="text-white font-medium mb-1">{title}</p>
+        <p className="text-foreground font-medium mb-1">{title}</p>
         {description && (
           <p className="text-sm text-slate-muted mb-4 max-w-md">{description}</p>
         )}
@@ -112,7 +112,7 @@ export function EmptyState({
           action.href ? (
             <Link
               href={action.href}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -120,7 +120,7 @@ export function EmptyState({
           ) : (
             <button
               onClick={action.onClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {ActionIcon && <ActionIcon className="w-4 h-4" />}
               {action.label}
@@ -160,7 +160,7 @@ export function ErrorState({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             <RefreshCw className="w-4 h-4" />
             Retry
@@ -291,7 +291,7 @@ export function SectionHeader({
   return (
     <div className={cn('flex items-center justify-between mb-4', className)}>
       <div>
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         {subtitle && <p className="text-sm text-slate-muted">{subtitle}</p>}
       </div>
       {action}
@@ -327,12 +327,19 @@ export function StatGrid({ children, columns = 4, className }: StatGridProps) {
 // BUTTON
 // =============================================================================
 
+import { MODULE_COLORS, type AppModule } from '@/lib/module-colors';
+
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
   size?: 'sm' | 'md' | 'lg';
   icon?: LucideIcon;
   iconPosition?: 'left' | 'right';
   loading?: boolean;
+  /**
+   * Module context for brand-colored primary buttons.
+   * When set, primary variant uses the module's brand color.
+   */
+  module?: AppModule;
 }
 
 export function Button({
@@ -344,16 +351,28 @@ export function Button({
   loading,
   disabled,
   className,
+  module,
   ...props
 }: ButtonProps) {
-  const variants = {
+  // Base variants (non-module specific)
+  const baseVariants = {
     primary:
-      'bg-gradient-to-r from-teal-electric to-teal-glow text-white hover:shadow-lg hover:shadow-teal-electric/25',
+      'bg-gradient-to-r from-teal-electric to-teal-glow text-foreground hover:shadow-lg hover:shadow-teal-electric/25',
     secondary:
-      'bg-slate-elevated border border-slate-border text-white hover:bg-slate-border',
+      'bg-slate-elevated border border-slate-border text-foreground hover:bg-slate-border',
     danger:
       'bg-coral-alert/15 border border-coral-alert/30 text-coral-alert hover:bg-coral-alert/25',
-    ghost: 'text-slate-muted hover:text-white hover:bg-slate-elevated',
+    ghost: 'text-slate-muted hover:text-foreground hover:bg-slate-elevated',
+    success: 'bg-emerald-500 text-foreground hover:bg-emerald-400',
+  };
+
+  // Module-specific primary colors
+  const getVariantClasses = () => {
+    if (variant === 'primary' && module) {
+      const colors = MODULE_COLORS[module];
+      return `${colors.primary} ${colors.primaryHover} text-foreground`;
+    }
+    return baseVariants[variant];
   };
 
   const sizes = {
@@ -366,7 +385,7 @@ export function Button({
     <button
       className={cn(
         'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric focus-visible:ring-offset-2 focus-visible:ring-offset-slate-deep',
-        variants[variant],
+        getVariantClasses(),
         sizes[size],
         (disabled || loading) && 'opacity-60 cursor-not-allowed',
         className
@@ -424,7 +443,7 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-slate-card border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+        className="w-full bg-slate-card border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
       />
     </div>
   );
@@ -462,7 +481,7 @@ export function Select({
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}
       className={cn(
-        'bg-slate-card border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 appearance-none cursor-pointer',
+        'bg-slate-card border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 appearance-none cursor-pointer',
         'bg-[url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%2364748b\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")] bg-[length:1.5em_1.5em] bg-[right_0.5rem_center] bg-no-repeat pr-10',
         className
       )}
@@ -518,8 +537,8 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
             className={cn(
               'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric',
               isActive
-                ? 'bg-slate-card text-white shadow-sm'
-                : 'text-slate-muted hover:text-white'
+                ? 'bg-slate-card text-foreground shadow-sm'
+                : 'text-slate-muted hover:text-foreground'
             )}
           >
             {Icon && <Icon className="w-4 h-4" />}
@@ -553,3 +572,8 @@ export {
   DashboardErrorState,
   DashboardEmptyState,
 } from './DashboardShell';
+
+export { BackButton, type BackButtonProps } from './BackButton';
+
+// Re-export module types for convenience
+export type { AppModule } from '@/lib/module-colors';

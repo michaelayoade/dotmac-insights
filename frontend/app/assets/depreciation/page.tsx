@@ -48,7 +48,7 @@ export default function DepreciationSchedulePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Depreciation Schedule</h1>
+          <h1 className="text-2xl font-bold text-foreground">Depreciation Schedule</h1>
           <p className="text-sm text-slate-muted mt-1">
             View and manage asset depreciation entries
           </p>
@@ -57,13 +57,13 @@ export default function DepreciationSchedulePage() {
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
           <Link
             href="/assets/depreciation/pending"
-            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-foreground transition-colors"
           >
             <TrendingDown className="w-4 h-4" />
             Pending
@@ -75,7 +75,7 @@ export default function DepreciationSchedulePage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-sm text-slate-muted">Total Entries</p>
-          <p className="text-2xl font-bold text-white">{total}</p>
+          <p className="text-2xl font-bold text-foreground">{total}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-sm text-slate-muted">Booked</p>
@@ -95,19 +95,19 @@ export default function DepreciationSchedulePage() {
             placeholder="Finance book..."
             value={financeBook}
             onChange={(e) => { setFinanceBook(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
           <input
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
           <input
             type="date"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
           <select
             value={bookedOnly === undefined ? "" : bookedOnly ? "booked" : "pending"}
@@ -116,7 +116,7 @@ export default function DepreciationSchedulePage() {
               setBookedOnly(val === "" ? undefined : val === "booked");
               setPage(1);
             }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           >
             <option value="">All Status</option>
             <option value="booked">Booked Only</option>
@@ -130,7 +130,7 @@ export default function DepreciationSchedulePage() {
               setBookedOnly(undefined);
               setPage(1);
             }}
-            className="px-4 py-2 text-sm text-slate-muted hover:text-white transition-colors"
+            className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             Clear Filters
           </button>
@@ -172,7 +172,7 @@ export default function DepreciationSchedulePage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/assets/list/${entry.asset_id}`}
-                        className="text-sm font-medium text-white hover:text-indigo-300 transition-colors"
+                        className="text-sm font-medium text-foreground hover:text-indigo-300 transition-colors"
                       >
                         {entry.asset_name}
                       </Link>
@@ -226,7 +226,7 @@ export default function DepreciationSchedulePage() {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -236,7 +236,7 @@ export default function DepreciationSchedulePage() {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

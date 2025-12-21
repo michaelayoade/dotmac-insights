@@ -12,7 +12,7 @@ export default function StockSummaryPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Stock Summary</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Stock Summary</h1>
         <p className="text-slate-muted text-sm">Overview of stock levels across all items and warehouses</p>
       </div>
 
@@ -22,7 +22,7 @@ export default function StockSummaryPage() {
           {isLoading ? (
             <Loader2 className="w-4 h-4 text-amber-500 animate-spin mt-2" />
           ) : (
-            <p className="text-2xl font-bold text-white mt-1">
+            <p className="text-2xl font-bold text-foreground mt-1">
               {(data?.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           )}
@@ -32,7 +32,7 @@ export default function StockSummaryPage() {
           {isLoading ? (
             <Loader2 className="w-4 h-4 text-blue-500 animate-spin mt-2" />
           ) : (
-            <p className="text-2xl font-bold text-white mt-1">{data?.total_items ?? 0}</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{data?.total_items ?? 0}</p>
           )}
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -40,7 +40,7 @@ export default function StockSummaryPage() {
           {isLoading ? (
             <Loader2 className="w-4 h-4 text-emerald-500 animate-spin mt-2" />
           ) : (
-            <p className="text-2xl font-bold text-white mt-1">
+            <p className="text-2xl font-bold text-foreground mt-1">
               {(data?.total_qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
             </p>
           )}
@@ -86,7 +86,7 @@ export default function StockSummaryPage() {
                 {items.map((item: any, idx: number) => (
                   <tr key={`${item.item_code}-${idx}`} className="hover:bg-slate-elevated/50 transition-colors">
                     <td className="py-3 text-amber-400 font-mono">{item.item_code}</td>
-                    <td className="py-3 text-white">{item.item_name || "-"}</td>
+                    <td className="py-3 text-foreground">{item.item_name || "-"}</td>
                     <td className="py-3 text-right">
                       <span className={cn(
                         "font-mono",
@@ -98,7 +98,7 @@ export default function StockSummaryPage() {
                     <td className="py-3 text-right font-mono text-slate-muted">
                       {(item.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-3 text-right font-mono text-white">
+                    <td className="py-3 text-right font-mono text-foreground">
                       {(item.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3">

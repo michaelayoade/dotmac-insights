@@ -50,7 +50,7 @@ export default function JournalEntryDetailPage() {
         <p className="text-red-400">Failed to load journal entry</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -67,14 +67,14 @@ export default function JournalEntryDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/journal-entries"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to journal entries
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Journal Entry</p>
-            <h1 className="text-xl font-semibold text-white">{(data as any).erpnext_id || data.voucher_no || `JE #${id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{(data as any).erpnext_id || data.voucher_no || `JE #${id}`}</h1>
           </div>
         </div>
       </div>
@@ -82,17 +82,17 @@ export default function JournalEntryDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Posting Date</p>
-          <p className="text-white font-semibold">{formatDate(data.posting_date)}</p>
+          <p className="text-foreground font-semibold">{formatDate(data.posting_date)}</p>
         </div>
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Total Debit / Credit</p>
-          <p className="text-white font-semibold">
+          <p className="text-foreground font-semibold">
             {formatCurrency(data.total_debit)} / {formatCurrency(data.total_credit)}
           </p>
         </div>
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Status</p>
-          <p className="text-white font-semibold">{(data as any).is_balanced ? 'Balanced' : 'Unbalanced'}</p>
+          <p className="text-foreground font-semibold">{(data as any).is_balanced ? 'Balanced' : 'Unbalanced'}</p>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function JournalEntryDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Accounts</h3>
+            <h3 className="text-foreground font-semibold">Accounts</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -116,7 +116,7 @@ export default function JournalEntryDetailPage() {
               <tbody>
                 {accounts.map((acc: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-white font-mono">{acc.account}</td>
+                    <td className="px-2 py-2 text-foreground font-mono">{acc.account}</td>
                     <td className="px-2 py-2 text-slate-200">{acc.party || acc.party_type || '-'}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(acc.debit)}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(acc.credit)}</td>

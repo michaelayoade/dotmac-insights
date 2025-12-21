@@ -59,7 +59,7 @@ export default function AssetCategoriesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Asset Categories</h1>
+          <h1 className="text-2xl font-bold text-foreground">Asset Categories</h1>
           <p className="text-sm text-slate-muted mt-1">
             Configure depreciation settings for asset groups
           </p>
@@ -68,13 +68,13 @@ export default function AssetCategoriesPage() {
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-foreground transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Category
@@ -85,7 +85,7 @@ export default function AssetCategoriesPage() {
       {/* Create Form */}
       {showCreateForm && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4">Create Asset Category</h3>
+          <h3 className="font-semibold text-foreground mb-4">Create Asset Category</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -95,7 +95,7 @@ export default function AssetCategoriesPage() {
                   value={newCategory.asset_category_name}
                   onChange={(e) => setNewCategory((prev) => ({ ...prev, asset_category_name: e.target.value }))}
                   placeholder="e.g., Office Equipment"
-                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                   required
                 />
               </div>
@@ -116,13 +116,13 @@ export default function AssetCategoriesPage() {
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="px-4 py-2 text-sm text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-white transition-colors"
+                className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 Create Category
               </button>
@@ -158,7 +158,7 @@ export default function AssetCategoriesPage() {
                   >
                     <div className="flex items-center gap-3">
                       {hasFinanceBooks ? (
-                        <button className="p-1 text-slate-muted hover:text-white">
+                        <button className="p-1 text-slate-muted hover:text-foreground">
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
                           ) : (
@@ -172,7 +172,7 @@ export default function AssetCategoriesPage() {
                         <Layers className="w-4 h-4 text-indigo-300" />
                       </div>
                       <div>
-                        <p className="font-medium text-white">{category.asset_category_name}</p>
+                        <p className="font-medium text-foreground">{category.asset_category_name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {category.enable_cwip_accounting && (
                             <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-300 rounded-full">
@@ -190,14 +190,14 @@ export default function AssetCategoriesPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); }}
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); }}
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Settings"
                       >
                         <Settings className="w-4 h-4" />
@@ -219,19 +219,19 @@ export default function AssetCategoriesPage() {
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                                 <div>
                                   <p className="text-xs text-slate-muted">Finance Book</p>
-                                  <p className="text-white">{book.finance_book || "Default"}</p>
+                                  <p className="text-foreground">{book.finance_book || "Default"}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-slate-muted">Method</p>
-                                  <p className="text-white capitalize">{book.depreciation_method || "-"}</p>
+                                  <p className="text-foreground capitalize">{book.depreciation_method || "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-slate-muted">Depreciations</p>
-                                  <p className="text-white">{book.total_number_of_depreciations}</p>
+                                  <p className="text-foreground">{book.total_number_of_depreciations}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-slate-muted">Frequency</p>
-                                  <p className="text-white">{book.frequency_of_depreciation} months</p>
+                                  <p className="text-foreground">{book.frequency_of_depreciation} months</p>
                                 </div>
                               </div>
                               {(book.fixed_asset_account || book.depreciation_expense_account) && (
@@ -239,13 +239,13 @@ export default function AssetCategoriesPage() {
                                   {book.fixed_asset_account && (
                                     <div>
                                       <p className="text-xs text-slate-muted">Fixed Asset Account</p>
-                                      <p className="text-white text-xs">{book.fixed_asset_account}</p>
+                                      <p className="text-foreground text-xs">{book.fixed_asset_account}</p>
                                     </div>
                                   )}
                                   {book.depreciation_expense_account && (
                                     <div>
                                       <p className="text-xs text-slate-muted">Depreciation Expense</p>
-                                      <p className="text-white text-xs">{book.depreciation_expense_account}</p>
+                                      <p className="text-foreground text-xs">{book.depreciation_expense_account}</p>
                                     </div>
                                   )}
                                 </div>

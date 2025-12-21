@@ -39,12 +39,12 @@ export default function SupportRoutingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filter by Team</span>
+          <span className="text-foreground text-sm font-medium">Filter by Team</span>
         </div>
         <select
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
         >
           <option value="">All teams</option>
           {teams.map((team: any) => (
@@ -59,7 +59,7 @@ export default function SupportRoutingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="w-4 h-4 text-amber-400" />
-          <h3 className="text-white font-semibold">Queue Health</h3>
+          <h3 className="text-foreground font-semibold">Queue Health</h3>
         </div>
         {!queue.data ? (
           <p className="text-slate-muted text-sm">Loading queue health…</p>
@@ -69,7 +69,7 @@ export default function SupportRoutingPage() {
               <p className={cn(
                 'text-2xl font-bold',
                 queueData.unassigned_tickets > 10 ? 'text-rose-400' :
-                queueData.unassigned_tickets > 5 ? 'text-amber-400' : 'text-white'
+                queueData.unassigned_tickets > 5 ? 'text-amber-400' : 'text-foreground'
               )}>
                 {queueData.unassigned_tickets ?? 0}
               </p>
@@ -118,7 +118,7 @@ export default function SupportRoutingPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold">Routing Rules</h3>
+              <h3 className="text-foreground font-semibold">Routing Rules</h3>
             </div>
             <span className="text-xs text-slate-muted">{rules.data?.length ?? 0} rules</span>
           </div>
@@ -132,7 +132,7 @@ export default function SupportRoutingPage() {
                 <div key={rule.id} className="border border-slate-border rounded-lg p-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-white font-semibold">{rule.name}</p>
+                      <p className="text-foreground font-semibold">{rule.name}</p>
                       <p className="text-slate-muted text-xs">{rule.description || 'No description'}</p>
                     </div>
                     <span className="px-2 py-1 rounded-full border border-slate-border text-slate-muted text-xs">
@@ -166,7 +166,7 @@ export default function SupportRoutingPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-white font-semibold">Agent Workload</h3>
+              <h3 className="text-foreground font-semibold">Agent Workload</h3>
             </div>
             <span className="text-xs text-slate-muted">{workload.data?.length ?? 0} agents</span>
           </div>
@@ -180,7 +180,7 @@ export default function SupportRoutingPage() {
                 <div key={agent.agent_id} className="border border-slate-border rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <p className="text-white font-semibold">{agent.agent_name || agent.email || `Agent #${agent.agent_id}`}</p>
+                      <p className="text-foreground font-semibold">{agent.agent_name || agent.email || `Agent #${agent.agent_id}`}</p>
                       <p className="text-slate-muted text-xs">
                         Load {agent.current_load}/{agent.capacity} • Weight {agent.routing_weight}
                       </p>

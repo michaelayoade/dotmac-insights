@@ -352,6 +352,344 @@ export interface AccountingDashboardResponse {
 }
 
 // =============================================================================
+// HR DASHBOARD
+// =============================================================================
+
+export interface HRDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    total_employees: number;
+    active_employees: number;
+    on_leave_today: number;
+    present_today: number;
+  };
+
+  leave: {
+    pending_approvals: number;
+    by_status: Record<string, number>;
+    trend: Array<{ month: string; count: number }>;
+  };
+
+  attendance: {
+    status_30d: Record<string, number>;
+    trend: Array<{ date: string; status_counts: Record<string, number> }>;
+  };
+
+  payroll_30d: {
+    slip_count: number;
+    gross_total: number;
+    deduction_total: number;
+    net_total: number;
+  };
+
+  recruitment: {
+    open_positions: number;
+    funnel: {
+      applications: number;
+      screened: number;
+      interviewed: number;
+      offered: number;
+      hired: number;
+    };
+  };
+
+  training: {
+    scheduled_events: number;
+    upcoming: Array<{
+      id: number;
+      event_name: string;
+      start_time: string | null;
+      type: string | null;
+    }>;
+  };
+
+  onboarding: {
+    active_count: number;
+    recent: Array<{
+      id: number;
+      employee_name: string | null;
+      status: string | null;
+      date_of_joining: string | null;
+    }>;
+  };
+}
+
+// =============================================================================
+// INVENTORY DASHBOARD
+// =============================================================================
+
+export interface InventoryDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    total_value: number;
+    total_items: number;
+    total_warehouses: number;
+    low_stock_alerts: number;
+  };
+
+  stock_by_warehouse: Array<{
+    warehouse: string;
+    value: number;
+    items: number;
+  }>;
+
+  recent: {
+    entries: Array<{
+      id: number;
+      stock_entry_type: string | null;
+      posting_date: string | null;
+      total_amount: number;
+      from_warehouse: string | null;
+      to_warehouse: string | null;
+      docstatus: number;
+    }>;
+    items: Array<{
+      id: number;
+      item_code: string | null;
+      item_name: string | null;
+      stock_uom: string | null;
+      total_stock_qty: number;
+    }>;
+  };
+
+  counts: {
+    total_entries: number;
+  };
+}
+
+// =============================================================================
+// ASSETS DASHBOARD
+// =============================================================================
+
+export interface AssetsDashboardResponse {
+  generated_at: string;
+
+  totals: {
+    count: number;
+    purchase_value: number;
+    book_value: number;
+    accumulated_depreciation: number;
+  };
+
+  by_status: Array<{ status: string; count: number }>;
+
+  depreciation: {
+    pending_count: number;
+    pending_amount: number;
+    entries: Array<{
+      asset_id: number;
+      asset_name: string | null;
+      schedule_date: string | null;
+      depreciation_amount: number;
+    }>;
+  };
+
+  maintenance: {
+    due_count: number;
+    assets: Array<{
+      id: number;
+      asset_name: string;
+      location: string | null;
+      last_maintenance: string | null;
+    }>;
+  };
+
+  expiring: {
+    warranty: {
+      count: number;
+      assets: Array<{
+        id: number;
+        asset_name: string;
+        warranty_expiry_date: string | null;
+        days_remaining: number;
+      }>;
+    };
+    insurance: {
+      count: number;
+      assets: Array<{
+        id: number;
+        asset_name: string;
+        insurance_end_date: string | null;
+        days_remaining: number;
+      }>;
+    };
+  };
+}
+
+// =============================================================================
+// EXPENSES DASHBOARD
+// =============================================================================
+
+export interface ExpensesDashboardResponse {
+  generated_at: string;
+
+  claims: {
+    total: number;
+    by_status: Record<string, { count: number; total: number }>;
+    total_claimed_amount: number;
+    recent: Array<{
+      id: number;
+      claim_number: string | null;
+      title: string | null;
+      total_claimed_amount: number;
+      status: string | null;
+      claim_date: string | null;
+    }>;
+  };
+
+  advances: {
+    total: number;
+    by_status: Record<string, { count: number; outstanding: number }>;
+    outstanding_amount: number;
+    recent: Array<{
+      id: number;
+      advance_number: string | null;
+      purpose: string | null;
+      requested_amount: number;
+      outstanding_amount: number;
+      status: string | null;
+      request_date: string | null;
+    }>;
+  };
+
+  pending_approvals: number;
+  trend: Array<{ month: string; claims: number; amount: number }>;
+}
+
+// =============================================================================
+// PROJECTS DASHBOARD
+// =============================================================================
+
+export interface ProjectsDashboardResponse {
+  generated_at: string;
+
+  projects: {
+    total: number;
+    active: number;
+    completed: number;
+    on_hold: number;
+    cancelled: number;
+  };
+
+  tasks: {
+    total: number;
+    open: number;
+    overdue: number;
+  };
+
+  metrics: {
+    avg_completion_percent: number;
+    due_this_week: number;
+  };
+
+  financials: {
+    total_billed: number;
+    total_cost: number;
+    total_margin: number;
+  };
+
+  recent: Array<{
+    id: number;
+    project_name: string;
+    status: string | null;
+    percent_complete: number;
+    expected_end_date: string | null;
+    department: string | null;
+  }>;
+}
+
+// =============================================================================
+// INBOX DASHBOARD
+// =============================================================================
+
+export interface InboxDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    open_count: number;
+    pending_count: number;
+    resolved_today: number;
+    total_unread: number;
+  };
+
+  by_channel: Record<string, number>;
+  by_priority: Record<string, number>;
+  avg_response_time_hours: number;
+
+  recent: Array<{
+    id: number;
+    subject: string | null;
+    contact_name: string | null;
+    contact_email: string | null;
+    status: string | null;
+    priority: string | null;
+    unread_count: number;
+    last_message_at: string | null;
+  }>;
+}
+
+// =============================================================================
+// CONTACTS DASHBOARD
+// =============================================================================
+
+export interface ContactsDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    total_contacts: number;
+    new_30d: number;
+    by_stage: Record<string, number>;
+  };
+
+  sources: Array<{ source: string; count: number }>;
+
+  recent_activities: Array<{
+    id: number;
+    activity_type: string | null;
+    subject: string;
+    status: string | null;
+    scheduled_at: string | null;
+  }>;
+}
+
+// =============================================================================
+// CUSTOMERS DASHBOARD
+// =============================================================================
+
+export interface CustomersDashboardResponse {
+  generated_at: string;
+  currency: string;
+
+  summary: {
+    total_customers: number;
+    active: number;
+    churned_30d: number;
+  };
+
+  billing: {
+    outstanding: number;
+    overdue: number;
+    avg_invoice_value: number;
+  };
+
+  subscriptions: {
+    active: number;
+    mrr: number;
+    by_plan: Array<{ plan: string; count: number }>;
+  };
+
+  recent: Array<{
+    id: number;
+    name: string | null;
+    customer_name: string | null;
+    territory: string | null;
+    created_at: string | null;
+  }>;
+}
+
+// =============================================================================
 // API FUNCTIONS
 // =============================================================================
 
@@ -398,6 +736,58 @@ export const dashboardsApi = {
    */
   getAccountingDashboard: (currency?: string) =>
     fetchApi<AccountingDashboardResponse>('/dashboards/accounting', {
+      params: currency ? { currency } : undefined,
+    }),
+
+  /**
+   * Get consolidated HR Dashboard data (11 calls → 1)
+   */
+  getHRDashboard: () =>
+    fetchApi<HRDashboardResponse>('/dashboards/hr'),
+
+  /**
+   * Get consolidated Inventory Dashboard data (3 calls → 1)
+   */
+  getInventoryDashboard: () =>
+    fetchApi<InventoryDashboardResponse>('/dashboards/inventory'),
+
+  /**
+   * Get consolidated Assets Dashboard data (5 calls → 1)
+   */
+  getAssetsDashboard: (daysAhead?: number) =>
+    fetchApi<AssetsDashboardResponse>('/dashboards/assets', {
+      params: daysAhead ? { days_ahead: daysAhead } : undefined,
+    }),
+
+  /**
+   * Get consolidated Expenses Dashboard data (2 calls → 1)
+   */
+  getExpensesDashboard: () =>
+    fetchApi<ExpensesDashboardResponse>('/dashboards/expenses'),
+
+  /**
+   * Get consolidated Projects Dashboard data (2 calls → 1)
+   */
+  getProjectsDashboard: () =>
+    fetchApi<ProjectsDashboardResponse>('/dashboards/projects'),
+
+  /**
+   * Get consolidated Inbox Dashboard data (3 calls → 1)
+   */
+  getInboxDashboard: () =>
+    fetchApi<InboxDashboardResponse>('/dashboards/inbox'),
+
+  /**
+   * Get consolidated Contacts Dashboard data
+   */
+  getContactsDashboard: () =>
+    fetchApi<ContactsDashboardResponse>('/dashboards/contacts'),
+
+  /**
+   * Get consolidated Customers Dashboard data
+   */
+  getCustomersDashboard: (currency?: string) =>
+    fetchApi<CustomersDashboardResponse>('/dashboards/customers', {
       params: currency ? { currency } : undefined,
     }),
 };

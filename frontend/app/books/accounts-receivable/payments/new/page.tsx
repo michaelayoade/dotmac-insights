@@ -84,14 +84,14 @@ export default function NewPaymentPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/accounts-receivable/payments"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to payments
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">New Payment</p>
-            <h1 className="text-xl font-semibold text-white">Record Payment</h1>
+            <h1 className="text-xl font-semibold text-foreground">Record Payment</h1>
           </div>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function NewPaymentPage() {
           <button
             type="button"
             onClick={() => setShowMoreOptions(!showMoreOptions)}
-            className="flex items-center gap-2 text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             {showMoreOptions ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             More options
@@ -179,10 +179,10 @@ export default function NewPaymentPage() {
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-2 max-w-xs ml-auto">
-            <p className="text-sm text-white font-semibold">Summary</p>
+            <p className="text-sm text-foreground font-semibold">Summary</p>
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-muted">Amount</span>
-              <span className="font-mono text-white">{amountDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {form.currency}</span>
+              <span className="font-mono text-foreground">{amountDisplay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {form.currency}</span>
             </div>
             {selectedInvoice && (
               <p className="text-xs text-slate-muted">Will be applied to {selectedInvoice.invoice_number || `Invoice #${selectedInvoice.id}`}</p>
@@ -200,7 +200,7 @@ export default function NewPaymentPage() {
         <div className="flex justify-end gap-3">
           <Link
             href="/books/accounts-receivable/payments"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Cancel
           </Link>

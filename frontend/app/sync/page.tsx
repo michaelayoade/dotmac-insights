@@ -183,7 +183,7 @@ export default function SyncPage() {
               <span className="text-slate-muted text-sm">Last Sync</span>
               <Badge variant="info">Most Recent</Badge>
             </div>
-            <p className="text-white font-mono text-lg">
+            <p className="text-foreground font-mono text-lg">
               {(() => {
                 const lastSyncs = Object.values(syncStatus || {})
                   .filter((s): s is NonNullable<typeof s> => !!(s as any)?.last_sync)
@@ -199,7 +199,7 @@ export default function SyncPage() {
               <span className="text-slate-muted text-sm">Total Records</span>
               <Badge variant="success">Synced</Badge>
             </div>
-            <p className="text-white font-mono text-lg">
+            <p className="text-foreground font-mono text-lg">
               {Object.values(syncStatus || {})
                 .filter((s): s is NonNullable<typeof s> => !!s)
                 .reduce((sum, s: any) => sum + (s.records_created || 0) + (s.records_updated || 0), 0)
@@ -222,7 +222,7 @@ export default function SyncPage() {
                 </Badge>
               )}
             </div>
-            <p className="text-white font-mono text-lg">
+            <p className="text-foreground font-mono text-lg">
               {Object.values(syncStatus || {}).filter((s: any) => s?.status === 'success').length} / {Object.keys(syncStatus || {}).length} OK
             </p>
           </Card>
@@ -252,7 +252,7 @@ export default function SyncPage() {
                       <Icon className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white">{config.name}</h3>
+                      <h3 className="font-semibold text-foreground">{config.name}</h3>
                       <p className="text-slate-muted text-xs">
                         {sourceStatus?.last_sync
                           ? `Last: ${formatDate(sourceStatus.last_sync)}`
@@ -283,13 +283,13 @@ export default function SyncPage() {
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-slate-elevated rounded-lg p-3">
                       <p className="text-slate-muted text-xs">Records</p>
-                      <p className="text-white font-mono font-semibold">
+                      <p className="text-foreground font-mono font-semibold">
                         {((sourceStatus.records_created || 0) + (sourceStatus.records_updated || 0)).toLocaleString()}
                       </p>
                     </div>
                     <div className="bg-slate-elevated rounded-lg p-3">
                       <p className="text-slate-muted text-xs">Duration</p>
-                      <p className="text-white font-mono font-semibold">
+                      <p className="text-foreground font-mono font-semibold">
                         {sourceStatus.duration_seconds ? `${sourceStatus.duration_seconds}s` : '—'}
                       </p>
                     </div>
@@ -314,7 +314,7 @@ export default function SyncPage() {
                       'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all',
                       isSyncing || !canWrite
                         ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
-                        : 'bg-slate-elevated text-white hover:bg-slate-border'
+                        : 'bg-slate-elevated text-foreground hover:bg-slate-border'
                     )}
                   >
                     {isSyncing ? (
@@ -331,7 +331,7 @@ export default function SyncPage() {
                       'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all',
                       isSyncing || !canWrite
                         ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
-                        : 'border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated'
+                        : 'border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-elevated'
                     )}
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -353,7 +353,7 @@ export default function SyncPage() {
           </div>
           <button
             onClick={() => refreshLogs()}
-            className="text-slate-muted hover:text-white transition-colors"
+            className="text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className="w-5 h-5" />
           </button>
@@ -371,7 +371,7 @@ export default function SyncPage() {
                 return (
                   <div className="flex items-center gap-2">
                     <Icon className={cn('w-4 h-4', config.color)} />
-                    <span className="text-white font-medium">{config.name}</span>
+                    <span className="text-foreground font-medium">{config.name}</span>
                   </div>
                 );
               },
@@ -395,7 +395,7 @@ export default function SyncPage() {
               header: 'Records',
               align: 'right',
               render: (item) => (
-                <span className="font-mono text-white">
+                <span className="font-mono text-foreground">
                   {(item.records_fetched as number || 0).toLocaleString()}
                   {(item.records_created || item.records_updated) ? (
                     <span className="text-slate-muted text-xs ml-1">
@@ -455,7 +455,7 @@ export default function SyncPage() {
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setConfirmModal({ open: false, source: null })}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
           >
             Cancel
           </button>

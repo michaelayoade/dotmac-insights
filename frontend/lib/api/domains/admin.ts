@@ -207,15 +207,6 @@ export interface RoleUpdatePayload {
 // API
 // =============================================================================
 
-// Helper to get access token for export function
-function getAccessToken(): string {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('dotmac_access_token');
-    if (token) return token;
-  }
-  return '';
-}
-
 export const adminApi = {
   // =========================================================================
   // SYNC
@@ -291,16 +282,12 @@ export const adminApi = {
       }
     });
 
-    const accessToken = getAccessToken();
     let response: Response;
     try {
       response = await fetch(
         `${API_BASE}/api/explore/tables/${table}/export?${searchParams.toString()}`,
         {
-          credentials: accessToken ? 'omit' : 'include',
-          headers: {
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
+          credentials: 'include',
         }
       );
     } catch (error) {

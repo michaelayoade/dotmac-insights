@@ -160,7 +160,7 @@ export default function PurchasingAnalyticsPage() {
       {/* Header with Date Range Filter */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Purchasing Analytics</h2>
+          <h2 className="text-xl font-semibold text-foreground">Purchasing Analytics</h2>
           <p className="text-slate-muted text-sm">Spending insights and trends ({start_date} → {end_date})</p>
         </div>
         <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ export default function PurchasingAnalyticsPage() {
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
@@ -189,7 +189,7 @@ export default function PurchasingAnalyticsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             {formatCurrency(totalOutstanding)}
           </p>
         </Link>
@@ -202,7 +202,7 @@ export default function PurchasingAnalyticsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             {formatNumber(supplierCount)}
           </p>
           <p className="text-xs text-slate-muted mt-1">Due this week: {formatCurrency(dueThisWeek)} ({formatNumber(dueThisWeekCount)} bills)</p>
@@ -216,7 +216,7 @@ export default function PurchasingAnalyticsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all" />
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             {formatCurrency(totalSupplierSpend && supplierCount ? totalSupplierSpend / supplierCount : 0)}
           </p>
         </Link>
@@ -243,7 +243,7 @@ export default function PurchasingAnalyticsPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-teal-electric" />
-            <h3 className="text-white font-medium">Spending Trend</h3>
+            <h3 className="text-foreground font-medium">Spending Trend</h3>
           </div>
         </div>
 
@@ -269,11 +269,11 @@ export default function PurchasingAnalyticsPage() {
               return (
                 <div key={item.period || item.month || index} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">
+                    <span className="text-foreground-secondary">
                       {item.period || item.month || item.date || `Period ${index + 1}`}
                     </span>
                     <div className="flex items-center gap-3">
-                      <span className="text-white font-medium">{formatCurrency(amount)}</span>
+                      <span className="text-foreground font-medium">{formatCurrency(amount)}</span>
                       {index > 0 && (
                         <span
                           className={cn(
@@ -310,7 +310,7 @@ export default function PurchasingAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-6">
             <Building2 className="w-5 h-5 text-blue-400" />
-            <h3 className="text-white font-medium">Top Suppliers by Spend</h3>
+            <h3 className="text-foreground font-medium">Top Suppliers by Spend</h3>
           </div>
 
           {supplierLoading ? (
@@ -347,12 +347,12 @@ export default function PurchasingAnalyticsPage() {
                             colors[index % colors.length]
                           )}
                         />
-                        <span className="text-slate-300 text-sm truncate">
+                        <span className="text-foreground-secondary text-sm truncate">
                           {supplier.name || 'Unknown'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-white font-mono text-sm">
+                        <span className="text-foreground font-mono text-sm">
                           {formatCurrency(amount)}
                         </span>
                         <span className="text-slate-muted text-xs">
@@ -377,7 +377,7 @@ export default function PurchasingAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-6">
             <Briefcase className="w-5 h-5 text-purple-400" />
-            <h3 className="text-white font-medium">Spend by Cost Center</h3>
+            <h3 className="text-foreground font-medium">Spend by Cost Center</h3>
           </div>
 
           {costCenterLoading ? (
@@ -415,12 +415,12 @@ export default function PurchasingAnalyticsPage() {
                             colors[index % colors.length]
                           )}
                         />
-                        <span className="text-slate-300 text-sm truncate">
+                        <span className="text-foreground-secondary text-sm truncate">
                           {center.cost_center || center.name || 'Unassigned'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-white font-mono text-sm">
+                        <span className="text-foreground font-mono text-sm">
                           {formatCurrency(amount)}
                         </span>
                         <span className="text-slate-muted text-xs">

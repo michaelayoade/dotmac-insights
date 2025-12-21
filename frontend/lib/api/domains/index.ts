@@ -41,6 +41,7 @@ export type {
   ProjectTaskListResponse,
   ProjectListParams,
   ProjectTaskParams,
+  ProjectTaskUpdatePayload,
 } from './projects';
 
 // CRM Domain (Leads, Opportunities, Activities, Contacts, Pipeline)
@@ -712,4 +713,12 @@ export type {
   SupportDashboardResponse as SupportDashboardAggregateResponse,
   FieldServiceDashboardResponse,
   AccountingDashboardResponse,
+  HRDashboardResponse,
+  InventoryDashboardResponse,
+  AssetsDashboardResponse,
+  ExpensesDashboardResponse,
+  ProjectsDashboardResponse,
+  InboxDashboardResponse,
+  ContactsDashboardResponse,
+  CustomersDashboardResponse,
 } from './dashboards';

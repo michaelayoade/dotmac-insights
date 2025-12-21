@@ -24,7 +24,7 @@ function FormLabel({ children, required }: { children: React.ReactNode; required
 function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = (status || 'draft').toLowerCase();
   const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
     submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
     'under review': { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-300', icon: <Eye className="w-3 h-3" /> },
     completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -54,7 +54,7 @@ function StatCard({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
       <div>
         <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
       </div>
       <div className="p-2 rounded-lg bg-slate-elevated">
         <Icon className={cn('w-5 h-5', tone)} />
@@ -103,7 +103,7 @@ export default function HrAppraisalsPage() {
                 setStatus(e.target.value);
                 setOffset(0);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             >
               <option value="">All statuses</option>
               <option value="draft">Draft</option>
@@ -120,18 +120,18 @@ export default function HrAppraisalsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-amber-400" />
-          <h3 className="text-white font-semibold">Appraisal Templates</h3>
+          <h3 className="text-foreground font-semibold">Appraisal Templates</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'template_name', header: 'Template Name', render: (item: any) => <span className="text-white font-medium">{item.template_name}</span> },
+            { key: 'template_name', header: 'Template Name', render: (item: any) => <span className="text-foreground font-medium">{item.template_name}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             {
               key: 'goals',
               header: 'Goals',
               align: 'right' as const,
               render: (item: any) => (
-                <span className="inline-flex items-center gap-1 text-white">
+                <span className="inline-flex items-center gap-1 text-foreground">
                   <Target className="w-3 h-3 text-slate-muted" />
                   {item.goals?.length ?? 0}
                 </span>
@@ -149,11 +149,11 @@ export default function HrAppraisalsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4 text-violet-400" />
-          <h3 className="text-white font-semibold">Appraisals</h3>
+          <h3 className="text-foreground font-semibold">Appraisals</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             { key: 'appraisal_template', header: 'Template', render: (item: any) => <span className="text-slate-muted text-sm">{item.appraisal_template || '—'}</span> },
             {
@@ -171,7 +171,7 @@ export default function HrAppraisalsPage() {
               header: 'Goals',
               align: 'right' as const,
               render: (item: any) => (
-                <span className="inline-flex items-center gap-1 text-white">
+                <span className="inline-flex items-center gap-1 text-foreground">
                   <Target className="w-3 h-3 text-slate-muted" />
                   {item.goals?.length ?? 0}
                 </span>

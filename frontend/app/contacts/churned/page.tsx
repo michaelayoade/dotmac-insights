@@ -146,7 +146,7 @@ export default function ChurnedPage() {
             <UserX className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <p className="text-white font-medium">{item.name}</p>
+            <p className="text-foreground font-medium">{item.name}</p>
             {item.company_name && item.company_name !== item.name && (
               <p className="text-slate-muted text-xs">{item.company_name}</p>
             )}
@@ -182,7 +182,7 @@ export default function ChurnedPage() {
       header: 'Territory',
       render: (item: UnifiedContact) => (
         item.territory ? (
-          <span className="flex items-center gap-1 text-sm text-slate-300">
+          <span className="flex items-center gap-1 text-sm text-foreground-secondary">
             <MapPin className="w-3 h-3 text-slate-muted" />
             {item.territory}
           </span>
@@ -200,7 +200,7 @@ export default function ChurnedPage() {
       key: 'cancellation_date',
       header: 'Churned On',
       render: (item: UnifiedContact) => (
-        <span className="text-sm text-slate-300">{formatDate(item.cancellation_date)}</span>
+        <span className="text-sm text-foreground-secondary">{formatDate(item.cancellation_date)}</span>
       ),
     },
   ];
@@ -237,7 +237,7 @@ export default function ChurnedPage() {
               'px-3 py-1 rounded text-sm transition-colors',
               periodDays === days
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                : 'text-slate-muted hover:text-white bg-slate-elevated'
+                : 'text-slate-muted hover:text-foreground bg-slate-elevated'
             )}
           >
             {days === 365 ? '1 Year' : `${days} Days`}
@@ -253,7 +253,7 @@ export default function ChurnedPage() {
               <UserX className="w-5 h-5 text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{analytics?.total_churned || total}</p>
+              <p className="text-2xl font-bold text-foreground">{analytics?.total_churned || total}</p>
               <p className="text-xs text-slate-muted">Churned ({periodDays}d)</p>
             </div>
           </div>
@@ -286,7 +286,7 @@ export default function ChurnedPage() {
               <AlertCircle className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{churnReasons.length}</p>
+              <p className="text-2xl font-bold text-foreground">{churnReasons.length}</p>
               <p className="text-xs text-slate-muted">Churn Reasons</p>
             </div>
           </div>
@@ -299,7 +299,7 @@ export default function ChurnedPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-4 h-4 text-red-400" />
-            <h3 className="text-white font-semibold">Churn Reasons</h3>
+            <h3 className="text-foreground font-semibold">Churn Reasons</h3>
           </div>
           {churnReasons.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -337,7 +337,7 @@ export default function ChurnedPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <TrendingDown className="w-4 h-4 text-red-400" />
-            <h3 className="text-white font-semibold">Monthly Trend</h3>
+            <h3 className="text-foreground font-semibold">Monthly Trend</h3>
           </div>
           {monthlyTrend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -361,14 +361,14 @@ export default function ChurnedPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="w-4 h-4 text-red-400" />
-          <h3 className="text-white font-semibold">Filter by Reason</h3>
+          <h3 className="text-foreground font-semibold">Filter by Reason</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setReasonFilter('')}
             className={cn(
               'px-3 py-1.5 rounded-lg text-sm transition-colors',
-              !reasonFilter ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-300 hover:bg-slate-elevated bg-slate-elevated'
+              !reasonFilter ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-foreground-secondary hover:bg-slate-elevated bg-slate-elevated'
             )}
           >
             All ({analytics?.total_churned || total})
@@ -379,7 +379,7 @@ export default function ChurnedPage() {
               onClick={() => setReasonFilter(reason.name)}
               className={cn(
                 'px-3 py-1.5 rounded-lg text-sm transition-colors',
-                reasonFilter === reason.name ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-slate-300 hover:bg-slate-elevated bg-slate-elevated'
+                reasonFilter === reason.name ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-foreground-secondary hover:bg-slate-elevated bg-slate-elevated'
               )}
             >
               {reason.name} ({reason.value})
@@ -392,7 +392,7 @@ export default function ChurnedPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-red-400" />
-          <span className="text-white text-sm font-medium">Search</span>
+          <span className="text-foreground text-sm font-medium">Search</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 min-w-[200px] max-w-md relative">
@@ -402,7 +402,7 @@ export default function ChurnedPage() {
               placeholder="Search churned customers..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-red-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-red-500/50"
             />
           </form>
           {(search || reasonFilter) && (
@@ -413,7 +413,7 @@ export default function ChurnedPage() {
                 setReasonFilter('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

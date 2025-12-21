@@ -30,6 +30,8 @@ import {
   Upload,
   X,
   Loader2,
+  Car,
+  Box,
 } from 'lucide-react';
 import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -188,7 +190,7 @@ export default function ServiceOrderDetailPage() {
     return (
       <div className="text-center py-12">
         <AlertTriangle className="w-12 h-12 mx-auto mb-3 text-amber-400" />
-        <p className="text-lg text-white mb-2">Order not found</p>
+        <p className="text-lg text-foreground mb-2">Order not found</p>
         <Link href="/field-service/orders" className="text-teal-electric hover:underline">
           Back to orders
         </Link>
@@ -255,13 +257,13 @@ export default function ServiceOrderDetailPage() {
         <div>
           <Link
             href="/field-service/orders"
-            className="inline-flex items-center gap-1 text-slate-muted hover:text-white text-sm mb-2 transition-colors"
+            className="inline-flex items-center gap-1 text-slate-muted hover:text-foreground text-sm mb-2 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to orders
           </Link>
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-white">{order.order_number}</h2>
+            <h2 className="text-xl font-semibold text-foreground">{order.order_number}</h2>
             <span className={cn('px-2 py-1 rounded text-xs font-medium capitalize', priority.color, priority.bg)}>
               {order.priority}
             </span>
@@ -286,7 +288,7 @@ export default function ServiceOrderDetailPage() {
               }}
               disabled={isUpdating}
               className={cn(
-                'inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors disabled:opacity-50',
+                'inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-foreground transition-colors disabled:opacity-50',
                 action.color,
                 action.action === 'cancel' ? 'hover:bg-red-600' : 'hover:opacity-90'
               )}
@@ -298,7 +300,7 @@ export default function ServiceOrderDetailPage() {
           ))}
           <Link
             href={`/field-service/orders/${order.id}/edit`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <Edit2 className="w-4 h-4" />
             Edit
@@ -335,7 +337,7 @@ export default function ServiceOrderDetailPage() {
                       'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
                       activeTab === tab.key
                         ? 'border-teal-electric text-teal-electric'
-                        : 'border-transparent text-slate-muted hover:text-white'
+                        : 'border-transparent text-slate-muted hover:text-foreground'
                     )}
                   >
                     <tab.icon className="w-4 h-4" />
@@ -350,7 +352,7 @@ export default function ServiceOrderDetailPage() {
                 <div className="space-y-6">
                   <div>
                     <h4 className="text-sm font-medium text-slate-muted mb-2">Description</h4>
-                    <p className="text-white">{order.description || 'No description provided'}</p>
+                    <p className="text-foreground">{order.description || 'No description provided'}</p>
                   </div>
 
                   {order.notes && (
@@ -363,18 +365,18 @@ export default function ServiceOrderDetailPage() {
                   {order.resolution_notes && (
                     <div>
                       <h4 className="text-sm font-medium text-slate-muted mb-2">Resolution Notes</h4>
-                      <p className="text-white">{order.resolution_notes}</p>
+                      <p className="text-foreground">{order.resolution_notes}</p>
                     </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <h4 className="text-sm font-medium text-slate-muted mb-2">Service Type</h4>
-                      <p className="text-white capitalize">{order.order_type?.replace('_', ' ') || 'General'}</p>
+                      <p className="text-foreground capitalize">{order.order_type?.replace('_', ' ') || 'General'}</p>
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-slate-muted mb-2">Estimated Duration</h4>
-                      <p className="text-white">
+                      <p className="text-foreground">
                         {order.estimated_duration
                           ? `${order.estimated_duration} mins`
                           : order.estimated_duration_minutes
@@ -392,7 +394,7 @@ export default function ServiceOrderDetailPage() {
                     <div className="space-y-4">
                       {checklistGroups.map((checklist: any) => (
                         <div key={checklist.id} className="space-y-2">
-                          <h4 className="text-white font-medium">{checklist.template_name || 'Checklist'}</h4>
+                          <h4 className="text-foreground font-medium">{checklist.template_name || 'Checklist'}</h4>
                           <div className="space-y-1">
                             {checklist.items?.map((item: any, idx: number) => (
                               <div
@@ -406,11 +408,11 @@ export default function ServiceOrderDetailPage() {
                                   'w-5 h-5 rounded border flex items-center justify-center',
                                   item.checked ? 'bg-green-500 border-green-500' : 'border-slate-border'
                                 )}>
-                                  {item.checked && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                  {item.checked && <CheckCircle2 className="w-3 h-3 text-foreground" />}
                                 </div>
                                 <span className={cn(
                                   'text-sm',
-                                  item.checked ? 'text-green-400' : 'text-white'
+                                  item.checked ? 'text-green-400' : 'text-foreground'
                                 )}>
                                   {item.item_name}
                                 </span>
@@ -433,13 +435,13 @@ export default function ServiceOrderDetailPage() {
                       {timeEntries.map((entry: any) => (
                         <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-elevated">
                           <div>
-                            <p className="text-white text-sm capitalize">{entry.entry_type.replace('_', ' ')}</p>
+                            <p className="text-foreground text-sm capitalize">{entry.entry_type.replace('_', ' ')}</p>
                             <p className="text-slate-muted text-xs">
                               {new Date(entry.start_time).toLocaleString()}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-white font-medium">
+                            <p className="text-foreground font-medium">
                               {entry.duration_minutes ? `${entry.duration_minutes} mins` : 'In progress'}
                             </p>
                           </div>
@@ -461,7 +463,7 @@ export default function ServiceOrderDetailPage() {
                         <select
                           value={uploadPhotoType}
                           onChange={(e) => setUploadPhotoType(e.target.value)}
-                          className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white text-sm focus:outline-none focus:border-teal-electric/50"
+                          className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground text-sm focus:outline-none focus:border-teal-electric/50"
                         >
                           <option value="before">Before</option>
                           <option value="after">After</option>
@@ -474,7 +476,7 @@ export default function ServiceOrderDetailPage() {
                           placeholder="Caption (optional)"
                           value={uploadCaption}
                           onChange={(e) => setUploadCaption(e.target.value)}
-                          className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white text-sm focus:outline-none focus:border-teal-electric/50"
+                          className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground text-sm focus:outline-none focus:border-teal-electric/50"
                         />
                       </div>
                       <label className="cursor-pointer">
@@ -523,7 +525,7 @@ export default function ServiceOrderDetailPage() {
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button
                               onClick={() => handleDeletePhoto(photo.id)}
-                              className="p-2 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                              className="p-2 bg-red-500 rounded-full text-foreground hover:bg-red-600 transition-colors"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -531,7 +533,7 @@ export default function ServiceOrderDetailPage() {
                           <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1">
                             <p className="text-xs text-slate-muted capitalize">{photo.photo_type}</p>
                             {photo.caption && (
-                              <p className="text-xs text-white truncate">{photo.caption}</p>
+                              <p className="text-xs text-foreground truncate">{photo.caption}</p>
                             )}
                           </div>
                         </div>
@@ -558,10 +560,10 @@ export default function ServiceOrderDetailPage() {
                       <tbody className="divide-y divide-slate-border">
                         {items.map((item: any) => (
                           <tr key={item.id}>
-                            <td className="py-2 text-white">{item.item_name}</td>
+                            <td className="py-2 text-foreground">{item.item_name}</td>
                             <td className="py-2 text-slate-muted">{item.quantity}</td>
                             <td className="py-2 text-right text-slate-muted">₦{item.unit_price?.toLocaleString()}</td>
-                            <td className="py-2 text-right text-white">₦{item.total_price?.toLocaleString()}</td>
+                            <td className="py-2 text-right text-foreground">₦{item.total_price?.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -579,14 +581,14 @@ export default function ServiceOrderDetailPage() {
         <div className="space-y-6">
           {/* Schedule Info */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-teal-electric" />
               Schedule
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-slate-muted text-sm">Scheduled Date</span>
-                <span className="text-white text-sm">
+                <span className="text-foreground text-sm">
                   {order.scheduled_date
                     ? new Date(order.scheduled_date).toLocaleDateString('en-NG', {
                         weekday: 'short',
@@ -598,14 +600,14 @@ export default function ServiceOrderDetailPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-muted text-sm">Time Window</span>
-                <span className="text-white text-sm">
+                <span className="text-foreground text-sm">
                   {order.scheduled_start_time || 'TBD'} - {order.scheduled_end_time || 'TBD'}
                 </span>
               </div>
               {order.actual_start_time && (
                 <div className="flex justify-between">
                   <span className="text-slate-muted text-sm">Actual Start</span>
-                  <span className="text-white text-sm">
+                  <span className="text-foreground text-sm">
                     {new Date(order.actual_start_time).toLocaleTimeString()}
                   </span>
                 </div>
@@ -613,7 +615,7 @@ export default function ServiceOrderDetailPage() {
               {order.actual_end_time && (
                 <div className="flex justify-between">
                   <span className="text-slate-muted text-sm">Actual End</span>
-                  <span className="text-white text-sm">
+                  <span className="text-foreground text-sm">
                     {new Date(order.actual_end_time).toLocaleTimeString()}
                   </span>
                 </div>
@@ -623,13 +625,13 @@ export default function ServiceOrderDetailPage() {
 
           {/* Customer Info */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <User className="w-4 h-4 text-teal-electric" />
               Customer
             </h3>
             {order.customer_id ? (
               <div className="space-y-3">
-                <p className="text-white font-medium">{order.customer_name}</p>
+                <p className="text-foreground font-medium">{order.customer_name}</p>
                 {order.customer_phone && (
                   <div className="flex items-center gap-2 text-slate-muted text-sm">
                     <Phone className="w-4 h-4" />
@@ -650,12 +652,12 @@ export default function ServiceOrderDetailPage() {
 
           {/* Location Info */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-teal-electric" />
               Location
             </h3>
             <div className="space-y-2 text-sm">
-              {order.address && <p className="text-white">{order.address}</p>}
+              {order.address && <p className="text-foreground">{order.address}</p>}
               {(order.city || order.state) && (
                 <p className="text-slate-muted">{[order.city, order.state].filter(Boolean).join(', ')}</p>
               )}
@@ -675,7 +677,7 @@ export default function ServiceOrderDetailPage() {
 
           {/* Technician Info */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <Truck className="w-4 h-4 text-teal-electric" />
               Assigned Technician
             </h3>
@@ -685,7 +687,7 @@ export default function ServiceOrderDetailPage() {
                   <User className="w-5 h-5 text-slate-muted" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">{order.technician_name}</p>
+                  <p className="text-foreground font-medium">{order.technician_name}</p>
                   {order.team_name && (
                     <p className="text-slate-muted text-sm">{order.team_name}</p>
                   )}
@@ -699,28 +701,66 @@ export default function ServiceOrderDetailPage() {
             )}
           </div>
 
+          {/* Related Asset */}
+          {order.asset_id && (
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+              <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
+                <Box className="w-4 h-4 text-teal-electric" />
+                Related Asset
+              </h3>
+              <Link
+                href={`/assets/list/${order.asset_id}`}
+                className="text-foreground hover:text-teal-electric transition-colors"
+              >
+                <p className="font-medium">{order.asset_name || `Asset #${order.asset_id}`}</p>
+                {order.asset_code && (
+                  <p className="text-slate-muted text-sm">{order.asset_code}</p>
+                )}
+              </Link>
+            </div>
+          )}
+
+          {/* Related Vehicle */}
+          {order.vehicle_id && (
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+              <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
+                <Car className="w-4 h-4 text-teal-electric" />
+                Related Vehicle
+              </h3>
+              <Link
+                href={`/hr/fleet/${order.vehicle_id}`}
+                className="text-foreground hover:text-teal-electric transition-colors"
+              >
+                <p className="font-medium">{order.vehicle_name || order.license_plate || `Vehicle #${order.vehicle_id}`}</p>
+                {order.vehicle_model && (
+                  <p className="text-slate-muted text-sm">{order.vehicle_model}</p>
+                )}
+              </Link>
+            </div>
+          )}
+
           {/* Financials */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-teal-electric" />
               Financials
             </h3>
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-slate-muted text-sm">Labor Cost</span>
-                <span className="text-white text-sm">
+                <span className="text-foreground text-sm">
                   ₦{(order.labor_cost || 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-muted text-sm">Parts Cost</span>
-                <span className="text-white text-sm">
+                <span className="text-foreground text-sm">
                   ₦{(order.parts_cost || 0).toLocaleString()}
                 </span>
               </div>
               <div className="border-t border-slate-border pt-3 flex justify-between">
-                <span className="text-white font-medium">Total</span>
-                <span className="text-white font-bold">
+                <span className="text-foreground font-medium">Total</span>
+                <span className="text-foreground font-bold">
                   ₦{(order.total_cost || 0).toLocaleString()}
                 </span>
               </div>
@@ -730,7 +770,7 @@ export default function ServiceOrderDetailPage() {
           {/* Customer Rating */}
           {order.customer_rating !== undefined && order.customer_rating !== null && (
             <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
                 <Star className="w-4 h-4 text-amber-400" />
                 Customer Feedback
               </h3>
@@ -764,13 +804,13 @@ export default function ServiceOrderDetailPage() {
           />
           <div className="relative bg-slate-card border border-slate-border rounded-xl w-full max-w-lg p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <Truck className="w-5 h-5 text-teal-electric" />
                 Dispatch Order
               </h3>
               <button
                 onClick={() => setShowDispatchModal(false)}
-                className="p-1 text-slate-muted hover:text-white transition-colors"
+                className="p-1 text-slate-muted hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -785,7 +825,7 @@ export default function ServiceOrderDetailPage() {
                 <select
                   value={selectedTechnician || ''}
                   onChange={(e) => setSelectedTechnician(Number(e.target.value) || null)}
-                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
                 >
                   <option value="">Choose a technician...</option>
                   {technicians?.map((tech: any) => (
@@ -806,7 +846,7 @@ export default function ServiceOrderDetailPage() {
                   onChange={(e) => setDispatchNotes(e.target.value)}
                   placeholder="Optional notes for the technician..."
                   rows={3}
-                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
+                  className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
                 />
               </div>
 
@@ -818,7 +858,7 @@ export default function ServiceOrderDetailPage() {
                   onChange={(e) => setNotifyCustomer(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-border bg-slate-elevated text-teal-electric focus:ring-teal-electric/50"
                 />
-                <span className="text-sm text-white">Notify customer about technician assignment</span>
+                <span className="text-sm text-foreground">Notify customer about technician assignment</span>
               </label>
 
               {/* Error in modal */}
@@ -832,14 +872,14 @@ export default function ServiceOrderDetailPage() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-border">
                 <button
                   onClick={() => setShowDispatchModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+                  className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDispatch}
                   disabled={isUpdating || !selectedTechnician}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-foreground font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
                 >
                   {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Dispatch

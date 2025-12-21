@@ -16,7 +16,7 @@ export function InsightCard({ title, children, className = '' }: { title: string
   return (
     <div className={`bg-slate-card rounded-lg border border-slate-border ${className}`}>
       <div className="px-4 py-3 border-b border-slate-border">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -72,7 +72,7 @@ export function SummaryCard({
   gradient?: string;
 }) {
   return (
-    <div className={`bg-gradient-to-br ${gradient} rounded-lg p-4 text-white`}>
+    <div className={`bg-gradient-to-br ${gradient} rounded-lg p-4 text-foreground`}>
       <div className="text-sm opacity-80">{title}</div>
       <div className="text-3xl font-bold">{value}</div>
       {subtitle && <div className="text-sm opacity-80 mt-1">{subtitle}</div>}
@@ -155,7 +155,7 @@ export function EmptyState({ title, message, icon }: EmptyStateProps) {
       <div className="p-3 rounded-full bg-slate-elevated mb-4">
         {icon || <Inbox className="w-8 h-8 text-slate-muted" />}
       </div>
-      {title && <h3 className="text-lg font-medium text-white mb-1">{title}</h3>}
+      {title && <h3 className="text-lg font-medium text-foreground mb-1">{title}</h3>}
       <p className="text-sm text-slate-muted max-w-sm">{message}</p>
     </div>
   );

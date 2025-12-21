@@ -237,7 +237,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               value={query}
               onChange={(e) => search(e.target.value)}
               placeholder="Search or type a command..."
-              className="flex-1 bg-transparent text-white text-lg placeholder:text-slate-muted focus:outline-none"
+              className="flex-1 bg-transparent text-foreground text-lg placeholder:text-slate-muted focus:outline-none"
             />
             <div className="flex items-center gap-2 flex-shrink-0">
               <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 bg-slate-elevated border border-slate-border rounded text-xs text-slate-muted">
@@ -246,7 +246,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
               <button
                 onClick={onClose}
                 aria-label="Close command palette"
-                className="p-1 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+                className="p-1 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
               >
                 <X className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -272,7 +272,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       onClick={() => handleSelect(item.href, item)}
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
-                        isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-white hover:bg-slate-elevated'
+                        isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-foreground hover:bg-slate-elevated'
                       )}
                     >
                       <Clock className="w-4 h-4 text-slate-muted" />
@@ -304,7 +304,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                         onClick={() => handleSelect(mod.href, mod)}
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors',
-                          isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-white hover:bg-slate-elevated'
+                          isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-foreground hover:bg-slate-elevated'
                         )}
                       >
                         <Icon className={cn('w-4 h-4', isSelected ? 'text-teal-400' : colors.text)} />
@@ -334,7 +334,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       onClick={() => handleSelect(result.href, result)}
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
-                        isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-white hover:bg-slate-elevated'
+                        isSelected ? 'bg-teal-500/20 text-teal-300' : 'text-foreground hover:bg-slate-elevated'
                       )}
                     >
                       <div className={cn(

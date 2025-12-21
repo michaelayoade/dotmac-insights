@@ -32,7 +32,7 @@ export default function FinanceCustomersPage() {
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
           <div className="flex flex-col">
-            <span className="text-white text-sm">{item.customer_name || 'Unknown'}</span>
+            <span className="text-foreground text-sm">{item.customer_name || 'Unknown'}</span>
             {item.customer && <span className="text-xs text-slate-muted font-mono">{item.customer}</span>}
           </div>
         </div>
@@ -42,7 +42,7 @@ export default function FinanceCustomersPage() {
       key: 'total_receivable',
       header: 'Total AR',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.total_receivable)}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.total_receivable)}</span>,
     },
     {
       key: 'current',
@@ -72,7 +72,7 @@ export default function FinanceCustomersPage() {
       key: 'invoice_count',
       header: '# Invoices',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.invoice_count ?? 0}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.invoice_count ?? 0}</span>,
     },
   ];
 
@@ -89,7 +89,7 @@ export default function FinanceCustomersPage() {
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Customers (Finance)</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Customers (Finance)</h1>
           <p className="text-slate-muted text-sm">Receivables snapshot by customer for accounting.</p>
         </div>
       </div>

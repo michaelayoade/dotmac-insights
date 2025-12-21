@@ -28,12 +28,12 @@ export default function OmniWebhooksPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Omnichannel Webhooks</h1>
+          <h1 className="text-2xl font-bold text-foreground">Omnichannel Webhooks</h1>
           <p className="text-slate-muted">Channel delivery webhooks and secrets.</p>
         </div>
         <button
           onClick={() => mutate()}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -51,7 +51,7 @@ export default function OmniWebhooksPage() {
               <div className="flex items-center gap-2">
                 <Radio className="w-5 h-5 text-blue-400" />
                 <div>
-                  <p className="text-white font-semibold">{channel.name}</p>
+                  <p className="text-foreground font-semibold">{channel.name}</p>
                   <p className="text-xs text-slate-muted uppercase">{channel.type}</p>
                 </div>
               </div>

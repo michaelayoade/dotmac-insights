@@ -147,7 +147,7 @@ export default function FieldServiceAnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Analytics</h2>
+          <h2 className="text-xl font-semibold text-foreground">Analytics</h2>
           <p className="text-sm text-slate-muted">Field service performance metrics</p>
         </div>
         <div className="flex items-center bg-slate-elevated border border-slate-border rounded-lg p-1">
@@ -159,7 +159,7 @@ export default function FieldServiceAnalyticsPage() {
                 'px-4 py-1.5 rounded text-sm capitalize transition-colors',
                 period === p
                   ? 'bg-teal-electric text-slate-950'
-                  : 'text-slate-muted hover:text-white'
+                  : 'text-slate-muted hover:text-foreground'
               )}
             >
               {p}
@@ -205,7 +205,7 @@ export default function FieldServiceAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Completion Trend */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-6 flex items-center gap-2">
             <Activity className="w-4 h-4 text-teal-electric" />
             Completion Trend (Last 7 Days)
           </h3>
@@ -220,7 +220,7 @@ export default function FieldServiceAnalyticsPage() {
 
         {/* Order Types */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-6 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-teal-electric" />
             Orders by Type
           </h3>
@@ -238,7 +238,7 @@ export default function FieldServiceAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Status Distribution */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-teal-electric" />
             Status Distribution
           </h3>
@@ -259,7 +259,7 @@ export default function FieldServiceAnalyticsPage() {
                 <div key={status}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-muted capitalize">{status.replace('_', ' ')}</span>
-                    <span className="text-white">{count as number}</span>
+                    <span className="text-foreground">{count as number}</span>
                   </div>
                   <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
                     <div
@@ -275,7 +275,7 @@ export default function FieldServiceAnalyticsPage() {
 
         {/* Top Technicians */}
         <div className="lg:col-span-2 bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
             Top Performing Technicians
           </h3>
@@ -286,15 +286,15 @@ export default function FieldServiceAnalyticsPage() {
                   key={tech.id || idx}
                   className="flex items-center gap-4 p-3 rounded-lg bg-slate-elevated"
                 >
-                  <div className="w-8 h-8 rounded-full bg-slate-card flex items-center justify-center text-white font-bold text-sm">
+                  <div className="w-8 h-8 rounded-full bg-slate-card flex items-center justify-center text-foreground font-bold text-sm">
                     {idx + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="text-white font-medium">{tech.name}</p>
+                    <p className="text-foreground font-medium">{tech.name}</p>
                     <p className="text-xs text-slate-muted">{tech.team_name || 'No team'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-semibold">{tech.completed_orders || 0}</p>
+                    <p className="text-foreground font-semibold">{tech.completed_orders || 0}</p>
                     <p className="text-xs text-slate-muted">orders</p>
                   </div>
                   <div className="text-right">
@@ -330,7 +330,7 @@ export default function FieldServiceAnalyticsPage() {
             <Clock className="w-4 h-4" />
             Avg Service Time
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             {stats.avg_service_duration ? `${Math.round(stats.avg_service_duration)}m` : 'N/A'}
           </p>
         </div>
@@ -339,7 +339,7 @@ export default function FieldServiceAnalyticsPage() {
             <MapPin className="w-4 h-4" />
             Avg Travel Time
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             {stats.avg_travel_time ? `${Math.round(stats.avg_travel_time)}m` : 'N/A'}
           </p>
         </div>
@@ -348,7 +348,7 @@ export default function FieldServiceAnalyticsPage() {
             <DollarSign className="w-4 h-4" />
             Total Revenue
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-2xl font-bold text-foreground">
             ₦{(stats.total_revenue || 0).toLocaleString()}
           </p>
         </div>

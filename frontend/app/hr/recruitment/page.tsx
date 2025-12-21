@@ -36,7 +36,7 @@ function StatCard({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
       <div>
         <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
       </div>
       <div className="p-2 rounded-lg bg-slate-elevated">
         <Icon className={cn('w-5 h-5', tone)} />
@@ -330,7 +330,7 @@ export default function HrRecruitmentPage() {
             setOpeningStatus(e.target.value);
             setOpeningOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All openings</option>
           <option value="open">Open</option>
@@ -342,7 +342,7 @@ export default function HrRecruitmentPage() {
             setOfferStatus(e.target.value);
             setOfferOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All offers</option>
           <option value="draft">Draft</option>
@@ -353,13 +353,13 @@ export default function HrRecruitmentPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="space-y-3">
-          <p className="text-white font-semibold">New Job Opening</p>
+          <p className="text-foreground font-semibold">New Job Opening</p>
           <input
             type="text"
             placeholder="Job Title"
             value={newOpening.job_title}
             onChange={(e) => setNewOpening({ ...newOpening, job_title: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
           />
           <div className="grid grid-cols-2 gap-2">
             <input
@@ -367,12 +367,12 @@ export default function HrRecruitmentPage() {
               placeholder="Company"
               value={newOpening.company}
               onChange={(e) => setNewOpening({ ...newOpening, company: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <select
               value={newOpening.status}
               onChange={(e) => setNewOpening({ ...newOpening, status: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             >
               <option value="open">Open</option>
               <option value="closed">Closed</option>
@@ -383,13 +383,13 @@ export default function HrRecruitmentPage() {
               type="date"
               value={newOpening.posting_date}
               onChange={(e) => setNewOpening({ ...newOpening, posting_date: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <input
               type="date"
               value={newOpening.expected_date}
               onChange={(e) => setNewOpening({ ...newOpening, expected_date: e.target.value })}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
           </div>
           <input
@@ -397,7 +397,7 @@ export default function HrRecruitmentPage() {
             placeholder="Vacancies"
             value={newOpening.vacancies}
             onChange={(e) => setNewOpening({ ...newOpening, vacancies: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
           />
           <button
             onClick={handleCreateOpening}
@@ -408,10 +408,10 @@ export default function HrRecruitmentPage() {
         </div>
 
         <div className="space-y-3">
-          <p className="text-white font-semibold">Upcoming Interviews</p>
+          <p className="text-foreground font-semibold">Upcoming Interviews</p>
           <DataTable
             columns={[
-              { key: 'job_applicant_name', header: 'Candidate', render: (item: any) => <span className="text-white">{item.job_applicant_name || item.applicant_name || `Applicant #${item.job_applicant_id}`}</span> },
+              { key: 'job_applicant_name', header: 'Candidate', render: (item: any) => <span className="text-foreground">{item.job_applicant_name || item.applicant_name || `Applicant #${item.job_applicant_id}`}</span> },
               { key: 'scheduled_at', header: 'Date & Time', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.scheduled_at)}</span> },
               { key: 'interviewer', header: 'Interviewer', render: (item: any) => <span className="text-slate-muted text-sm">{item.interviewer || item.interviewer_name || '—'}</span> },
               { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status || 'scheduled'} type="interview" /> },
@@ -427,16 +427,16 @@ export default function HrRecruitmentPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="space-y-3">
-          <p className="text-white font-semibold">Applicant Actions</p>
+          <p className="text-foreground font-semibold">Applicant Actions</p>
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
-            <p className="text-sm text-white font-semibold">Schedule Interview</p>
+            <p className="text-sm text-foreground font-semibold">Schedule Interview</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <FormLabel required>Candidate</FormLabel>
                 <select
                   value={scheduleForm.applicantId}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, applicantId: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="">Select candidate...</option>
                   {(applicantList.items || []).map((a: any) => (
@@ -452,7 +452,7 @@ export default function HrRecruitmentPage() {
                   type="datetime-local"
                   value={scheduleForm.interview_date}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, interview_date: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
             </div>
@@ -464,7 +464,7 @@ export default function HrRecruitmentPage() {
                   placeholder="e.g. John Smith"
                   value={scheduleForm.interviewer}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, interviewer: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div>
@@ -474,7 +474,7 @@ export default function HrRecruitmentPage() {
                   placeholder="e.g. Room 101 / Zoom"
                   value={scheduleForm.location}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, location: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
             </div>
@@ -485,7 +485,7 @@ export default function HrRecruitmentPage() {
                 placeholder="Any additional notes..."
                 value={scheduleForm.notes}
                 onChange={(e) => setScheduleForm({ ...scheduleForm, notes: e.target.value })}
-                className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <button
@@ -497,14 +497,14 @@ export default function HrRecruitmentPage() {
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
-            <p className="text-sm text-white font-semibold">Attach Offer to Candidate</p>
+            <p className="text-sm text-foreground font-semibold">Attach Offer to Candidate</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <FormLabel required>Candidate</FormLabel>
                 <select
                   value={makeOfferForm.applicantId}
                   onChange={(e) => setMakeOfferForm({ ...makeOfferForm, applicantId: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="">Select candidate...</option>
                   {(applicantList.items || []).map((a: any) => (
@@ -519,7 +519,7 @@ export default function HrRecruitmentPage() {
                 <select
                   value={makeOfferForm.offerId}
                   onChange={(e) => setMakeOfferForm({ ...makeOfferForm, offerId: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="">Select offer...</option>
                   {(offerList.items || []).map((o: any) => (
@@ -540,16 +540,16 @@ export default function HrRecruitmentPage() {
         </div>
 
         <div className="space-y-3">
-          <p className="text-white font-semibold">Interviews & Offers</p>
+          <p className="text-foreground font-semibold">Interviews & Offers</p>
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
-            <p className="text-sm text-white font-semibold">Create Interview</p>
+            <p className="text-sm text-foreground font-semibold">Create Interview</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <FormLabel required>Candidate</FormLabel>
                 <select
                   value={interviewForm.applicantId}
                   onChange={(e) => setInterviewForm({ ...interviewForm, applicantId: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="">Select candidate...</option>
                   {(applicantList.items || []).map((a: any) => (
@@ -565,7 +565,7 @@ export default function HrRecruitmentPage() {
                   type="datetime-local"
                   value={interviewForm.scheduled_at}
                   onChange={(e) => setInterviewForm({ ...interviewForm, scheduled_at: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
             </div>
@@ -577,7 +577,7 @@ export default function HrRecruitmentPage() {
                   placeholder="e.g. Jane Doe"
                   value={interviewForm.interviewer}
                   onChange={(e) => setInterviewForm({ ...interviewForm, interviewer: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div>
@@ -587,7 +587,7 @@ export default function HrRecruitmentPage() {
                   placeholder="e.g. Conference Room A"
                   value={interviewForm.location}
                   onChange={(e) => setInterviewForm({ ...interviewForm, location: e.target.value })}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
             </div>
@@ -596,7 +596,7 @@ export default function HrRecruitmentPage() {
               <select
                 value={interviewForm.mode}
                 onChange={(e) => setInterviewForm({ ...interviewForm, mode: e.target.value })}
-                className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               >
                 <option value="in-person">In-person</option>
                 <option value="remote">Remote / Video Call</option>
@@ -612,7 +612,7 @@ export default function HrRecruitmentPage() {
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
-            <p className="text-sm text-white font-semibold">Complete/Cancel Interview</p>
+            <p className="text-sm text-foreground font-semibold">Complete/Cancel Interview</p>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
@@ -622,14 +622,14 @@ export default function HrRecruitmentPage() {
                   setCompleteInterviewForm({ ...completeInterviewForm, interviewId: e.target.value });
                   setInterviewActionId(e.target.value);
                 }}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="number"
                 placeholder="Rating"
                 value={completeInterviewForm.rating}
                 onChange={(e) => setCompleteInterviewForm({ ...completeInterviewForm, rating: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <input
@@ -637,13 +637,13 @@ export default function HrRecruitmentPage() {
               placeholder="Result (pass/fail)"
               value={completeInterviewForm.result}
               onChange={(e) => setCompleteInterviewForm({ ...completeInterviewForm, result: e.target.value })}
-              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <textarea
               placeholder="Feedback"
               value={completeInterviewForm.feedback}
               onChange={(e) => setCompleteInterviewForm({ ...completeInterviewForm, feedback: e.target.value })}
-              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <div className="flex gap-2">
               <button
@@ -655,14 +655,14 @@ export default function HrRecruitmentPage() {
               <select
                 value={interviewAction}
                 onChange={(e) => setInterviewAction(e.target.value as 'cancel' | 'no-show')}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               >
                 <option value="cancel">Cancel</option>
                 <option value="no-show">No-show</option>
               </select>
               <button
                 onClick={handleInterviewAction}
-                className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-white"
+                className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-foreground"
               >
                 Apply
               </button>
@@ -670,19 +670,19 @@ export default function HrRecruitmentPage() {
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
-            <p className="text-sm text-white font-semibold">Offer Actions</p>
+            <p className="text-sm text-foreground font-semibold">Offer Actions</p>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
                 placeholder="Offer ID"
                 value={offerActionId}
                 onChange={(e) => setOfferActionId(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <select
                 value={offerAction}
                 onChange={(e) => setOfferAction(e.target.value as 'send' | 'accept' | 'reject' | 'void')}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               >
                 <option value="send">Send</option>
                 <option value="accept">Accept</option>
@@ -696,7 +696,7 @@ export default function HrRecruitmentPage() {
                 placeholder="Void reason"
                 value={offerVoidReason}
                 onChange={(e) => setOfferVoidReason(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             )}
             <button
@@ -712,20 +712,20 @@ export default function HrRecruitmentPage() {
                 placeholder="Offer IDs (comma-separated)"
                 value={bulkOfferIds}
                 onChange={(e) => setBulkOfferIds(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <div className="flex gap-2">
                 <select
                   value={bulkOfferDelivery}
                   onChange={(e) => setBulkOfferDelivery(e.target.value)}
-                  className="flex-1 bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="flex-1 bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="email">Email</option>
                   <option value="manual">Manual</option>
                 </select>
                 <button
                   onClick={handleBulkOfferSend}
-                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-white"
+                  className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-foreground"
                 >
                   Send
                 </button>
@@ -739,15 +739,15 @@ export default function HrRecruitmentPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Briefcase className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Job Openings</h3>
+          <h3 className="text-foreground font-semibold">Job Openings</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'job_title', header: 'Position', render: (item: any) => <span className="text-white font-medium">{item.job_title}</span> },
+            { key: 'job_title', header: 'Position', render: (item: any) => <span className="text-foreground font-medium">{item.job_title}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             { key: 'posting_date', header: 'Posted', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.posting_date) || '—'}</span> },
             { key: 'expected_date', header: 'Closes', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.expected_date) || '—'}</span> },
-            { key: 'vacancies', header: 'Open Positions', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{item.vacancies ?? '—'}</span> },
+            { key: 'vacancies', header: 'Open Positions', align: 'right' as const, render: (item: any) => <span className="font-mono text-foreground">{item.vacancies ?? '—'}</span> },
             { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status || 'open'} type="job" /> },
           ]}
           data={(openingList.items || []).map((item: any) => ({ ...item, id: item.id || item.job_title }))}
@@ -772,11 +772,11 @@ export default function HrRecruitmentPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <UserSearch className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Job Applicants</h3>
+          <h3 className="text-foreground font-semibold">Job Applicants</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'applicant_name', header: 'Candidate Name', render: (item: any) => <span className="text-white font-medium">{item.applicant_name}</span> },
+            { key: 'applicant_name', header: 'Candidate Name', render: (item: any) => <span className="text-foreground font-medium">{item.applicant_name}</span> },
             { key: 'email_id', header: 'Email', render: (item: any) => <span className="text-slate-muted text-sm">{item.email_id}</span> },
             { key: 'job_title', header: 'Applied For', render: (item: any) => <span className="text-slate-muted text-sm">{item.job_title || '—'}</span> },
             { key: 'application_date', header: 'Applied On', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.application_date) || '—'}</span> },
@@ -824,11 +824,11 @@ export default function HrRecruitmentPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <FileSignature className="w-4 h-4 text-teal-electric" />
-          <h3 className="text-white font-semibold">Job Offers</h3>
+          <h3 className="text-foreground font-semibold">Job Offers</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'job_applicant_name', header: 'Candidate', render: (item: any) => <span className="text-white font-medium">{item.job_applicant_name || item.applicant_name || `Applicant #${item.job_applicant}`}</span> },
+            { key: 'job_applicant_name', header: 'Candidate', render: (item: any) => <span className="text-foreground font-medium">{item.job_applicant_name || item.applicant_name || `Applicant #${item.job_applicant}`}</span> },
             { key: 'job_title', header: 'Position', render: (item: any) => <span className="text-slate-muted text-sm">{item.job_title || item.designation || '—'}</span> },
             { key: 'offer_date', header: 'Offered On', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.offer_date) || '—'}</span> },
             { key: 'salary_structure', header: 'Salary Package', render: (item: any) => <span className="text-slate-muted text-sm">{item.salary_structure || '—'}</span> },

@@ -94,11 +94,11 @@ export default function ChannelsPage() {
             <Globe className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Channels</h1>
+            <h1 className="text-2xl font-bold text-foreground">Channels</h1>
             <p className="text-slate-muted text-sm">Configure communication channels</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Plus className="w-4 h-4" />
           Add Channel
         </button>
@@ -111,7 +111,7 @@ export default function ChannelsPage() {
             <Globe className="w-4 h-4" />
             <span>Total Channels</span>
           </div>
-          <p className="text-2xl font-bold text-white">{CHANNELS.length}</p>
+          <p className="text-2xl font-bold text-foreground">{CHANNELS.length}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center gap-2 text-slate-muted text-sm mb-1">
@@ -153,7 +153,7 @@ export default function ChannelsPage() {
                     <Icon className={cn('w-5 h-5', colors.text)} />
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold">{channel.name}</h3>
+                    <h3 className="text-foreground font-semibold">{channel.name}</h3>
                     <p className="text-sm text-slate-muted">{channel.description}</p>
                   </div>
                 </div>
@@ -172,15 +172,15 @@ export default function ChannelsPage() {
               <div className="flex items-center justify-between pt-4 border-t border-slate-border/50">
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-slate-muted">
-                    <span className="text-white font-medium">{channel.stats.conversations}</span> conversations
+                    <span className="text-foreground font-medium">{channel.stats.conversations}</span> conversations
                   </span>
                   <span className="text-slate-muted">
-                    Avg: <span className="text-white font-medium">{channel.stats.responseTime}</span>
+                    Avg: <span className="text-foreground font-medium">{channel.stats.responseTime}</span>
                   </span>
                 </div>
                 <Link
                   href={`/inbox/channels/${channel.type}`}
-                  className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                  className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                 >
                   <Settings className="w-4 h-4" />
                 </Link>
@@ -192,26 +192,26 @@ export default function ChannelsPage() {
 
       {/* Quick setup guides */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="text-white font-semibold mb-4">Quick Setup</h3>
+        <h3 className="text-foreground font-semibold mb-4">Quick Setup</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <Link href="/inbox/channels/email" className="p-3 rounded-lg border border-slate-border hover:border-blue-500/50 transition-colors">
             <Mail className="w-5 h-5 text-blue-400 mb-2" />
-            <p className="text-white text-sm font-medium">Connect Email</p>
+            <p className="text-foreground text-sm font-medium">Connect Email</p>
             <p className="text-xs text-slate-muted">IMAP, Gmail, Outlook</p>
           </Link>
           <Link href="/inbox/channels/chat" className="p-3 rounded-lg border border-slate-border hover:border-emerald-500/50 transition-colors">
             <MessageCircle className="w-5 h-5 text-emerald-400 mb-2" />
-            <p className="text-white text-sm font-medium">Setup Live Chat</p>
+            <p className="text-foreground text-sm font-medium">Setup Live Chat</p>
             <p className="text-xs text-slate-muted">Widget for your website</p>
           </Link>
           <Link href="/inbox/channels/whatsapp" className="p-3 rounded-lg border border-slate-border hover:border-green-500/50 transition-colors">
             <MessageCircle className="w-5 h-5 text-green-400 mb-2" />
-            <p className="text-white text-sm font-medium">WhatsApp Business</p>
+            <p className="text-foreground text-sm font-medium">WhatsApp Business</p>
             <p className="text-xs text-slate-muted">API integration</p>
           </Link>
           <Link href="/inbox/channels/phone" className="p-3 rounded-lg border border-slate-border hover:border-violet-500/50 transition-colors">
             <Phone className="w-5 h-5 text-violet-400 mb-2" />
-            <p className="text-white text-sm font-medium">Voice Channel</p>
+            <p className="text-foreground text-sm font-medium">Voice Channel</p>
             <p className="text-xs text-slate-muted">Call logging</p>
           </Link>
         </div>

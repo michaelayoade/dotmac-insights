@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from app.models.credit_note import CreditNote
     from app.models.books_settings import DebitNote
     from app.models.accounting import PurchaseInvoice
+    from app.models.sales import SalesOrder, Quotation
+    from app.models.purchasing_order import PurchaseOrder
 
 
 class DocumentLineMixin:
@@ -197,3 +199,128 @@ class DebitNoteLine(DocumentLineMixin, Base):
 
     def __repr__(self) -> str:
         return f"<DebitNoteLine {self.item_name or self.item_code} @ {self.rate}>"
+
+
+class SalesOrderItem(DocumentLineMixin, Base):
+    """
+    Line item for sales orders.
+
+    Tracks delivery and billing status per item.
+    """
+
+    __tablename__ = "sales_order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Parent link
+    sales_order_id: Mapped[int] = mapped_column(
+        ForeignKey("sales_orders.id"), nullable=False, index=True
+    )
+
+    # Stock/Delivery
+    stock_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    stock_uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("1"))
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    delivered_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Billing
+    price_list_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    billed_amt: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Audit
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    sales_order: Mapped["SalesOrder"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<SalesOrderItem {self.item_name or self.item_code} @ {self.rate}>"
+
+
+class QuotationItem(DocumentLineMixin, Base):
+    """
+    Line item for quotations.
+
+    Tracks quoted prices and validity.
+    """
+
+    __tablename__ = "quotation_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Parent link
+    quotation_id: Mapped[int] = mapped_column(
+        ForeignKey("quotations.id"), nullable=False, index=True
+    )
+
+    # Stock
+    stock_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    stock_uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("1"))
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Pricing
+    price_list_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    margin_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    margin_rate_or_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Audit
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    quotation: Mapped["Quotation"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<QuotationItem {self.item_name or self.item_code} @ {self.rate}>"
+
+
+class PurchaseOrderItem(DocumentLineMixin, Base):
+    """
+    Line item for purchase orders.
+
+    Tracks receipt and billing status per item.
+    """
+
+    __tablename__ = "purchase_order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    # Parent link
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_orders.id"), nullable=False, index=True
+    )
+
+    # Stock/Receipt
+    stock_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    stock_uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    conversion_factor: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("1"))
+    warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    received_qty: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    expected_delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Billing
+    price_list_rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    billed_amt: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
+
+    # ERPNext reference
+    erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Audit
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    purchase_order: Mapped["PurchaseOrder"] = relationship(back_populates="items")
+
+    def __repr__(self) -> str:
+        return f"<PurchaseOrderItem {self.item_name or self.item_code} @ {self.rate}>"

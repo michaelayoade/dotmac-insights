@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.ticket import Ticket
     from app.models.task import Task
+    from app.models.vehicle import Vehicle
+    from app.models.asset import Asset
 
 
 class ExpenseStatus(enum.Enum):
@@ -50,6 +52,12 @@ class Expense(Base):
     # Task FK (for expenses linked to tasks)
     task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
     erpnext_task: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # Vehicle FK (for fuel/maintenance expenses)
+    vehicle_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vehicles.id"), nullable=True, index=True)
+
+    # Asset FK (for asset maintenance/repair expenses)
+    asset_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assets.id"), nullable=True, index=True)
 
     # Expense details
     expense_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -104,6 +112,8 @@ class Expense(Base):
     pop: Mapped[Optional["Pop"]] = relationship(back_populates="expenses")
     ticket: Mapped[Optional["Ticket"]] = relationship(back_populates="expenses")
     task_rel: Mapped[Optional["Task"]] = relationship("Task", back_populates="expenses")
+    vehicle: Mapped[Optional["Vehicle"]] = relationship(backref="expenses")
+    asset: Mapped[Optional["Asset"]] = relationship(backref="expenses")
 
     def __repr__(self) -> str:
         return f"<Expense {self.erpnext_id} - {self.total_claimed_amount} {self.currency}>"

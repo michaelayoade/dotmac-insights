@@ -46,7 +46,7 @@ export default function SalesQuotationsPage() {
     {
       key: 'quotation_number',
       header: 'Quote #',
-      render: (item: any) => <span className="font-mono text-white">{item.quotation_number || `#${item.id}`}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.quotation_number || `#${item.id}`}</span>,
     },
     {
       key: 'customer',
@@ -65,7 +65,7 @@ export default function SalesQuotationsPage() {
       header: 'Amount',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total_amount || 0, item.currency || currency)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total_amount || 0, item.currency || currency)}</span>
       ),
     },
     {
@@ -86,7 +86,7 @@ export default function SalesQuotationsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <StickyNote className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Sales Quotations</h1>
+          <h1 className="text-xl font-semibold text-foreground">Sales Quotations</h1>
         </div>
         <Link
           href="/sales/quotations/new"

@@ -24,13 +24,13 @@ interface LineItemProps {
   colorClass?: string;
 }
 
-function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-white' }: LineItemProps) {
+function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-foreground' }: LineItemProps) {
   return (
     <div className={cn(
       'flex justify-between items-center py-2',
       bold && 'font-semibold border-t border-slate-border pt-3 mt-2'
     )} style={{ paddingLeft: `${indent * 1.5}rem` }}>
-      <span className={bold ? colorClass : 'text-slate-300'}>{name}</span>
+      <span className={bold ? colorClass : 'text-foreground-secondary'}>{name}</span>
       <span className={cn('font-mono', colorClass)}>
         {formatCurrency(amount)}
       </span>
@@ -73,7 +73,7 @@ export default function IncomeStatementPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Income Statement</h2>
+          <h2 className="text-lg font-semibold text-foreground">Income Statement</h2>
           {data?.period && (
             <span className="text-slate-muted text-sm">
               {typeof data.period === 'string'
@@ -93,7 +93,7 @@ export default function IncomeStatementPage() {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               placeholder="Start Date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
             <span className="text-slate-muted">to</span>
             <input
@@ -101,13 +101,13 @@ export default function IncomeStatementPage() {
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               placeholder="End Date"
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           {(startDate || endDate) && (
             <button
               onClick={() => { setStartDate(''); setEndDate(''); }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
             </button>
@@ -208,7 +208,7 @@ export default function IncomeStatementPage() {
 
       {/* Net Income Calculation */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">Net Income Calculation</h3>
+        <h3 className="text-foreground font-semibold mb-4">Net Income Calculation</h3>
         <div className="flex items-center justify-center gap-6 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Revenue</p>
@@ -238,13 +238,13 @@ export default function IncomeStatementPage() {
               {grossProfit !== 0 && (
                 <div>
                   <p className="text-slate-muted text-sm">Gross Profit</p>
-                  <p className="font-mono font-semibold text-white">{formatCurrency(grossProfit)}</p>
+                  <p className="font-mono font-semibold text-foreground">{formatCurrency(grossProfit)}</p>
                 </div>
               )}
               {operatingIncome !== 0 && (
                 <div>
                   <p className="text-slate-muted text-sm">Operating Income</p>
-                  <p className="font-mono font-semibold text-white">{formatCurrency(operatingIncome)}</p>
+                  <p className="font-mono font-semibold text-foreground">{formatCurrency(operatingIncome)}</p>
                 </div>
               )}
               {revenue.total > 0 && (

@@ -114,7 +114,7 @@ export default function QuotationEditPage() {
         <p className="text-red-400">Failed to load quotation</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -129,12 +129,12 @@ export default function QuotationEditPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/quotations"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to quotations
           </Link>
-          <h1 className="text-xl font-semibold text-white">Edit Quotation</h1>
+          <h1 className="text-xl font-semibold text-foreground">Edit Quotation</h1>
         </div>
       </div>
 
@@ -147,7 +147,7 @@ export default function QuotationEditPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <StickyNote className="w-4 h-4 text-teal-electric" />
             Quotation Details
           </h3>
@@ -158,7 +158,7 @@ export default function QuotationEditPage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.customerId && 'border-red-500/60'
                 )}
               >
@@ -177,7 +177,7 @@ export default function QuotationEditPage() {
                 type="text"
                 value={quotationNumber}
                 onChange={(e) => setQuotationNumber(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -188,7 +188,7 @@ export default function QuotationEditPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="draft">Draft</option>
                 <option value="open">Open</option>
@@ -206,7 +206,7 @@ export default function QuotationEditPage() {
                 value={quotationDate}
                 onChange={(e) => setQuotationDate(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.quotationDate && 'border-red-500/60'
                 )}
               />
@@ -218,7 +218,7 @@ export default function QuotationEditPage() {
                 type="date"
                 value={validTill}
                 onChange={(e) => setValidTill(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function QuotationEditPage() {
                 value={totalAmount}
                 onChange={(e) => setTotalAmount(Number(e.target.value))}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.totalAmount && 'border-red-500/60'
                 )}
               />
@@ -243,7 +243,7 @@ export default function QuotationEditPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional notes"
               />
             </div>
@@ -254,7 +254,7 @@ export default function QuotationEditPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
@@ -273,7 +273,7 @@ export default function QuotationEditPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <StickyNote className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Quotation Items</h3>
+            <h3 className="text-foreground font-semibold">Quotation Items</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -289,11 +289,11 @@ export default function QuotationEditPage() {
               <tbody>
                 {(data as any).items.map((item: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-white font-mono">{item.item_code || '-'}</td>
+                    <td className="px-2 py-2 text-foreground font-mono">{item.item_code || '-'}</td>
                     <td className="px-2 py-2 text-slate-200">{item.item_name || item.description || '-'}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.qty ?? item.quantity ?? 0}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.rate ?? item.unit_price ?? 0}</td>
-                    <td className="px-2 py-2 text-right text-white font-mono">{item.amount ?? item.net_amount ?? 0}</td>
+                    <td className="px-2 py-2 text-right text-foreground font-mono">{item.amount ?? item.net_amount ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

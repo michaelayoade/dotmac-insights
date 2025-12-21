@@ -61,7 +61,7 @@ export default function PerformanceDashboardPage() {
         )}
         <div className="text-center py-16 text-slate-400">
           <Award className="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <h2 className="text-xl font-semibold text-white mb-2">No Active Period</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-2">No Active Period</h2>
           <p className="mb-6">Create an evaluation period to get started with performance management.</p>
           <Link
             href="/performance/periods/new"
@@ -92,7 +92,7 @@ export default function PerformanceDashboardPage() {
               <Calendar className="w-5 h-5 text-violet-400" />
               <div>
                 <p className="text-sm text-slate-400">Active Period</p>
-                <p className="text-white font-medium">{data.active_period.name}</p>
+                <p className="text-foreground font-medium">{data.active_period.name}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -126,7 +126,7 @@ export default function PerformanceDashboardPage() {
             <Users className="w-5 h-5 text-slate-400" />
             <span className="text-xs text-slate-500">Employees</span>
           </div>
-          <p className="text-2xl font-bold text-white">{data.total_employees}</p>
+          <p className="text-2xl font-bold text-foreground">{data.total_employees}</p>
           <p className="text-sm text-slate-400">Total active employees</p>
         </div>
 
@@ -135,7 +135,7 @@ export default function PerformanceDashboardPage() {
             <ClipboardCheck className="w-5 h-5 text-cyan-400" />
             <span className="text-xs text-slate-500">Scorecards</span>
           </div>
-          <p className="text-2xl font-bold text-white">{data.scorecards_generated}</p>
+          <p className="text-2xl font-bold text-foreground">{data.scorecards_generated}</p>
           <p className="text-sm text-slate-400">{data.scorecards_computed} computed ({computedPercent}%)</p>
         </div>
 
@@ -144,7 +144,7 @@ export default function PerformanceDashboardPage() {
             <BarChart3 className="w-5 h-5 text-amber-400" />
             <span className="text-xs text-slate-500">In Review</span>
           </div>
-          <p className="text-2xl font-bold text-white">{data.scorecards_in_review}</p>
+          <p className="text-2xl font-bold text-foreground">{data.scorecards_in_review}</p>
           <p className="text-sm text-slate-400">Awaiting approval</p>
         </div>
 
@@ -153,7 +153,7 @@ export default function PerformanceDashboardPage() {
             <Award className="w-5 h-5 text-emerald-400" />
             <span className="text-xs text-slate-500">Average</span>
           </div>
-          <p className="text-2xl font-bold text-white">{formatScore(data.avg_score)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatScore(data.avg_score)}</p>
           <p className="text-sm text-slate-400">Avg performance score</p>
         </div>
       </div>
@@ -161,7 +161,7 @@ export default function PerformanceDashboardPage() {
       {/* Progress Bar */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-white">Period Progress</h3>
+          <h3 className="font-medium text-foreground">Period Progress</h3>
           <span className="text-sm text-slate-400">{progressPercent}% finalized</span>
         </div>
         <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
@@ -179,7 +179,7 @@ export default function PerformanceDashboardPage() {
       {/* Score Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+          <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-violet-400" />
             Score Distribution
           </h3>
@@ -195,7 +195,7 @@ export default function PerformanceDashboardPage() {
               return (
                 <div key={band.label} className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-300">{band.label}</span>
+                    <span className="text-foreground-secondary">{band.label}</span>
                     <span className="text-slate-400">{band.count} ({percent}%)</span>
                   </div>
                   <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
@@ -218,7 +218,7 @@ export default function PerformanceDashboardPage() {
 
         {/* Quick Actions */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4">Quick Actions</h3>
+          <h3 className="font-medium text-foreground mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
             <Link
               href="/performance/reviews"
@@ -226,7 +226,7 @@ export default function PerformanceDashboardPage() {
             >
               <ClipboardCheck className="w-5 h-5 text-amber-400" />
               <div>
-                <p className="text-sm font-medium text-white">Review Queue</p>
+                <p className="text-sm font-medium text-foreground">Review Queue</p>
                 <p className="text-xs text-slate-400">{data.scorecards_in_review} pending</p>
               </div>
             </Link>
@@ -236,7 +236,7 @@ export default function PerformanceDashboardPage() {
             >
               <Users className="w-5 h-5 text-cyan-400" />
               <div>
-                <p className="text-sm font-medium text-white">All Scorecards</p>
+                <p className="text-sm font-medium text-foreground">All Scorecards</p>
                 <p className="text-xs text-slate-400">{data.scorecards_generated} total</p>
               </div>
             </Link>
@@ -246,7 +246,7 @@ export default function PerformanceDashboardPage() {
             >
               <BarChart3 className="w-5 h-5 text-violet-400" />
               <div>
-                <p className="text-sm font-medium text-white">Analytics</p>
+                <p className="text-sm font-medium text-foreground">Analytics</p>
                 <p className="text-xs text-slate-400">Trends & insights</p>
               </div>
             </Link>
@@ -256,7 +256,7 @@ export default function PerformanceDashboardPage() {
             >
               <Award className="w-5 h-5 text-emerald-400" />
               <div>
-                <p className="text-sm font-medium text-white">Bonus Report</p>
+                <p className="text-sm font-medium text-foreground">Bonus Report</p>
                 <p className="text-xs text-slate-400">Eligibility calc</p>
               </div>
             </Link>
@@ -268,7 +268,7 @@ export default function PerformanceDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Performers */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+          <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <Medal className="w-5 h-5 text-amber-400" />
             Top Performers
           </h3>
@@ -281,14 +281,14 @@ export default function PerformanceDashboardPage() {
                   <div className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
                     idx === 0 && 'bg-amber-500/20 text-amber-400',
-                    idx === 1 && 'bg-slate-400/20 text-slate-300',
+                    idx === 1 && 'bg-slate-400/20 text-foreground-secondary',
                     idx === 2 && 'bg-orange-500/20 text-orange-400',
                     idx > 2 && 'bg-slate-elevated text-slate-400',
                   )}>
                     {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{emp.employee_name}</p>
+                    <p className="text-foreground font-medium truncate">{emp.employee_name}</p>
                     <p className="text-xs text-slate-400">{emp.department || 'No department'}</p>
                   </div>
                   <div className="text-right">
@@ -302,7 +302,7 @@ export default function PerformanceDashboardPage() {
 
         {/* Improvement Needed */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+          <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-red-400" />
             Needs Improvement
           </h3>
@@ -316,7 +316,7 @@ export default function PerformanceDashboardPage() {
                     <TrendingDown className="w-4 h-4 text-red-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{emp.employee_name}</p>
+                    <p className="text-foreground font-medium truncate">{emp.employee_name}</p>
                     <p className="text-xs text-slate-400">{emp.department || 'No department'}</p>
                   </div>
                   <div className="text-right">

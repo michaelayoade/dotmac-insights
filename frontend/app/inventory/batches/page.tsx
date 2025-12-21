@@ -42,7 +42,7 @@ export default function BatchesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Batch Tracking</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Batch Tracking</h1>
           <p className="text-slate-muted text-sm">Track items by batch number with expiry dates</p>
         </div>
         <Link
@@ -61,7 +61,7 @@ export default function BatchesPage() {
             placeholder="Filter by item code..."
             value={itemCode}
             onChange={(e) => setItemCode(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
           <label className="flex items-center gap-2 text-slate-muted text-sm">
             <input
@@ -127,7 +127,7 @@ export default function BatchesPage() {
                       </td>
                       <td className="py-3">
                         <div>
-                          <span className="text-white">{batch.item_code}</span>
+                          <span className="text-foreground">{batch.item_code}</span>
                           {batch.item_name && (
                             <span className="text-slate-muted ml-2 text-xs">{batch.item_name}</span>
                           )}
@@ -162,7 +162,7 @@ export default function BatchesPage() {
                           <span className="text-slate-muted">-</span>
                         )}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(batch.batch_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-slate-muted">{batch.supplier || "-"}</td>

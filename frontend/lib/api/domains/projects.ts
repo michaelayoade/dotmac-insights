@@ -182,6 +182,10 @@ export interface ProjectTaskParams {
   offset?: number;
 }
 
+export interface ProjectTaskUpdatePayload {
+  assigned_to?: string;
+}
+
 // =============================================================================
 // API
 // =============================================================================
@@ -234,6 +238,12 @@ export const projectsApi = {
     }),
 
   getTaskDetail: (id: number) => fetchApi<unknown>(`/projects/tasks/${id}`),
+
+  updateTask: (id: number, body: ProjectTaskUpdatePayload) =>
+    fetchApi<unknown>(`/projects/tasks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 };
 
 export default projectsApi;

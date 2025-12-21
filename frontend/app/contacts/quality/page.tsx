@@ -137,7 +137,7 @@ export default function QualityPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setViewIssue(null)}
-              className="text-slate-muted hover:text-white transition-colors"
+              className="text-slate-muted hover:text-foreground transition-colors"
             >
               &larr; Back to Quality Report
             </button>
@@ -166,13 +166,13 @@ export default function QualityPage() {
                   ? 'text-amber-400'
                   : 'text-slate-400'
             )} />
-            <h3 className="text-white font-semibold mb-2">{issue.count} Contacts Affected</h3>
+            <h3 className="text-foreground font-semibold mb-2">{issue.count} Contacts Affected</h3>
             <p className="text-slate-muted text-sm mb-4">
               Click below to view and fix contacts with this data quality issue.
             </p>
             <Link
               href={filterParam ? `/contacts?quality_issue=${filterParam}` : '/contacts'}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-400 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-400 transition-colors"
             >
               <Eye className="w-4 h-4" />
               View Affected Contacts
@@ -227,7 +227,7 @@ export default function QualityPage() {
             <span className="text-slate-muted text-sm">Total Contacts</span>
             <Users className="w-5 h-5 text-cyan-400" />
           </div>
-          <p className="text-4xl font-bold text-white">{totalContacts}</p>
+          <p className="text-4xl font-bold text-foreground">{totalContacts}</p>
           <p className="text-xs text-slate-muted mt-1">Analyzed</p>
         </div>
         <div className="bg-slate-card rounded-xl border border-slate-border p-5">
@@ -254,7 +254,7 @@ export default function QualityPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Issues by Severity</h3>
+            <h3 className="text-foreground font-semibold">Issues by Severity</h3>
           </div>
           {severityData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -295,7 +295,7 @@ export default function QualityPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Issue Distribution</h3>
+            <h3 className="text-foreground font-semibold">Issue Distribution</h3>
           </div>
           {issuesByType.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -326,7 +326,7 @@ export default function QualityPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <h3 className="text-white font-semibold">Quality Issues</h3>
+          <h3 className="text-foreground font-semibold">Quality Issues</h3>
         </div>
 
         {qualityIssues.length > 0 ? (
@@ -359,7 +359,7 @@ export default function QualityPage() {
                       )} />
                     </div>
                     <div>
-                      <p className="text-white font-medium">{issue.label}</p>
+                      <p className="text-foreground font-medium">{issue.label}</p>
                       <p className="text-sm text-slate-muted">
                         {issue.count} contacts ({issue.percentage}%)
                       </p>
@@ -385,7 +385,7 @@ export default function QualityPage() {
         ) : (
           <div className="py-8 text-center">
             <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-            <h3 className="text-white font-semibold mb-2">Excellent Data Quality!</h3>
+            <h3 className="text-foreground font-semibold mb-2">Excellent Data Quality!</h3>
             <p className="text-slate-muted text-sm">
               No quality issues were found in your contact data.
             </p>
@@ -397,11 +397,11 @@ export default function QualityPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Recommendations</h3>
+          <h3 className="text-foreground font-semibold">Recommendations</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-slate-elevated rounded-lg">
-            <h4 className="text-white font-medium mb-2">Required Fields</h4>
+            <h4 className="text-foreground font-medium mb-2">Required Fields</h4>
             <p className="text-sm text-slate-muted mb-3">
               Ensure all contacts have email and phone for effective communication.
             </p>
@@ -413,7 +413,7 @@ export default function QualityPage() {
             </Link>
           </div>
           <div className="p-4 bg-slate-elevated rounded-lg">
-            <h4 className="text-white font-medium mb-2">Segmentation</h4>
+            <h4 className="text-foreground font-medium mb-2">Segmentation</h4>
             <p className="text-sm text-slate-muted mb-3">
               Assign territories and categories for better reporting and targeting.
             </p>
@@ -425,7 +425,7 @@ export default function QualityPage() {
             </Link>
           </div>
           <div className="p-4 bg-slate-elevated rounded-lg">
-            <h4 className="text-white font-medium mb-2">Duplicates</h4>
+            <h4 className="text-foreground font-medium mb-2">Duplicates</h4>
             <p className="text-sm text-slate-muted mb-3">
               Regularly check for and merge duplicate records to maintain clean data.
             </p>
@@ -437,7 +437,7 @@ export default function QualityPage() {
             </Link>
           </div>
           <div className="p-4 bg-slate-elevated rounded-lg">
-            <h4 className="text-white font-medium mb-2">Enrichment</h4>
+            <h4 className="text-foreground font-medium mb-2">Enrichment</h4>
             <p className="text-sm text-slate-muted mb-3">
               Add company details and social profiles to build complete customer profiles.
             </p>

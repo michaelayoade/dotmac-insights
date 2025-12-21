@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.expense import Expense
     from app.models.unified_ticket import UnifiedTicket
+    from app.models.agent import Team
 
 
 class TicketStatus(enum.Enum):
@@ -81,7 +82,10 @@ class Ticket(SoftDeleteMixin, Base):
 
     # Assignment - Employee FKs
     assigned_employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
-    resolution_team: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    resolution_team: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # TEXT for ERPNext
+    resolution_team_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("teams.id"), nullable=True, index=True
+    )  # FK for local queries
 
     # Legacy/String fields for non-linked data
     assigned_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -134,7 +138,13 @@ class Ticket(SoftDeleteMixin, Base):
         back_populates="tickets", foreign_keys=[employee_id]
     )
     assigned_employee: Mapped[Optional[Employee]] = relationship(
+        back_populates="assigned_tickets",
         foreign_keys=[assigned_employee_id]
+    )
+    resolution_team_rel: Mapped[Optional["Team"]] = relationship(
+        "Team",
+        foreign_keys=[resolution_team_id],
+        backref="tickets"
     )
     project: Mapped[Optional[Project]] = relationship(back_populates="tickets")
 

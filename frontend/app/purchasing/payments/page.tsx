@@ -129,7 +129,7 @@ export default function PurchasingPaymentsPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <CreditCard className="w-4 h-4 text-teal-electric" />
-          <span className="font-mono text-white font-medium">
+          <span className="font-mono text-foreground font-medium">
             {item.voucher_no || `#${item.id}`}
           </span>
         </div>
@@ -141,7 +141,7 @@ export default function PurchasingPaymentsPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[180px]">
+          <span className="text-foreground-secondary truncate max-w-[180px]">
             {item.supplier || '-'}
           </span>
         </div>
@@ -153,7 +153,7 @@ export default function PurchasingPaymentsPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3 text-slate-muted" />
-          <span className="text-slate-300">
+          <span className="text-foreground-secondary">
             {formatDate(item.posting_date)}
           </span>
         </div>
@@ -163,7 +163,7 @@ export default function PurchasingPaymentsPage() {
       key: 'account',
       header: 'Account',
       render: (item: any) => (
-        <span className="text-slate-300 text-sm">{item.account || '-'}</span>
+        <span className="text-foreground-secondary text-sm">{item.account || '-'}</span>
       ),
     },
     {
@@ -171,7 +171,7 @@ export default function PurchasingPaymentsPage() {
       header: 'Amount',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white font-medium">
+        <span className="font-mono text-foreground font-medium">
           {formatCurrency(item.amount)}
         </span>
       ),
@@ -196,7 +196,7 @@ export default function PurchasingPaymentsPage() {
             <CreditCard className="w-4 h-4 text-teal-electric" />
             <p className="text-slate-muted text-sm">Total Payments</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(total)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -237,7 +237,7 @@ export default function PurchasingPaymentsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex-1 min-w-[200px] max-w-md relative">
@@ -250,7 +250,7 @@ export default function PurchasingPaymentsPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <select
@@ -259,7 +259,7 @@ export default function PurchasingPaymentsPage() {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Status</option>
             <option value="completed">Completed</option>
@@ -274,7 +274,7 @@ export default function PurchasingPaymentsPage() {
                 setSupplierId(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
             >
               <option value="">All Suppliers</option>
               {suppliers.map((supplier: any) => (
@@ -292,7 +292,7 @@ export default function PurchasingPaymentsPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="Start date"
             />
             <span className="text-slate-muted">to</span>
@@ -303,7 +303,7 @@ export default function PurchasingPaymentsPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="End date"
             />
           </div>
@@ -317,7 +317,7 @@ export default function PurchasingPaymentsPage() {
                 setEndDate('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

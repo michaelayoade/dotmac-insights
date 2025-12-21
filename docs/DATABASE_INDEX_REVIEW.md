@@ -41,7 +41,7 @@ ON invoices (status, currency);
 -- Aging analysis by due date
 CREATE INDEX CONCURRENTLY ix_invoices_due_status_currency
 ON invoices (due_date, status, currency)
-WHERE status IN ('pending', 'overdue', 'partially_paid');
+WHERE status IN ('PENDING', 'OVERDUE', 'PARTIALLY_PAID');
 ```
 
 ### Purchase Invoices Table
@@ -214,7 +214,7 @@ ON invoices (status, currency);
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_invoices_due_status_currency
 ON invoices (due_date, status, currency)
-WHERE status IN ('pending', 'overdue', 'partially_paid');
+WHERE status IN ('PENDING', 'OVERDUE', 'PARTIALLY_PAID');
 
 -- Purchase Invoices
 CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_purchase_invoices_status_date_currency

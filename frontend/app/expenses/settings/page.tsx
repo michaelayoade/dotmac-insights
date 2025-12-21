@@ -48,8 +48,8 @@ function TabButton({ active, onClick, icon: Icon, label, count }: { active: bool
       className={cn(
         'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
         active
-          ? 'bg-violet-500/15 border border-violet-500/40 text-white'
-          : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+          ? 'bg-violet-500/15 border border-violet-500/40 text-foreground'
+          : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
       )}
     >
       <Icon className={cn('w-4 h-4', active ? 'text-violet-400' : '')} />
@@ -127,8 +127,8 @@ function CategoryFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-slate-card border border-slate-border rounded-xl w-full max-w-lg mx-4 shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-border">
-          <h3 className="text-lg font-semibold text-white">{category ? 'Edit Category' : 'New Category'}</h3>
-          <button onClick={onClose} className="text-slate-muted hover:text-white">
+          <h3 className="text-lg font-semibold text-foreground">{category ? 'Edit Category' : 'New Category'}</h3>
+          <button onClick={onClose} className="text-slate-muted hover:text-foreground">
             <XCircle className="w-5 h-5" />
           </button>
         </div>
@@ -141,7 +141,7 @@ function CategoryFormModal({
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 required
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 placeholder="e.g. TRAVEL"
               />
             </div>
@@ -152,7 +152,7 @@ function CategoryFormModal({
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 placeholder="e.g. Travel Expenses"
               />
             </div>
@@ -164,7 +164,7 @@ function CategoryFormModal({
               value={form.expense_account}
               onChange={(e) => setForm({ ...form, expense_account: e.target.value })}
               required
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               placeholder="e.g. 6100 - Travel"
             />
           </div>
@@ -174,7 +174,7 @@ function CategoryFormModal({
               value={form.description || ''}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={2}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
               placeholder="Optional description..."
             />
           </div>
@@ -199,13 +199,13 @@ function CategoryFormModal({
             </label>
           </div>
           <div className="flex justify-end gap-3 pt-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-white transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {category ? 'Update' : 'Create'}
@@ -274,8 +274,8 @@ function PolicyFormModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto py-8">
       <div className="bg-slate-card border border-slate-border rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-border">
-          <h3 className="text-lg font-semibold text-white">{policy ? 'Edit Policy' : 'New Policy'}</h3>
-          <button onClick={onClose} className="text-slate-muted hover:text-white">
+          <h3 className="text-lg font-semibold text-foreground">{policy ? 'Edit Policy' : 'New Policy'}</h3>
+          <button onClick={onClose} className="text-slate-muted hover:text-foreground">
             <XCircle className="w-5 h-5" />
           </button>
         </div>
@@ -293,7 +293,7 @@ function PolicyFormModal({
                   value={form.policy_name}
                   onChange={(e) => setForm({ ...form, policy_name: e.target.value })}
                   required
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="e.g. Default Travel Policy"
                 />
               </div>
@@ -302,7 +302,7 @@ function PolicyFormModal({
                 <select
                   value={form.category_id || ''}
                   onChange={(e) => setForm({ ...form, category_id: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 >
                   <option value="">All Categories</option>
                   {categories.map((c) => (
@@ -317,7 +317,7 @@ function PolicyFormModal({
                 value={form.description || ''}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 rows={2}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
               />
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -327,7 +327,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.priority || 0}
                   onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
               <div>
@@ -336,7 +336,7 @@ function PolicyFormModal({
                   type="date"
                   value={form.effective_from || ''}
                   onChange={(e) => setForm({ ...form, effective_from: e.target.value || undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
               <div>
@@ -345,7 +345,7 @@ function PolicyFormModal({
                   type="date"
                   value={form.effective_to || ''}
                   onChange={(e) => setForm({ ...form, effective_to: e.target.value || undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
             </div>
@@ -363,7 +363,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.max_single_expense ?? ''}
                   onChange={(e) => setForm({ ...form, max_single_expense: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="No limit"
                 />
               </div>
@@ -373,7 +373,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.max_daily_limit ?? ''}
                   onChange={(e) => setForm({ ...form, max_daily_limit: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="No limit"
                 />
               </div>
@@ -383,7 +383,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.max_monthly_limit ?? ''}
                   onChange={(e) => setForm({ ...form, max_monthly_limit: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="No limit"
                 />
               </div>
@@ -393,7 +393,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.max_claim_amount ?? ''}
                   onChange={(e) => setForm({ ...form, max_claim_amount: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="No limit"
                 />
               </div>
@@ -412,7 +412,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.auto_approve_below ?? ''}
                   onChange={(e) => setForm({ ...form, auto_approve_below: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="Never auto-approve"
                 />
               </div>
@@ -422,7 +422,7 @@ function PolicyFormModal({
                   type="number"
                   value={form.receipt_threshold ?? ''}
                   onChange={(e) => setForm({ ...form, receipt_threshold: e.target.value ? Number(e.target.value) : undefined })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   placeholder="Always required"
                 />
               </div>
@@ -464,7 +464,7 @@ function PolicyFormModal({
                 />
                 <div className="flex items-center gap-2">
                   <Wallet2 className="w-4 h-4 text-emerald-400" />
-                  <span className="text-sm text-white">Out of Pocket</span>
+                  <span className="text-sm text-foreground">Out of Pocket</span>
                 </div>
               </label>
               <label className="flex items-center gap-3 p-3 bg-slate-elevated rounded-lg cursor-pointer hover:bg-slate-border/30 transition-colors">
@@ -476,7 +476,7 @@ function PolicyFormModal({
                 />
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-amber-400" />
-                  <span className="text-sm text-white">Cash Advance</span>
+                  <span className="text-sm text-foreground">Cash Advance</span>
                 </div>
               </label>
               <label className="flex items-center gap-3 p-3 bg-slate-elevated rounded-lg cursor-pointer hover:bg-slate-border/30 transition-colors">
@@ -488,7 +488,7 @@ function PolicyFormModal({
                 />
                 <div className="flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-violet-400" />
-                  <span className="text-sm text-white">Corporate Card</span>
+                  <span className="text-sm text-foreground">Corporate Card</span>
                 </div>
               </label>
               <label className="flex items-center gap-3 p-3 bg-slate-elevated rounded-lg cursor-pointer hover:bg-slate-border/30 transition-colors">
@@ -500,20 +500,20 @@ function PolicyFormModal({
                 />
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-sky-400" />
-                  <span className="text-sm text-white">Per Diem</span>
+                  <span className="text-sm text-foreground">Per Diem</span>
                 </div>
               </label>
             </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-border">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-white transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {policy ? 'Update' : 'Create'}
@@ -573,7 +573,7 @@ function CategoriesTab() {
         </div>
         <button
           onClick={() => setShowNewForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Category
@@ -606,7 +606,7 @@ function CategoriesTab() {
               {categories.map((cat) => (
                 <tr key={cat.id} className="bg-slate-card hover:bg-slate-elevated/50 transition-colors">
                   <td className="px-4 py-3 text-sm font-mono text-violet-400">{cat.code}</td>
-                  <td className="px-4 py-3 text-sm text-white">{cat.name}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{cat.name}</td>
                   <td className="px-4 py-3 text-sm text-slate-muted">{cat.expense_account}</td>
                   <td className="px-4 py-3 text-center">
                     {cat.requires_receipt ? (
@@ -622,7 +622,7 @@ function CategoriesTab() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setEditingCategory(cat)}
-                        className="p-1.5 text-slate-muted hover:text-white hover:bg-slate-elevated rounded transition-colors"
+                        className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -713,7 +713,7 @@ function PoliciesTab() {
         </div>
         <button
           onClick={() => setShowNewForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Policy
@@ -739,7 +739,7 @@ function PoliciesTab() {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-white font-medium">{policy.policy_name}</h3>
+                    <h3 className="text-foreground font-medium">{policy.policy_name}</h3>
                     <StatusBadge active={policy.is_active} />
                     <span className="px-2 py-0.5 rounded bg-slate-elevated text-xs text-slate-muted">
                       Priority: {policy.priority}
@@ -755,7 +755,7 @@ function PoliciesTab() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setEditingPolicy(policy)}
-                    className="p-1.5 text-slate-muted hover:text-white hover:bg-slate-elevated rounded transition-colors"
+                    className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
@@ -774,19 +774,19 @@ function PoliciesTab() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div className="bg-slate-elevated rounded-lg p-2">
                   <p className="text-[10px] text-slate-muted uppercase">Single Max</p>
-                  <p className="text-sm font-mono text-white">{formatLimit(policy.max_single_expense)}</p>
+                  <p className="text-sm font-mono text-foreground">{formatLimit(policy.max_single_expense)}</p>
                 </div>
                 <div className="bg-slate-elevated rounded-lg p-2">
                   <p className="text-[10px] text-slate-muted uppercase">Daily Max</p>
-                  <p className="text-sm font-mono text-white">{formatLimit(policy.max_daily_limit)}</p>
+                  <p className="text-sm font-mono text-foreground">{formatLimit(policy.max_daily_limit)}</p>
                 </div>
                 <div className="bg-slate-elevated rounded-lg p-2">
                   <p className="text-[10px] text-slate-muted uppercase">Monthly Max</p>
-                  <p className="text-sm font-mono text-white">{formatLimit(policy.max_monthly_limit)}</p>
+                  <p className="text-sm font-mono text-foreground">{formatLimit(policy.max_monthly_limit)}</p>
                 </div>
                 <div className="bg-slate-elevated rounded-lg p-2">
                   <p className="text-[10px] text-slate-muted uppercase">Auto-Approve</p>
-                  <p className="text-sm font-mono text-white">{formatLimit(policy.auto_approve_below)}</p>
+                  <p className="text-sm font-mono text-foreground">{formatLimit(policy.auto_approve_below)}</p>
                 </div>
               </div>
 
@@ -856,7 +856,7 @@ export default function ExpensesSettingsPage() {
           <Settings className="w-5 h-5 text-violet-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Expense Settings</h1>
+          <h1 className="text-2xl font-bold text-foreground">Expense Settings</h1>
           <p className="text-slate-muted text-sm">Manage categories, policies, and limits</p>
         </div>
       </div>

@@ -49,11 +49,11 @@ export default function OmniChannelDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/admin/webhooks/omni" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white hover:bg-slate-border">
+          <Link href="/admin/webhooks/omni" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
-          <h1 className="text-2xl font-bold text-white">{channel?.name || 'Channel'}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{channel?.name || 'Channel'}</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -61,7 +61,7 @@ export default function OmniChannelDetailPage() {
               mutate();
               mutateEvents();
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -79,7 +79,7 @@ export default function OmniChannelDetailPage() {
       {channel && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-2">
           <p className="text-sm text-slate-muted">Webhook URL</p>
-          <p className="text-white text-base">{channel.webhook_url || 'Not configured'}</p>
+          <p className="text-foreground text-base">{channel.webhook_url || 'Not configured'}</p>
           <div className="flex items-center gap-2 text-xs text-slate-muted">
             <Shield className="w-3.5 h-3.5" />
             {channel.webhook_secret_configured ? 'Secret configured' : 'Secret missing'}
@@ -92,7 +92,7 @@ export default function OmniChannelDetailPage() {
           <p className="text-sm text-slate-muted">Webhook Events</p>
           <button
             onClick={() => mutateEvents()}
-            className="text-xs text-slate-muted hover:text-white inline-flex items-center gap-1"
+            className="text-xs text-slate-muted hover:text-foreground inline-flex items-center gap-1"
           >
             <RefreshCw className="w-3 h-3" />
             Refresh
@@ -111,7 +111,7 @@ export default function OmniChannelDetailPage() {
           <tbody className="divide-y divide-slate-border">
             {(events || []).map((event) => (
               <tr key={event.id}>
-                <td className="px-4 py-3 text-white">{event.id}</td>
+                <td className="px-4 py-3 text-foreground">{event.id}</td>
                 <td className="px-4 py-3 text-slate-muted">{event.event_type}</td>
                 <td className="px-4 py-3">
                   <span
@@ -131,7 +131,7 @@ export default function OmniChannelDetailPage() {
                 <td className="px-4 py-3 text-right">
                   <button
                     onClick={() => loadEvent(event.id)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white text-xs hover:bg-slate-border"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground text-xs hover:bg-slate-border"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     Payload
@@ -154,7 +154,7 @@ export default function OmniChannelDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl">
           <div className="px-4 py-3 border-b border-slate-border flex items-center justify-between">
             <p className="text-sm text-slate-muted">Event Payload</p>
-            <button onClick={() => setPayload(null)} className="text-xs text-slate-muted hover:text-white">
+            <button onClick={() => setPayload(null)} className="text-xs text-slate-muted hover:text-foreground">
               Close
             </button>
           </div>

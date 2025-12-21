@@ -88,7 +88,7 @@ export default function FiscalYearsPage() {
       header: 'Fiscal Year',
       render: (item: AccountingFiscalYear) => (
         <div className="flex items-center gap-2">
-          <span className="text-white font-medium">{item.name}</span>
+          <span className="text-foreground font-medium">{item.name}</span>
           {currentFY?.id === item.id && (
             <span className="text-xs px-2 py-0.5 rounded bg-teal-electric/20 text-teal-electric">Current</span>
           )}
@@ -104,7 +104,7 @@ export default function FiscalYearsPage() {
             type="date"
             value={formData.year_start_date}
             onChange={(e) => setFormData({ ...formData, year_start_date: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           />
         ) : (
           <span className="text-slate-muted text-sm">{formatDate(item.year_start_date)}</span>
@@ -119,7 +119,7 @@ export default function FiscalYearsPage() {
             type="date"
             value={formData.year_end_date}
             onChange={(e) => setFormData({ ...formData, year_end_date: e.target.value })}
-            className="bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           />
         ) : (
           <span className="text-slate-muted text-sm">{formatDate(item.year_end_date)}</span>
@@ -182,7 +182,7 @@ export default function FiscalYearsPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -208,7 +208,7 @@ export default function FiscalYearsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Fiscal Years</h1>
+            <h1 className="text-xl font-semibold text-foreground">Fiscal Years</h1>
           </div>
           {!isCreating && (
             <button
@@ -230,7 +230,7 @@ export default function FiscalYearsPage() {
 
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Fiscal Year</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Fiscal Year</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Name</label>
@@ -238,7 +238,7 @@ export default function FiscalYearsPage() {
                   type="text"
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="e.g., FY 2024-25"
                 />
               </div>
@@ -248,7 +248,7 @@ export default function FiscalYearsPage() {
                   type="date"
                   value={formData.year_start_date}
                   onChange={(e) => setFormData({ ...formData, year_start_date: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -257,7 +257,7 @@ export default function FiscalYearsPage() {
                   type="date"
                   value={formData.year_end_date}
                   onChange={(e) => setFormData({ ...formData, year_end_date: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -265,7 +265,7 @@ export default function FiscalYearsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.year_start_date || !formData.year_end_date}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>

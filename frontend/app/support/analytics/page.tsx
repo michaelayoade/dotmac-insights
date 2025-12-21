@@ -113,7 +113,7 @@ function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; s
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="w-4 h-4 text-teal-electric" />}
         <div>
-          <h3 className="text-white font-semibold">{title}</h3>
+          <h3 className="text-foreground font-semibold">{title}</h3>
           {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
         </div>
       </div>
@@ -155,7 +155,7 @@ function SlaGauge({ attainment }: { attainment: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{attainment.toFixed(0)}%</span>
+        <span className="text-2xl font-bold text-foreground">{attainment.toFixed(0)}%</span>
         <span className="text-[10px] text-slate-muted">SLA</span>
       </div>
     </div>
@@ -166,7 +166,7 @@ function HeatmapCell({ value, max }: { value: number; max: number }) {
   const intensity = max > 0 ? Math.min(value / max, 1) : 0;
   const bg = intensity > 0.7 ? 'bg-teal-500' : intensity > 0.4 ? 'bg-teal-600' : intensity > 0 ? 'bg-teal-700' : 'bg-slate-elevated';
   return (
-    <div className={cn('w-8 h-8 rounded flex items-center justify-center text-xs font-mono', bg, intensity > 0.4 ? 'text-white' : 'text-slate-muted')}>
+    <div className={cn('w-8 h-8 rounded flex items-center justify-center text-xs font-mono', bg, intensity > 0.4 ? 'text-foreground' : 'text-slate-muted')}>
       {value || '-'}
     </div>
   );
@@ -240,7 +240,7 @@ export default function SupportAnalyticsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Time Range</span>
+          <span className="text-foreground text-sm font-medium">Time Range</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div>
@@ -248,7 +248,7 @@ export default function SupportAnalyticsPage() {
             <select
               value={months}
               onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value={3}>3 months</option>
               <option value={6}>6 months</option>
@@ -260,7 +260,7 @@ export default function SupportAnalyticsPage() {
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value={7}>7 days</option>
               <option value={14}>14 days</option>
@@ -323,7 +323,7 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Target className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">SLA Attainment</h3>
+            <h3 className="text-foreground font-semibold">SLA Attainment</h3>
           </div>
           <SlaGauge attainment={slaAttainment} />
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
@@ -394,7 +394,7 @@ export default function SupportAnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-2 text-center">
-                <span className="text-2xl font-bold text-white">
+                <span className="text-2xl font-bold text-foreground">
                   {resolutionTrend[resolutionTrend.length - 1]?.avg_resolution_hours?.toFixed(1) ?? 0}h
                 </span>
                 <span className="text-xs text-slate-muted ml-2">latest month</span>
@@ -453,7 +453,7 @@ export default function SupportAnalyticsPage() {
               {volumeTrend.slice(-6).map((v: any) => (
                 <div key={v.period} className="bg-slate-elevated rounded-lg p-2 text-center">
                   <p className="text-[10px] text-slate-muted">{v.period}</p>
-                  <p className="text-sm font-bold text-white">{v.total}</p>
+                  <p className="text-sm font-bold text-foreground">{v.total}</p>
                   <p className="text-[10px] text-emerald-400">{v.resolution_rate}% res</p>
                 </div>
               ))}
@@ -505,7 +505,7 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-white font-semibold">Agent Performance ({days}d)</h3>
+            <h3 className="text-foreground font-semibold">Agent Performance ({days}d)</h3>
           </div>
           {agentInsights?.by_assignee?.length ? (
             <div className="overflow-x-auto">
@@ -522,7 +522,7 @@ export default function SupportAnalyticsPage() {
                 <tbody>
                   {agentInsights.by_assignee.slice(0, 10).map((agent: any) => (
                     <tr key={agent.assignee} className="border-t border-slate-border/40">
-                      <td className="py-2 text-white truncate max-w-[120px]">{agent.assignee}</td>
+                      <td className="py-2 text-foreground truncate max-w-[120px]">{agent.assignee}</td>
                       <td className="py-2 text-right font-mono text-slate-muted">{agent.total_tickets}</td>
                       <td className="py-2 text-right font-mono text-emerald-400">{agent.resolved}</td>
                       <td className="py-2 text-right font-mono text-blue-400">{agent.resolution_rate}%</td>
@@ -544,7 +544,7 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-4 h-4 text-orange-400" />
-            <h3 className="text-white font-semibold">Peak Hours</h3>
+            <h3 className="text-foreground font-semibold">Peak Hours</h3>
           </div>
           {patterns?.peak_hours?.length ? (
             <div className="space-y-2">
@@ -554,7 +554,7 @@ export default function SupportAnalyticsPage() {
                     {idx === 0 && '🔥 '}
                     {h.hour.toString().padStart(2, '0')}:00
                   </span>
-                  <span className="font-mono text-white">{h.count} tickets</span>
+                  <span className="font-mono text-foreground">{h.count} tickets</span>
                 </div>
               ))}
               <p className="text-xs text-slate-muted mt-3 pt-3 border-t border-slate-border">
@@ -570,7 +570,7 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-4 h-4 text-purple-400" />
-            <h3 className="text-white font-semibold">Peak Days</h3>
+            <h3 className="text-foreground font-semibold">Peak Days</h3>
           </div>
           {patterns?.peak_days?.length ? (
             <div className="space-y-2">
@@ -580,7 +580,7 @@ export default function SupportAnalyticsPage() {
                     {idx === 0 && '🔥 '}
                     {d.day}
                   </span>
-                  <span className="font-mono text-white">{d.count} tickets</span>
+                  <span className="font-mono text-foreground">{d.count} tickets</span>
                 </div>
               ))}
               <p className="text-xs text-slate-muted mt-3 pt-3 border-t border-slate-border">
@@ -596,14 +596,14 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-4 h-4 text-rose-400" />
-            <h3 className="text-white font-semibold">By Region</h3>
+            <h3 className="text-foreground font-semibold">By Region</h3>
           </div>
           {patterns?.by_region?.length ? (
             <div className="space-y-2">
                 {patterns.by_region.slice(0, 6).map((r: any) => (
                 <div key={r.region} className="flex items-center justify-between">
                   <span className="text-slate-muted text-sm truncate max-w-[140px]">{r.region}</span>
-                  <span className="font-mono text-white">{r.count}</span>
+                  <span className="font-mono text-foreground">{r.count}</span>
                 </div>
               ))}
             </div>
@@ -618,11 +618,11 @@ export default function SupportAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Queue Health</h3>
+            <h3 className="text-foreground font-semibold">Queue Health</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{qh.unassigned_tickets ?? 0}</p>
+              <p className="text-2xl font-bold text-foreground">{qh.unassigned_tickets ?? 0}</p>
               <p className="text-xs text-slate-muted">Unassigned</p>
             </div>
             <div className="text-center">

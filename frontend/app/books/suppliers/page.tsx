@@ -44,7 +44,7 @@ export default function SuppliersPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Building className="w-4 h-4 text-teal-electric" />
-          <span className="text-white font-medium">{item.name || item.supplier_name}</span>
+          <span className="text-foreground font-medium">{item.name || item.supplier_name}</span>
         </div>
       ),
     },
@@ -63,13 +63,13 @@ export default function SuppliersPage() {
           {item.email && (
             <div className="flex items-center gap-1 text-sm">
               <Mail className="w-3 h-3 text-slate-muted" />
-              <span className="text-slate-300">{item.email}</span>
+              <span className="text-foreground-secondary">{item.email}</span>
             </div>
           )}
           {item.phone && (
             <div className="flex items-center gap-1 text-sm">
               <Phone className="w-3 h-3 text-slate-muted" />
-              <span className="text-slate-300">{item.phone}</span>
+              <span className="text-foreground-secondary">{item.phone}</span>
             </div>
           )}
           {!item.email && !item.phone && <span className="text-slate-muted">-</span>}
@@ -94,7 +94,7 @@ export default function SuppliersPage() {
       header: 'Total Purchases',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">
+        <span className="font-mono text-foreground">
           {formatCurrency(item.total_purchases || item.total_invoices)}
         </span>
       ),
@@ -131,7 +131,7 @@ export default function SuppliersPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total Suppliers</p>
-          <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
+          <p className="text-2xl font-bold text-foreground">{data?.total || 0}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Active</p>
@@ -171,7 +171,7 @@ export default function SuppliersPage() {
           {(search || status) && (
             <button
               onClick={() => { setSearch(''); setStatus(''); setOffset(0); }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

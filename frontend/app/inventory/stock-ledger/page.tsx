@@ -24,7 +24,7 @@ export default function StockLedgerPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Stock Ledger</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Stock Ledger</h1>
         <p className="text-slate-muted text-sm">Complete history of inventory movements</p>
       </div>
 
@@ -37,7 +37,7 @@ export default function StockLedgerPage() {
               placeholder="Item code..."
               value={itemCode}
               onChange={(e) => setItemCode(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
           <div className="relative">
@@ -47,7 +47,7 @@ export default function StockLedgerPage() {
               placeholder="Warehouse..."
               value={warehouse}
               onChange={(e) => setWarehouse(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
           <div className="relative">
@@ -56,7 +56,7 @@ export default function StockLedgerPage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
           <div className="relative">
@@ -65,7 +65,7 @@ export default function StockLedgerPage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function StockLedgerPage() {
                         {entry.posting_date ? new Date(entry.posting_date).toLocaleDateString() : "-"}
                       </td>
                       <td className="py-3 text-amber-400 font-mono">{entry.item_code}</td>
-                      <td className="py-3 text-white">{entry.warehouse}</td>
+                      <td className="py-3 text-foreground">{entry.warehouse}</td>
                       <td className="py-3 text-right">
                         <div className={cn(
                           "inline-flex items-center gap-1 font-mono",
@@ -126,13 +126,13 @@ export default function StockLedgerPage() {
                           {Math.abs(entry.actual_qty).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </div>
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {entry.qty_after_transaction.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-right font-mono text-slate-muted">
                         {(entry.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(entry.stock_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-slate-muted text-xs">

@@ -207,7 +207,7 @@ export function ModuleLayout({
           >
             <button
               onClick={() => toggleSection(section.key)}
-              className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-white hover:bg-slate-elevated/50 rounded-lg transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-foreground hover:bg-slate-elevated/50 rounded-lg transition-colors"
             >
               <div className="flex items-center gap-2">
                 <Icon className={cn('w-4 h-4', isActiveSection ? colors.iconText : 'text-slate-muted')} />
@@ -235,7 +235,7 @@ export function ModuleLayout({
                         'block px-3 py-2 text-sm rounded-lg transition-colors group',
                         isActive
                           ? `${colors.activeItemBg} ${colors.activeItemText}`
-                          : 'text-slate-muted hover:text-white hover:bg-slate-elevated/50'
+                          : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated/50'
                       )}
                     >
                       <span className="block">{item.name}</span>
@@ -290,38 +290,44 @@ export function ModuleLayout({
             <Link
               href="/"
               className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center shrink-0"
-              title="Back to Home"
+              title="Back to app home"
             >
               <Zap className="w-4 h-4 text-slate-900" />
             </Link>
             <div className="w-px h-6 bg-slate-border" />
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
-              <ModuleIcon className="w-4 h-4 text-slate-deep" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-display font-bold text-white tracking-tight text-sm">{moduleName}</span>
-              <span className="text-[9px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
-            </div>
+            <Link
+              href={baseRoute}
+              className="flex items-center gap-3 group"
+              title="Back to module home"
+            >
+              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
+                <ModuleIcon className="w-4 h-4 text-slate-deep" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-display font-bold text-foreground tracking-tight text-sm">{moduleName}</span>
+                <span className="text-[9px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
+              </div>
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             {headerContent}
             <button
               onClick={openCommandPalette}
-              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
               title="Search"
             >
               <Search className="w-5 h-5" />
             </button>
             <button
               onClick={toggleTheme}
-              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
               title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
             <button
               onClick={() => setMobileMenuOpen((v) => !v)}
-              className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+              className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -335,8 +341,8 @@ export function ModuleLayout({
         <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
-            title="Back to Home"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
+            title="Back to app home"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
               <Zap className="w-4 h-4 text-slate-900" />
@@ -349,7 +355,7 @@ export function ModuleLayout({
               <ModuleIcon className="w-5 h-5 text-slate-deep" />
             </div>
             <div className="flex flex-col">
-              <span className="font-display font-bold text-white tracking-tight">{moduleName}</span>
+              <span className="font-display font-bold text-foreground tracking-tight">{moduleName}</span>
               <span className="text-[10px] text-slate-muted uppercase tracking-widest">{moduleSubtitle}</span>
             </div>
           </Link>
@@ -358,7 +364,7 @@ export function ModuleLayout({
           {headerContent}
           <button
             onClick={openCommandPalette}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-slate-muted hover:text-foreground transition-colors"
             title="Search (Cmd+K)"
           >
             <Search className="w-4 h-4" />
@@ -367,7 +373,7 @@ export function ModuleLayout({
           </button>
           <button
             onClick={toggleTheme}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -440,7 +446,7 @@ export function ModuleLayout({
         <aside className="hidden lg:block bg-slate-card border border-slate-border rounded-xl p-4 space-y-4 h-fit">
           {/* Header */}
           <div className="pb-3 border-b border-slate-border">
-            <h1 className="text-lg font-semibold text-white">{sidebarTitle}</h1>
+            <h1 className="text-lg font-semibold text-foreground">{sidebarTitle}</h1>
             <p className="text-slate-muted text-xs mt-1">{sidebarDescription}</p>
           </div>
 
@@ -464,7 +470,7 @@ export function ModuleLayout({
                           'px-2 py-1 rounded text-xs font-medium transition-colors cursor-pointer hover:opacity-80',
                           currentPhase === phase.key
                             ? `${colors.activeItemBg} ${colors.activeItemText} border ${colors.activeBorder}`
-                            : 'text-slate-muted hover:text-white hover:bg-slate-border/30'
+                            : 'text-slate-muted hover:text-foreground hover:bg-slate-border/30'
                         )}
                         title={phase.description}
                       >

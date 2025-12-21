@@ -71,7 +71,7 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, class
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-slate-muted text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
           {trend && trendValue && (
             <div className={cn(
@@ -212,7 +212,7 @@ export default function ContactsPage() {
           canWrite ? (
             <Link
               href="/contacts/new"
-              className="flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg hover:bg-teal-glow transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg hover:bg-teal-glow transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               Add Contact
@@ -260,19 +260,19 @@ export default function ContactsPage() {
       {/* Funnel */}
       {funnel ? (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Sales Funnel (30 days)</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Sales Funnel (30 days)</h3>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-4 bg-slate-elevated rounded-lg">
-              <p className="text-2xl font-bold text-white">{funnel.funnel?.leads_created || 0}</p>
+              <p className="text-2xl font-bold text-foreground">{funnel.funnel?.leads_created || 0}</p>
               <p className="text-sm text-slate-muted">Leads Created</p>
             </div>
             <div className="text-center p-4 bg-slate-elevated rounded-lg">
-              <p className="text-2xl font-bold text-white">{funnel.funnel?.prospects_qualified || 0}</p>
+              <p className="text-2xl font-bold text-foreground">{funnel.funnel?.prospects_qualified || 0}</p>
               <p className="text-sm text-slate-muted">Qualified</p>
               <p className="text-xs text-teal-electric mt-1">{funnel.conversion_rates?.lead_to_prospect}% rate</p>
             </div>
             <div className="text-center p-4 bg-slate-elevated rounded-lg">
-              <p className="text-2xl font-bold text-white">{funnel.funnel?.customers_converted || 0}</p>
+              <p className="text-2xl font-bold text-foreground">{funnel.funnel?.customers_converted || 0}</p>
               <p className="text-sm text-slate-muted">Converted</p>
               <p className="text-xs text-green-400 mt-1">{funnel.conversion_rates?.overall}% overall</p>
             </div>
@@ -291,7 +291,7 @@ export default function ContactsPage() {
                 placeholder="Search contacts..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
+                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
               />
             </div>
           </form>
@@ -299,7 +299,7 @@ export default function ContactsPage() {
           <select
             value={params.contact_type || ''}
             onChange={(e) => handleFilterChange('contact_type', e.target.value as any)}
-            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric"
+            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric"
           >
             <option value="">All Types</option>
             <option value="lead">Leads</option>
@@ -311,7 +311,7 @@ export default function ContactsPage() {
           <select
             value={params.status || ''}
             onChange={(e) => handleFilterChange('status', e.target.value as any)}
-            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric"
+            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric"
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
@@ -322,7 +322,7 @@ export default function ContactsPage() {
           <select
             value={params.category || ''}
             onChange={(e) => handleFilterChange('category', e.target.value as any)}
-            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric"
+            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric"
           >
             <option value="">All Categories</option>
             <option value="residential">Residential</option>
@@ -334,7 +334,7 @@ export default function ContactsPage() {
           <select
             value={params.sort_by || 'created_at'}
             onChange={(e) => handleFilterChange('sort_by', e.target.value as any)}
-            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric"
+            className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric"
           >
             <option value="created_at">Date Created</option>
             <option value="name">Name</option>
@@ -370,7 +370,7 @@ export default function ContactsPage() {
                 >
                   <td className="px-4 py-4">
                     <div>
-                      <p className="text-white font-medium">{contact.name}</p>
+                      <p className="text-foreground font-medium">{contact.name}</p>
                       {contact.company_name && contact.company_name !== contact.name && (
                         <p className="text-sm text-slate-muted">{contact.company_name}</p>
                       )}
@@ -424,7 +424,7 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-4 py-4">
                     {contact.mrr ? (
-                      <span className="text-white font-mono text-sm">
+                      <span className="text-foreground font-mono text-sm">
                         {formatCurrency(contact.mrr)}
                       </span>
                     ) : (
@@ -474,7 +474,7 @@ export default function ContactsPage() {
               <button
                 onClick={() => setParams({ ...params, page: (params.page || 1) - 1 })}
                 disabled={params.page === 1}
-                className="px-3 py-1 text-sm bg-slate-elevated border border-slate-border rounded hover:bg-slate-border disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                className="px-3 py-1 text-sm bg-slate-elevated border border-slate-border rounded hover:bg-slate-border disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
               >
                 Previous
               </button>
@@ -484,7 +484,7 @@ export default function ContactsPage() {
               <button
                 onClick={() => setParams({ ...params, page: (params.page || 1) + 1 })}
                 disabled={(params.page || 1) >= totalPages}
-                className="px-3 py-1 text-sm bg-slate-elevated border border-slate-border rounded hover:bg-slate-border disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                className="px-3 py-1 text-sm bg-slate-elevated border border-slate-border rounded hover:bg-slate-border disabled:opacity-50 disabled:cursor-not-allowed text-foreground"
               >
                 Next
               </button>

@@ -1,16 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Settings,
   Save,
   RefreshCw,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAssetSettings, useAssetSettingsMutations } from "@/hooks/useAssetSettings";
+import type { AssetSettingsUpdate } from "@/lib/api/domains/assets";
 
 export default function AssetSettingsPage() {
-  const [settings, setSettings] = useState({
+  const { data: settings, isLoading, error, mutate } = useAssetSettings();
+  const { updateSettings } = useAssetSettingsMutations();
+
+  const [formData, setFormData] = useState<AssetSettingsUpdate>({
     default_depreciation_method: "straight_line",
     auto_post_depreciation: false,
     enable_cwip_by_default: false,
@@ -22,20 +28,65 @@ export default function AssetSettingsPage() {
   });
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Sync form data with fetched settings
+  useEffect(() => {
+    if (settings) {
+      setFormData({
+        default_depreciation_method: settings.default_depreciation_method,
+        auto_post_depreciation: settings.auto_post_depreciation,
+        enable_cwip_by_default: settings.enable_cwip_by_default,
+        default_finance_book: settings.default_finance_book || "",
+        depreciation_posting_date: settings.depreciation_posting_date,
+        maintenance_alert_days: settings.maintenance_alert_days,
+        warranty_alert_days: settings.warranty_alert_days,
+        insurance_alert_days: settings.insurance_alert_days,
+      });
+    }
+  }, [settings]);
 
   const handleSave = async () => {
     setSaving(true);
-    // Placeholder for API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setSaving(false);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      await updateSettings(formData);
+      await mutate();
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+        <span className="ml-2 text-slate-muted">Loading settings...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+        <p className="text-red-300">Failed to load settings: {error.message}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Asset Settings</h1>
+          <h1 className="text-2xl font-bold text-foreground">Asset Settings</h1>
           <p className="text-sm text-slate-muted mt-1">
             Configure default behaviors for asset management
           </p>
@@ -43,28 +94,40 @@ export default function AssetSettingsPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-white transition-colors disabled:opacity-50"
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-foreground transition-colors disabled:opacity-50",
+            saveSuccess
+              ? "bg-emerald-500 hover:bg-emerald-600"
+              : "bg-indigo-500 hover:bg-indigo-600"
+          )}
         >
           {saving ? (
             <RefreshCw className="w-4 h-4 animate-spin" />
           ) : (
             <Save className="w-4 h-4" />
           )}
-          Save Changes
+          {saveSuccess ? "Saved!" : "Save Changes"}
         </button>
       </div>
 
+      {/* Error/Success Messages */}
+      {saveError && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+          <p className="text-red-300 text-sm">{saveError}</p>
+        </div>
+      )}
+
       {/* Depreciation Settings */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4">Depreciation</h3>
+        <h3 className="font-semibold text-foreground mb-4">Depreciation</h3>
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-slate-muted mb-1">Default Depreciation Method</label>
               <select
-                value={settings.default_depreciation_method}
-                onChange={(e) => setSettings((s) => ({ ...s, default_depreciation_method: e.target.value }))}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                value={formData.default_depreciation_method}
+                onChange={(e) => setFormData((s) => ({ ...s, default_depreciation_method: e.target.value }))}
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               >
                 <option value="straight_line">Straight Line</option>
                 <option value="double_declining_balance">Double Declining Balance</option>
@@ -76,10 +139,10 @@ export default function AssetSettingsPage() {
               <label className="block text-sm text-slate-muted mb-1">Default Finance Book</label>
               <input
                 type="text"
-                value={settings.default_finance_book}
-                onChange={(e) => setSettings((s) => ({ ...s, default_finance_book: e.target.value }))}
+                value={formData.default_finance_book || ""}
+                onChange={(e) => setFormData((s) => ({ ...s, default_finance_book: e.target.value || null }))}
                 placeholder="Leave empty for default"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               />
             </div>
           </div>
@@ -87,9 +150,9 @@ export default function AssetSettingsPage() {
             <div>
               <label className="block text-sm text-slate-muted mb-1">Depreciation Posting Date</label>
               <select
-                value={settings.depreciation_posting_date}
-                onChange={(e) => setSettings((s) => ({ ...s, depreciation_posting_date: e.target.value }))}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                value={formData.depreciation_posting_date}
+                onChange={(e) => setFormData((s) => ({ ...s, depreciation_posting_date: e.target.value }))}
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               >
                 <option value="last_day">Last Day of Period</option>
                 <option value="first_day">First Day of Period</option>
@@ -100,8 +163,8 @@ export default function AssetSettingsPage() {
               <input
                 type="checkbox"
                 id="auto_post"
-                checked={settings.auto_post_depreciation}
-                onChange={(e) => setSettings((s) => ({ ...s, auto_post_depreciation: e.target.checked }))}
+                checked={formData.auto_post_depreciation}
+                onChange={(e) => setFormData((s) => ({ ...s, auto_post_depreciation: e.target.checked }))}
                 className="w-4 h-4 rounded border-slate-border bg-slate-elevated focus:ring-indigo-500"
               />
               <label htmlFor="auto_post" className="text-sm text-slate-muted">
@@ -113,8 +176,8 @@ export default function AssetSettingsPage() {
             <input
               type="checkbox"
               id="cwip"
-              checked={settings.enable_cwip_by_default}
-              onChange={(e) => setSettings((s) => ({ ...s, enable_cwip_by_default: e.target.checked }))}
+              checked={formData.enable_cwip_by_default}
+              onChange={(e) => setFormData((s) => ({ ...s, enable_cwip_by_default: e.target.checked }))}
               className="w-4 h-4 rounded border-slate-border bg-slate-elevated focus:ring-indigo-500"
             />
             <label htmlFor="cwip" className="text-sm text-slate-muted">
@@ -126,7 +189,7 @@ export default function AssetSettingsPage() {
 
       {/* Alert Settings */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4">Alert Thresholds</h3>
+        <h3 className="font-semibold text-foreground mb-4">Alert Thresholds</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm text-slate-muted mb-1">Maintenance Alert (days)</label>
@@ -134,9 +197,9 @@ export default function AssetSettingsPage() {
               type="number"
               min="1"
               max="365"
-              value={settings.maintenance_alert_days}
-              onChange={(e) => setSettings((s) => ({ ...s, maintenance_alert_days: parseInt(e.target.value) || 7 }))}
-              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              value={formData.maintenance_alert_days}
+              onChange={(e) => setFormData((s) => ({ ...s, maintenance_alert_days: parseInt(e.target.value) || 7 }))}
+              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
           </div>
           <div>
@@ -145,9 +208,9 @@ export default function AssetSettingsPage() {
               type="number"
               min="1"
               max="365"
-              value={settings.warranty_alert_days}
-              onChange={(e) => setSettings((s) => ({ ...s, warranty_alert_days: parseInt(e.target.value) || 30 }))}
-              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              value={formData.warranty_alert_days}
+              onChange={(e) => setFormData((s) => ({ ...s, warranty_alert_days: parseInt(e.target.value) || 30 }))}
+              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
           </div>
           <div>
@@ -156,9 +219,9 @@ export default function AssetSettingsPage() {
               type="number"
               min="1"
               max="365"
-              value={settings.insurance_alert_days}
-              onChange={(e) => setSettings((s) => ({ ...s, insurance_alert_days: parseInt(e.target.value) || 30 }))}
-              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              value={formData.insurance_alert_days}
+              onChange={(e) => setFormData((s) => ({ ...s, insurance_alert_days: parseInt(e.target.value) || 30 }))}
+              className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
           </div>
         </div>

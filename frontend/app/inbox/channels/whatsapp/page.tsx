@@ -12,7 +12,7 @@ export default function WhatsAppChannelPage() {
             <MessageCircle className="w-5 h-5 text-green-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">WhatsApp Business</h1>
+            <h1 className="text-2xl font-bold text-foreground">WhatsApp Business</h1>
             <p className="text-slate-muted text-sm">Connect your WhatsApp Business account</p>
           </div>
         </div>
@@ -26,7 +26,7 @@ export default function WhatsAppChannelPage() {
             <MessageCircle className="w-8 h-8 text-green-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Connect WhatsApp Business API</h2>
+            <h2 className="text-xl font-semibold text-foreground">Connect WhatsApp Business API</h2>
             <p className="text-slate-muted">Receive and respond to WhatsApp messages directly in your inbox</p>
           </div>
         </div>
@@ -37,10 +37,10 @@ export default function WhatsAppChannelPage() {
               <CheckCircle className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="flex-1">
-              <p className="text-white font-medium">Meta Business Account</p>
+              <p className="text-foreground font-medium">Meta Business Account</p>
               <p className="text-sm text-slate-muted">Required for WhatsApp Business API access</p>
             </div>
-            <button className="px-4 py-2 bg-slate-border text-white rounded-lg text-sm font-medium hover:bg-slate-muted transition-colors">
+            <button className="px-4 py-2 bg-slate-border text-foreground rounded-lg text-sm font-medium hover:bg-slate-muted transition-colors">
               Verify
             </button>
           </div>
@@ -50,10 +50,10 @@ export default function WhatsAppChannelPage() {
               <AlertCircle className="w-4 h-4 text-slate-400" />
             </div>
             <div className="flex-1">
-              <p className="text-white font-medium">Phone Number Verification</p>
+              <p className="text-foreground font-medium">Phone Number Verification</p>
               <p className="text-sm text-slate-muted">Verify your business phone number</p>
             </div>
-            <button className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
+            <button className="px-4 py-2 bg-green-500 text-foreground rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
               Connect
             </button>
           </div>
@@ -63,7 +63,7 @@ export default function WhatsAppChannelPage() {
               <Settings className="w-4 h-4 text-slate-400" />
             </div>
             <div className="flex-1">
-              <p className="text-white font-medium">Configure Templates</p>
+              <p className="text-foreground font-medium">Configure Templates</p>
               <p className="text-sm text-slate-muted">Set up message templates for outbound messages</p>
             </div>
             <span className="text-xs text-slate-muted">Pending</span>
@@ -77,21 +77,21 @@ export default function WhatsAppChannelPage() {
           <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center mb-3">
             <MessageCircle className="w-5 h-5 text-green-400" />
           </div>
-          <h3 className="text-white font-semibold mb-2">Two-Way Messaging</h3>
+          <h3 className="text-foreground font-semibold mb-2">Two-Way Messaging</h3>
           <p className="text-sm text-slate-muted">Receive and respond to customer messages in real-time</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center mb-3">
             <Phone className="w-5 h-5 text-blue-400" />
           </div>
-          <h3 className="text-white font-semibold mb-2">Message Templates</h3>
+          <h3 className="text-foreground font-semibold mb-2">Message Templates</h3>
           <p className="text-sm text-slate-muted">Pre-approved templates for notifications and updates</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center mb-3">
             <Settings className="w-5 h-5 text-violet-400" />
           </div>
-          <h3 className="text-white font-semibold mb-2">Rich Media</h3>
+          <h3 className="text-foreground font-semibold mb-2">Rich Media</h3>
           <p className="text-sm text-slate-muted">Send images, documents, and interactive buttons</p>
         </div>
       </div>
@@ -100,12 +100,12 @@ export default function WhatsAppChannelPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-white font-semibold">Need help setting up?</h3>
+            <h3 className="text-foreground font-semibold">Need help setting up?</h3>
             <p className="text-sm text-slate-muted">Check our documentation for step-by-step instructions</p>
           </div>
           <a
             href="#"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
           >
             View Documentation
             <ExternalLink className="w-4 h-4" />

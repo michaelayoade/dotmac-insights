@@ -52,7 +52,7 @@ export default function BonusReportPage() {
       header: 'Employee',
       render: (item: BonusEligibility) => (
         <div>
-          <p className="text-white font-medium">{item.employee_name}</p>
+          <p className="text-foreground font-medium">{item.employee_name}</p>
           <p className="text-xs text-slate-400">{item.department || 'No department'}</p>
         </div>
       ),
@@ -61,7 +61,7 @@ export default function BonusReportPage() {
       key: 'bonus_band',
       header: 'Bonus Band',
       render: (item: BonusEligibility) => (
-        <span className="text-slate-300 text-sm">{item.bonus_band || '-'}</span>
+        <span className="text-foreground-secondary text-sm">{item.bonus_band || '-'}</span>
       ),
     },
     {
@@ -115,7 +115,7 @@ export default function BonusReportPage() {
         <span className={cn(
           'font-mono',
           (item.bonus_factor ?? 0) > 1 && 'text-emerald-400',
-          (item.bonus_factor ?? 0) === 1 && 'text-slate-300',
+          (item.bonus_factor ?? 0) === 1 && 'text-foreground-secondary',
           (item.bonus_factor ?? 0) < 1 && 'text-amber-400',
         )}>
           {(item.bonus_factor ?? 0).toFixed(2)}x
@@ -129,7 +129,7 @@ export default function BonusReportPage() {
       render: (item: BonusEligibility) => (
         <Link
           href={`/performance/employees/${item.employee_id}`}
-          className="text-slate-400 hover:text-white p-1"
+          className="text-slate-400 hover:text-foreground p-1"
         >
           <ChevronRight className="w-4 h-4" />
         </Link>
@@ -162,13 +162,13 @@ export default function BonusReportPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Bonus Eligibility Report</h1>
+          <h1 className="text-xl font-semibold text-foreground">Bonus Eligibility Report</h1>
           <p className="text-sm text-slate-400 mt-1">
             Performance-based bonus calculations and eligibility
           </p>
         </div>
         <button
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Download className="w-4 h-4" />
           Export CSV
@@ -184,7 +184,7 @@ export default function BonusReportPage() {
                 <Users className="w-5 h-5 text-violet-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{summary.total}</p>
+                <p className="text-2xl font-bold text-foreground">{summary.total}</p>
                 <p className="text-sm text-slate-400">Total Employees</p>
               </div>
             </div>
@@ -195,7 +195,7 @@ export default function BonusReportPage() {
                 <Award className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{summary.eligible}</p>
+                <p className="text-2xl font-bold text-foreground">{summary.eligible}</p>
                 <p className="text-sm text-slate-400">Bonus Eligible</p>
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function BonusReportPage() {
                 <Percent className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{summary.avgFactor.toFixed(2)}x</p>
+                <p className="text-2xl font-bold text-foreground">{summary.avgFactor.toFixed(2)}x</p>
                 <p className="text-sm text-slate-400">Avg Factor</p>
               </div>
             </div>
@@ -222,7 +222,7 @@ export default function BonusReportPage() {
             setPeriodId(e.target.value ? Number(e.target.value) : 0);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.filter(p => ['finalized', 'review'].includes(p.status)).map((p) => (
@@ -239,7 +239,7 @@ export default function BonusReportPage() {
             setDepartmentFilter(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         />
       </div>
 
@@ -248,7 +248,7 @@ export default function BonusReportPage() {
         <div className="flex items-start gap-3">
           <DollarSign className="w-5 h-5 text-emerald-400 mt-0.5" />
           <div>
-            <h3 className="font-medium text-white">Bonus Calculation</h3>
+            <h3 className="font-medium text-foreground">Bonus Calculation</h3>
             <p className="text-sm text-slate-400 mt-1">
               Bonus eligibility and multipliers are calculated based on the active bonus policy.
               Employees must score above the minimum threshold (typically 50) to be eligible.

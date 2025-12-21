@@ -100,14 +100,14 @@ export default function FilingCalendarPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Filing Calendar</h1>
+            <h1 className="text-xl font-semibold text-foreground">Filing Calendar</h1>
           </div>
         </div>
       </div>
@@ -131,7 +131,7 @@ export default function FilingCalendarPage() {
                     {filing.tax_type}
                   </span>
                   <div>
-                    <p className="text-white text-sm font-medium">{filing.period}</p>
+                    <p className="text-foreground text-sm font-medium">{filing.period}</p>
                     <p className="text-slate-muted text-xs">{filing.description}</p>
                   </div>
                 </div>
@@ -162,7 +162,7 @@ export default function FilingCalendarPage() {
                   <Clock className={cn('w-5 h-5', TAX_TYPE_COLORS[filing.tax_type]?.text || 'text-slate-muted')} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{filing.tax_type} - {filing.period}</p>
+                  <p className="text-foreground text-sm font-medium truncate">{filing.tax_type} - {filing.period}</p>
                   <p className={cn(
                     'text-xs',
                     filing.days_until_due <= 7 ? 'text-amber-400' : 'text-slate-muted'
@@ -243,7 +243,7 @@ export default function FilingCalendarPage() {
                   <AlertTriangle className="w-6 h-6 text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-white font-semibold">No filings match these filters</p>
+                  <p className="text-foreground font-semibold">No filings match these filters</p>
                   <p className="text-slate-muted text-sm">Adjust the year, tax type, or status to see the calendar.</p>
                 </div>
               </div>
@@ -258,7 +258,7 @@ export default function FilingCalendarPage() {
 
                 return (
                   <div key={month} className="bg-slate-card border border-slate-border rounded-xl p-4">
-                    <h3 className="text-white font-semibold mb-4">{monthName}</h3>
+                    <h3 className="text-foreground font-semibold mb-4">{monthName}</h3>
                     <div className="space-y-3">
                       {filteredFilings.map((filing: any, idx: number) => (
                         <div
@@ -296,13 +296,13 @@ export default function FilingCalendarPage() {
                                 )}>
                                   {filing.tax_type}
                                 </span>
-                                <span className="text-white font-medium">{filing.period}</span>
+                                <span className="text-foreground font-medium">{filing.period}</span>
                               </div>
                               <p className="text-slate-muted text-sm mt-1">{filing.description}</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-white text-sm font-medium">{formatDateLong(filing.deadline)}</p>
+                            <p className="text-foreground text-sm font-medium">{formatDateLong(filing.deadline)}</p>
                             <p className={cn(
                               'text-sm',
                               filing.status === 'FILED'
@@ -335,7 +335,7 @@ export default function FilingCalendarPage() {
 
       {/* Filing Schedule Reference */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-teal-electric" />
           Standard Filing Schedule
         </h3>

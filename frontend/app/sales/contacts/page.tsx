@@ -46,14 +46,14 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Contacts</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Contacts</h1>
           <p className="text-sm text-slate-400 mt-1">
             Manage contacts across customers and leads
           </p>
         </div>
         <Link
           href="/sales/contacts/new"
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Contact
@@ -69,13 +69,13 @@ export default function ContactsPage() {
             placeholder="Search contacts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           />
         </div>
         <select
           value={isPrimary}
           onChange={(e) => setIsPrimary(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Contacts</option>
           <option value="true">Primary Only</option>
@@ -84,7 +84,7 @@ export default function ContactsPage() {
         <select
           value={isDecisionMaker}
           onChange={(e) => setIsDecisionMaker(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Roles</option>
           <option value="true">Decision Makers</option>
@@ -117,12 +117,12 @@ export default function ContactsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-medium text-lg">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-foreground font-medium text-lg">
                       {contact.full_name?.charAt(0) || '?'}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-white">{contact.full_name}</span>
+                        <span className="font-medium text-foreground">{contact.full_name}</span>
                         {contact.is_primary && (
                           <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
                         )}
@@ -144,7 +144,7 @@ export default function ContactsPage() {
                   {contact.email && (
                     <a
                       href={`mailto:${contact.email}`}
-                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-foreground transition-colors"
                     >
                       <Mail className="w-4 h-4" />
                       {contact.email}
@@ -153,7 +153,7 @@ export default function ContactsPage() {
                   {contact.phone && (
                     <a
                       href={`tel:${contact.phone}`}
-                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-foreground transition-colors"
                     >
                       <Phone className="w-4 h-4" />
                       {contact.phone}
@@ -162,7 +162,7 @@ export default function ContactsPage() {
                   {contact.mobile && (
                     <a
                       href={`tel:${contact.mobile}`}
-                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-foreground transition-colors"
                     >
                       <Phone className="w-4 h-4" />
                       {contact.mobile}
@@ -173,7 +173,7 @@ export default function ContactsPage() {
                       href={contact.linkedin_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-foreground transition-colors"
                     >
                       <Linkedin className="w-4 h-4" />
                       LinkedIn
@@ -219,7 +219,7 @@ export default function ContactsPage() {
                 {!contact.is_primary && (
                   <button
                     onClick={() => handleSetPrimary(contact.id)}
-                    className="mt-3 w-full px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors"
+                    className="mt-3 w-full px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-foreground rounded-lg transition-colors"
                   >
                     Set as Primary
                   </button>
@@ -239,14 +239,14 @@ export default function ContactsPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(p => p + 1)}
                 disabled={page * 20 >= contacts.total}
-                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

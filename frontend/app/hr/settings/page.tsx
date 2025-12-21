@@ -148,7 +148,7 @@ export default function HRSettingsPage() {
         </div>
       )}
       <header>
-        <h1 className="text-2xl font-bold text-white">HR Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">HR Settings</h1>
         <p className="text-slate-muted text-sm">Configure leave policies, payroll, attendance, and HR operations.</p>
       </header>
 
@@ -166,7 +166,7 @@ export default function HRSettingsPage() {
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   isActive
                     ? 'border-teal-electric text-teal-electric'
-                    : 'border-transparent text-slate-muted hover:text-white hover:border-slate-border'
+                    : 'border-transparent text-slate-muted hover:text-foreground hover:border-slate-border'
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -1076,7 +1076,7 @@ function Card({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-teal-electric" />
-        <h2 className="text-white font-semibold text-sm">{title}</h2>
+        <h2 className="text-foreground font-semibold text-sm">{title}</h2>
       </div>
       {children}
     </div>

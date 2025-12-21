@@ -35,12 +35,12 @@ export default function InboundWebhooksPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inbound Webhooks</h1>
+          <h1 className="text-2xl font-bold text-foreground">Inbound Webhooks</h1>
           <p className="text-slate-muted">Payments and provider webhooks coming into the platform.</p>
         </div>
         <button
           onClick={() => mutate()}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -57,7 +57,7 @@ export default function InboundWebhooksPage() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Globe2 className="w-5 h-5 text-teal-electric" />
-                <h3 className="text-lg font-semibold text-white">{provider.display_name || provider.name}</h3>
+                <h3 className="text-lg font-semibold text-foreground">{provider.display_name || provider.name}</h3>
               </div>
               <span
                 className={cn(
@@ -89,7 +89,7 @@ export default function InboundWebhooksPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-2">
           <BarChart3 className="w-5 h-5 text-blue-400" />
-          <h3 className="text-sm font-semibold text-white">Recent Events</h3>
+          <h3 className="text-sm font-semibold text-foreground">Recent Events</h3>
         </div>
         <p className="text-sm text-slate-muted mb-2">
           View and replay inbound webhook events.

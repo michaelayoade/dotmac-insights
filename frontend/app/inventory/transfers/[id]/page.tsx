@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 function getStatusBadge(status: string) {
   switch (status) {
     case "draft":
-      return { label: "Draft", className: "bg-slate-500/20 text-slate-300 border-slate-500/30", icon: Clock };
+      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary border-slate-500/30", icon: Clock };
     case "pending_approval":
       return { label: "Pending Approval", className: "bg-amber-500/20 text-amber-300 border-amber-500/30", icon: Clock };
     case "approved":
@@ -37,7 +37,7 @@ function getStatusBadge(status: string) {
     case "cancelled":
       return { label: "Cancelled", className: "bg-red-500/20 text-red-300 border-red-500/30", icon: XCircle };
     default:
-      return { label: status, className: "bg-slate-500/20 text-slate-300 border-slate-500/30", icon: Clock };
+      return { label: status, className: "bg-slate-500/20 text-foreground-secondary border-slate-500/30", icon: Clock };
   }
 }
 
@@ -93,7 +93,7 @@ export default function TransferDetailPage() {
         )}
         <div className="text-center py-12">
           <AlertCircle className="w-12 h-12 text-slate-muted mx-auto mb-3" />
-          <p className="text-white font-medium">Transfer not found</p>
+          <p className="text-foreground font-medium">Transfer not found</p>
           <Link
             href="/inventory/transfers"
             className="inline-flex items-center gap-2 mt-4 text-amber-400 hover:text-amber-300"
@@ -120,13 +120,13 @@ export default function TransferDetailPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/inventory/transfers"
-          className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+          className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-white">Transfer #{transfer.id}</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Transfer #{transfer.id}</h1>
             <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border", statusInfo.className)}>
               <StatusIcon className="w-4 h-4" />
               {statusInfo.label}
@@ -148,7 +148,7 @@ export default function TransferDetailPage() {
             <>
               <button
                 onClick={() => handleAction("approve")}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white font-semibold hover:bg-emerald-400 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-foreground font-semibold hover:bg-emerald-400 transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
                 Approve
@@ -165,7 +165,7 @@ export default function TransferDetailPage() {
           {transfer.status === "approved" && (
             <button
               onClick={() => handleAction("execute")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white font-semibold hover:bg-purple-400 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-foreground font-semibold hover:bg-purple-400 transition-colors"
             >
               <Truck className="w-4 h-4" />
               Execute Transfer
@@ -178,7 +178,7 @@ export default function TransferDetailPage() {
         {/* Transfer Details */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <ArrowRightLeft className="w-5 h-5 text-amber-400" />
               Transfer Details
             </h2>
@@ -187,19 +187,19 @@ export default function TransferDetailPage() {
                 <p className="text-sm text-slate-muted mb-1">From Warehouse</p>
                 <div className="flex items-center gap-2">
                   <Warehouse className="w-4 h-4 text-red-400" />
-                  <span className="text-white font-medium">{transfer.from_warehouse || "-"}</span>
+                  <span className="text-foreground font-medium">{transfer.from_warehouse || "-"}</span>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-slate-muted mb-1">To Warehouse</p>
                 <div className="flex items-center gap-2">
                   <Warehouse className="w-4 h-4 text-emerald-400" />
-                  <span className="text-white font-medium">{transfer.to_warehouse || "-"}</span>
+                  <span className="text-foreground font-medium">{transfer.to_warehouse || "-"}</span>
                 </div>
               </div>
               <div>
                 <p className="text-sm text-slate-muted mb-1">Request Date</p>
-                <div className="flex items-center gap-2 text-white">
+                <div className="flex items-center gap-2 text-foreground">
                   <Calendar className="w-4 h-4 text-slate-muted" />
                   {transfer.request_date
                     ? new Date(transfer.request_date).toLocaleDateString()
@@ -208,7 +208,7 @@ export default function TransferDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-slate-muted mb-1">Required Date</p>
-                <div className="flex items-center gap-2 text-white">
+                <div className="flex items-center gap-2 text-foreground">
                   <Calendar className="w-4 h-4 text-slate-muted" />
                   {transfer.required_date
                     ? new Date(transfer.required_date).toLocaleDateString()
@@ -219,14 +219,14 @@ export default function TransferDetailPage() {
             {transfer.remarks && (
               <div className="mt-4 pt-4 border-t border-slate-border">
                 <p className="text-sm text-slate-muted mb-1">Remarks</p>
-                <p className="text-white">{transfer.remarks}</p>
+                <p className="text-foreground">{transfer.remarks}</p>
               </div>
             )}
           </div>
 
           {/* Items */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <Package className="w-5 h-5 text-amber-400" />
               Items
             </h2>
@@ -251,14 +251,14 @@ export default function TransferDetailPage() {
                             <p className="text-slate-muted text-xs mt-0.5">{item.item_name}</p>
                           )}
                         </td>
-                        <td className="py-3 text-right font-mono text-white">
+                        <td className="py-3 text-right font-mono text-foreground">
                           {(item.qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 text-slate-muted">{item.uom || "-"}</td>
                         <td className="py-3 text-right font-mono text-slate-muted">
                           {(item.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="py-3 text-right font-mono text-white">
+                        <td className="py-3 text-right font-mono text-foreground">
                           {((item.qty ?? 0) * (item.valuation_rate ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
                       </tr>
@@ -267,10 +267,10 @@ export default function TransferDetailPage() {
                   <tfoot>
                     <tr className="border-t border-slate-border">
                       <td colSpan={3} className="py-3 text-right text-slate-muted font-medium">Total:</td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(transfer.total_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 text-right font-mono text-white font-semibold">
+                      <td className="py-3 text-right font-mono text-foreground font-semibold">
                         {(transfer.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
@@ -291,7 +291,7 @@ export default function TransferDetailPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-slate-muted">Total Quantity</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {(transfer.total_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </p>
               </div>
@@ -311,7 +311,7 @@ export default function TransferDetailPage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-slate-muted" />
-                  <span className="text-white">Approved</span>
+                  <span className="text-foreground">Approved</span>
                 </div>
               </div>
             </div>
@@ -321,7 +321,7 @@ export default function TransferDetailPage() {
           {transfer.approval_status === "rejected" && transfer.remarks && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
               <h3 className="text-sm font-medium text-red-400 mb-2">Rejection Reason</h3>
-              <p className="text-white text-sm">{transfer.remarks}</p>
+              <p className="text-foreground text-sm">{transfer.remarks}</p>
             </div>
           )}
 
@@ -332,7 +332,7 @@ export default function TransferDetailPage() {
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 rounded-full bg-slate-muted mt-2" />
                 <div>
-                  <p className="text-white text-sm">Requested</p>
+                  <p className="text-foreground text-sm">Requested</p>
                   <p className="text-xs text-slate-muted">
                     {transfer.request_date
                       ? new Date(transfer.request_date).toLocaleString()
@@ -344,7 +344,7 @@ export default function TransferDetailPage() {
                 <div className="flex items-start gap-3">
                   <div className="w-2 h-2 rounded-full bg-amber-500 mt-2" />
                   <div>
-                    <p className="text-white text-sm">Transferred</p>
+                    <p className="text-foreground text-sm">Transferred</p>
                     <p className="text-xs text-slate-muted">
                       {new Date(transfer.transfer_date).toLocaleString()}
                     </p>

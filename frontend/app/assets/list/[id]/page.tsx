@@ -47,7 +47,7 @@ function InfoCard({
     <div className="bg-slate-card border border-slate-border rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Icon className="w-4 h-4 text-indigo-300" />
-        <h3 className="font-semibold text-white">{title}</h3>
+        <h3 className="font-semibold text-foreground">{title}</h3>
       </div>
       {children}
     </div>
@@ -58,7 +58,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between py-2 border-b border-slate-border last:border-0">
       <span className="text-sm text-slate-muted">{label}</span>
-      <span className="text-sm text-white text-right">{value ?? "-"}</span>
+      <span className="text-sm text-foreground text-right">{value ?? "-"}</span>
     </div>
   );
 }
@@ -136,13 +136,13 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
         <div className="flex items-center gap-4">
           <Link
             href="/assets/list"
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{asset.asset_name}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{asset.asset_name}</h1>
               <span
                 className={cn(
                   "px-3 py-1 text-xs font-medium rounded-full border capitalize",
@@ -162,7 +162,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
           {asset.status === "draft" && (
             <button
               onClick={handleSubmit}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
               Submit
@@ -171,7 +171,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
           {asset.status === "in_maintenance" && (
             <button
               onClick={handleCompleteMaintenance}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
               Complete Maintenance
@@ -181,14 +181,14 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
             <>
               <button
                 onClick={handleMarkMaintenance}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-white transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 <Wrench className="w-4 h-4" />
                 Mark for Maintenance
               </button>
               <button
                 onClick={handleScrap}
-                className="flex items-center gap-2 px-4 py-2 bg-coral-alert hover:bg-red-600 rounded-lg text-sm text-white transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-coral-alert hover:bg-red-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
                 Scrap
@@ -258,7 +258,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
       {/* Finance Books */}
       {asset.finance_books && asset.finance_books.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4">Finance Books</h3>
+          <h3 className="font-semibold text-foreground mb-4">Finance Books</h3>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -274,12 +274,12 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
               <tbody className="divide-y divide-slate-border">
                 {asset.finance_books.map((book, idx) => (
                   <tr key={idx}>
-                    <td className="px-4 py-2 text-sm text-white">{book.finance_book || "Default"}</td>
+                    <td className="px-4 py-2 text-sm text-foreground">{book.finance_book || "Default"}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted capitalize">{book.depreciation_method || "-"}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted text-right">{book.total_number_of_depreciations}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted text-right">{book.frequency_of_depreciation} mo</td>
                     <td className="px-4 py-2 text-sm text-slate-muted text-right">{book.rate_of_depreciation}%</td>
-                    <td className="px-4 py-2 text-sm text-white text-right">{formatCurrency(book.value_after_depreciation ?? 0)}</td>
+                    <td className="px-4 py-2 text-sm text-foreground text-right">{formatCurrency(book.value_after_depreciation ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -291,7 +291,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
       {/* Depreciation Schedule */}
       {asset.depreciation_schedules && asset.depreciation_schedules.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4">Depreciation Schedule</h3>
+          <h3 className="font-semibold text-foreground mb-4">Depreciation Schedule</h3>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -307,9 +307,9 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
               <tbody className="divide-y divide-slate-border">
                 {asset.depreciation_schedules.slice(0, 12).map((entry, idx) => (
                   <tr key={idx}>
-                    <td className="px-4 py-2 text-sm text-white">{formatDate(entry.schedule_date)}</td>
+                    <td className="px-4 py-2 text-sm text-foreground">{formatDate(entry.schedule_date)}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted">{entry.finance_book || "Default"}</td>
-                    <td className="px-4 py-2 text-sm text-white text-right">{formatCurrency(entry.depreciation_amount)}</td>
+                    <td className="px-4 py-2 text-sm text-foreground text-right">{formatCurrency(entry.depreciation_amount)}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted text-right">{formatCurrency(entry.accumulated_depreciation_amount)}</td>
                     <td className="px-4 py-2 text-sm text-slate-muted">{entry.journal_entry || "-"}</td>
                     <td className="px-4 py-2">
@@ -340,7 +340,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
       {/* Description */}
       {asset.description && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-3">Description</h3>
+          <h3 className="font-semibold text-foreground mb-3">Description</h3>
           <p className="text-sm text-slate-muted whitespace-pre-wrap">{asset.description}</p>
         </div>
       )}

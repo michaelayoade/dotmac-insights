@@ -109,7 +109,7 @@ export default function AccountsReceivablePage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-400" />
-          <span className="text-white text-sm">{item.customer_name || 'Unknown Customer'}</span>
+          <span className="text-foreground text-sm">{item.customer_name || 'Unknown Customer'}</span>
         </div>
       ),
     },
@@ -118,7 +118,7 @@ export default function AccountsReceivablePage() {
       header: 'Total Receivable',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total_receivable)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total_receivable)}</span>
       ),
     },
     {
@@ -157,7 +157,7 @@ export default function AccountsReceivablePage() {
       key: 'invoice_count',
       header: '# Invoices',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.invoice_count}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.invoice_count}</span>,
     },
     {
       key: 'oldest_invoice_date',
@@ -188,7 +188,7 @@ export default function AccountsReceivablePage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total AR</p>
-          <p className="text-2xl font-bold text-white">{formatCurrency(data?.total_receivable)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(data?.total_receivable)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Current</p>
@@ -235,14 +235,14 @@ export default function AccountsReceivablePage() {
         {(customerSearch || minAmount) && (
           <button
             onClick={() => { setFilters((prev) => ({ ...prev, customerSearch: '', minAmount: '', offset: 0 })); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>
         )}
         <button
           onClick={exportAging}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70 ml-auto"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70 ml-auto"
         >
           <Download className="w-4 h-4" />
           Export aging

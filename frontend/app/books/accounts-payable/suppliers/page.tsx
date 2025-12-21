@@ -32,7 +32,7 @@ export default function FinanceSuppliersPage() {
         <div className="flex items-center gap-2">
           <Factory className="w-4 h-4 text-amber-400" />
           <div className="flex flex-col">
-            <span className="text-white text-sm">{item.supplier_name || 'Unknown'}</span>
+            <span className="text-foreground text-sm">{item.supplier_name || 'Unknown'}</span>
             {item.supplier && <span className="text-xs text-slate-muted font-mono">{item.supplier}</span>}
           </div>
         </div>
@@ -42,7 +42,7 @@ export default function FinanceSuppliersPage() {
       key: 'total_payable',
       header: 'Total AP',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.total_payable)}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.total_payable)}</span>,
     },
     {
       key: 'current',
@@ -72,7 +72,7 @@ export default function FinanceSuppliersPage() {
       key: 'bill_count',
       header: '# Bills',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.bill_count ?? 0}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.bill_count ?? 0}</span>,
     },
   ];
 
@@ -89,7 +89,7 @@ export default function FinanceSuppliersPage() {
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Suppliers (Finance)</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Suppliers (Finance)</h1>
           <p className="text-slate-muted text-sm">Payables snapshot by supplier for accounting.</p>
         </div>
       </div>

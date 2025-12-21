@@ -55,14 +55,14 @@ export default function NewAccountPage() {
       <div className="flex items-center gap-3">
         <Link
           href="/books/chart-of-accounts"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Chart of Accounts</p>
-          <h1 className="text-xl font-semibold text-white">New Account</h1>
+          <h1 className="text-xl font-semibold text-foreground">New Account</h1>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ export default function NewAccountPage() {
                 value={form.account_name}
                 onChange={handleChange}
                 required
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -100,7 +100,7 @@ export default function NewAccountPage() {
                 value={form.account_number || ''}
                 onChange={handleChange}
                 placeholder="e.g., 1000"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -109,7 +109,7 @@ export default function NewAccountPage() {
                 name="root_type"
                 value={form.root_type || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 {ROOT_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -123,7 +123,7 @@ export default function NewAccountPage() {
                 value={form.account_type || ''}
                 onChange={handleChange}
                 placeholder="e.g., Bank, Cash, Receivable"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -133,7 +133,7 @@ export default function NewAccountPage() {
                 value={form.parent_account || ''}
                 onChange={handleChange}
                 placeholder="Parent account name"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -144,7 +144,7 @@ export default function NewAccountPage() {
                 onChange={handleChange}
                 placeholder="NGN"
                 maxLength={3}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="flex items-center gap-2 pt-6">
@@ -174,7 +174,7 @@ export default function NewAccountPage() {
           </button>
           <Link
             href="/books/chart-of-accounts"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Cancel
           </Link>

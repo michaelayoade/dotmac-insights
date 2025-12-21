@@ -113,26 +113,27 @@ export function createExpiredToken(scopes: Scope[]): string {
  */
 export async function setupAuth(page: Page, scopes: Scope[] = ALL_SCOPES): Promise<void> {
   const token = createTestToken(scopes);
+  const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 
-  // Navigate to a page first to establish the origin for localStorage
+  await page.context().addCookies([{
+    name: 'dotmac_access_token',
+    value: token,
+    url: baseURL,
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: baseURL.startsWith('https://'),
+    path: '/',
+  }]);
+
+  // Navigate to pick up the auth state
   await page.goto('/');
-
-  // Set the auth token in localStorage
-  await page.evaluate((authToken) => {
-    localStorage.setItem('dotmac_access_token', authToken);
-  }, token);
-
-  // Reload to pick up the auth state
-  await page.reload();
 }
 
 /**
  * Clear authentication from the browser context.
  */
 export async function clearAuth(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    localStorage.removeItem('dotmac_access_token');
-  });
+  await page.context().clearCookies();
 }
 
 /**

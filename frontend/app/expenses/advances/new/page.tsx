@@ -62,7 +62,7 @@ export default function NewCashAdvancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-white">New Cash Advance</h2>
+        <h2 className="text-xl font-semibold text-foreground">New Cash Advance</h2>
         <p className="text-sm text-slate-muted">Request pre-funding for expenses.</p>
       </div>
 
@@ -79,7 +79,7 @@ export default function NewCashAdvancePage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Purpose</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.purpose}
               onChange={(e) => setForm((prev) => ({ ...prev, purpose: e.target.value }))}
             />
@@ -88,7 +88,7 @@ export default function NewCashAdvancePage() {
             <span className="text-slate-muted">Request Date</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.request_date}
               onChange={(e) => setForm((prev) => ({ ...prev, request_date: e.target.value }))}
             />
@@ -97,7 +97,7 @@ export default function NewCashAdvancePage() {
             <span className="text-slate-muted">Required By</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.required_by_date || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, required_by_date: e.target.value }))}
             />
@@ -107,7 +107,7 @@ export default function NewCashAdvancePage() {
             <input
               type="number"
               step="0.01"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.requested_amount}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, requested_amount: Number(e.target.value) || 0 }))
@@ -117,7 +117,7 @@ export default function NewCashAdvancePage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Currency</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.currency || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
             />
@@ -127,7 +127,7 @@ export default function NewCashAdvancePage() {
             <input
               type="number"
               step="0.0001"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.conversion_rate}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, conversion_rate: Number(e.target.value) || 1 }))
@@ -137,7 +137,7 @@ export default function NewCashAdvancePage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Destination</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.destination || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, destination: e.target.value }))}
             />
@@ -146,7 +146,7 @@ export default function NewCashAdvancePage() {
             <span className="text-slate-muted">Trip Start</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.trip_start_date || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, trip_start_date: e.target.value }))}
             />
@@ -155,7 +155,7 @@ export default function NewCashAdvancePage() {
             <span className="text-slate-muted">Trip End</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.trip_end_date || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, trip_end_date: e.target.value }))}
             />

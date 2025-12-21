@@ -90,7 +90,7 @@ export default function OverviewPage() {
             <div key={entity.entity} className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium text-white capitalize">
+                  <span className="text-sm font-medium text-foreground capitalize">
                     {entity.entity.replace(/_/g, ' ')}
                   </span>
                   <span className="text-sm text-slate-muted">

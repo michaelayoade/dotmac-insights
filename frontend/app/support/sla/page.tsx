@@ -39,7 +39,7 @@ function SlaGauge({ attainment }: { attainment: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{attainment.toFixed(0)}%</span>
+        <span className="text-2xl font-bold text-foreground">{attainment.toFixed(0)}%</span>
         <span className="text-[10px] text-slate-muted">Attainment</span>
       </div>
     </div>
@@ -75,7 +75,7 @@ export default function SupportSlaPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <label className="inline-flex items-center gap-2 text-slate-muted text-sm cursor-pointer">
@@ -92,7 +92,7 @@ export default function SupportSlaPage() {
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value={7}>7 days</option>
               <option value={14}>14 days</option>
@@ -110,7 +110,7 @@ export default function SupportSlaPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Target className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-white font-semibold">SLA Attainment</h3>
+            <h3 className="text-foreground font-semibold">SLA Attainment</h3>
           </div>
           <SlaGauge attainment={overallAttainment} />
           {latestPerf && (
@@ -131,7 +131,7 @@ export default function SupportSlaPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 md:col-span-2">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">Breach Summary ({days}d)</h3>
+            <h3 className="text-foreground font-semibold">Breach Summary ({days}d)</h3>
           </div>
           {!breaches.data ? (
             <p className="text-slate-muted text-sm">Loading breach data…</p>
@@ -166,7 +166,7 @@ export default function SupportSlaPage() {
                   {breachTargets.map((row: any, idx: number) => (
                     <div key={idx} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-white">{row.target_type || 'Unknown'}</span>
+                        <span className="text-foreground">{row.target_type || 'Unknown'}</span>
                         <span className="text-slate-muted">
                           {row.count} breaches • avg {row.avg_overrun_hours?.toFixed?.(1) ?? 0}h
                         </span>
@@ -190,7 +190,7 @@ export default function SupportSlaPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Target className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">SLA Performance Trend (6 months)</h3>
+            <h3 className="text-foreground font-semibold">SLA Performance Trend (6 months)</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {slaPerformance.data.map((perf: any) => (
@@ -221,7 +221,7 @@ export default function SupportSlaPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-400" />
-                <h3 className="text-white font-semibold">Business Calendars</h3>
+                <h3 className="text-foreground font-semibold">Business Calendars</h3>
               </div>
               <span className="text-xs text-slate-muted">{calendarsData.length} calendars</span>
             </div>
@@ -235,7 +235,7 @@ export default function SupportSlaPage() {
                 <div key={cal.id} className="border border-slate-border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-white font-semibold">{cal.name}</p>
+                      <p className="text-foreground font-semibold">{cal.name}</p>
                       <p className="text-slate-muted text-xs mt-0.5">{cal.description || cal.calendar_type}</p>
                     </div>
                     <span className={cn(
@@ -262,7 +262,7 @@ export default function SupportSlaPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-violet-400" />
-              <h3 className="text-white font-semibold">SLA Policies</h3>
+              <h3 className="text-foreground font-semibold">SLA Policies</h3>
             </div>
             <span className="text-xs text-slate-muted">{policiesData.length} policies</span>
           </div>
@@ -279,7 +279,7 @@ export default function SupportSlaPage() {
                 <div key={policy.id} className="border border-slate-border rounded-lg p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-white font-semibold">{policy.name}</p>
+                      <p className="text-foreground font-semibold">{policy.name}</p>
                       <p className="text-slate-muted text-xs mt-0.5">{policy.description || 'No description'}</p>
                     </div>
                     <span className={cn(
@@ -311,7 +311,7 @@ export default function SupportSlaPage() {
                       {targets.slice(0, 3).map((target: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
                           <span className="text-slate-muted">{target.target_type || 'Target'}</span>
-                          <span className="text-white">{target.target_hours}h</span>
+                          <span className="text-foreground">{target.target_hours}h</span>
                         </div>
                       ))}
                       {targets.length > 3 && (

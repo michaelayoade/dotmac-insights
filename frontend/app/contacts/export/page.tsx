@@ -182,18 +182,9 @@ export default function ExportPage() {
       if (category) params.set('category', category);
       if (status) params.set('status', status);
 
-      // Get auth token (match apiFetch behavior)
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('dotmac_access_token') || process.env.NEXT_PUBLIC_DEV_TOKEN || ''
-          : process.env.NEXT_PUBLIC_DEV_TOKEN || '';
-
       // Fetch from backend export endpoint
       const response = await fetch(`${API_BASE}/api/contacts/export?${params.toString()}`, {
-        credentials: token ? 'omit' : 'include',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -267,7 +258,7 @@ export default function ExportPage() {
               <Users className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
               <p className="text-xs text-slate-muted">Contacts to Export</p>
             </div>
           </div>
@@ -278,7 +269,7 @@ export default function ExportPage() {
               <CheckSquare className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{selectedFields.size}</p>
+              <p className="text-2xl font-bold text-foreground">{selectedFields.size}</p>
               <p className="text-xs text-slate-muted">Fields Selected</p>
             </div>
           </div>
@@ -289,7 +280,7 @@ export default function ExportPage() {
               <FileText className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{exportFormat.toUpperCase()}</p>
+              <p className="text-2xl font-bold text-foreground">{exportFormat.toUpperCase()}</p>
               <p className="text-xs text-slate-muted">Format</p>
             </div>
           </div>
@@ -300,7 +291,7 @@ export default function ExportPage() {
               <Filter className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {contactType || category || status ? 'Active' : 'None'}
               </p>
               <p className="text-xs text-slate-muted">Filters</p>
@@ -313,7 +304,7 @@ export default function ExportPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Filter Contacts</h3>
+          <h3 className="text-foreground font-semibold">Filter Contacts</h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -322,7 +313,7 @@ export default function ExportPage() {
             <select
               value={contactType}
               onChange={(e) => setContactType(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             >
               <option value="">All Types</option>
               <option value="lead">Lead</option>
@@ -336,7 +327,7 @@ export default function ExportPage() {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             >
               <option value="">All Categories</option>
               <option value="residential">Residential</option>
@@ -350,7 +341,7 @@ export default function ExportPage() {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             >
               <option value="">All Status</option>
               <option value="active">Active</option>
@@ -365,7 +356,7 @@ export default function ExportPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <FileText className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Export Format</h3>
+          <h3 className="text-foreground font-semibold">Export Format</h3>
         </div>
 
         <div className="flex gap-3">
@@ -375,7 +366,7 @@ export default function ExportPage() {
               'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
               exportFormat === 'csv'
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-slate-elevated text-slate-muted hover:text-white'
+                : 'bg-slate-elevated text-slate-muted hover:text-foreground'
             )}
           >
             <FileText className="w-4 h-4" />
@@ -387,7 +378,7 @@ export default function ExportPage() {
               'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
               exportFormat === 'json'
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-slate-elevated text-slate-muted hover:text-white'
+                : 'bg-slate-elevated text-slate-muted hover:text-foreground'
             )}
           >
             <FileText className="w-4 h-4" />
@@ -401,7 +392,7 @@ export default function ExportPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <CheckSquare className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-white font-semibold">Select Fields</h3>
+            <h3 className="text-foreground font-semibold">Select Fields</h3>
           </div>
           <div className="flex gap-2">
             <button
@@ -413,7 +404,7 @@ export default function ExportPage() {
             <span className="text-slate-muted">|</span>
             <button
               onClick={selectNone}
-              className="text-sm text-slate-muted hover:text-white transition-colors"
+              className="text-sm text-slate-muted hover:text-foreground transition-colors"
             >
               Clear All
             </button>
@@ -431,7 +422,7 @@ export default function ExportPage() {
                 <div className="flex items-center justify-between mb-3">
                   <button
                     onClick={() => toggleGroup(group)}
-                    className="flex items-center gap-2 text-white font-medium hover:text-emerald-400 transition-colors"
+                    className="flex items-center gap-2 text-foreground font-medium hover:text-emerald-400 transition-colors"
                   >
                     {allSelected ? (
                       <CheckSquare className="w-4 h-4 text-emerald-400" />
@@ -455,7 +446,7 @@ export default function ExportPage() {
                         'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left',
                         selectedFields.has(field.key)
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-elevated text-slate-muted hover:text-white'
+                          : 'bg-slate-elevated text-slate-muted hover:text-foreground'
                       )}
                     >
                       {selectedFields.has(field.key) ? (
@@ -482,7 +473,7 @@ export default function ExportPage() {
             'flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors',
             exporting || selectedFields.size === 0
               ? 'bg-slate-elevated text-slate-muted cursor-not-allowed'
-              : 'bg-emerald-500 text-white hover:bg-emerald-400'
+              : 'bg-emerald-500 text-foreground hover:bg-emerald-400'
           )}
         >
           {exporting ? (

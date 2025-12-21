@@ -102,7 +102,7 @@ export default function BankAccountsPage() {
               <Building2 className="w-5 h-5 text-slate-muted" />
               <p className="text-slate-muted text-sm">Total Accounts</p>
             </div>
-            <p className="text-3xl font-bold text-white">{accounts.length}</p>
+            <p className="text-3xl font-bold text-foreground">{accounts.length}</p>
             <p className="text-slate-muted text-sm mt-1">{activeCount} active</p>
           </div>
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
@@ -129,7 +129,7 @@ export default function BankAccountsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Landmark className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Bank Accounts</h1>
+            <h1 className="text-xl font-semibold text-foreground">Bank Accounts</h1>
           </div>
           {!isCreating && (
             <button
@@ -152,7 +152,7 @@ export default function BankAccountsPage() {
         {/* Create Form */}
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Bank Account</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Bank Account</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Account Name *</label>
@@ -160,7 +160,7 @@ export default function BankAccountsPage() {
                   type="text"
                   value={formData.account_name}
                   onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   autoFocus
                 />
               </div>
@@ -170,7 +170,7 @@ export default function BankAccountsPage() {
                   type="text"
                   value={formData.bank || ''}
                   onChange={(e) => setFormData({ ...formData, bank: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="e.g., GTBank"
                 />
               </div>
@@ -180,7 +180,7 @@ export default function BankAccountsPage() {
                   type="text"
                   value={formData.account_number || ''}
                   onChange={(e) => setFormData({ ...formData, account_number: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -188,7 +188,7 @@ export default function BankAccountsPage() {
                 <select
                   value={formData.account_type || ''}
                   onChange={(e) => setFormData({ ...formData, account_type: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="">Select type</option>
                   <option value="Checking">Checking</option>
@@ -203,7 +203,7 @@ export default function BankAccountsPage() {
                   type="text"
                   value={formData.currency || ''}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="NGN"
                   maxLength={3}
                 />
@@ -233,7 +233,7 @@ export default function BankAccountsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.account_name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>
@@ -274,21 +274,21 @@ export default function BankAccountsPage() {
                         type="text"
                         value={formData.account_name}
                         onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
                         placeholder="Account Name"
                       />
                       <input
                         type="text"
                         value={formData.bank || ''}
                         onChange={(e) => setFormData({ ...formData, bank: e.target.value || null })}
-                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
                         placeholder="Bank Name"
                       />
                       <input
                         type="text"
                         value={formData.account_number || ''}
                         onChange={(e) => setFormData({ ...formData, account_number: e.target.value || null })}
-                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+                        className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
                         placeholder="Account Number"
                       />
                       <div className="flex items-center gap-2">
@@ -343,14 +343,14 @@ export default function BankAccountsPage() {
                             <Landmark className="w-6 h-6 text-teal-electric" />
                           </div>
                           <div>
-                            <h3 className="text-white font-semibold">{account.account_name || account.name}</h3>
+                            <h3 className="text-foreground font-semibold">{account.account_name || account.name}</h3>
                             <p className="text-slate-muted text-sm">{account.bank || '-'}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => startEdit(account)}
-                            className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                            className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                             title="Edit"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -368,17 +368,17 @@ export default function BankAccountsPage() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-muted text-sm">Account Number</span>
-                          <span className="font-mono text-white">
+                          <span className="font-mono text-foreground">
                             {account.account_number ? `****${String(account.account_number).slice(-4)}` : '-'}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-muted text-sm">Account Type</span>
-                          <span className="text-white capitalize">{account.account_type || 'Checking'}</span>
+                          <span className="text-foreground capitalize">{account.account_type || 'Checking'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-muted text-sm">Currency</span>
-                          <span className="text-white">{account.currency || 'NGN'}</span>
+                          <span className="text-foreground">{account.currency || 'NGN'}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-muted text-sm">Status</span>

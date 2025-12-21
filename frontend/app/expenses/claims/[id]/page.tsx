@@ -15,10 +15,10 @@ export default function ExpenseClaimDetailPage() {
 
   const actions = [];
   if (data.status === "draft" || data.status === "returned" || data.status === "recalled") {
-    actions.push(<button key="submit" onClick={() => submitClaim(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-white">Submit</button>);
+    actions.push(<button key="submit" onClick={() => submitClaim(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-foreground">Submit</button>);
   }
   if (data.status === "pending_approval") {
-    actions.push(<button key="approve" onClick={() => approveClaim(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-white">Approve</button>);
+    actions.push(<button key="approve" onClick={() => approveClaim(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-foreground">Approve</button>);
     actions.push(
       <button
         key="reject"
@@ -26,7 +26,7 @@ export default function ExpenseClaimDetailPage() {
           const reason = prompt("Enter rejection reason");
           if (reason) rejectClaim(data.id, reason);
         }}
-        className="rounded-lg bg-red-600 px-3 py-2 text-white"
+        className="rounded-lg bg-red-600 px-3 py-2 text-foreground"
       >
         Reject
       </button>
@@ -34,7 +34,7 @@ export default function ExpenseClaimDetailPage() {
   }
   if (data.status === "approved") {
     actions.push(
-      <button key="post" onClick={() => postClaim(data.id)} className="rounded-lg bg-indigo-600 px-3 py-2 text-white">
+      <button key="post" onClick={() => postClaim(data.id)} className="rounded-lg bg-indigo-600 px-3 py-2 text-foreground">
         Post to GL
       </button>
     );
@@ -47,7 +47,7 @@ export default function ExpenseClaimDetailPage() {
           const reason = prompt("Enter reversal reason");
           if (reason) reverseClaim(data.id, reason);
         }}
-        className="rounded-lg bg-amber-600 px-3 py-2 text-white"
+        className="rounded-lg bg-amber-600 px-3 py-2 text-foreground"
       >
         Reverse
       </button>

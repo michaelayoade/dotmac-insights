@@ -123,7 +123,7 @@ export default function NewOpportunityPage() {
           <ArrowLeft className="w-5 h-5 text-slate-400" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-white">New Opportunity</h1>
+          <h1 className="text-2xl font-semibold text-foreground">New Opportunity</h1>
           <p className="text-sm text-slate-400 mt-1">Create a new deal in your pipeline</p>
         </div>
       </div>
@@ -137,7 +137,7 @@ export default function NewOpportunityPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <Target className="w-5 h-5 text-emerald-400" />
             Opportunity Details
           </h2>
@@ -150,7 +150,7 @@ export default function NewOpportunityPage() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Enterprise License Deal - Acme Corp"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div className="md:col-span-2">
@@ -161,7 +161,7 @@ export default function NewOpportunityPage() {
                 onChange={handleChange}
                 placeholder="Describe this opportunity..."
                 rows={3}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
@@ -169,7 +169,7 @@ export default function NewOpportunityPage() {
 
         {/* Customer/Lead Selection */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-emerald-400" />
             Customer / Lead
           </h2>
@@ -180,7 +180,7 @@ export default function NewOpportunityPage() {
                 name="customer_id"
                 value={formData.customer_id || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, customer_id: parseInt(e.target.value) || null, lead_id: null }))}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
                 <option value="">Select customer...</option>
                 {customers?.items?.map((customer: any) => (
@@ -194,7 +194,7 @@ export default function NewOpportunityPage() {
                 name="lead_id"
                 value={formData.lead_id || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, lead_id: parseInt(e.target.value) || null, customer_id: null }))}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
                 <option value="">Select lead...</option>
                 {leads?.items?.map((lead: Lead) => (
@@ -207,7 +207,7 @@ export default function NewOpportunityPage() {
 
         {/* Pipeline & Value */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-emerald-400" />
             Pipeline & Value
           </h2>
@@ -218,7 +218,7 @@ export default function NewOpportunityPage() {
                 name="stage_id"
                 value={formData.stage_id || ''}
                 onChange={handleStageChange}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
                 <option value="">Select stage...</option>
                 {stages?.filter((s: PipelineStage) => !s.is_won && !s.is_lost).map((stage: PipelineStage) => (
@@ -235,7 +235,7 @@ export default function NewOpportunityPage() {
                   name="expected_close_date"
                   value={formData.expected_close_date}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function NewOpportunityPage() {
                   value={formData.deal_value}
                   onChange={handleChange}
                   placeholder="0.00"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -264,7 +264,7 @@ export default function NewOpportunityPage() {
                   onChange={handleChange}
                   min="0"
                   max="100"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function NewOpportunityPage() {
 
         {/* Source */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-400" />
             Source
           </h2>
@@ -298,7 +298,7 @@ export default function NewOpportunityPage() {
                 value={formData.source}
                 onChange={handleChange}
                 placeholder="Website, Referral, etc."
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -309,7 +309,7 @@ export default function NewOpportunityPage() {
                 value={formData.campaign}
                 onChange={handleChange}
                 placeholder="Q4 2025 Promotion"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
@@ -319,14 +319,14 @@ export default function NewOpportunityPage() {
         <div className="flex items-center justify-end gap-4">
           <Link
             href="/sales/opportunities"
-            className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? 'Creating...' : 'Create Opportunity'}

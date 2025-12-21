@@ -210,14 +210,14 @@ export default function RoutingPage() {
                       {rule.is_active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
                     </button>
                     <div>
-                      <h3 className="text-white font-semibold">{rule.name}</h3>
+                      <h3 className="text-foreground font-semibold">{rule.name}</h3>
                       {rule.description && <p className="text-sm text-slate-muted">{rule.description}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-muted">{rule.match_count || 0} matches</span>
                     <button
-                      className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                      className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                       aria-label="Edit rule"
                     >
                       <Edit className="w-4 h-4" />
@@ -258,21 +258,21 @@ export default function RoutingPage() {
 
       {/* Help section */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="text-white font-semibold mb-3">How Routing Works</h3>
+        <h3 className="text-foreground font-semibold mb-3">How Routing Works</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="space-y-2">
             <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold">1</div>
-            <p className="text-white font-medium">Message Arrives</p>
+            <p className="text-foreground font-medium">Message Arrives</p>
             <p className="text-slate-muted">When a new conversation starts, the system evaluates all active rules in priority order.</p>
           </div>
           <div className="space-y-2">
             <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 font-bold">2</div>
-            <p className="text-white font-medium">Conditions Match</p>
+            <p className="text-foreground font-medium">Conditions Match</p>
             <p className="text-slate-muted">Rules check channel, keywords, tags, priority, and contact attributes.</p>
           </div>
           <div className="space-y-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold">3</div>
-            <p className="text-white font-medium">Action Executes</p>
+            <p className="text-foreground font-medium">Action Executes</p>
             <p className="text-slate-muted">First matching rule triggers: assign to team/agent, add tags, or create tickets.</p>
           </div>
         </div>

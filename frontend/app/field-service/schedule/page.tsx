@@ -181,22 +181,22 @@ export default function SchedulePage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigateMonth(-1)}
-            className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-semibold text-white min-w-[200px] text-center">
+          <h2 className="text-xl font-semibold text-foreground min-w-[200px] text-center">
             {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </h2>
           <button
             onClick={() => navigateMonth(1)}
-            className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Today
           </button>
@@ -207,7 +207,7 @@ export default function SchedulePage() {
           <select
             value={selectedTeam}
             onChange={(e) => setSelectedTeam(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
           >
             <option value="all">All Teams</option>
             {teams?.map((team: any) => (
@@ -223,7 +223,7 @@ export default function SchedulePage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
                 viewMode === 'calendar'
                   ? 'bg-teal-electric text-slate-950'
-                  : 'text-slate-muted hover:text-white'
+                  : 'text-slate-muted hover:text-foreground'
               )}
             >
               <Grid3X3 className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function SchedulePage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
                 viewMode === 'dispatch'
                   ? 'bg-teal-electric text-slate-950'
-                  : 'text-slate-muted hover:text-white'
+                  : 'text-slate-muted hover:text-foreground'
               )}
             >
               <Truck className="w-4 h-4" />
@@ -247,7 +247,7 @@ export default function SchedulePage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
                 viewMode === 'list'
                   ? 'bg-teal-electric text-slate-950'
-                  : 'text-slate-muted hover:text-white'
+                  : 'text-slate-muted hover:text-foreground'
               )}
             >
               <List className="w-4 h-4" />
@@ -307,7 +307,7 @@ export default function SchedulePage() {
                       >
                         <div className="flex items-center gap-1">
                           <div className={cn('w-1.5 h-1.5 rounded-full', statusColors[order.status])} />
-                          <span className="text-white truncate">{order.title}</span>
+                          <span className="text-foreground truncate">{order.title}</span>
                         </div>
                         {order.scheduled_start_time && (
                           <span className="text-slate-muted">{order.scheduled_start_time}</span>
@@ -360,7 +360,7 @@ export default function SchedulePage() {
             {/* Unassigned Orders */}
             <div className="bg-slate-card border border-slate-border rounded-xl">
               <div className="p-4 border-b border-slate-border">
-                <h3 className="font-semibold text-white flex items-center gap-2">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-400" />
                   Unassigned
                   <span className="text-sm text-slate-muted">
@@ -383,7 +383,7 @@ export default function SchedulePage() {
                       )}
                     >
                       <Link href={`/field-service/orders/${order.id}`} className="block">
-                        <p className="text-white text-sm font-medium truncate">{order.title}</p>
+                        <p className="text-foreground text-sm font-medium truncate">{order.title}</p>
                         <div className="flex items-center gap-2 text-xs text-slate-muted mt-1">
                           <MapPin className="w-3 h-3" />
                           {order.city || 'Unknown'}
@@ -425,7 +425,7 @@ export default function SchedulePage() {
                       )} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-white text-sm">{tech.name}</h3>
+                      <h3 className="font-semibold text-foreground text-sm">{tech.name}</h3>
                       <p className="text-xs text-slate-muted">{tech.orders?.length || 0} orders</p>
                     </div>
                   </div>
@@ -451,7 +451,7 @@ export default function SchedulePage() {
                       >
                         <div className="flex items-center gap-2">
                           <div className={cn('w-2 h-2 rounded-full', statusColors[order.status])} />
-                          <p className="text-white text-sm font-medium truncate">{order.title}</p>
+                          <p className="text-foreground text-sm font-medium truncate">{order.title}</p>
                         </div>
                         <div className="flex items-center justify-between text-xs text-slate-muted mt-1">
                           <span className="flex items-center gap-1">
@@ -501,7 +501,7 @@ export default function SchedulePage() {
               ) : ordersData && ordersData.length > 0 ? (
                 ordersData.map((order: any) => (
                   <tr key={order.id} className="hover:bg-slate-elevated/30 transition-colors">
-                    <td className="px-4 py-3 text-sm text-white">
+                    <td className="px-4 py-3 text-sm text-foreground">
                       {order.scheduled_date
                         ? new Date(order.scheduled_date).toLocaleDateString('en-NG', {
                             month: 'short',
@@ -515,7 +515,7 @@ export default function SchedulePage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/field-service/orders/${order.id}`}
-                        className="text-white text-sm hover:text-teal-electric transition-colors"
+                        className="text-foreground text-sm hover:text-teal-electric transition-colors"
                       >
                         {order.title}
                       </Link>
@@ -525,7 +525,7 @@ export default function SchedulePage() {
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {order.technician_name ? (
-                        <span className="text-white">{order.technician_name}</span>
+                        <span className="text-foreground">{order.technician_name}</span>
                       ) : (
                         <span className="text-amber-400">Unassigned</span>
                       )}

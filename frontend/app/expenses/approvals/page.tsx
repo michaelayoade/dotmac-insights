@@ -217,7 +217,7 @@ export default function ApprovalsPage() {
           <Clock className="w-5 h-5 text-amber-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Pending Approvals</h1>
+          <h1 className="text-2xl font-bold text-foreground">Pending Approvals</h1>
           <p className="text-slate-muted text-sm">Review and approve expense claims and cash advances</p>
         </div>
       </div>
@@ -229,14 +229,14 @@ export default function ApprovalsPage() {
             <Clock className="w-4 h-4" />
             <span>Total Pending</span>
           </div>
-          <p className="text-2xl font-bold text-white">{items.length}</p>
+          <p className="text-2xl font-bold text-foreground">{items.length}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center gap-2 text-slate-muted text-sm mb-1">
             <DollarSign className="w-4 h-4" />
             <span>Total Amount</span>
           </div>
-          <p className="text-2xl font-bold text-white">{formatCurrency(totalAmount)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(totalAmount)}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center gap-2 text-slate-muted text-sm mb-1">
@@ -277,7 +277,7 @@ export default function ApprovalsPage() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               >
                 <option value="all">All types</option>
                 <option value="claims">Claims only</option>
@@ -298,7 +298,7 @@ export default function ApprovalsPage() {
             <button
               onClick={handleBulkApprove}
               disabled={selectedItems.size === 0 || processing}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -348,7 +348,7 @@ export default function ApprovalsPage() {
 
                     <button
                       onClick={() => setExpandedItem(isExpanded ? null : key)}
-                      className="p-1 text-slate-muted hover:text-white transition-colors"
+                      className="p-1 text-slate-muted hover:text-foreground transition-colors"
                     >
                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
@@ -364,7 +364,7 @@ export default function ApprovalsPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-medium truncate">{item.title}</p>
+                        <p className="text-foreground font-medium truncate">{item.title}</p>
                         {item.number && (
                           <span className="text-xs text-slate-muted font-mono">#{item.number}</span>
                         )}
@@ -385,14 +385,14 @@ export default function ApprovalsPage() {
                     </div>
 
                     <div className="text-right">
-                      <p className="text-white font-semibold">{formatCurrency(item.amount, item.currency)}</p>
+                      <p className="text-foreground font-semibold">{formatCurrency(item.amount, item.currency)}</p>
                       <p className="text-xs text-slate-muted">{item.currency}</p>
                     </div>
 
                     <div className="flex items-center gap-1">
                       <Link
                         href={item.type === 'claim' ? `/expenses/claims/${item.id}` : `/expenses/advances/${item.id}`}
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="View details"
                       >
                         <Eye className="w-4 h-4" />
@@ -424,7 +424,7 @@ export default function ApprovalsPage() {
                           </div>
                         ) : (
                           <div>
-                            <p className="text-white mb-1">Purpose: {item.title}</p>
+                            <p className="text-foreground mb-1">Purpose: {item.title}</p>
                             {item.description && (
                               <p className="text-slate-muted">Destination: {item.description}</p>
                             )}
@@ -451,11 +451,11 @@ export default function ApprovalsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-slate-card border border-slate-border rounded-xl w-full max-w-md mx-4 shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-border">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-rose-400" />
                 Reject {selectedItems.size} Item{selectedItems.size > 1 ? 's' : ''}
               </h3>
-              <button onClick={() => setShowRejectModal(false)} className="text-slate-muted hover:text-white">
+              <button onClick={() => setShowRejectModal(false)} className="text-slate-muted hover:text-foreground">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
@@ -469,21 +469,21 @@ export default function ApprovalsPage() {
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={3}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 resize-none"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/50 resize-none"
                   placeholder="Enter reason for rejection..."
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   onClick={() => setShowRejectModal(false)}
-                  className="px-4 py-2 text-sm text-slate-muted hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBulkReject}
                   disabled={!rejectReason.trim() || processing}
-                  className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                 >
                   {processing && <Loader2 className="w-4 h-4 animate-spin" />}
                   Reject

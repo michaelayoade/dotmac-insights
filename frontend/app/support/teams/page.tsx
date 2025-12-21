@@ -114,7 +114,7 @@ export default function SupportTeamsPage() {
             <Shield className="w-5 h-5 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Teams</h1>
+            <h1 className="text-2xl font-bold text-foreground">Teams</h1>
             <p className="text-slate-muted text-sm">Manage queues, routing rules, and membership</p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function SupportTeamsPage() {
         <form onSubmit={handleCreateTeam} className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Plus className="w-4 h-4 text-teal-electric" />
-            <span className="text-white font-semibold">Create New Team</span>
+            <span className="text-foreground font-semibold">Create New Team</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
@@ -158,7 +158,7 @@ export default function SupportTeamsPage() {
                 value={teamForm.team_name}
                 onChange={(e) => setTeamForm({ ...teamForm, team_name: e.target.value })}
                 placeholder="e.g., Support Tier 1"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1.5">
@@ -167,7 +167,7 @@ export default function SupportTeamsPage() {
                 value={teamForm.description}
                 onChange={(e) => setTeamForm({ ...teamForm, description: e.target.value })}
                 placeholder="Team description"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1.5">
@@ -175,7 +175,7 @@ export default function SupportTeamsPage() {
               <select
                 value={teamForm.assignment_rule}
                 onChange={(e) => setTeamForm({ ...teamForm, assignment_rule: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="round_robin">Round robin</option>
                 <option value="load_balanced">Load balanced</option>
@@ -186,7 +186,7 @@ export default function SupportTeamsPage() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white text-sm"
+              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground text-sm"
             >
               Cancel
             </button>
@@ -205,7 +205,7 @@ export default function SupportTeamsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filter</span>
+          <span className="text-foreground text-sm font-medium">Filter</span>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
@@ -214,7 +214,7 @@ export default function SupportTeamsPage() {
             placeholder="Search teams by name or description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
       </div>
@@ -224,7 +224,7 @@ export default function SupportTeamsPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Teams</h3>
+            <h3 className="text-foreground font-semibold">Teams</h3>
           </div>
           <span className="text-xs text-slate-muted">{filteredTeams.length} teams</span>
         </div>
@@ -246,7 +246,7 @@ export default function SupportTeamsPage() {
                   {/* Team Header */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-white font-semibold text-lg">{team.team_name}</p>
+                      <p className="text-foreground font-semibold text-lg">{team.team_name}</p>
                       <p className="text-slate-muted text-sm">{team.description || 'No description'}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export default function SupportTeamsPage() {
                       <button
                         onClick={() => deleteTeam(team.id)}
                         disabled={!canWrite}
-                        className="px-2 py-1 rounded border border-red-500/40 text-red-300 hover:text-white text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="px-2 py-1 rounded border border-red-500/40 text-red-300 hover:text-foreground text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         Delete
                       </button>
@@ -279,7 +279,7 @@ export default function SupportTeamsPage() {
                               <User className="w-3 h-3 text-emerald-400" />
                             </div>
                             <div>
-                              <p className="text-white text-sm font-medium">
+                              <p className="text-foreground text-sm font-medium">
                                 {member.user_name || member.agent_name || member.user || `Agent #${member.agent_id}`}
                               </p>
                               {member.role && (
@@ -289,7 +289,7 @@ export default function SupportTeamsPage() {
                             <button
                               onClick={() => deleteMember(team.id, member.id)}
                               disabled={!canWrite}
-                              className="text-red-300 hover:text-white ml-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                              className="text-red-300 hover:text-foreground ml-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -303,7 +303,7 @@ export default function SupportTeamsPage() {
                   <div className="pt-3 border-t border-slate-border/50">
                     <div className="flex items-center gap-2 mb-2">
                       <UserPlus className="w-4 h-4 text-emerald-400" />
-                      <span className="text-sm text-white">Add member</span>
+                      <span className="text-sm text-foreground">Add member</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <select
@@ -314,7 +314,7 @@ export default function SupportTeamsPage() {
                             [team.id]: { agent_id: e.target.value, role: memberForms[team.id]?.role || '' },
                           }))
                         }
-                        className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       >
                         <option value="">-- Select an agent --</option>
                         {availableAgents.map((agent: any) => (
@@ -332,7 +332,7 @@ export default function SupportTeamsPage() {
                           }))
                         }
                         placeholder="Role (optional)"
-                        className="w-40 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                        className="w-40 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
                       <button
                         onClick={async () => {

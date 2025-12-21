@@ -97,9 +97,14 @@ class Opportunity(Base):
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
     sales_person_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sales_persons.id"), nullable=True, index=True)
 
-    # Source/Campaign
+    # Source/Campaign (TEXT fields for ERPNext sync)
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # e.g., "Website", "Referral"
     campaign: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Campaign FK (for local queries)
+    campaign_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("campaigns.id"), nullable=True, index=True
+    )
 
     # Lost reason (if status = lost)
     lost_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -126,6 +131,11 @@ class Opportunity(Base):
     sales_person: Mapped[Optional["SalesPerson"]] = relationship()
     quotation: Mapped[Optional["Quotation"]] = relationship()
     sales_order: Mapped[Optional["SalesOrder"]] = relationship()
+    campaign_rel: Mapped[Optional["Campaign"]] = relationship(
+        "Campaign",
+        foreign_keys=[campaign_id],
+        backref="opportunities"
+    )
     activities: Mapped[List["Activity"]] = relationship(back_populates="opportunity")
 
     def __repr__(self) -> str:

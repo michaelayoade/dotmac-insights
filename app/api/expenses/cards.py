@@ -16,12 +16,13 @@ from app.models.expense_management import (
     CorporateCard,
     CorporateCardStatus,
 )
-from app.auth import get_current_principal, Principal
+from app.auth import get_current_principal, Principal, Require
+from app.api.expenses.access import apply_employee_scope, assert_employee_access
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[CorporateCardRead])
+@router.get("/", response_model=List[CorporateCardRead], dependencies=[Depends(Require("expenses:read"))])
 async def list_cards(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -29,9 +30,17 @@ async def list_cards(
     status: Optional[str] = Query(default=None, description="Filter by status"),
     include_inactive: bool = Query(default=False, description="Include suspended/cancelled cards"),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ):
     """List corporate cards with optional filters."""
     query = db.query(CorporateCard).order_by(CorporateCard.created_at.desc())
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
+    )
 
     if employee_id:
         query = query.filter(CorporateCard.employee_id == employee_id)
@@ -48,16 +57,28 @@ async def list_cards(
     return cards
 
 
-@router.get("/{card_id}", response_model=CorporateCardRead)
-async def get_card(card_id: int, db: Session = Depends(get_db)):
+@router.get("/{card_id}", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:read"))])
+async def get_card(
+    card_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
     """Get a single corporate card by ID."""
-    card = db.query(CorporateCard).filter(CorporateCard.id == card_id).first()
+    query = db.query(CorporateCard).filter(CorporateCard.id == card_id)
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
+    )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
     return card
 
 
-@router.post("/", response_model=CorporateCardRead, status_code=201)
+@router.post("/", response_model=CorporateCardRead, status_code=201, dependencies=[Depends(Require("expenses:write"))])
 async def create_card(
     payload: CorporateCardCreate,
     db: Session = Depends(get_db),
@@ -67,6 +88,7 @@ async def create_card(
     # Check if employee exists
     from app.models.employee import Employee
 
+    assert_employee_access(principal, db, payload.employee_id)
     employee = db.query(Employee).filter(Employee.id == payload.employee_id).first()
     if not employee:
         raise HTTPException(status_code=400, detail="Employee not found")
@@ -98,7 +120,7 @@ async def create_card(
     return card
 
 
-@router.put("/{card_id}", response_model=CorporateCardRead)
+@router.put("/{card_id}", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:write"))])
 async def update_card(
     card_id: int,
     payload: CorporateCardUpdate,
@@ -106,12 +128,15 @@ async def update_card(
     principal: Principal = Depends(get_current_principal),
 ):
     """Update a corporate card."""
-    card = (
-        db.query(CorporateCard)
-        .filter(CorporateCard.id == card_id)
-        .with_for_update()
-        .first()
+    query = db.query(CorporateCard).filter(CorporateCard.id == card_id).with_for_update()
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
     )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
 
@@ -124,19 +149,22 @@ async def update_card(
     return card
 
 
-@router.post("/{card_id}/suspend", response_model=CorporateCardRead)
+@router.post("/{card_id}/suspend", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:write"))])
 async def suspend_card(
     card_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Suspend a corporate card."""
-    card = (
-        db.query(CorporateCard)
-        .filter(CorporateCard.id == card_id)
-        .with_for_update()
-        .first()
+    query = db.query(CorporateCard).filter(CorporateCard.id == card_id).with_for_update()
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
     )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
 
@@ -149,19 +177,22 @@ async def suspend_card(
     return card
 
 
-@router.post("/{card_id}/activate", response_model=CorporateCardRead)
+@router.post("/{card_id}/activate", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:write"))])
 async def activate_card(
     card_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Activate a suspended corporate card."""
-    card = (
-        db.query(CorporateCard)
-        .filter(CorporateCard.id == card_id)
-        .with_for_update()
-        .first()
+    query = db.query(CorporateCard).filter(CorporateCard.id == card_id).with_for_update()
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
     )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
 
@@ -174,19 +205,22 @@ async def activate_card(
     return card
 
 
-@router.post("/{card_id}/cancel", response_model=CorporateCardRead)
+@router.post("/{card_id}/cancel", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:write"))])
 async def cancel_card(
     card_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Cancel a corporate card (permanent)."""
-    card = (
-        db.query(CorporateCard)
-        .filter(CorporateCard.id == card_id)
-        .with_for_update()
-        .first()
+    query = db.query(CorporateCard).filter(CorporateCard.id == card_id).with_for_update()
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
     )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
 
@@ -199,19 +233,26 @@ async def cancel_card(
     return card
 
 
-@router.delete("/{card_id}", status_code=204)
+@router.delete("/{card_id}", status_code=204, dependencies=[Depends(Require("expenses:write"))])
 async def delete_card(
     card_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Delete a corporate card (only if no transactions exist)."""
-    card = (
+    query = (
         db.query(CorporateCard)
         .options(selectinload(CorporateCard.transactions))
         .filter(CorporateCard.id == card_id)
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
+    )
+    card = query.first()
     if not card:
         raise HTTPException(status_code=404, detail="Corporate card not found")
 

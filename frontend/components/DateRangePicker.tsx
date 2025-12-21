@@ -193,8 +193,8 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
           'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
           'bg-slate-elevated border border-slate-border',
           'text-sm font-medium',
-          isOpen ? 'border-teal-electric/50 text-white' : 'text-slate-muted hover:text-white hover:border-slate-elevated',
-          value.startDate && value.endDate && 'text-white'
+          isOpen ? 'border-teal-electric/50 text-foreground' : 'text-slate-muted hover:text-foreground hover:border-slate-elevated',
+          value.startDate && value.endDate && 'text-foreground'
         )}
       >
         <Calendar className="w-4 h-4" />
@@ -215,7 +215,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                     'px-3 py-2 text-sm rounded-md transition-all text-left',
                     activePreset === key
                       ? 'bg-teal-electric/20 text-teal-electric'
-                      : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                      : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
                   )}
                 >
                   {preset.label}
@@ -236,7 +236,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                   className={cn(
                     'w-full px-3 py-2 rounded-lg text-sm',
                     'bg-slate-elevated border border-slate-border',
-                    'text-white placeholder-slate-muted',
+                    'text-foreground placeholder-slate-muted',
                     'focus:outline-none focus:border-teal-electric/50',
                     '[color-scheme:dark]'
                   )}
@@ -252,7 +252,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                   className={cn(
                     'w-full px-3 py-2 rounded-lg text-sm',
                     'bg-slate-elevated border border-slate-border',
-                    'text-white placeholder-slate-muted',
+                    'text-foreground placeholder-slate-muted',
                     'focus:outline-none focus:border-teal-electric/50',
                     '[color-scheme:dark]'
                   )}

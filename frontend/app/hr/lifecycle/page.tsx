@@ -35,21 +35,21 @@ function StatusBadge({ status, type = 'onboarding' }: { status: string; type?: '
       open: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
       in_progress: { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-300', icon: <ArrowRight className="w-3 h-3" /> },
       completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <XCircle className="w-3 h-3" /> },
+      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <XCircle className="w-3 h-3" /> },
     },
     separation: {
       open: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
       in_progress: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <ArrowRight className="w-3 h-3" /> },
-      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <CheckCircle2 className="w-3 h-3" /> },
+      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <CheckCircle2 className="w-3 h-3" /> },
     },
     promotion: {
-      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
       submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
       approved: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
       rejected: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
     },
     transfer: {
-      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
       submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
       approved: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
       rejected: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
@@ -83,7 +83,7 @@ function StatCard({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
       <div>
         <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
       </div>
       <div className="p-2 rounded-lg bg-slate-elevated">
         <Icon className={cn('w-5 h-5', tone)} />
@@ -166,14 +166,14 @@ export default function HrLifecyclePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Onboarding & Separation Updates */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <p className="text-white font-semibold">Update Onboarding Status</p>
+          <p className="text-foreground font-semibold">Update Onboarding Status</p>
           <div className="space-y-3">
             <div>
               <FormLabel required>Select Employee</FormLabel>
               <select
                 value={statusForm.onboardingId}
                 onChange={(e) => setStatusForm({ ...statusForm, onboardingId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select onboarding record...</option>
                 {(onboardingList.items || []).map((item: any) => (
@@ -188,7 +188,7 @@ export default function HrLifecyclePage() {
               <select
                 value={statusForm.onboardingStatus}
                 onChange={(e) => setStatusForm({ ...statusForm, onboardingStatus: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="open">Open</option>
                 <option value="in_progress">In Progress</option>
@@ -206,13 +206,13 @@ export default function HrLifecyclePage() {
           </div>
 
           <div className="pt-4 border-t border-slate-border space-y-3">
-            <p className="text-white font-semibold">Update Separation Status</p>
+            <p className="text-foreground font-semibold">Update Separation Status</p>
             <div>
               <FormLabel required>Select Employee</FormLabel>
               <select
                 value={statusForm.separationId}
                 onChange={(e) => setStatusForm({ ...statusForm, separationId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select separation record...</option>
                 {(separationList.items || []).map((item: any) => (
@@ -227,7 +227,7 @@ export default function HrLifecyclePage() {
               <select
                 value={statusForm.separationStatus}
                 onChange={(e) => setStatusForm({ ...statusForm, separationStatus: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="open">Open</option>
                 <option value="in_progress">In Progress</option>
@@ -246,14 +246,14 @@ export default function HrLifecyclePage() {
 
         {/* Promotion & Transfer Updates */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-          <p className="text-white font-semibold">Update Promotion Status</p>
+          <p className="text-foreground font-semibold">Update Promotion Status</p>
           <div className="space-y-3">
             <div>
               <FormLabel required>Select Employee</FormLabel>
               <select
                 value={statusForm.promotionId}
                 onChange={(e) => setStatusForm({ ...statusForm, promotionId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select promotion record...</option>
                 {(promotionList.items || []).map((item: any) => (
@@ -268,7 +268,7 @@ export default function HrLifecyclePage() {
               <select
                 value={statusForm.promotionStatus}
                 onChange={(e) => setStatusForm({ ...statusForm, promotionStatus: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="draft">Draft</option>
                 <option value="submitted">Submitted</option>
@@ -286,13 +286,13 @@ export default function HrLifecyclePage() {
           </div>
 
           <div className="pt-4 border-t border-slate-border space-y-3">
-            <p className="text-white font-semibold">Update Transfer Status</p>
+            <p className="text-foreground font-semibold">Update Transfer Status</p>
             <div>
               <FormLabel required>Select Employee</FormLabel>
               <select
                 value={statusForm.transferId}
                 onChange={(e) => setStatusForm({ ...statusForm, transferId: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="">Select transfer record...</option>
                 {(transferList.items || []).map((item: any) => (
@@ -307,7 +307,7 @@ export default function HrLifecyclePage() {
               <select
                 value={statusForm.transferStatus}
                 onChange={(e) => setStatusForm({ ...statusForm, transferStatus: e.target.value })}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               >
                 <option value="draft">Draft</option>
                 <option value="submitted">Submitted</option>
@@ -337,11 +337,11 @@ export default function HrLifecyclePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <UserCheck className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Employee Onboardings</h3>
+          <h3 className="text-foreground font-semibold">Employee Onboardings</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             { key: 'status', header: 'Status', render: (item: any) => <StatusBadge status={item.status} type="onboarding" /> },
             {
@@ -349,7 +349,7 @@ export default function HrLifecyclePage() {
               header: 'Activities',
               align: 'right' as const,
               render: (item: any) => (
-                <span className="inline-flex items-center gap-1 text-white">
+                <span className="inline-flex items-center gap-1 text-foreground">
                   <CheckCircle2 className="w-3 h-3 text-slate-muted" />
                   {item.activities?.length ?? 0}
                 </span>
@@ -379,11 +379,11 @@ export default function HrLifecyclePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Flag className="w-4 h-4 text-rose-400" />
-          <h3 className="text-white font-semibold">Employee Separations</h3>
+          <h3 className="text-foreground font-semibold">Employee Separations</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             { key: 'reason', header: 'Reason', render: (item: any) => <span className="text-slate-muted text-sm">{item.reason || '—'}</span> },
             { key: 'notice_date', header: 'Notice Date', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.notice_date)}</span> },
@@ -418,11 +418,11 @@ export default function HrLifecyclePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Rocket className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">Promotions</h3>
+            <h3 className="text-foreground font-semibold">Promotions</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+              { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
               { key: 'promotion_date', header: 'Date', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.promotion_date)}</span> },
               {
                 key: 'details',
@@ -451,11 +451,11 @@ export default function HrLifecyclePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Transfers</h3>
+            <h3 className="text-foreground font-semibold">Transfers</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-white font-medium">{item.employee_name || item.employee}</span> },
+              { key: 'employee', header: 'Employee Name', render: (item: any) => <span className="text-foreground font-medium">{item.employee_name || item.employee}</span> },
               { key: 'transfer_date', header: 'Date', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.transfer_date)}</span> },
               {
                 key: 'details',

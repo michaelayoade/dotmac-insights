@@ -57,12 +57,12 @@ export default function InventoryWarehouseCreatePage() {
       <div className="flex items-center gap-3">
         <Link
           href="/inventory"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
-        <h1 className="text-xl font-semibold text-white">New Warehouse</h1>
+        <h1 className="text-xl font-semibold text-foreground">New Warehouse</h1>
       </div>
 
       {error && (
@@ -93,7 +93,7 @@ export default function InventoryWarehouseCreatePage() {
                 value={(form as any)[field.name]}
                 onChange={handleChange}
                 required={field.required}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           ))}
@@ -103,7 +103,7 @@ export default function InventoryWarehouseCreatePage() {
               name="address"
               value={form.address}
               onChange={handleChange}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               rows={2}
             />
           </div>
@@ -114,7 +114,7 @@ export default function InventoryWarehouseCreatePage() {
                 name="latitude"
                 value={form.latitude}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -123,7 +123,7 @@ export default function InventoryWarehouseCreatePage() {
                 name="longitude"
                 value={form.longitude}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -132,7 +132,7 @@ export default function InventoryWarehouseCreatePage() {
                 name="status"
                 value={form.status}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>

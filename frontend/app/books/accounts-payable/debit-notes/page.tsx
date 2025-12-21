@@ -36,7 +36,7 @@ export default function BooksDebitNotesPage() {
       header: 'Debit Note',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="font-mono text-white">{item.debit_note_no || item.name || `#${item.id}`}</span>
+          <span className="font-mono text-foreground">{item.debit_note_no || item.name || `#${item.id}`}</span>
           <span className="text-slate-muted text-sm">{formatDate(item.posting_date)}</span>
         </div>
       ),
@@ -57,7 +57,7 @@ export default function BooksDebitNotesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-white font-mono">{formatCurrency(item.grand_total ?? item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatCurrency(item.grand_total ?? item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">Outstanding: {formatCurrency(item.outstanding_amount ?? 0, item.currency)}</div>
         </div>
       ),
@@ -83,7 +83,7 @@ export default function BooksDebitNotesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AP Debit Notes</h1>
+          <h1 className="text-2xl font-bold text-foreground">AP Debit Notes</h1>
           <p className="text-slate-muted text-sm">Track vendor credits</p>
         </div>
         <Link
@@ -98,7 +98,7 @@ export default function BooksDebitNotesPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input

@@ -25,19 +25,19 @@ export default function InventoryValuationPage() {
       key: 'qty',
       header: 'Qty',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{item.qty}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{item.qty}</span>,
     },
     {
       key: 'valuation_rate',
       header: 'Rate',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.valuation_rate, item.currency || 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.valuation_rate, item.currency || 'NGN')}</span>,
     },
     {
       key: 'valuation',
       header: 'Value',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.valuation, item.currency || 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.valuation, item.currency || 'NGN')}</span>,
     },
   ];
 
@@ -46,7 +46,7 @@ export default function InventoryValuationPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Boxes className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-2xl font-bold text-white">Inventory Valuation</h1>
+          <h1 className="text-2xl font-bold text-foreground">Inventory Valuation</h1>
         </div>
         <div className="flex items-center gap-2">
           <Search className="w-4 h-4 text-slate-muted" />
@@ -55,7 +55,7 @@ export default function InventoryValuationPage() {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
             placeholder="Search item code or name"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
       </div>

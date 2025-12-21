@@ -50,7 +50,7 @@ function MovementRow({ label, value, currency, isSubItem, isTotal, colorClass }:
         isSubItem && 'pl-4'
       )}
     >
-      <span className={cn('text-white', isSubItem && 'text-slate-muted')}>{label}</span>
+      <span className={cn('text-foreground', isSubItem && 'text-slate-muted')}>{label}</span>
       <span
         className={cn(
           'font-mono w-36 text-right',
@@ -102,7 +102,7 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
         <div className="flex items-center gap-3">
           <Coins className="w-5 h-5 text-teal-electric" />
           <div className="text-left">
-            <h4 className="font-semibold text-white">{component.component}</h4>
+            <h4 className="font-semibold text-foreground">{component.component}</h4>
             <p className="text-sm text-slate-muted">
               {formatCurrency(component.opening_balance, currency)} → {formatCurrency(component.closing_balance, currency)}
             </p>
@@ -170,7 +170,7 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
               {Object.entries(component.accounts).map(([account, balance]) => (
                 <div key={account} className="flex justify-between py-1 text-sm">
                   <span className="text-slate-muted">{account}</span>
-                  <span className="font-mono text-white">{formatCurrency(balance, currency)}</span>
+                  <span className="font-mono text-foreground">{formatCurrency(balance, currency)}</span>
                 </div>
               ))}
             </div>
@@ -219,7 +219,7 @@ export default function EquityStatementPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Statement of Changes in Equity</h2>
+          <h2 className="text-lg font-semibold text-foreground">Statement of Changes in Equity</h2>
           {data?.period && (
             <span className="text-slate-muted text-sm">
               {data.period.start_date} to {data.period.end_date}
@@ -252,7 +252,7 @@ export default function EquityStatementPage() {
                 setStartDate('');
                 setEndDate('');
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
             </button>
@@ -260,14 +260,14 @@ export default function EquityStatementPage() {
           <div className="flex gap-2">
             <button
               onClick={() => exportStatement('csv')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
             </button>
             <button
               onClick={() => exportStatement('pdf')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
@@ -284,7 +284,7 @@ export default function EquityStatementPage() {
               <PiggyBank className="w-5 h-5 text-slate-muted" />
               <p className="text-slate-muted text-sm">Opening Equity</p>
             </div>
-            <p className="text-2xl font-bold text-white">{formatCurrency(summary.total_opening_equity, currency)}</p>
+            <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.total_opening_equity, currency)}</p>
           </div>
 
           <div className={cn(
@@ -353,11 +353,11 @@ export default function EquityStatementPage() {
       {/* Equity Flow Visualization */}
       {summary && (
         <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4">Equity Flow (IAS 1)</h3>
+          <h3 className="text-foreground font-semibold mb-4">Equity Flow (IAS 1)</h3>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <div className="text-center">
               <p className="text-slate-muted text-xs mb-1">Opening Equity</p>
-              <p className="font-mono font-bold text-white">{formatCurrency(summary.total_opening_equity, currency)}</p>
+              <p className="font-mono font-bold text-foreground">{formatCurrency(summary.total_opening_equity, currency)}</p>
             </div>
             <ArrowRight className="w-5 h-5 text-slate-muted" />
             <div className="text-center">
@@ -389,7 +389,7 @@ export default function EquityStatementPage() {
 
       {/* Equity Components */}
       <div className="space-y-4">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <Coins className="w-5 h-5 text-teal-electric" />
           Equity Components
         </h3>
@@ -413,7 +413,7 @@ export default function EquityStatementPage() {
           <div className="p-4 border-b border-slate-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BarChart2 className="w-5 h-5 text-teal-electric" />
-              <h3 className="font-semibold text-white">Equity Reconciliation</h3>
+              <h3 className="font-semibold text-foreground">Equity Reconciliation</h3>
             </div>
             {reconciliation.is_reconciled ? (
               <span className="flex items-center gap-1 text-green-400 text-sm">
@@ -429,8 +429,8 @@ export default function EquityStatementPage() {
           </div>
           <div className="p-4 space-y-1">
             <div className="flex justify-between py-2 border-b border-slate-border/50">
-              <span className="text-white">Opening Equity</span>
-              <span className="font-mono text-white">{formatCurrency(reconciliation.opening_equity, currency)}</span>
+              <span className="text-foreground">Opening Equity</span>
+              <span className="font-mono text-foreground">{formatCurrency(reconciliation.opening_equity, currency)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-border/50">
               <span className="text-slate-muted pl-4">Add: Profit for the period</span>
@@ -471,7 +471,7 @@ export default function EquityStatementPage() {
               </div>
             )}
             <div className="flex justify-between py-3 border-t-2 border-slate-border font-bold">
-              <span className="text-white">Closing Equity</span>
+              <span className="text-foreground">Closing Equity</span>
               <span className="font-mono text-lg text-teal-electric">{formatCurrency(reconciliation.closing_equity, currency)}</span>
             </div>
           </div>
@@ -481,7 +481,7 @@ export default function EquityStatementPage() {
       {/* IAS 1 Note */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
         <p className="text-slate-muted text-sm">
-          <strong className="text-white">IAS 1 Disclosure:</strong> This statement presents changes in equity components
+          <strong className="text-foreground">IAS 1 Disclosure:</strong> This statement presents changes in equity components
           including share capital, share premium, retained earnings, and reserves. It reconciles opening and closing
           balances for each equity component, showing comprehensive income and transactions with owners in their capacity
           as owners (dividends, share issues, treasury shares).

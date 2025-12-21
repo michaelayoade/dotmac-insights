@@ -19,7 +19,7 @@ function SectionCard({
       <div className="flex items-center gap-2">
         <Layers className="w-4 h-4 text-teal-electric" />
         <div>
-          <h3 className="text-white font-semibold">{title}</h3>
+          <h3 className="text-foreground font-semibold">{title}</h3>
           {description && <p className="text-xs text-slate-muted">{description}</p>}
         </div>
       </div>
@@ -111,16 +111,16 @@ export default function AccountingTaxesPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Books</p>
-          <h1 className="text-xl font-semibold text-white">Taxes & VAT</h1>
+          <h1 className="text-xl font-semibold text-foreground">Taxes & VAT</h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-slate-card border border-slate-border rounded-lg px-4 py-3">
             <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Tax Payable</p>
-            <p className="text-lg font-semibold text-white">{payableTotal.toLocaleString()}</p>
+            <p className="text-lg font-semibold text-foreground">{payableTotal.toLocaleString()}</p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-lg px-4 py-3">
             <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Tax Receivable</p>
-            <p className="text-lg font-semibold text-white">{receivableTotal.toLocaleString()}</p>
+            <p className="text-lg font-semibold text-foreground">{receivableTotal.toLocaleString()}</p>
           </div>
         </div>
       </div>

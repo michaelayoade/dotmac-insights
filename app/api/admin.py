@@ -532,6 +532,14 @@ async def create_service_token(
     if principal.type != "user":
         raise HTTPException(status_code=400, detail="Service tokens can only be created by users")
 
+    if not principal.is_superuser:
+        invalid_scopes = [scope for scope in request.scopes if not principal.has_scope(scope)]
+        if invalid_scopes:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot grant scopes you do not hold: {', '.join(invalid_scopes)}",
+            )
+
     # Generate token
     token_value, prefix, token_hash = generate_service_token()
 
@@ -597,3 +605,84 @@ async def revoke_service_token(
     logger.info("service_token_revoked", token_id=token_id, revoked_by=principal.id)
 
     return {"status": "revoked", "token_id": token_id}
+
+
+# ============================================================================
+# Teams (Combined endpoint for all team types)
+# ============================================================================
+
+
+class TeamResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    domain: Optional[str] = None  # support|field|mixed
+    is_active: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class TeamsListResponse(BaseModel):
+    teams: List[TeamResponse]
+
+
+@router.get(
+    "/teams",
+    response_model=TeamsListResponse,
+    dependencies=[Depends(Require("admin:read"))],
+)
+async def list_all_teams(
+    domain: Optional[str] = Query(None, description="Filter by domain: support, field"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    db: Session = Depends(get_db),
+):
+    """List all teams across the system (support teams + field teams).
+
+    This endpoint combines teams from:
+    - Agent Teams (support/sales/projects)
+    - Field Service Teams (field technicians)
+
+    Useful for picker dropdowns that need access to all team types.
+    """
+    from app.models.agent import Team
+    from app.models.field_service import FieldTeam
+
+    teams = []
+
+    # Fetch agent teams (support/sales/projects)
+    if domain is None or domain == "support":
+        agent_teams_query = db.query(Team)
+        if is_active is not None:
+            agent_teams_query = agent_teams_query.filter(Team.is_active == is_active)
+        agent_teams = agent_teams_query.all()
+
+        for t in agent_teams:
+            teams.append(TeamResponse(
+                id=t.id,
+                name=t.name,
+                description=t.description,
+                domain=t.domain or "support",
+                is_active=t.is_active,
+            ))
+
+    # Fetch field teams
+    if domain is None or domain == "field":
+        field_teams_query = db.query(FieldTeam)
+        if is_active is not None:
+            field_teams_query = field_teams_query.filter(FieldTeam.is_active == is_active)
+        field_teams = field_teams_query.all()
+
+        for field_team in field_teams:
+            teams.append(TeamResponse(
+                id=field_team.id + 100000,  # Offset to avoid ID collisions
+                name=field_team.name,
+                description=field_team.description,
+                domain="field",
+                is_active=field_team.is_active,
+            ))
+
+    # Sort by name
+    teams.sort(key=lambda x: x.name.lower())
+
+    return TeamsListResponse(teams=teams)

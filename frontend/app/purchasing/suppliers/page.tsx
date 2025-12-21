@@ -62,7 +62,7 @@ export default function PurchasingSuppliersPage() {
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-teal-electric" />
           <div>
-            <p className="text-white font-medium">{item.name || item.supplier_name}</p>
+            <p className="text-foreground font-medium">{item.name || item.supplier_name}</p>
             {item.company_name && item.company_name !== item.name && (
               <p className="text-slate-muted text-xs">{item.company_name}</p>
             )}
@@ -78,13 +78,13 @@ export default function PurchasingSuppliersPage() {
           {item.email || item.email_id ? (
             <div className="flex items-center gap-1 text-sm">
               <Mail className="w-3 h-3 text-slate-muted" />
-              <span className="text-slate-300 truncate max-w-[180px]">{item.email || item.email_id}</span>
+              <span className="text-foreground-secondary truncate max-w-[180px]">{item.email || item.email_id}</span>
             </div>
           ) : null}
           {item.mobile || item.phone ? (
             <div className="flex items-center gap-1 text-sm">
               <Phone className="w-3 h-3 text-slate-muted" />
-              <span className="text-slate-300">{item.mobile || item.phone}</span>
+              <span className="text-foreground-secondary">{item.mobile || item.phone}</span>
             </div>
           ) : null}
           {!item.email && !item.phone && <span className="text-slate-muted">-</span>}
@@ -126,7 +126,7 @@ export default function PurchasingSuppliersPage() {
             <Users className="w-4 h-4 text-teal-electric" />
           <p className="text-slate-muted text-sm">Total Suppliers</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(total)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -161,7 +161,7 @@ export default function PurchasingSuppliersPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex-1 min-w-[200px] max-w-md">
@@ -173,7 +173,7 @@ export default function PurchasingSuppliersPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           {groups.length > 0 && (
@@ -183,7 +183,7 @@ export default function PurchasingSuppliersPage() {
                 setGroupId(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value="">All Groups</option>
               {groups.map((group: any) => (
@@ -200,7 +200,7 @@ export default function PurchasingSuppliersPage() {
                 setGroupId('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

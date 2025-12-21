@@ -51,7 +51,7 @@ export default function SalesCustomerDetailPage() {
         <p className="text-red-400">Failed to load customer</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -78,14 +78,14 @@ export default function SalesCustomerDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/customers"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to customers
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Sales Customer</p>
-            <h1 className="text-xl font-semibold text-white">{data.name || `Customer #${data.id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{data.name || `Customer #${data.id}`}</h1>
           </div>
         </div>
         <Link
@@ -101,7 +101,7 @@ export default function SalesCustomerDetailPage() {
         {summary.map((row) => (
           <div key={row.label}>
             <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className={cn('text-white font-semibold break-all', row.label === 'Status' && 'capitalize')}>
+            <p className={cn('text-foreground font-semibold break-all', row.label === 'Status' && 'capitalize')}>
               {row.value}
             </p>
           </div>
@@ -112,24 +112,24 @@ export default function SalesCustomerDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Billing & Metrics</h3>
+            <h3 className="text-foreground font-semibold">Billing & Metrics</h3>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">MRR</p>
-              <p className="text-white font-semibold">{formatCurrency(data.mrr ?? 0)}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(data.mrr ?? 0)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Invoiced</p>
-              <p className="text-white font-semibold">{formatCurrency(data.invoiced_total ?? 0)}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(data.invoiced_total ?? 0)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Paid</p>
-              <p className="text-white font-semibold">{formatCurrency(data.paid_total ?? 0)}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(data.paid_total ?? 0)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Outstanding</p>
-              <p className="text-white font-semibold">{formatCurrency(data.outstanding_balance ?? 0)}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(data.outstanding_balance ?? 0)}</p>
             </div>
           </div>
           <p className="text-slate-muted text-sm">
@@ -141,7 +141,7 @@ export default function SalesCustomerDetailPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold">Subscriptions</h3>
+              <h3 className="text-foreground font-semibold">Subscriptions</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -157,8 +157,8 @@ export default function SalesCustomerDetailPage() {
                 <tbody>
                   {data.subscriptions.map((sub: any) => (
                     <tr key={sub.id} className="border-t border-slate-border/60">
-                      <td className="px-2 py-2 text-white">{sub.plan_name}</td>
-                      <td className="px-2 py-2 text-right text-white font-mono">{formatCurrency(sub.price)}</td>
+                      <td className="px-2 py-2 text-foreground">{sub.plan_name}</td>
+                      <td className="px-2 py-2 text-right text-foreground font-mono">{formatCurrency(sub.price)}</td>
                       <td className="px-2 py-2 text-slate-200 capitalize">{sub.status}</td>
                       <td className="px-2 py-2 text-slate-200">{formatDate(sub.start_date)}</td>
                       <td className="px-2 py-2 text-slate-200">{formatDate(sub.end_date)}</td>
@@ -175,7 +175,7 @@ export default function SalesCustomerDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Recent Invoices</h3>
+            <h3 className="text-foreground font-semibold">Recent Invoices</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -191,12 +191,12 @@ export default function SalesCustomerDetailPage() {
               <tbody>
                 {data.recent_invoices.map((inv: any) => (
                   <tr key={inv.id} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-white font-mono">
+                    <td className="px-2 py-2 text-foreground font-mono">
                       <Link href={`/sales/invoices/${inv.id}`} className="hover:text-teal-electric">
                         {inv.invoice_number || `INV-${inv.id}`}
                       </Link>
                     </td>
-                    <td className="px-2 py-2 text-right text-white font-mono">
+                    <td className="px-2 py-2 text-right text-foreground font-mono">
                       {formatCurrency(inv.total_amount ?? inv.total ?? 0)}
                     </td>
                     <td className="px-2 py-2 text-right text-slate-200">

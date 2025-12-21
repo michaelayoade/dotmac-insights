@@ -210,39 +210,60 @@ export function onAuthError(handler: AuthEventHandler): () => void {
 /**
  * Clear the stored access token and trigger re-authentication.
  */
-export function clearAuthToken(): void {
-  if (typeof window !== 'undefined') {
+export async function clearAuthToken(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('dotmac_access_token');
+  }
+  try {
+    await fetch(buildApiUrl('/auth/session'), {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  } catch {
+    // Ignore network errors when clearing client auth state.
   }
 }
 
 /**
- * Set the access token for API calls.
+ * Set the access token for API calls via httpOnly cookie.
  */
-export function setAuthToken(token: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('dotmac_access_token', token);
+export async function setAuthToken(token: string): Promise<void> {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const response = await fetch(buildApiUrl('/auth/session'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    const errorMessage = errorBody.detail || `HTTP ${response.status}`;
+    throw new ApiError(response.status, errorMessage, '/auth/session');
   }
 }
 
 /**
  * Check if user has a valid auth token stored.
+ * Note: httpOnly cookies cannot be read from the browser.
  */
 export function hasAuthToken(): boolean {
   if (typeof window !== 'undefined') {
-    return !!localStorage.getItem('dotmac_access_token');
+    return false;
   }
-  return false;
+  return !!process.env.INTERNAL_SERVICE_TOKEN;
 }
 
 function getAccessToken(): string {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('dotmac_access_token');
-    if (token) return token;
-    // Fallback to env token for development (NEXT_PUBLIC_ exposes to browser)
-    return process.env.NEXT_PUBLIC_DEV_TOKEN || '';
+  if (typeof window === 'undefined') {
+    return process.env.INTERNAL_SERVICE_TOKEN || '';
   }
-  return process.env.INTERNAL_SERVICE_TOKEN || '';
+  return '';
 }
 
 // ============================================================================
@@ -250,21 +271,126 @@ function getAccessToken(): string {
 // ============================================================================
 
 /**
+ * Error category for UI handling
+ */
+export type ApiErrorCategory =
+  | 'auth'           // 401 - needs login
+  | 'forbidden'      // 403 - no permission
+  | 'not_found'      // 404 - resource doesn't exist
+  | 'validation'     // 422 - invalid data
+  | 'server'         // 5xx - server error
+  | 'network'        // 0 - connection failed
+  | 'timeout'        // request timed out
+  | 'unknown';       // other errors
+
+/**
+ * Get user-friendly error message based on status and context
+ */
+function getUserFriendlyMessage(status: number, backendMessage: string, url: string): string {
+  // Extract resource type from URL for better messages
+  const urlParts = url.replace(/^.*\/api\//, '').split('/').filter(Boolean);
+  const resource = urlParts[0]?.replace(/-/g, ' ') || 'resource';
+
+  switch (status) {
+    case 0:
+      if (backendMessage.includes('timeout')) {
+        return 'Request timed out. Please check your connection and try again.';
+      }
+      return 'Unable to connect to the server. Please check your internet connection.';
+    case 400:
+      return backendMessage || 'Invalid request. Please check your input and try again.';
+    case 401:
+      return 'Authentication required. Please sign in.';
+    case 403:
+      return 'Access denied. You do not have permission to access this resource.';
+    case 404:
+      // Check if it looks like a specific resource ID was requested
+      if (urlParts.length > 1 && /^\d+$/.test(urlParts[urlParts.length - 1])) {
+        return `The requested ${resource} could not be found. It may have been deleted or moved.`;
+      }
+      // Check if backend provided a meaningful message
+      if (backendMessage && backendMessage !== 'Not Found' && backendMessage !== 'Not found') {
+        return backendMessage;
+      }
+      return `This ${resource} endpoint is not available. The feature may not be enabled.`;
+    case 409:
+      return backendMessage || 'This action conflicts with existing data. Please refresh and try again.';
+    case 422:
+      return backendMessage || 'The provided data is invalid. Please check your input.';
+    case 429:
+      return 'Too many requests. Please wait a moment and try again.';
+    case 500:
+      return 'An unexpected server error occurred. Please try again later.';
+    case 502:
+    case 503:
+    case 504:
+      return 'The server is temporarily unavailable. Please try again in a few moments.';
+    default:
+      if (status >= 500) {
+        return 'A server error occurred. Please try again later.';
+      }
+      return backendMessage || `Request failed (${status}). Please try again.`;
+  }
+}
+
+/**
+ * Determine error category from status code
+ */
+function getErrorCategory(status: number, message: string): ApiErrorCategory {
+  if (status === 0) {
+    return message.includes('timeout') ? 'timeout' : 'network';
+  }
+  if (status === 401) return 'auth';
+  if (status === 403) return 'forbidden';
+  if (status === 404) return 'not_found';
+  if (status === 422) return 'validation';
+  if (status >= 500) return 'server';
+  return 'unknown';
+}
+
+/**
  * API Error class for handling HTTP errors
  */
 export class ApiError extends Error {
+  public readonly category: ApiErrorCategory;
+  public readonly userMessage: string;
+
   constructor(
     public status: number,
-    message: string
+    message: string,
+    url: string = ''
   ) {
-    super(message);
+    const userMessage = getUserFriendlyMessage(status, message, url);
+    super(userMessage);
     this.name = 'ApiError';
+    this.category = getErrorCategory(status, message);
+    this.userMessage = userMessage;
   }
 
   /** Check if this error should trigger a retry */
   get isRetryable(): boolean {
     // Retry on server errors (5xx) or network errors (status 0)
     return this.status === 0 || this.status >= 500;
+  }
+
+  /** Check if user should be prompted to sign in */
+  get requiresAuth(): boolean {
+    return this.category === 'auth';
+  }
+
+  /** Check if this is a permission error */
+  get isForbidden(): boolean {
+    return this.category === 'forbidden';
+  }
+
+  /** Check if resource wasn't found */
+  get isNotFound(): boolean {
+    return this.category === 'not_found';
+  }
+
+  /** Check if this is a validation error */
+  get isValidation(): boolean {
+    return this.category === 'validation';
   }
 }
 
@@ -423,7 +549,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       const response = await fetchWithTimeout(url, {
         ...fetchOptions,
         timeout,
-        credentials: accessToken ? 'omit' : 'include',
+        credentials: typeof window !== 'undefined' ? 'include' : 'omit',
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -439,12 +565,12 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
 
         // Handle authentication errors globally
         if (response.status === 401) {
-          clearAuthToken();
+          void clearAuthToken();
           if (authEventHandler) {
             authEventHandler('unauthorized', errorMessage);
           }
           logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
-          throw new ApiError(response.status, 'Authentication required. Please sign in.');
+          throw new ApiError(response.status, errorMessage, url);
         }
 
         if (response.status === 403) {
@@ -452,13 +578,10 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
             authEventHandler('forbidden', errorMessage);
           }
           logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
-          throw new ApiError(
-            response.status,
-            'Access denied. You do not have permission to access this resource.'
-          );
+          throw new ApiError(response.status, errorMessage, url);
         }
 
-        const apiError = new ApiError(response.status, errorMessage);
+        const apiError = new ApiError(response.status, errorMessage, url);
 
         // Check if we should retry
         if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
@@ -517,7 +640,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
       }
 
       // Network error
-      const apiError = new ApiError(0, `Network error: ${errorMessage}`);
+      const apiError = new ApiError(0, errorMessage, url);
 
       if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
         const backoff = calculateBackoff(attempt, retryConfig);
@@ -540,7 +663,7 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
   }
 
   // Should never reach here, but TypeScript needs this
-  throw new ApiError(0, 'Max retry attempts exceeded');
+  throw new ApiError(0, 'Max retry attempts exceeded', url);
 }
 
 /**
@@ -591,7 +714,7 @@ export async function fetchApiFormData<T>(
       const response = await fetchWithTimeout(url, {
         method,
         timeout,
-        credentials: accessToken ? 'omit' : 'include',
+        credentials: typeof window !== 'undefined' ? 'include' : 'omit',
         headers: {
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
@@ -605,12 +728,12 @@ export async function fetchApiFormData<T>(
         const errorMessage = errorBody.detail || `HTTP ${response.status}`;
 
         if (response.status === 401) {
-          clearAuthToken();
+          void clearAuthToken();
           if (authEventHandler) {
             authEventHandler('unauthorized', errorMessage);
           }
           logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
-          throw new ApiError(response.status, 'Authentication required. Please sign in.');
+          throw new ApiError(response.status, errorMessage, url);
         }
 
         if (response.status === 403) {
@@ -618,13 +741,10 @@ export async function fetchApiFormData<T>(
             authEventHandler('forbidden', errorMessage);
           }
           logApi({ type: 'error', method, url, status: response.status, error: errorMessage, durationMs });
-          throw new ApiError(
-            response.status,
-            'Access denied. You do not have permission to access this resource.'
-          );
+          throw new ApiError(response.status, errorMessage, url);
         }
 
-        const apiError = new ApiError(response.status, errorMessage);
+        const apiError = new ApiError(response.status, errorMessage, url);
 
         if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
           const backoff = calculateBackoff(attempt, retryConfig);
@@ -670,7 +790,7 @@ export async function fetchApiFormData<T>(
         throw error;
       }
 
-      const apiError = new ApiError(0, `Network error: ${errorMessage}`);
+      const apiError = new ApiError(0, errorMessage, url);
 
       if (retryConfig && attempt < maxAttempts && shouldRetry(apiError, retryConfig)) {
         const backoff = calculateBackoff(attempt, retryConfig);
@@ -692,5 +812,5 @@ export async function fetchApiFormData<T>(
     }
   }
 
-  throw new ApiError(0, 'Max retry attempts exceeded');
+  throw new ApiError(0, 'Max retry attempts exceeded', url);
 }

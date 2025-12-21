@@ -136,7 +136,7 @@ function ChartCard({ title, subtitle, icon: Icon, children, className }: {
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="w-5 h-5 text-teal-electric" />}
         <div>
-          <h3 className="text-white font-semibold">{title}</h3>
+          <h3 className="text-foreground font-semibold">{title}</h3>
           {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
         </div>
       </div>
@@ -296,7 +296,7 @@ export default function ProjectsAnalyticsPage() {
           <BarChart3 className="w-5 h-5 text-teal-electric" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Project Analytics</h1>
+          <h1 className="text-2xl font-bold text-foreground">Project Analytics</h1>
           <p className="text-slate-muted text-sm">Performance metrics, trends, and insights</p>
         </div>
       </div>
@@ -574,7 +574,7 @@ export default function ProjectsAnalyticsPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-slate-muted text-sm">#{index + 1}</span>
                   <div>
-                    <p className="text-white font-medium">{project.project_name}</p>
+                    <p className="text-foreground font-medium">{project.project_name}</p>
                     <p className="text-slate-muted text-xs">Margin: {formatPercent(project.margin_percent)}</p>
                   </div>
                 </div>

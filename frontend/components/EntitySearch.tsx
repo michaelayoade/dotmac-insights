@@ -180,14 +180,14 @@ export function EntitySearch({
           <Search className="w-4 h-4 text-slate-muted flex-shrink-0" />
           {value && !isOpen ? (
             <div className="flex-1 flex items-center justify-between min-w-0">
-              <span className="text-sm text-white truncate">{displayValue}</span>
+              <span className="text-sm text-foreground truncate">{displayValue}</span>
               {allowClear && !disabled && (
                 <button
                   type="button"
                   onClick={handleClear}
                   className="p-0.5 hover:bg-slate-card rounded"
                 >
-                  <X className="w-3.5 h-3.5 text-slate-muted hover:text-white" />
+                  <X className="w-3.5 h-3.5 text-slate-muted hover:text-foreground" />
                 </button>
               )}
             </div>
@@ -201,7 +201,7 @@ export function EntitySearch({
               onFocus={() => setIsOpen(true)}
               placeholder={value ? displayValue : placeholder}
               disabled={disabled}
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-muted focus:outline-none min-w-0"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-slate-muted focus:outline-none min-w-0"
             />
           )}
           {loading ? (
@@ -237,8 +237,8 @@ export function EntitySearch({
                     className={cn(
                       'px-3 py-2 cursor-pointer text-sm',
                       index === highlightedIndex
-                        ? 'bg-slate-elevated text-white'
-                        : 'text-slate-muted hover:bg-slate-elevated hover:text-white',
+                        ? 'bg-slate-elevated text-foreground'
+                        : 'text-slate-muted hover:bg-slate-elevated hover:text-foreground',
                       value?.id === option.id && 'bg-teal-electric/10 text-teal-electric'
                     )}
                   >
@@ -575,6 +575,152 @@ export function WarehouseSearch({
       onSelect={(opt) => {
         if (opt) {
           onSelect({ id: Number(opt.id), warehouse_name: opt.label });
+        } else {
+          onSelect(null);
+        }
+      }}
+      {...props}
+    />
+  );
+}
+
+export function TeamSearch({
+  teams,
+  value,
+  onSelect,
+  loading,
+  ...props
+}: Omit<EntitySearchProps, 'options' | 'onSelect' | 'value'> & {
+  teams: Array<{ id: number; name: string; description?: string; domain?: string; is_active?: boolean }>;
+  value?: { id: number; name: string } | null;
+  onSelect: (team: { id: number; name: string } | null) => void;
+}) {
+  const options: EntityOption[] = useMemo(
+    () =>
+      teams
+        .filter((t) => t.is_active !== false)
+        .map((t) => ({
+          id: t.id,
+          label: t.name,
+          sublabel: t.domain || t.description || `ID: ${t.id}`,
+        })),
+    [teams]
+  );
+
+  const selectedOption = value
+    ? { id: value.id, label: value.name, sublabel: `ID: ${value.id}` }
+    : null;
+
+  return (
+    <EntitySearch
+      placeholder="Search teams..."
+      options={options}
+      value={selectedOption}
+      loading={loading}
+      onSelect={(opt) => {
+        if (opt) {
+          onSelect({ id: Number(opt.id), name: opt.label });
+        } else {
+          onSelect(null);
+        }
+      }}
+      {...props}
+    />
+  );
+}
+
+export function VehicleSearch({
+  vehicles,
+  value,
+  onSelect,
+  loading,
+  ...props
+}: Omit<EntitySearchProps, 'options' | 'onSelect' | 'value'> & {
+  vehicles: Array<{ id: number; license_plate: string; make?: string; model?: string; driver_name?: string; is_active?: boolean }>;
+  value?: { id: number; license_plate: string } | null;
+  onSelect: (vehicle: { id: number; license_plate: string } | null) => void;
+}) {
+  const options: EntityOption[] = useMemo(
+    () =>
+      vehicles
+        .filter((v) => v.is_active !== false)
+        .map((v) => ({
+          id: v.id,
+          label: v.license_plate,
+          sublabel: [v.make, v.model, v.driver_name ? `Driver: ${v.driver_name}` : null]
+            .filter(Boolean)
+            .join(' • ') || `ID: ${v.id}`,
+        })),
+    [vehicles]
+  );
+
+  const selectedOption = value
+    ? { id: value.id, label: value.license_plate, sublabel: `ID: ${value.id}` }
+    : null;
+
+  return (
+    <EntitySearch
+      placeholder="Search vehicles..."
+      options={options}
+      value={selectedOption}
+      loading={loading}
+      onSelect={(opt) => {
+        if (opt) {
+          onSelect({ id: Number(opt.id), license_plate: opt.label });
+        } else {
+          onSelect(null);
+        }
+      }}
+      {...props}
+    />
+  );
+}
+
+export function AssetSearch({
+  assets,
+  value,
+  onSelect,
+  loading,
+  ...props
+}: Omit<EntitySearchProps, 'options' | 'onSelect' | 'value'> & {
+  assets: Array<{ id: number; asset_name: string; asset_code?: string; asset_category?: string; location?: string; status?: string }>;
+  value?: { id: number; asset_name: string; asset_code?: string } | null;
+  onSelect: (asset: { id: number; asset_name: string; asset_code?: string } | null) => void;
+}) {
+  const options: EntityOption[] = useMemo(
+    () =>
+      assets.map((a) => ({
+        id: a.id,
+        label: a.asset_code ? `${a.asset_code} - ${a.asset_name}` : a.asset_name,
+        sublabel: [a.asset_category, a.location, a.status]
+          .filter(Boolean)
+          .join(' • ') || `ID: ${a.id}`,
+      })),
+    [assets]
+  );
+
+  const selectedOption = value
+    ? {
+        id: value.id,
+        label: value.asset_code ? `${value.asset_code} - ${value.asset_name}` : value.asset_name,
+        sublabel: `ID: ${value.id}`,
+      }
+    : null;
+
+  return (
+    <EntitySearch
+      placeholder="Search assets..."
+      options={options}
+      value={selectedOption}
+      loading={loading}
+      onSelect={(opt) => {
+        if (opt) {
+          const asset = assets.find((a) => a.id === Number(opt.id));
+          onSelect({
+            id: Number(opt.id),
+            asset_name: asset?.asset_name || opt.label,
+            asset_code: asset?.asset_code,
+          });
         } else {
           onSelect(null);
         }

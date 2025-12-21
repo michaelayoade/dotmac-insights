@@ -96,7 +96,7 @@ export default function PurchasingAPAgingPage() {
           {isLoading ? (
             <Loader2 className="w-5 h-5 animate-spin text-slate-muted" />
           ) : (
-            <p className="text-2xl font-bold text-white">{formatCurrency(totalOutstanding)}</p>
+            <p className="text-2xl font-bold text-foreground">{formatCurrency(totalOutstanding)}</p>
           )}
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
@@ -161,7 +161,7 @@ export default function PurchasingAPAgingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2">
@@ -170,14 +170,14 @@ export default function PurchasingAPAgingPage() {
               type="date"
               value={asOfDate}
               onChange={(e) => setAsOfDate(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="As of date"
             />
           </div>
           <select
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="NGN">NGN - Naira</option>
             <option value="USD">USD - Dollar</option>
@@ -186,7 +186,7 @@ export default function PurchasingAPAgingPage() {
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
             >
               <option value="">All Suppliers</option>
               {suppliers.map((supplier: any) => (
@@ -203,7 +203,7 @@ export default function PurchasingAPAgingPage() {
                 setCurrency('NGN');
                 setSupplierId('');
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>
@@ -215,7 +215,7 @@ export default function PurchasingAPAgingPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-6">
           <TrendingDown className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">AP Aging Breakdown</h2>
+          <h2 className="text-lg font-semibold text-foreground">AP Aging Breakdown</h2>
         </div>
 
         {isLoading ? (
@@ -256,7 +256,7 @@ export default function PurchasingAPAgingPage() {
                       <div className={cn('w-3 h-3 rounded-full', color.bg)} />
                       <p className={cn('text-sm font-medium', color.text)}>{bucket.bucket}</p>
                     </div>
-                    <p className="text-xl font-bold text-white">{formatCurrency(bucket.total)}</p>
+                    <p className="text-xl font-bold text-foreground">{formatCurrency(bucket.total)}</p>
                     <div className="flex justify-between mt-1">
                       <p className="text-xs text-slate-muted">{formatNumber(bucket.count)} bills</p>
                       <p className="text-xs text-slate-muted">{formatPercent(bucket.percentage)}</p>
@@ -269,7 +269,7 @@ export default function PurchasingAPAgingPage() {
             {/* Total row */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-border mt-4">
               <span className="text-slate-muted font-medium">Total Outstanding</span>
-              <span className="text-2xl font-bold text-white">{formatCurrency(totalOutstanding)}</span>
+              <span className="text-2xl font-bold text-foreground">{formatCurrency(totalOutstanding)}</span>
             </div>
           </div>
         ) : (

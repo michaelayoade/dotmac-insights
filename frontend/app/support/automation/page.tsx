@@ -70,12 +70,12 @@ export default function SupportAutomationPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filter by trigger</span>
+          <span className="text-foreground text-sm font-medium">Filter by trigger</span>
         </div>
         <select
           value={trigger}
           onChange={(e) => setTrigger(e.target.value || '')}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
         >
           <option value="">All triggers</option>
           {triggers.map((t) => (
@@ -89,7 +89,7 @@ export default function SupportAutomationPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <PlayCircle className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Automation Rules</h3>
+            <h3 className="text-foreground font-semibold">Automation Rules</h3>
           </div>
           <span className="text-xs text-slate-muted">{Array.isArray(rules.data) ? rules.data.length : 0} rules</span>
         </div>
@@ -108,7 +108,7 @@ export default function SupportAutomationPage() {
               <div key={rule.id} className="border border-slate-border rounded-lg p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-white font-semibold">{rule.name}</p>
+                    <p className="text-foreground font-semibold">{rule.name}</p>
                     <p className="text-slate-muted text-xs mt-0.5">{rule.description || 'No description'}</p>
                   </div>
                   <span className={cn(
@@ -134,7 +134,7 @@ export default function SupportAutomationPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-white font-semibold">Recent Execution Logs</h3>
+            <h3 className="text-foreground font-semibold">Recent Execution Logs</h3>
           </div>
           <span className="text-xs text-slate-muted">{Array.isArray(logs.data?.data) ? logs.data?.data.length : 0} logs</span>
         </div>
@@ -154,7 +154,7 @@ export default function SupportAutomationPage() {
                       <XCircle className="w-4 h-4 text-rose-400" />
                     )}
                     <div>
-                      <p className="text-white font-medium">{log.rule_name || `Rule #${log.rule_id}`}</p>
+                      <p className="text-foreground font-medium">{log.rule_name || `Rule #${log.rule_id}`}</p>
                       <p className="text-slate-muted text-xs">Trigger: {log.trigger}</p>
                     </div>
                   </div>

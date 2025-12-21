@@ -126,14 +126,14 @@ export default function NewBillPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/accounts-payable/bills"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to bills
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">New Bill</p>
-            <h1 className="text-xl font-semibold text-white">Create Bill</h1>
+            <h1 className="text-xl font-semibold text-foreground">Create Bill</h1>
           </div>
         </div>
       </div>
@@ -167,7 +167,7 @@ export default function NewBillPage() {
           <button
             type="button"
             onClick={() => setShowMoreOptions(!showMoreOptions)}
-            className="flex items-center gap-2 text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             {showMoreOptions ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             More options
@@ -208,13 +208,13 @@ export default function NewBillPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white font-semibold">Line Items</p>
+              <p className="text-sm text-foreground font-semibold">Line Items</p>
               <p className="text-xs text-slate-muted">Item, quantity, unit cost, and per-line tax</p>
             </div>
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-white hover:bg-slate-elevated"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-foreground hover:bg-slate-elevated"
             >
               <Plus className="w-4 h-4" />
               Add line
@@ -230,7 +230,7 @@ export default function NewBillPage() {
                     value={item.description}
                     onChange={(e) => handleLineChange(idx, 'description', e.target.value)}
                     placeholder="Item or service"
-                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                   />
                 </div>
                 <div>
@@ -240,7 +240,7 @@ export default function NewBillPage() {
                     min={0}
                     value={item.quantity}
                     onChange={(e) => handleLineChange(idx, 'quantity', e.target.value)}
-                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                   />
                 </div>
                 <div>
@@ -250,7 +250,7 @@ export default function NewBillPage() {
                     min={0}
                     value={item.unit_price}
                     onChange={(e) => handleLineChange(idx, 'unit_price', e.target.value)}
-                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                   />
                 </div>
                 <div>
@@ -260,7 +260,7 @@ export default function NewBillPage() {
                     min={0}
                     value={item.tax_rate}
                     onChange={(e) => handleLineChange(idx, 'tax_rate', e.target.value)}
-                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                    className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                   />
                 </div>
                 <div className="flex justify-end">
@@ -280,7 +280,7 @@ export default function NewBillPage() {
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-2 max-w-sm ml-auto">
-            <p className="text-sm text-white font-semibold">Totals</p>
+            <p className="text-sm text-foreground font-semibold">Totals</p>
             <TotalRow label="Subtotal" value={totals.subtotal} currency={form.currency} />
             <TotalRow label="Tax" value={totals.tax} currency={form.currency} />
             <hr className="border-slate-border/60" />
@@ -298,7 +298,7 @@ export default function NewBillPage() {
         <div className="flex justify-end gap-3">
           <Link
             href="/books/accounts-payable/bills"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Cancel
           </Link>
@@ -320,7 +320,7 @@ function TotalRow({ label, value, currency, bold }: { label: string; value: numb
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-muted">{label}</span>
-      <span className={cn('font-mono', bold ? 'text-white font-semibold' : 'text-white')}>
+      <span className={cn('font-mono', bold ? 'text-foreground font-semibold' : 'text-foreground')}>
         {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency || ''}
       </span>
     </div>

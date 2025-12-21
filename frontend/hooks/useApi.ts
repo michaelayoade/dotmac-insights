@@ -558,12 +558,48 @@ export function useProjectTasks(
   );
 }
 
+export function useAllTasks(
+  params?: {
+    project_id?: number;
+    status?: string;
+    priority?: string;
+    assigned_to?: string;
+    task_type?: string;
+    search?: string;
+    overdue_only?: boolean;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['all-tasks', params] as const,
+    ([, p]) => api.getProjectTasks(p),
+    config
+  );
+}
+
 export function useTaskDetail(id: number | null, config?: SWRConfiguration) {
   return useSWR(
     id ? ['task-detail', id] as const : null,
     ([, taskId]) => api.getTaskDetail(taskId),
     config
   );
+}
+
+export function useTaskMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    updateTask: async (id: number, payload: import('@/lib/api').ProjectTaskUpdatePayload) => {
+      const res = await api.updateTask(id, payload);
+      await mutate(['task-detail', id]);
+      await mutate('all-tasks');
+      await mutate('projects');
+      return res;
+    },
+  };
 }
 
 export function useProjectMutations() {
@@ -5270,6 +5306,126 @@ export function useConsolidatedAccountingDashboard(currency?: string, config?: S
   return useSWR(
     ['consolidated-accounting-dashboard', currency],
     () => dashboardsApi.getAccountingDashboard(currency),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated HR Dashboard (11 API calls → 1)
+ * Returns: Employee summary, leave, attendance, payroll, recruitment, training, onboarding
+ */
+export function useConsolidatedHRDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-hr-dashboard',
+    () => dashboardsApi.getHRDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Inventory Dashboard (3 API calls → 1)
+ * Returns: Stock summary, warehouse breakdown, recent entries
+ */
+export function useConsolidatedInventoryDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-inventory-dashboard',
+    () => dashboardsApi.getInventoryDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Assets Dashboard (5 API calls → 1)
+ * Returns: Asset totals, status, depreciation, maintenance, warranty, insurance
+ */
+export function useConsolidatedAssetsDashboard(daysAhead?: number, config?: SWRConfiguration) {
+  return useSWR(
+    ['consolidated-assets-dashboard', daysAhead],
+    () => dashboardsApi.getAssetsDashboard(daysAhead),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Expenses Dashboard (2 API calls → 1)
+ * Returns: Expense claims, cash advances, trends
+ */
+export function useConsolidatedExpensesDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-expenses-dashboard',
+    () => dashboardsApi.getExpensesDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Projects Dashboard (2 API calls → 1)
+ * Returns: Project counts, tasks, financials, recent projects
+ */
+export function useConsolidatedProjectsDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-projects-dashboard',
+    () => dashboardsApi.getProjectsDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Inbox Dashboard (3 API calls → 1)
+ * Returns: Conversation counts, channels, priorities, recent
+ */
+export function useConsolidatedInboxDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-inbox-dashboard',
+    () => dashboardsApi.getInboxDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Contacts Dashboard
+ * Returns: Contact counts, sources, activities
+ */
+export function useConsolidatedContactsDashboard(config?: SWRConfiguration) {
+  return useSWR(
+    'consolidated-contacts-dashboard',
+    () => dashboardsApi.getContactsDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Customers Dashboard
+ * Returns: Customer counts, billing, subscriptions
+ */
+export function useConsolidatedCustomersDashboard(currency?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['consolidated-customers-dashboard', currency],
+    () => dashboardsApi.getCustomersDashboard(currency),
     {
       refreshInterval: 60000,
       ...config,

@@ -161,7 +161,7 @@ export default function SettingsGroupPage() {
             <ArrowLeft className="w-5 h-5 text-slate-muted" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-foreground">
               {GROUP_LABELS[group] || group}
             </h1>
             <p className="text-slate-muted text-sm">
@@ -175,7 +175,7 @@ export default function SettingsGroupPage() {
             <button
               onClick={handleTest}
               disabled={testing}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-white text-sm font-medium hover:bg-slate-elevated disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm font-medium hover:bg-slate-elevated disabled:opacity-50 transition-colors"
             >
               {testing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -256,7 +256,7 @@ export default function SettingsGroupPage() {
                       onChange={(e) => handleChange(fieldName, e.target.checked)}
                       className="w-5 h-5 rounded border-slate-border bg-slate-elevated text-teal-electric focus:ring-teal-electric"
                     />
-                    <span className="text-sm text-slate-300">
+                    <span className="text-sm text-foreground-secondary">
                       {value ? 'Enabled' : 'Disabled'}
                     </span>
                   </label>
@@ -264,7 +264,7 @@ export default function SettingsGroupPage() {
                   <select
                     value={(value as string) || ''}
                     onChange={(e) => handleChange(fieldName, e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:border-teal-electric focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none"
                   >
                     <option value="">Select...</option>
                     {fieldSchema.enum.map((opt: string) => (
@@ -282,7 +282,7 @@ export default function SettingsGroupPage() {
                     }
                     min={fieldSchema.minimum}
                     max={fieldSchema.maximum}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:border-teal-electric focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none"
                   />
                 ) : (
                   <div className="relative">
@@ -291,13 +291,13 @@ export default function SettingsGroupPage() {
                       value={(value as string) || ''}
                       onChange={(e) => handleChange(fieldName, e.target.value)}
                       placeholder={isSecret ? '***REDACTED***' : ''}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:border-teal-electric focus:outline-none pr-10"
+                      className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none pr-10"
                     />
                     {isSecret && (
                       <button
                         type="button"
                         onClick={() => toggleSecret(fieldName)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-muted hover:text-white"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-muted hover:text-foreground"
                       >
                         {showValue ? (
                           <EyeOff className="w-4 h-4" />

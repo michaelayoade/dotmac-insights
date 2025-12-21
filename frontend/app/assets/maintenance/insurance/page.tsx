@@ -25,7 +25,7 @@ export default function InsuranceExpiringPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Expiring Insurance</h1>
+          <h1 className="text-2xl font-bold text-foreground">Expiring Insurance</h1>
           <p className="text-sm text-slate-muted mt-1">
             Assets with insurance coverage expiring soon
           </p>
@@ -34,7 +34,7 @@ export default function InsuranceExpiringPage() {
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
@@ -53,8 +53,8 @@ export default function InsuranceExpiringPage() {
                 className={cn(
                   "px-3 py-1.5 text-sm rounded-lg transition-colors",
                   days === d
-                    ? "bg-indigo-500 text-white"
-                    : "bg-slate-elevated text-slate-muted hover:text-white"
+                    ? "bg-indigo-500 text-foreground"
+                    : "bg-slate-elevated text-slate-muted hover:text-foreground"
                 )}
               >
                 {d} days
@@ -72,7 +72,7 @@ export default function InsuranceExpiringPage() {
               <FileWarning className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{expiringAssets.length}</p>
+              <p className="text-2xl font-bold text-foreground">{expiringAssets.length}</p>
               <p className="text-sm text-slate-muted">policies expiring in {days} days</p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export default function InsuranceExpiringPage() {
               <DollarSign className="w-5 h-5 text-emerald-300" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalInsuredValue)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalInsuredValue)}</p>
               <p className="text-sm text-slate-muted">total insured value at risk</p>
             </div>
           </div>
@@ -99,7 +99,7 @@ export default function InsuranceExpiringPage() {
       ) : expiringAssets.length === 0 ? (
         <div className="bg-slate-card border border-slate-border rounded-xl p-12 text-center">
           <FileWarning className="w-8 h-8 mx-auto mb-3 text-emerald-400" />
-          <p className="font-medium text-white">No Expiring Insurance</p>
+          <p className="font-medium text-foreground">No Expiring Insurance</p>
           <p className="text-sm text-slate-muted mt-1">No insurance policies expiring in the next {days} days</p>
         </div>
       ) : (
@@ -123,7 +123,7 @@ export default function InsuranceExpiringPage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/assets/list/${asset.id}`}
-                        className="font-medium text-white hover:text-indigo-300 transition-colors"
+                        className="font-medium text-foreground hover:text-indigo-300 transition-colors"
                       >
                         {asset.asset_name}
                       </Link>

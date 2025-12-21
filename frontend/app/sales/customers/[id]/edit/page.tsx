@@ -113,7 +113,7 @@ export default function SalesCustomerEditPage() {
         <p className="text-red-400">Failed to load customer</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -128,12 +128,12 @@ export default function SalesCustomerEditPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/customers"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to customers
           </Link>
-          <h1 className="text-xl font-semibold text-white">Edit Customer</h1>
+          <h1 className="text-xl font-semibold text-foreground">Edit Customer</h1>
         </div>
       </div>
 
@@ -146,7 +146,7 @@ export default function SalesCustomerEditPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-electric" />
             Customer Details
           </h3>
@@ -158,7 +158,7 @@ export default function SalesCustomerEditPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.name && 'border-red-500/60'
                 )}
               />
@@ -170,7 +170,7 @@ export default function SalesCustomerEditPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function SalesCustomerEditPage() {
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -189,7 +189,7 @@ export default function SalesCustomerEditPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -204,7 +204,7 @@ export default function SalesCustomerEditPage() {
               <select
                 value={customerType}
                 onChange={(e) => setCustomerType(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="residential">Residential</option>
                 <option value="business">Business</option>
@@ -217,7 +217,7 @@ export default function SalesCustomerEditPage() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -226,7 +226,7 @@ export default function SalesCustomerEditPage() {
                 type="text"
                 value={stateVal}
                 onChange={(e) => setStateVal(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function SalesCustomerEditPage() {
                 type="date"
                 value={signupDate}
                 onChange={(e) => setSignupDate(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -247,7 +247,7 @@ export default function SalesCustomerEditPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel

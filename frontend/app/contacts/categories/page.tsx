@@ -118,7 +118,7 @@ export default function CategoriesPage() {
               <FolderOpen className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{categoryList.length}</p>
+              <p className="text-2xl font-bold text-foreground">{categoryList.length}</p>
               <p className="text-xs text-slate-muted">Categories</p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function CategoriesPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
               <p className="text-xs text-slate-muted">Total Contacts</p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function CategoriesPage() {
               <DollarSign className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalMrr)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrr)}</p>
               <p className="text-xs text-slate-muted">Total MRR</p>
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function CategoriesPage() {
               <BarChart3 className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {categoryList.length > 0 ? formatCurrency(totalMrr / categoryList.length) : '-'}
               </p>
               <p className="text-xs text-slate-muted">Avg MRR/Category</p>
@@ -166,7 +166,7 @@ export default function CategoriesPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">Contact Distribution</h3>
+            <h3 className="text-foreground font-semibold">Contact Distribution</h3>
           </div>
           {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
@@ -204,7 +204,7 @@ export default function CategoriesPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <FolderOpen className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">Category Breakdown</h3>
+            <h3 className="text-foreground font-semibold">Category Breakdown</h3>
           </div>
           <div className="space-y-3">
             {categoryList.map((cat) => {
@@ -215,7 +215,7 @@ export default function CategoriesPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Icon className={`w-4 h-4 text-${cat.config.color}-400`} />
-                      <span className="text-sm text-white">{cat.config.label}</span>
+                      <span className="text-sm text-foreground">{cat.config.label}</span>
                     </div>
                     <span className="text-sm text-slate-muted">{cat.total} ({percentage}%)</span>
                   </div>
@@ -250,12 +250,12 @@ export default function CategoriesPage() {
                 <div className={cn('p-3 rounded-xl', bgColor, borderColor, 'border')}>
                   <Icon className={cn('w-6 h-6', textColor)} />
                 </div>
-                <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-white transition-colors" />
+                <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-foreground transition-colors" />
               </div>
-              <h3 className="text-white font-semibold text-lg mb-1">{cat.config.label}</h3>
+              <h3 className="text-foreground font-semibold text-lg mb-1">{cat.config.label}</h3>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-slate-muted">
-                  <span className="text-white font-semibold">{cat.total}</span> contacts
+                  <span className="text-foreground font-semibold">{cat.total}</span> contacts
                 </span>
                 <span className="text-slate-muted">
                   <span className={cn('font-semibold', textColor)}>{formatCurrency(cat.mrr)}</span> MRR

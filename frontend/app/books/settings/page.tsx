@@ -186,7 +186,7 @@ export default function BooksSettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-white">Books Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">Books Settings</h1>
         <p className="text-slate-muted text-sm">Configure accounting preferences, document numbering, and currencies.</p>
       </header>
 
@@ -204,7 +204,7 @@ export default function BooksSettingsPage() {
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                   isActive
                     ? 'border-teal-electric text-teal-electric'
-                    : 'border-transparent text-slate-muted hover:text-white hover:border-slate-border'
+                    : 'border-transparent text-slate-muted hover:text-foreground hover:border-slate-border'
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -721,7 +721,7 @@ function NumberFormatsTab() {
             setShowAdd(true);
             generatePreview(newForm.format_pattern, newForm.prefix, newForm.min_digits);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-border text-slate-muted hover:text-white hover:border-teal-electric transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-border text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Number Format
@@ -852,7 +852,7 @@ function NumberFormatsTab() {
                 setNewForm(getInitialForm('invoice'));
                 setPreview(null);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-white text-sm hover:bg-slate-elevated"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
             >
               <X className="w-4 h-4" />
               Cancel
@@ -866,7 +866,7 @@ function NumberFormatsTab() {
         {!formats?.length ? (
           <div className="bg-slate-card border border-slate-border rounded-xl p-6 text-center">
             <Hash className="w-8 h-8 text-slate-muted mx-auto mb-3" />
-            <p className="text-white font-medium mb-1">No Number Formats Configured</p>
+            <p className="text-foreground font-medium mb-1">No Number Formats Configured</p>
             <p className="text-slate-muted text-sm">Click "Add Number Format" above to configure document numbering.</p>
           </div>
         ) : (
@@ -913,7 +913,7 @@ function NumberFormatsTab() {
                     <button onClick={handleUpdate} className="px-3 py-1.5 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold">
                       Save
                     </button>
-                    <button onClick={() => { setEditingId(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-white text-sm">
+                    <button onClick={() => { setEditingId(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-foreground text-sm">
                       Cancel
                     </button>
                   </div>
@@ -922,7 +922,7 @@ function NumberFormatsTab() {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                      <span className="text-white font-medium">{documentTypeLabels[fmt.document_type as DocumentType]}</span>
+                      <span className="text-foreground font-medium">{documentTypeLabels[fmt.document_type as DocumentType]}</span>
                       <span className={cn(
                         'px-2 py-0.5 rounded text-xs font-medium',
                         fmt.is_active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-elevated text-slate-muted'
@@ -943,7 +943,7 @@ function NumberFormatsTab() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { setEditingId(fmt.id); setEditForm({}); }}
-                      className="p-2 rounded-lg text-slate-muted hover:text-white hover:bg-slate-elevated"
+                      className="p-2 rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated"
                       title="Edit"
                     >
                       <Pencil className="w-4 h-4" />
@@ -1091,7 +1091,7 @@ function CurrenciesTab() {
       {!showAdd ? (
         <button
           onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-border text-slate-muted hover:text-white hover:border-teal-electric transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-border text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Currency
@@ -1226,7 +1226,7 @@ function CurrenciesTab() {
                 </button>
                 <button
                   onClick={resetAddForm}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-white text-sm hover:bg-slate-elevated"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -1240,7 +1240,7 @@ function CurrenciesTab() {
             <div className="mt-4">
               <button
                 onClick={resetAddForm}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-white text-sm hover:bg-slate-elevated"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
               >
                 <X className="w-4 h-4" />
                 Cancel
@@ -1255,7 +1255,7 @@ function CurrenciesTab() {
         {!currencies?.length ? (
           <div className="col-span-full bg-slate-card border border-slate-border rounded-xl p-6 text-center">
             <Coins className="w-8 h-8 text-slate-muted mx-auto mb-3" />
-            <p className="text-white font-medium mb-1">No Currencies Configured</p>
+            <p className="text-foreground font-medium mb-1">No Currencies Configured</p>
             <p className="text-slate-muted text-sm">Click "Add Currency" above to configure currencies for your books.</p>
           </div>
         ) : (
@@ -1298,7 +1298,7 @@ function CurrenciesTab() {
                     <button onClick={handleUpdate} className="px-3 py-1.5 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold">
                       Save
                     </button>
-                    <button onClick={() => { setEditingCode(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-white text-sm">
+                    <button onClick={() => { setEditingCode(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-foreground text-sm">
                       Cancel
                     </button>
                   </div>
@@ -1311,7 +1311,7 @@ function CurrenciesTab() {
                         {curr.symbol}
                       </div>
                       <div>
-                        <p className="text-white font-medium">{curr.currency_code}</p>
+                        <p className="text-foreground font-medium">{curr.currency_code}</p>
                         <p className="text-slate-muted text-xs">{curr.currency_name}</p>
                       </div>
                     </div>
@@ -1336,11 +1336,11 @@ function CurrenciesTab() {
                   </div>
                   <div className="p-2 bg-slate-elevated rounded text-center">
                     <span className="text-slate-muted text-xs">Format: </span>
-                    <span className="text-white font-mono">{formatPreview(curr)}</span>
+                    <span className="text-foreground font-mono">{formatPreview(curr)}</span>
                   </div>
                   <button
                     onClick={() => { setEditingCode(curr.currency_code); setEditForm({}); }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated text-sm"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated text-sm"
                   >
                     <Pencil className="w-4 h-4" />
                     Edit
@@ -1372,7 +1372,7 @@ function Card({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-teal-electric" />
-        <h2 className="text-white font-semibold text-sm">{title}</h2>
+        <h2 className="text-foreground font-semibold text-sm">{title}</h2>
       </div>
       {children}
     </div>

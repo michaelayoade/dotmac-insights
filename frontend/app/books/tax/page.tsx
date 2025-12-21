@@ -96,7 +96,7 @@ export default function TaxDashboardPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BadgePercent className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Tax Dashboard</h1>
+          <h1 className="text-xl font-semibold text-foreground">Tax Dashboard</h1>
         </div>
         <p className="text-sm text-slate-muted">Period: {dashboard?.period || 'Loading...'}</p>
       </div>
@@ -111,7 +111,7 @@ export default function TaxDashboardPage() {
           <div className="space-y-2">
             {overdue.slice(0, 3).map((filing: import('@/lib/api').FilingDeadline, idx: number) => (
               <div key={idx} className="flex items-center justify-between text-sm">
-                <span className="text-white">{filing.tax_type} - {filing.period}</span>
+                <span className="text-foreground">{filing.tax_type} - {filing.period}</span>
                 <span className="text-red-400">
                   {Math.abs(filing.days_until_due)} days overdue
                 </span>
@@ -136,7 +136,7 @@ export default function TaxDashboardPage() {
                   <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', card.color)}>
                     <Icon className="w-5 h-5" />
                   </div>
-                  <h3 className="text-white font-semibold">{card.title}</h3>
+                  <h3 className="text-foreground font-semibold">{card.title}</h3>
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-teal-electric transition-colors" />
               </div>
@@ -151,7 +151,7 @@ export default function TaxDashboardPage() {
                   {card.stats.map((stat, idx) => (
                     <div key={idx} className="flex items-center justify-between text-sm">
                       <span className="text-slate-muted">{stat.label}</span>
-                      <span className={cn('font-mono', stat.highlight ? 'text-teal-electric font-semibold' : 'text-white')}>
+                      <span className={cn('font-mono', stat.highlight ? 'text-teal-electric font-semibold' : 'text-foreground')}>
                         {stat.value}
                       </span>
                     </div>
@@ -168,7 +168,7 @@ export default function TaxDashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-electric" />
-            <h3 className="text-white font-semibold">Upcoming Deadlines</h3>
+            <h3 className="text-foreground font-semibold">Upcoming Deadlines</h3>
           </div>
           <Link
             href="/books/tax/filing"
@@ -192,14 +192,14 @@ export default function TaxDashboardPage() {
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-white text-sm font-medium">{filing.tax_type} - {filing.period}</p>
+                    <p className="text-foreground text-sm font-medium">{filing.tax_type} - {filing.period}</p>
                     <p className="text-slate-muted text-xs">{filing.description}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={cn(
                     'text-sm font-medium',
-                    filing.days_until_due <= 7 ? 'text-amber-400' : 'text-white'
+                    filing.days_until_due <= 7 ? 'text-amber-400' : 'text-foreground'
                   )}>
                     {formatDate(filing.deadline)}
                   </p>
@@ -219,28 +219,28 @@ export default function TaxDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Link
           href="/books/tax/vat"
-          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-white hover:border-slate-border transition-colors"
+          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-foreground hover:border-slate-border transition-colors"
         >
           <TrendingUp className="w-4 h-4 text-blue-400" />
           Record VAT Output
         </Link>
         <Link
           href="/books/tax/wht"
-          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-white hover:border-slate-border transition-colors"
+          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-foreground hover:border-slate-border transition-colors"
         >
           <TrendingDown className="w-4 h-4 text-amber-400" />
           Deduct WHT
         </Link>
         <Link
           href="/books/tax/paye"
-          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-white hover:border-slate-border transition-colors"
+          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-foreground hover:border-slate-border transition-colors"
         >
           <Users className="w-4 h-4 text-emerald-400" />
           Calculate PAYE
         </Link>
         <Link
           href="/books/tax/settings"
-          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-white hover:border-slate-border transition-colors"
+          className="flex items-center gap-2 p-3 bg-slate-elevated rounded-lg border border-slate-border/50 text-sm text-slate-muted hover:text-foreground hover:border-slate-border transition-colors"
         >
           <Building2 className="w-4 h-4 text-purple-400" />
           Tax Settings

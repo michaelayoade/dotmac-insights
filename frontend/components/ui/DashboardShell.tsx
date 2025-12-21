@@ -288,7 +288,7 @@ function DashboardErrorState({
             {onRetry && (
               <button
                 onClick={onRetry}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-white transition-colors"
+                className="mt-4 flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Try again
@@ -343,7 +343,7 @@ function DashboardErrorBanner({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded text-xs text-white transition-colors"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded text-xs text-foreground transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
             Retry
@@ -388,7 +388,7 @@ function DashboardEmptyState({
         <div className="w-16 h-16 rounded-full bg-slate-elevated flex items-center justify-center mx-auto mb-4">
           <Icon className="w-8 h-8 text-slate-muted" />
         </div>
-        <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
         {description && (
           <p className="text-sm text-slate-muted mb-6">{description}</p>
         )}
@@ -396,14 +396,14 @@ function DashboardEmptyState({
           action.href ? (
             <Link
               href={action.href}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-white font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-foreground font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {action.label}
             </Link>
           ) : (
             <button
               onClick={action.onClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-white font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-electric to-teal-glow text-foreground font-medium rounded-lg hover:shadow-lg hover:shadow-teal-electric/25 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
             >
               {action.label}
             </button>

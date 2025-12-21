@@ -66,12 +66,12 @@ export default function InventoryItemCreatePage() {
       <div className="flex items-center gap-3">
         <Link
           href="/inventory"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
-        <h1 className="text-xl font-semibold text-white">New Inventory Item</h1>
+        <h1 className="text-xl font-semibold text-foreground">New Inventory Item</h1>
       </div>
 
       {error && (
@@ -104,7 +104,7 @@ export default function InventoryItemCreatePage() {
                 value={(form as any)[field.name]}
                 onChange={handleChange}
                 required={field.required}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           ))}
@@ -114,7 +114,7 @@ export default function InventoryItemCreatePage() {
               name="description"
               value={form.description}
               onChange={handleChange}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               rows={3}
             />
           </div>
@@ -134,7 +134,7 @@ export default function InventoryItemCreatePage() {
               name="status"
               value={form.status}
               onChange={handleChange}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -158,7 +158,7 @@ export default function InventoryItemCreatePage() {
                 name={field.name}
                 value={(form as any)[field.name]}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           ))}

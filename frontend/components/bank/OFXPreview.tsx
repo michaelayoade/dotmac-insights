@@ -42,7 +42,7 @@ export function OFXPreview({ ofxData, previewCount = 5 }: OFXPreviewProps) {
     <div className="space-y-6">
       {/* Account Information */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-medium mb-4 flex items-center gap-2">
+        <h3 className="text-foreground font-medium mb-4 flex items-center gap-2">
           <Landmark className="w-4 h-4 text-teal-electric" />
           Account Information
         </h3>
@@ -51,28 +51,28 @@ export function OFXPreview({ ofxData, previewCount = 5 }: OFXPreviewProps) {
           {ofxData.bankId && (
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Bank ID</p>
-              <p className="text-white font-mono">{ofxData.bankId}</p>
+              <p className="text-foreground font-mono">{ofxData.bankId}</p>
             </div>
           )}
 
           {ofxData.accountId && (
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Account</p>
-              <p className="text-white font-mono">****{ofxData.accountId.slice(-4)}</p>
+              <p className="text-foreground font-mono">****{ofxData.accountId.slice(-4)}</p>
             </div>
           )}
 
           {ofxData.accountType && (
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Type</p>
-              <p className="text-white">{getAccountTypeLabel(ofxData.accountType)}</p>
+              <p className="text-foreground">{getAccountTypeLabel(ofxData.accountType)}</p>
             </div>
           )}
 
           {ofxData.currency && (
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Currency</p>
-              <p className="text-white">{ofxData.currency}</p>
+              <p className="text-foreground">{ofxData.currency}</p>
             </div>
           )}
         </div>
@@ -175,7 +175,7 @@ export function OFXPreview({ ofxData, previewCount = 5 }: OFXPreviewProps) {
               <CreditCard className="w-4 h-4" />
               Total Transactions
             </div>
-            <p className="text-2xl font-bold text-white">{mappedTransactions.length}</p>
+            <p className="text-2xl font-bold text-foreground">{mappedTransactions.length}</p>
           </div>
 
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
@@ -222,7 +222,7 @@ export function OFXPreview({ ofxData, previewCount = 5 }: OFXPreviewProps) {
       {previewTransactions.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
           <div className="p-4 border-b border-slate-border">
-            <h3 className="text-white font-medium">Transaction Preview</h3>
+            <h3 className="text-foreground font-medium">Transaction Preview</h3>
             <p className="text-slate-muted text-sm">
               Showing first {previewTransactions.length} of {mappedTransactions.length} transactions
             </p>
@@ -242,7 +242,7 @@ export function OFXPreview({ ofxData, previewCount = 5 }: OFXPreviewProps) {
               <tbody>
                 {previewTransactions.map((tx, index) => (
                   <tr key={index} className="border-t border-slate-border">
-                    <td className="px-4 py-3 text-white">{formatDate(tx.transaction_date)}</td>
+                    <td className="px-4 py-3 text-foreground">{formatDate(tx.transaction_date)}</td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(

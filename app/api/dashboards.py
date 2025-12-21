@@ -21,7 +21,7 @@ from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
 from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.customer import Customer
+from app.models.customer import Customer, CustomerStatus
 from app.models.accounting import (
     PurchaseInvoice,
     PurchaseInvoiceStatus,
@@ -995,7 +995,7 @@ async def get_support_dashboard(
     # =========== SLA BREACHES (30 days) ===========
     breaches_query = db.query(
         Ticket.priority,
-        func.count(Ticket.id).label("count"),
+        func.count(Ticket.id).label("breach_count"),
     ).filter(
         Ticket.resolution_sla_breached == True,
         Ticket.created_at >= category_start,
@@ -1004,7 +1004,7 @@ async def get_support_dashboard(
         breaches_query = breaches_query.filter(Ticket.created_at <= range_end)
 
     sla_breaches = {
-        r.priority.value if r.priority else "unknown": r.count
+        r.priority.value if r.priority else "unknown": int(r.breach_count or 0)
         for r in breaches_query.all()
     }
     total_breaches = sum(sla_breaches.values())
@@ -1461,4 +1461,1164 @@ async def get_accounting_dashboard(
         },
 
         "fiscal_years": fiscal_years,
+    }
+
+
+# =============================================================================
+# HR DASHBOARD - Consolidated (11 calls → 1)
+# =============================================================================
+
+@router.get("/hr", dependencies=[Depends(Require("hr:read"))])
+@cached("dashboard-hr", ttl=CACHE_TTL["short"])
+async def get_hr_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated HR Dashboard endpoint.
+
+    Combines data from:
+    - Employee summary (total, active, on leave)
+    - Leave applications (pending, by status, trend)
+    - Attendance summary (30 days)
+    - Payroll summary (last 30 days)
+    - Recruitment (open positions, funnel)
+    - Training events (scheduled)
+    - Onboarding (active)
+    """
+    from app.models.employee import Employee, EmploymentStatus
+    from app.models.hr_leave import LeaveApplication, LeaveApplicationStatus
+    from app.models.hr_attendance import Attendance
+    from app.models.hr_payroll import SalarySlip, SalarySlipStatus
+    from app.models.hr_recruitment import JobOpening, JobApplicant
+    from app.models.hr_training import TrainingEvent
+    from app.models.hr_lifecycle import EmployeeOnboarding, BoardingStatus
+
+    now = datetime.now(timezone.utc)
+    today = date.today()
+    thirty_days_ago = now - timedelta(days=30)
+    six_months_ago = now - timedelta(days=180)
+
+    # =========== EMPLOYEE SUMMARY ===========
+    total_employees = db.query(func.count(Employee.id)).scalar() or 0
+    active_employees = db.query(func.count(Employee.id)).filter(
+        Employee.status == EmploymentStatus.ACTIVE
+    ).scalar() or 0
+
+    # On leave today (check active leave applications)
+    on_leave_today = db.query(func.count(LeaveApplication.id)).filter(
+        LeaveApplication.status == LeaveApplicationStatus.APPROVED,
+        LeaveApplication.from_date <= today,
+        LeaveApplication.to_date >= today,
+    ).scalar() or 0
+
+    # =========== LEAVE DATA ===========
+    pending_leave = db.query(func.count(LeaveApplication.id)).filter(
+        LeaveApplication.status == LeaveApplicationStatus.OPEN
+    ).scalar() or 0
+
+    leave_by_status = db.query(
+        LeaveApplication.status,
+        func.count(LeaveApplication.id).label("count")
+    ).group_by(LeaveApplication.status).all()
+    leave_status_map = {
+        row.status.value if row.status else "unknown": row.count
+        for row in leave_by_status
+    }
+
+    # Leave trend (last 6 months)
+    trunc_month = func.date_trunc("month", LeaveApplication.posting_date)
+    leave_trend = [
+        {"month": r.period, "count": r.count}
+        for r in db.query(
+            func.to_char(trunc_month, "YYYY-MM").label("period"),
+            func.count(LeaveApplication.id).label("count")
+        ).filter(
+            LeaveApplication.posting_date >= six_months_ago
+        ).group_by(trunc_month).order_by(trunc_month).all()
+    ]
+
+    # =========== ATTENDANCE (30 days) ===========
+    attendance_summary = db.query(
+        Attendance.status,
+        func.count(Attendance.id).label("count")
+    ).filter(
+        Attendance.attendance_date >= (today - timedelta(days=30))
+    ).group_by(Attendance.status).all()
+    attendance_30d = {
+        row.status.value if hasattr(row.status, 'value') else str(row.status): row.count
+        for row in attendance_summary
+    }
+
+    # Present today
+    present_today = db.query(func.count(Attendance.id)).filter(
+        Attendance.attendance_date == today,
+        Attendance.status.in_(["Present", "present", "PRESENT"])
+    ).scalar() or 0
+
+    # Attendance trend (14 days)
+    attendance_trend = []
+    for i in range(14):
+        day = today - timedelta(days=13 - i)
+        day_counts = db.query(
+            Attendance.status,
+            func.count(Attendance.id).label("count")
+        ).filter(
+            Attendance.attendance_date == day
+        ).group_by(Attendance.status).all()
+        status_counts = {
+            row.status.value if hasattr(row.status, 'value') else str(row.status): row.count
+            for row in day_counts
+        }
+        attendance_trend.append({
+            "date": day.isoformat(),
+            "status_counts": status_counts
+        })
+
+    # =========== PAYROLL (30 days) ===========
+    payroll_summary = db.query(
+        func.count(SalarySlip.id).label("slip_count"),
+        func.sum(SalarySlip.gross_pay).label("gross_total"),
+        func.sum(SalarySlip.total_deduction).label("deduction_total"),
+        func.sum(SalarySlip.net_pay).label("net_total"),
+    ).filter(
+        SalarySlip.posting_date >= thirty_days_ago,
+        SalarySlip.docstatus == 1,
+    ).first()
+
+    payroll_30d = {
+        "slip_count": payroll_summary.slip_count or 0 if payroll_summary else 0,
+        "gross_total": float(payroll_summary.gross_total or 0) if payroll_summary else 0,
+        "deduction_total": float(payroll_summary.deduction_total or 0) if payroll_summary else 0,
+        "net_total": float(payroll_summary.net_total or 0) if payroll_summary else 0,
+    }
+
+    # =========== RECRUITMENT ===========
+    open_positions = db.query(func.count(JobOpening.id)).filter(
+        JobOpening.status == "Open"
+    ).scalar() or 0
+
+    # Recruitment funnel
+    total_applicants = db.query(func.count(JobApplicant.id)).scalar() or 0
+    screened = db.query(func.count(JobApplicant.id)).filter(
+        JobApplicant.status.in_(["Screening", "Interview Scheduled", "Selected", "Offer Sent", "Accepted", "Rejected"])
+    ).scalar() or 0
+    interviewed = db.query(func.count(JobApplicant.id)).filter(
+        JobApplicant.status.in_(["Interview Scheduled", "Selected", "Offer Sent", "Accepted", "Rejected"])
+    ).scalar() or 0
+    offered = db.query(func.count(JobApplicant.id)).filter(
+        JobApplicant.status.in_(["Offer Sent", "Accepted"])
+    ).scalar() or 0
+    hired = db.query(func.count(JobApplicant.id)).filter(
+        JobApplicant.status == "Accepted"
+    ).scalar() or 0
+
+    recruitment_funnel = {
+        "applications": total_applicants,
+        "screened": screened,
+        "interviewed": interviewed,
+        "offered": offered,
+        "hired": hired,
+    }
+
+    # =========== TRAINING ===========
+    scheduled_training = db.query(func.count(TrainingEvent.id)).filter(
+        TrainingEvent.start_time >= now
+    ).scalar() or 0
+
+    upcoming_training = [
+        {
+            "id": t.id,
+            "event_name": t.event_name,
+            "start_time": t.start_time.isoformat() if t.start_time else None,
+            "type": t.type,
+        }
+        for t in db.query(TrainingEvent).filter(
+            TrainingEvent.start_time >= now
+        ).order_by(TrainingEvent.start_time.asc()).limit(5).all()
+    ]
+
+    # =========== ONBOARDING ===========
+    active_onboardings = db.query(func.count(EmployeeOnboarding.id)).filter(
+        EmployeeOnboarding.boarding_status.in_(
+            [BoardingStatus.PENDING, BoardingStatus.IN_PROGRESS]
+        )
+    ).scalar() or 0
+
+    recent_onboardings = [
+        {
+            "id": o.id,
+            "employee_name": o.employee_name,
+            "status": o.boarding_status.value if o.boarding_status else None,
+            "date_of_joining": o.date_of_joining.isoformat() if o.date_of_joining else None,
+        }
+        for o in db.query(EmployeeOnboarding).filter(
+            EmployeeOnboarding.boarding_status.in_(
+                [BoardingStatus.PENDING, BoardingStatus.IN_PROGRESS]
+            )
+        ).order_by(EmployeeOnboarding.date_of_joining.desc()).limit(5).all()
+    ]
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "total_employees": total_employees,
+            "active_employees": active_employees,
+            "on_leave_today": on_leave_today,
+            "present_today": present_today,
+        },
+
+        "leave": {
+            "pending_approvals": pending_leave,
+            "by_status": leave_status_map,
+            "trend": leave_trend,
+        },
+
+        "attendance": {
+            "status_30d": attendance_30d,
+            "trend": attendance_trend,
+        },
+
+        "payroll_30d": payroll_30d,
+
+        "recruitment": {
+            "open_positions": open_positions,
+            "funnel": recruitment_funnel,
+        },
+
+        "training": {
+            "scheduled_events": scheduled_training,
+            "upcoming": upcoming_training,
+        },
+
+        "onboarding": {
+            "active_count": active_onboardings,
+            "recent": recent_onboardings,
+        },
+    }
+
+
+# =============================================================================
+# INVENTORY DASHBOARD - Consolidated (3 calls → 1)
+# =============================================================================
+
+@router.get("/inventory", dependencies=[Depends(Require("inventory:read"))])
+@cached("dashboard-inventory", ttl=CACHE_TTL["short"])
+async def get_inventory_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Inventory Dashboard endpoint.
+
+    Combines data from:
+    - Stock summary (total value, item count)
+    - Warehouse breakdown
+    - Recent stock entries
+    - Items with stock
+    - Low stock alerts (coming soon)
+    """
+    from app.models.inventory import (
+        Warehouse, StockEntry, StockLedgerEntry
+    )
+    from app.models.sales import Item
+
+    now = datetime.now(timezone.utc)
+
+    # =========== STOCK SUMMARY ===========
+    # Get total stock value from stock ledger (latest entry per item/warehouse)
+    stock_value_query = db.query(
+        func.sum(StockLedgerEntry.stock_value)
+    ).filter(
+        StockLedgerEntry.is_cancelled == False
+    )
+    # This is a simplification - ideally we'd get the latest balance per item/warehouse
+    total_stock_value = float(stock_value_query.scalar() or 0)
+
+    # Total items with stock
+    items_with_stock = db.query(
+        func.count(distinct(StockLedgerEntry.item_code))
+    ).filter(
+        StockLedgerEntry.qty_after_transaction > 0,
+        StockLedgerEntry.is_cancelled == False
+    ).scalar() or 0
+
+    # Total warehouses
+    total_warehouses = db.query(func.count(Warehouse.id)).filter(
+        Warehouse.disabled == False,
+        Warehouse.is_group == False
+    ).scalar() or 0
+
+    # =========== WAREHOUSE BREAKDOWN ===========
+    warehouse_summary = db.query(
+        StockLedgerEntry.warehouse,
+        func.sum(StockLedgerEntry.stock_value).label("value"),
+        func.count(distinct(StockLedgerEntry.item_code)).label("items")
+    ).filter(
+        StockLedgerEntry.is_cancelled == False
+    ).group_by(
+        StockLedgerEntry.warehouse
+    ).order_by(
+        func.sum(StockLedgerEntry.stock_value).desc()
+    ).limit(10).all()
+
+    stock_by_warehouse = [
+        {
+            "warehouse": row.warehouse,
+            "value": float(row.value or 0),
+            "items": row.items
+        }
+        for row in warehouse_summary
+    ]
+
+    # =========== RECENT STOCK ENTRIES ===========
+    recent_entries = [
+        {
+            "id": e.id,
+            "stock_entry_type": e.stock_entry_type,
+            "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+            "total_amount": float(e.total_amount or 0),
+            "from_warehouse": e.from_warehouse,
+            "to_warehouse": e.to_warehouse,
+            "docstatus": e.docstatus,
+        }
+        for e in db.query(StockEntry).filter(
+            StockEntry.is_deleted == False
+        ).order_by(
+            StockEntry.posting_date.desc()
+        ).limit(5).all()
+    ]
+
+    # =========== RECENT ITEMS ===========
+    # Get items with actual stock
+    recent_items = [
+        {
+            "id": i.id,
+            "item_code": i.item_code,
+            "item_name": i.item_name,
+            "stock_uom": i.stock_uom,
+            "total_stock_qty": 0,  # Would need aggregation from SLE
+        }
+        for i in db.query(Item).filter(
+            Item.is_stock_item == True,
+            Item.disabled == False
+        ).order_by(
+            Item.updated_at.desc()
+        ).limit(5).all()
+    ]
+
+    # =========== ENTRY COUNTS ===========
+    total_entries = db.query(func.count(StockEntry.id)).filter(
+        StockEntry.is_deleted == False
+    ).scalar() or 0
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "total_value": total_stock_value,
+            "total_items": items_with_stock,
+            "total_warehouses": total_warehouses,
+            "low_stock_alerts": 0,  # TODO: Implement reorder level check
+        },
+
+        "stock_by_warehouse": stock_by_warehouse,
+
+        "recent": {
+            "entries": recent_entries,
+            "items": recent_items,
+        },
+
+        "counts": {
+            "total_entries": total_entries,
+        },
+    }
+
+
+# =============================================================================
+# ASSETS DASHBOARD - Consolidated (5 calls → 1)
+# =============================================================================
+
+@router.get("/assets", dependencies=[Depends(Require("assets:read"))])
+@cached("dashboard-assets", ttl=CACHE_TTL["short"])
+async def get_assets_dashboard(
+    days_ahead: int = 30,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Assets Dashboard endpoint.
+
+    Combines data from:
+    - Asset totals (count, purchase value, book value, depreciation)
+    - Assets by status
+    - Pending depreciation entries
+    - Maintenance due
+    - Warranty expiring
+    - Insurance expiring
+    """
+    from app.models.asset import Asset, AssetStatus, AssetDepreciationSchedule
+
+    now = datetime.now(timezone.utc)
+    today = date.today()
+    future_date = today + timedelta(days=days_ahead)
+
+    # =========== TOTALS ===========
+    totals = db.query(
+        func.count(Asset.id).label("asset_count"),
+        func.sum(Asset.gross_purchase_amount).label("purchase_value"),
+        func.sum(Asset.asset_value).label("book_value"),
+        func.sum(Asset.opening_accumulated_depreciation).label("accumulated_depreciation"),
+    ).filter(
+        Asset.status != AssetStatus.SCRAPPED
+    ).first()
+
+    totals_data = {
+        "count": int(totals.asset_count) if totals and totals.asset_count is not None else 0,
+        "purchase_value": float(totals.purchase_value or 0) if totals else 0,
+        "book_value": float(totals.book_value or 0) if totals else 0,
+        "accumulated_depreciation": float(totals.accumulated_depreciation or 0) if totals else 0,
+    }
+
+    # =========== BY STATUS ===========
+    by_status = [
+        {"status": row.status.value if row.status else "unknown", "count": int(row.status_count or 0)}
+        for row in db.query(
+            Asset.status,
+            func.count(Asset.id).label("status_count")
+        ).group_by(Asset.status).all()
+    ]
+
+    # =========== PENDING DEPRECIATION ===========
+    pending_depreciation = db.query(AssetDepreciationSchedule).join(Asset).filter(
+        AssetDepreciationSchedule.depreciation_booked == False,
+        AssetDepreciationSchedule.schedule_date <= today,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).order_by(AssetDepreciationSchedule.schedule_date.asc()).limit(10).all()
+
+    pending_dep_entries = [
+        {
+            "asset_id": d.asset_id,
+            "asset_name": d.asset.asset_name if d.asset else None,
+            "schedule_date": d.schedule_date.isoformat() if d.schedule_date else None,
+            "depreciation_amount": float(d.depreciation_amount or 0),
+        }
+        for d in pending_depreciation
+    ]
+
+    pending_dep_total = db.query(
+        func.count(AssetDepreciationSchedule.id),
+        func.sum(AssetDepreciationSchedule.depreciation_amount)
+    ).join(Asset).filter(
+        AssetDepreciationSchedule.depreciation_booked == False,
+        AssetDepreciationSchedule.schedule_date <= today,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).first()
+
+    # =========== MAINTENANCE DUE ===========
+    maintenance_due = db.query(Asset).filter(
+        Asset.maintenance_required == True,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).order_by(Asset.asset_name).limit(10).all()
+
+    maintenance_assets = [
+        {
+            "id": a.id,
+            "asset_name": a.asset_name,
+            "location": a.location,
+            "last_maintenance": None,  # Would need maintenance log
+        }
+        for a in maintenance_due
+    ]
+
+    # =========== WARRANTY EXPIRING ===========
+    warranty_expiring = db.query(Asset).filter(
+        Asset.warranty_expiry_date.isnot(None),
+        Asset.warranty_expiry_date >= today,
+        Asset.warranty_expiry_date <= future_date,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).order_by(Asset.warranty_expiry_date.asc()).limit(10).all()
+
+    warranty_assets = [
+        {
+            "id": a.id,
+            "asset_name": a.asset_name,
+            "warranty_expiry_date": a.warranty_expiry_date.isoformat() if a.warranty_expiry_date else None,
+            "days_remaining": (a.warranty_expiry_date - today).days if a.warranty_expiry_date else 0,
+        }
+        for a in warranty_expiring
+    ]
+
+    warranty_count = db.query(func.count(Asset.id)).filter(
+        Asset.warranty_expiry_date.isnot(None),
+        Asset.warranty_expiry_date >= today,
+        Asset.warranty_expiry_date <= future_date,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).scalar() or 0
+
+    # =========== INSURANCE EXPIRING ===========
+    insurance_expiring = db.query(Asset).filter(
+        Asset.insurance_end_date.isnot(None),
+        Asset.insurance_end_date >= today,
+        Asset.insurance_end_date <= future_date,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).order_by(Asset.insurance_end_date.asc()).limit(10).all()
+
+    insurance_assets = [
+        {
+            "id": a.id,
+            "asset_name": a.asset_name,
+            "insurance_end_date": a.insurance_end_date.isoformat() if a.insurance_end_date else None,
+            "days_remaining": (a.insurance_end_date - today).days if a.insurance_end_date else 0,
+        }
+        for a in insurance_expiring
+    ]
+
+    insurance_count = db.query(func.count(Asset.id)).filter(
+        Asset.insurance_end_date.isnot(None),
+        Asset.insurance_end_date >= today,
+        Asset.insurance_end_date <= future_date,
+        Asset.status == AssetStatus.SUBMITTED,
+    ).scalar() or 0
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "totals": totals_data,
+        "by_status": by_status,
+
+        "depreciation": {
+            "pending_count": pending_dep_total[0] if pending_dep_total else 0,
+            "pending_amount": float(pending_dep_total[1] or 0) if pending_dep_total else 0,
+            "entries": pending_dep_entries,
+        },
+
+        "maintenance": {
+            "due_count": len(maintenance_due),
+            "assets": maintenance_assets,
+        },
+
+        "expiring": {
+            "warranty": {
+                "count": warranty_count,
+                "assets": warranty_assets,
+            },
+            "insurance": {
+                "count": insurance_count,
+                "assets": insurance_assets,
+            },
+        },
+    }
+
+
+# =============================================================================
+# EXPENSES DASHBOARD - Consolidated (2 calls → 1)
+# =============================================================================
+
+@router.get("/expenses", dependencies=[Depends(Require("expenses:read"))])
+@cached("dashboard-expenses", ttl=CACHE_TTL["short"])
+async def get_expenses_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Expenses Dashboard endpoint.
+
+    Combines data from:
+    - Expense claims summary (by status, totals)
+    - Cash advances summary (by status, outstanding)
+    - Recent claims and advances
+    - Trend data
+    """
+    from app.models.expense_management import (
+        ExpenseClaim, ExpenseClaimStatus,
+        CashAdvance, CashAdvanceStatus
+    )
+
+    now = datetime.now(timezone.utc)
+    today = date.today()
+    six_months_ago = now - timedelta(days=180)
+
+    # =========== EXPENSE CLAIMS ===========
+    claims_by_status = db.query(
+        ExpenseClaim.status,
+        func.count(ExpenseClaim.id).label("status_count"),
+        func.sum(ExpenseClaim.total_claimed_amount).label("status_total")
+    ).group_by(ExpenseClaim.status).all()
+
+    claims_status_map: Dict[str, Dict[str, float | int]] = {}
+    for row in claims_by_status:
+        status_key = row.status.value if row.status else "unknown"
+        claims_status_map[status_key] = {
+            "count": int(row.status_count or 0),
+            "total": float(row.status_total or 0),
+        }
+
+    total_claims = sum(value["count"] for value in claims_status_map.values())
+    total_claimed_amount = sum(value["total"] for value in claims_status_map.values())
+
+    pending_claim_approvals = db.query(func.count(ExpenseClaim.id)).filter(
+        ExpenseClaim.status == ExpenseClaimStatus.PENDING_APPROVAL
+    ).scalar() or 0
+    pending_advance_approvals = db.query(func.count(CashAdvance.id)).filter(
+        CashAdvance.status == CashAdvanceStatus.PENDING_APPROVAL
+    ).scalar() or 0
+    pending_approvals = pending_claim_approvals + pending_advance_approvals
+
+    # Recent claims
+    recent_claims = [
+        {
+            "id": c.id,
+            "claim_number": c.claim_number,
+            "title": c.title,
+            "total_claimed_amount": float(c.total_claimed_amount or 0),
+            "status": c.status.value if c.status else None,
+            "claim_date": c.claim_date.isoformat() if c.claim_date else None,
+        }
+        for c in db.query(ExpenseClaim).order_by(
+            ExpenseClaim.claim_date.desc()
+        ).limit(5).all()
+    ]
+
+    # =========== CASH ADVANCES ===========
+    advances_by_status = db.query(
+        CashAdvance.status,
+        func.count(CashAdvance.id).label("status_count"),
+        func.sum(CashAdvance.outstanding_amount).label("status_outstanding")
+    ).group_by(CashAdvance.status).all()
+
+    advances_status_map: Dict[str, Dict[str, float | int]] = {}
+    for advance_row in advances_by_status:
+        status_key = advance_row.status.value if advance_row.status else "unknown"
+        advances_status_map[status_key] = {
+            "count": int(advance_row.status_count or 0),
+            "outstanding": float(advance_row.status_outstanding or 0),
+        }
+
+    total_advances = sum(value["count"] for value in advances_status_map.values())
+    total_outstanding = sum(value["outstanding"] for value in advances_status_map.values())
+
+    # Recent advances
+    recent_advances = [
+        {
+            "id": a.id,
+            "advance_number": a.advance_number,
+            "purpose": a.purpose,
+            "requested_amount": float(a.requested_amount or 0),
+            "outstanding_amount": float(a.outstanding_amount or 0),
+            "status": a.status.value if a.status else None,
+            "request_date": a.request_date.isoformat() if a.request_date else None,
+        }
+        for a in db.query(CashAdvance).order_by(
+            CashAdvance.request_date.desc()
+        ).limit(5).all()
+    ]
+
+    # =========== TREND (6 months) ===========
+    trunc_month = func.date_trunc("month", ExpenseClaim.claim_date)
+    claims_trend = [
+        {
+            "month": r.period,
+            "claims": r.count,
+            "amount": float(r.total or 0)
+        }
+        for r in db.query(
+            func.to_char(trunc_month, "YYYY-MM").label("period"),
+            func.count(ExpenseClaim.id).label("count"),
+            func.sum(ExpenseClaim.total_claimed_amount).label("total")
+        ).filter(
+            ExpenseClaim.claim_date >= six_months_ago
+        ).group_by(trunc_month).order_by(trunc_month).all()
+    ]
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "claims": {
+            "total": total_claims,
+            "by_status": claims_status_map,
+            "total_claimed_amount": total_claimed_amount,
+            "recent": recent_claims,
+        },
+
+        "advances": {
+            "total": total_advances,
+            "by_status": advances_status_map,
+            "outstanding_amount": total_outstanding,
+            "recent": recent_advances,
+        },
+
+        "pending_approvals": pending_approvals,
+        "trend": claims_trend,
+    }
+
+
+# =============================================================================
+# PROJECTS DASHBOARD - Consolidated (2 calls → 1)
+# =============================================================================
+
+@router.get("/projects", dependencies=[Depends(Require("projects:read"))])
+@cached("dashboard-projects", ttl=CACHE_TTL["short"])
+async def get_projects_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Projects Dashboard endpoint.
+
+    Combines data from:
+    - Project summary (by status, totals)
+    - Task metrics
+    - Financial summary
+    - Recent projects
+    """
+    from app.models.project import Project, ProjectStatus
+    from app.models.task import Task
+
+    now = datetime.now(timezone.utc)
+    today = date.today()
+    week_end = today + timedelta(days=7)
+
+    # =========== PROJECT COUNTS ===========
+    total_projects = db.query(func.count(Project.id)).filter(
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    active_projects = db.query(func.count(Project.id)).filter(
+        Project.status == ProjectStatus.OPEN,
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    completed_projects = db.query(func.count(Project.id)).filter(
+        Project.status == ProjectStatus.COMPLETED,
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    on_hold_projects = db.query(func.count(Project.id)).filter(
+        Project.status == ProjectStatus.ON_HOLD,
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    cancelled_projects = db.query(func.count(Project.id)).filter(
+        Project.status == ProjectStatus.CANCELLED,
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    # =========== TASK METRICS ===========
+    total_tasks = db.query(func.count(Task.id)).scalar() or 0
+    open_tasks = db.query(func.count(Task.id)).filter(
+        Task.status.in_(["Open", "Working", "Pending Review", "open", "working"])
+    ).scalar() or 0
+    overdue_tasks = db.query(func.count(Task.id)).filter(
+        Task.status.in_(["Open", "Working", "open", "working"]),
+        Task.exp_end_date < today
+    ).scalar() or 0
+
+    # =========== COMPLETION METRICS ===========
+    avg_completion = db.query(
+        func.avg(Project.percent_complete)
+    ).filter(
+        Project.status == ProjectStatus.OPEN,
+        Project.is_deleted == False
+    ).scalar()
+    avg_completion_percent = float(avg_completion or 0)
+
+    # Due this week
+    due_this_week = db.query(func.count(Project.id)).filter(
+        Project.expected_end_date >= today,
+        Project.expected_end_date <= week_end,
+        Project.status == ProjectStatus.OPEN,
+        Project.is_deleted == False
+    ).scalar() or 0
+
+    # =========== FINANCIALS ===========
+    financials = db.query(
+        func.sum(Project.total_billed_amount).label("billed"),
+        func.sum(Project.total_costing_amount).label("cost"),
+        func.sum(Project.gross_margin).label("margin")
+    ).filter(
+        Project.is_deleted == False
+    ).first()
+
+    financials_data = {
+        "total_billed": float(financials.billed or 0) if financials else 0,
+        "total_cost": float(financials.cost or 0) if financials else 0,
+        "total_margin": float(financials.margin or 0) if financials else 0,
+    }
+
+    # =========== RECENT PROJECTS ===========
+    recent_projects = [
+        {
+            "id": p.id,
+            "project_name": p.project_name,
+            "status": p.status.value if p.status else None,
+            "percent_complete": float(p.percent_complete or 0),
+            "expected_end_date": p.expected_end_date.isoformat() if p.expected_end_date else None,
+            "department": p.department,
+        }
+        for p in db.query(Project).filter(
+            Project.is_deleted == False
+        ).order_by(
+            Project.updated_at.desc()
+        ).limit(5).all()
+    ]
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "projects": {
+            "total": total_projects,
+            "active": active_projects,
+            "completed": completed_projects,
+            "on_hold": on_hold_projects,
+            "cancelled": cancelled_projects,
+        },
+
+        "tasks": {
+            "total": total_tasks,
+            "open": open_tasks,
+            "overdue": overdue_tasks,
+        },
+
+        "metrics": {
+            "avg_completion_percent": round(avg_completion_percent, 1),
+            "due_this_week": due_this_week,
+        },
+
+        "financials": financials_data,
+
+        "recent": recent_projects,
+    }
+
+
+# =============================================================================
+# INBOX DASHBOARD - Consolidated (3 calls → 1)
+# =============================================================================
+
+@router.get("/inbox", dependencies=[Depends(Require("inbox:read"))])
+@cached("dashboard-inbox", ttl=CACHE_TTL["short"])
+async def get_inbox_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Inbox Dashboard endpoint.
+
+    Combines data from:
+    - Conversation summary (open, pending, resolved)
+    - By channel breakdown
+    - By priority breakdown
+    - Recent conversations
+    """
+    from app.models.omni import OmniConversation, OmniChannel
+
+    now = datetime.now(timezone.utc)
+    today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+
+    # =========== CONVERSATION COUNTS ===========
+    open_count = db.query(func.count(OmniConversation.id)).filter(
+        OmniConversation.status == "open"
+    ).scalar() or 0
+
+    pending_count = db.query(func.count(OmniConversation.id)).filter(
+        OmniConversation.status == "pending"
+    ).scalar() or 0
+
+    resolved_today = db.query(func.count(OmniConversation.id)).filter(
+        OmniConversation.status == "resolved",
+        OmniConversation.resolved_at >= today_start
+    ).scalar() or 0
+
+    total_unread = db.query(func.sum(OmniConversation.unread_count)).filter(
+        OmniConversation.status.in_(["open", "pending"])
+    ).scalar() or 0
+
+    # =========== BY CHANNEL ===========
+    by_channel = db.query(
+        OmniChannel.type,
+        func.count(OmniConversation.id).label("count")
+    ).join(OmniChannel, OmniConversation.channel_id == OmniChannel.id).filter(
+        OmniConversation.status.in_(["open", "pending"])
+    ).group_by(OmniChannel.type).all()
+
+    channel_breakdown = {
+        row.type: row.count
+        for row in by_channel
+    }
+
+    # =========== BY PRIORITY ===========
+    by_priority = db.query(
+        OmniConversation.priority,
+        func.count(OmniConversation.id).label("count")
+    ).filter(
+        OmniConversation.status.in_(["open", "pending"])
+    ).group_by(OmniConversation.priority).all()
+
+    priority_breakdown = {
+        row.priority: row.count
+        for row in by_priority
+    }
+
+    # =========== RECENT CONVERSATIONS ===========
+    recent_conversations = [
+        {
+            "id": c.id,
+            "subject": c.subject,
+            "contact_name": c.contact_name,
+            "contact_email": c.contact_email,
+            "status": c.status,
+            "priority": c.priority,
+            "unread_count": c.unread_count,
+            "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,
+        }
+        for c in db.query(OmniConversation).filter(
+            OmniConversation.status.in_(["open", "pending"])
+        ).order_by(
+            OmniConversation.last_message_at.desc()
+        ).limit(10).all()
+    ]
+
+    # =========== AVG RESPONSE TIME ===========
+    avg_response = db.query(
+        func.avg(
+            func.extract(
+                "epoch",
+                OmniConversation.first_response_at - OmniConversation.created_at,
+            )
+        )
+    ).filter(
+        OmniConversation.first_response_at.isnot(None)
+    ).scalar()
+    avg_response_hours = round(float(avg_response or 0) / 3600, 1)
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "open_count": open_count,
+            "pending_count": pending_count,
+            "resolved_today": resolved_today,
+            "total_unread": int(total_unread or 0),
+        },
+
+        "by_channel": channel_breakdown,
+        "by_priority": priority_breakdown,
+        "avg_response_time_hours": avg_response_hours,
+
+        "recent": recent_conversations,
+    }
+
+
+# =============================================================================
+# CONTACTS DASHBOARD - Consolidated
+# =============================================================================
+
+@router.get("/contacts", dependencies=[Depends(Require("contacts:read"))])
+@cached("dashboard-contacts", ttl=CACHE_TTL["short"])
+async def get_contacts_dashboard(
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Contacts Dashboard endpoint.
+
+    Combines data from:
+    - Contact summary (total, by type)
+    - Pipeline/funnel data
+    - Source distribution
+    - Recent activities
+    """
+    from app.models.unified_contact import UnifiedContact
+    from app.models.crm import Activity, ActivityStatus
+
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+
+    # =========== CONTACT COUNTS ===========
+    total_contacts = db.query(func.count(UnifiedContact.id)).scalar() or 0
+
+    # By type/stage
+    by_stage = db.query(
+        UnifiedContact.contact_type,
+        func.count(UnifiedContact.id).label("count")
+    ).group_by(UnifiedContact.contact_type).all()
+
+    stage_breakdown = {
+        row.contact_type.value if row.contact_type else "unknown": row.count
+        for row in by_stage
+    }
+
+    # =========== SOURCE DISTRIBUTION ===========
+    by_source = db.query(
+        UnifiedContact.source,
+        func.count(UnifiedContact.id).label("count")
+    ).filter(
+        UnifiedContact.source.isnot(None)
+    ).group_by(UnifiedContact.source).order_by(
+        func.count(UnifiedContact.id).desc()
+    ).limit(10).all()
+
+    source_breakdown = [
+        {"source": row.source, "count": row.count}
+        for row in by_source
+    ]
+
+    # =========== RECENT ACTIVITIES ===========
+    recent_activities = [
+        {
+            "id": a.id,
+            "activity_type": a.activity_type.value if a.activity_type else None,
+            "subject": a.subject,
+            "status": a.status.value if a.status else None,
+            "scheduled_at": a.scheduled_at.isoformat() if a.scheduled_at else None,
+        }
+        for a in db.query(Activity).filter(
+            Activity.status.in_([ActivityStatus.PLANNED, ActivityStatus.COMPLETED])
+        ).order_by(Activity.scheduled_at.desc()).limit(5).all()
+    ]
+
+    # =========== NEW CONTACTS (30 days) ===========
+    new_contacts_30d = db.query(func.count(UnifiedContact.id)).filter(
+        UnifiedContact.created_at >= thirty_days_ago
+    ).scalar() or 0
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "total_contacts": total_contacts,
+            "new_30d": new_contacts_30d,
+            "by_stage": stage_breakdown,
+        },
+
+        "sources": source_breakdown,
+        "recent_activities": recent_activities,
+    }
+
+
+# =============================================================================
+# CUSTOMERS DASHBOARD - Consolidated
+# =============================================================================
+
+@router.get("/customers", dependencies=[Depends(Require("customers:read"))])
+@cached("dashboard-customers", ttl=CACHE_TTL["short"])
+async def get_customers_dashboard(
+    currency: Optional[str] = Query(default=None, description="Currency code"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Customers Dashboard endpoint.
+
+    Combines data from:
+    - Customer summary (total, active, at-risk)
+    - Billing health (outstanding, overdue)
+    - Subscription breakdown
+    - Recent customers
+    """
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+    currency = currency or "NGN"
+
+    # =========== CUSTOMER COUNTS ===========
+    total_customers = db.query(func.count(Customer.id)).filter(
+        Customer.status != CustomerStatus.INACTIVE
+    ).scalar() or 0
+
+    # Active (has active subscription or invoice in 30 days)
+    active_customers = db.query(func.count(distinct(Subscription.customer_id))).filter(
+        Subscription.status == SubscriptionStatus.ACTIVE,
+        *([Subscription.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # =========== BILLING HEALTH ===========
+    outstanding = db.query(
+        func.sum(Invoice.total_amount - Invoice.amount_paid)
+    ).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+        *([Invoice.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    overdue = db.query(
+        func.sum(Invoice.total_amount - Invoice.amount_paid)
+    ).filter(
+        Invoice.status == InvoiceStatus.OVERDUE,
+        *([Invoice.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    avg_invoice = db.query(
+        func.avg(Invoice.total_amount)
+    ).filter(
+        *([Invoice.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # =========== SUBSCRIPTIONS ===========
+    active_subscriptions = db.query(func.count(Subscription.id)).filter(
+        Subscription.status == SubscriptionStatus.ACTIVE,
+        *([Subscription.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # MRR calculation
+    mrr_case = case(
+        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
+        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
+        else_=Subscription.price
+    )
+    mrr = db.query(func.sum(mrr_case)).filter(
+        Subscription.status == SubscriptionStatus.ACTIVE,
+        *([Subscription.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # By plan
+    by_plan = db.query(
+        Subscription.plan_name,
+        func.count(Subscription.id).label("count")
+    ).filter(
+        Subscription.status == SubscriptionStatus.ACTIVE
+    ).group_by(Subscription.plan_name).order_by(
+        func.count(Subscription.id).desc()
+    ).limit(5).all()
+
+    plan_breakdown = [
+        {"plan": row.plan_name or "Unknown", "count": row.count}
+        for row in by_plan
+    ]
+
+    # =========== CHURNED (30 days) ===========
+    churned_30d = db.query(func.count(Subscription.id)).filter(
+        Subscription.status == SubscriptionStatus.CANCELLED,
+        Subscription.updated_at >= thirty_days_ago
+    ).scalar() or 0
+
+    # =========== RECENT CUSTOMERS ===========
+    recent_customers = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "customer_name": c.name,
+            "territory": None,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in db.query(Customer).filter(
+            Customer.status != CustomerStatus.INACTIVE
+        ).order_by(Customer.created_at.desc()).limit(5).all()
+    ]
+
+    return {
+        "generated_at": now.isoformat(),
+        "currency": currency,
+
+        "summary": {
+            "total_customers": total_customers,
+            "active": active_customers,
+            "churned_30d": churned_30d,
+        },
+
+        "billing": {
+            "outstanding": float(outstanding),
+            "overdue": float(overdue),
+            "avg_invoice_value": float(avg_invoice),
+        },
+
+        "subscriptions": {
+            "active": active_subscriptions,
+            "mrr": float(mrr),
+            "by_plan": plan_breakdown,
+        },
+
+        "recent": recent_customers,
     }

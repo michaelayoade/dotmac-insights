@@ -47,7 +47,7 @@ export default function SalesOrdersPage() {
       key: 'order_number',
       header: 'Order #',
       render: (item: any) => (
-        <span className="font-mono text-white">{item.order_number || `#${item.id}`}</span>
+        <span className="font-mono text-foreground">{item.order_number || `#${item.id}`}</span>
       ),
     },
     {
@@ -67,7 +67,7 @@ export default function SalesOrdersPage() {
       header: 'Amount',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total_amount || 0, item.currency || currency)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total_amount || 0, item.currency || currency)}</span>
       ),
     },
     {
@@ -90,7 +90,7 @@ export default function SalesOrdersPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShoppingCart className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Sales Orders</h1>
+          <h1 className="text-xl font-semibold text-foreground">Sales Orders</h1>
         </div>
         <Link
           href="/sales/orders/new"

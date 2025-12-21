@@ -19,7 +19,7 @@ export default function UnassignedPage() {
             <Inbox className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Unassigned</h1>
+            <h1 className="text-2xl font-bold text-foreground">Unassigned</h1>
             <p className="text-slate-muted text-sm">New conversations waiting for assignment</p>
           </div>
         </div>
@@ -38,13 +38,13 @@ export default function UnassignedPage() {
             )}
           >
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-white font-semibold">
+              <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-foreground font-semibold">
                 {conv.contact.charAt(0)}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">{conv.contact}</span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-white">
+                  <span className="font-semibold text-foreground">{conv.contact}</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-foreground">
                     {conv.unread}
                   </span>
                   {conv.priority === 'high' && (
@@ -66,10 +66,10 @@ export default function UnassignedPage() {
                   {conv.lastActivity}
                 </p>
               </div>
-              <button className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors" title="Assign to me">
+              <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Assign to me">
                 <UserPlus className="w-4 h-4" />
               </button>
-              <Link href={`/inbox?id=${conv.id}`} className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors">
+              <Link href={`/inbox?id=${conv.id}`} className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors">
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

@@ -50,12 +50,12 @@ function AccountLine({ name, amount, indent = 0, bold, className, pct }: Account
       )}
       style={{ paddingLeft: `${indent * 1.5}rem` }}
     >
-      <span className="text-white">{name}</span>
+      <span className="text-foreground">{name}</span>
       <div className="flex items-center gap-4">
         {pct !== undefined && (
           <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
         )}
-        <span className={cn('font-mono w-32 text-right', amount >= 0 ? 'text-white' : 'text-red-400')}>
+        <span className={cn('font-mono w-32 text-right', amount >= 0 ? 'text-foreground' : 'text-red-400')}>
           {formatCurrency(amount)}
         </span>
       </div>
@@ -255,7 +255,7 @@ export default function BalanceSheetPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Statement of Financial Position</h2>
+          <h2 className="text-lg font-semibold text-foreground">Statement of Financial Position</h2>
           {data?.as_of_date && (
             <span className="text-slate-muted text-sm">as of {data.as_of_date}</span>
           )}
@@ -285,7 +285,7 @@ export default function BalanceSheetPage() {
                 setAsOfDate('');
                 setCommonSize(false);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
             </button>
@@ -293,14 +293,14 @@ export default function BalanceSheetPage() {
           <div className="flex gap-2">
             <button
               onClick={() => exportSheet('csv')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
             </button>
             <button
               onClick={() => exportSheet('pdf')}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
@@ -348,7 +348,7 @@ export default function BalanceSheetPage() {
 
       {/* Assets Section */}
       <div className="space-y-4">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <Building2 className="w-5 h-5 text-blue-400" />
           Assets
         </h3>
@@ -386,7 +386,7 @@ export default function BalanceSheetPage() {
 
       {/* Liabilities Section */}
       <div className="space-y-4">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <CreditCard className="w-5 h-5 text-red-400" />
           Liabilities
         </h3>
@@ -424,7 +424,7 @@ export default function BalanceSheetPage() {
 
       {/* Equity Section with IFRS breakdown */}
       <div className="space-y-4">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <PiggyBank className="w-5 h-5 text-green-400" />
           Equity
         </h3>
@@ -451,7 +451,7 @@ export default function BalanceSheetPage() {
 
       {/* Accounting Equation */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">Accounting Equation (IAS 1)</h3>
+        <h3 className="text-foreground font-semibold mb-4">Accounting Equation (IAS 1)</h3>
         <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Assets</p>

@@ -58,13 +58,13 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Performance Analytics</h1>
+          <h1 className="text-xl font-semibold text-foreground">Performance Analytics</h1>
           <p className="text-sm text-slate-400 mt-1">
             Trends, distributions, and insights across periods
           </p>
         </div>
         <button
-          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg hover:bg-slate-elevated/80 transition-colors border border-slate-border"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg hover:bg-slate-elevated/80 transition-colors border border-slate-border"
         >
           <Download className="w-4 h-4" />
           Export Report
@@ -76,7 +76,7 @@ export default function AnalyticsPage() {
         <select
           value={periodId || ''}
           onChange={(e) => setPeriodId(e.target.value ? Number(e.target.value) : undefined)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.map((p) => (
@@ -90,13 +90,13 @@ export default function AnalyticsPage() {
           placeholder="Filter by department..."
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         />
       </div>
 
       {/* Trends Chart */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-        <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+        <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-violet-400" />
           Performance Trends
         </h3>
@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
                     <p className="text-xs text-slate-400 mt-2 text-center truncate w-full">
                       {point.period_name}
                     </p>
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-foreground">
                       {formatScore(point.avg_score)}
                     </p>
                   </div>
@@ -161,7 +161,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Score Distribution */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+          <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-violet-400" />
             Score Distribution
           </h3>
@@ -183,7 +183,7 @@ export default function AnalyticsPage() {
                 return (
                   <div key={band.key} className="space-y-1">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-300">{band.label}</span>
+                      <span className="text-foreground-secondary">{band.label}</span>
                       <span className="text-slate-400">{count} ({percent}%)</span>
                     </div>
                     <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
 
         {/* KRA Breakdown */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+          <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-cyan-400" />
             KRA Performance
           </h3>
@@ -218,7 +218,7 @@ export default function AnalyticsPage() {
               {kraBreakdown.map((kra) => (
                 <div key={kra.kra_id || kra.kra_code || kra.kra_name} className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{kra.kra_name}</p>
+                    <p className="text-foreground font-medium truncate">{kra.kra_name}</p>
                     <p className="text-xs text-slate-500">{kra.employee_count ?? kra.count ?? 0} employees</p>
                   </div>
                   <div className="text-right">
@@ -242,7 +242,7 @@ export default function AnalyticsPage() {
 
       {/* Department Comparison */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-        <h3 className="font-medium text-white mb-4 flex items-center gap-2">
+        <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
           <Building2 className="w-5 h-5 text-amber-400" />
           Department Overview
         </h3>

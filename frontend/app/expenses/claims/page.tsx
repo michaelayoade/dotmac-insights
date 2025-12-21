@@ -97,7 +97,7 @@ export default function ExpenseClaimsPage() {
                 <tr key={claim.id} className="border-b border-slate-border/50 hover:bg-slate-elevated/30 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/expenses/claims/${claim.id}`} className="block">
-                      <p className="text-white font-medium hover:text-teal-400 transition-colors">
+                      <p className="text-foreground font-medium hover:text-teal-400 transition-colors">
                         {claim.claim_number || `Draft #${claim.id}`}
                       </p>
                       <p className="text-sm text-slate-muted">{claim.title}</p>
@@ -117,7 +117,7 @@ export default function ExpenseClaimsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {claim.total_claimed_amount.toLocaleString()}
                     </span>
                   </td>

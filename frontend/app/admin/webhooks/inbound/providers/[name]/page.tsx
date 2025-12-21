@@ -37,18 +37,18 @@ export default function ProviderDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/admin/webhooks/inbound" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white hover:bg-slate-border">
+          <Link href="/admin/webhooks/inbound" className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
-          <h1 className="text-2xl font-bold text-white capitalize">{provider}</h1>
+          <h1 className="text-2xl font-bold text-foreground capitalize">{provider}</h1>
         </div>
         <button
           onClick={() => {
             mutate();
             mutateEvents();
           }}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -64,7 +64,7 @@ export default function ProviderDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-lg font-semibold text-white">Events</h3>
+            <h3 className="text-lg font-semibold text-foreground">Events</h3>
             <p className="text-sm text-slate-muted">Latest inbound events for this provider.</p>
           </div>
           <Link href="/admin/webhooks/inbound/events" className="text-sm text-teal-electric hover:text-teal-glow">
@@ -84,7 +84,7 @@ export default function ProviderDetailPage() {
           <tbody className="divide-y divide-slate-border">
             {((Array.isArray(events) ? events : events?.items) || []).map((event: any) => (
               <tr key={event.id}>
-                <td className="px-4 py-3 text-white">{event.id}</td>
+                <td className="px-4 py-3 text-foreground">{event.id}</td>
                 <td className="px-4 py-3 text-slate-muted">{event.event_type}</td>
                 <td className="px-4 py-3">
                   <span
@@ -105,7 +105,7 @@ export default function ProviderDetailPage() {
                   <div className="flex items-center justify-end gap-2">
                     <Link
                       href={`/admin/webhooks/inbound/events/${event.id}`}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white text-xs hover:bg-slate-border"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground text-xs hover:bg-slate-border"
                     >
                       <Activity className="w-3.5 h-3.5" />
                       Details

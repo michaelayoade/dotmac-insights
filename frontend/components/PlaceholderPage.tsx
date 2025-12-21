@@ -33,7 +33,7 @@ export function PlaceholderPage({
           backHref ? (
             <Link
               href={backHref}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg hover:bg-slate-border transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg hover:bg-slate-border transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               {backLabel}

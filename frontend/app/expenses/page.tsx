@@ -28,7 +28,7 @@ function StatCard({
   return (
     <div className={cn('rounded-2xl border p-4', 'border-slate-border', 'bg-slate-card')}>
       <p className="text-slate-muted text-sm">{label}</p>
-      <p className="text-3xl font-bold text-white mt-1">{value}</p>
+      <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
       {helper && (
         <p
           className={cn(
@@ -77,10 +77,10 @@ function ActionTile({
           <Icon className="w-5 h-5" />
         </div>
         <div className="flex-1">
-          <p className="text-white font-semibold">{title}</p>
+          <p className="text-foreground font-semibold">{title}</p>
           <p className="text-slate-muted text-sm">{desc}</p>
         </div>
-        <ArrowRight className="w-4 h-4 text-slate-muted group-hover:text-white transition" />
+        <ArrowRight className="w-4 h-4 text-slate-muted group-hover:text-foreground transition" />
       </div>
     </Link>
   );
@@ -139,7 +139,7 @@ export default function ExpensesDashboard() {
               <Sparkles className="w-4 h-4" />
               Expenses Workspace
             </div>
-            <h1 className="text-2xl font-bold text-white mt-3">Control spend without losing the audit trail</h1>
+            <h1 className="text-2xl font-bold text-foreground mt-3">Control spend without losing the audit trail</h1>
             <p className="text-slate-muted text-sm mt-2 max-w-2xl">
               Track employee claims and cash advances in one place. Submit, approve, and reconcile with clear statuses.
             </p>
@@ -154,7 +154,7 @@ export default function ExpensesDashboard() {
             </Link>
             <Link
               href="/expenses/advances/new"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-border px-4 py-2 text-white hover:border-sky-400"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-border px-4 py-2 text-foreground hover:border-sky-400"
             >
               <PlusCircle className="w-4 h-4" />
               Cash advance
@@ -192,7 +192,7 @@ export default function ExpensesDashboard() {
         <div className="rounded-2xl border border-slate-border bg-slate-card p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-white font-semibold">Recent claims</p>
+              <p className="text-foreground font-semibold">Recent claims</p>
               <p className="text-slate-muted text-sm">Last 4 submissions</p>
             </div>
             <Link href="/expenses/claims" className="text-sky-300 text-sm inline-flex items-center gap-1">
@@ -211,14 +211,14 @@ export default function ExpensesDashboard() {
                     <ClipboardList className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-white text-sm font-semibold">
+                    <p className="text-foreground text-sm font-semibold">
                       {claim.claim_number || `Claim #${claim.id}`}
                     </p>
                     <p className="text-slate-muted text-xs">{claim.title}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white text-sm font-semibold">{claim.total_claimed_amount.toLocaleString()}</p>
+                  <p className="text-foreground text-sm font-semibold">{claim.total_claimed_amount.toLocaleString()}</p>
                   <p className="text-slate-muted text-xs uppercase">{claim.status}</p>
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function ExpensesDashboard() {
         <div className="rounded-2xl border border-slate-border bg-slate-card p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-white font-semibold">Recent advances</p>
+              <p className="text-foreground font-semibold">Recent advances</p>
               <p className="text-slate-muted text-sm">Last 4 requests</p>
             </div>
             <Link href="/expenses/advances" className="text-emerald-300 text-sm inline-flex items-center gap-1">
@@ -248,14 +248,14 @@ export default function ExpensesDashboard() {
                     <Wallet2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-white text-sm font-semibold">
+                    <p className="text-foreground text-sm font-semibold">
                       {advance.advance_number || `Advance #${advance.id}`}
                     </p>
                     <p className="text-slate-muted text-xs">{advance.purpose}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white text-sm font-semibold">{advance.requested_amount.toLocaleString()}</p>
+                  <p className="text-foreground text-sm font-semibold">{advance.requested_amount.toLocaleString()}</p>
                   <p className="text-slate-muted text-xs uppercase">{advance.status}</p>
                 </div>
               </div>

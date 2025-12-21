@@ -55,11 +55,11 @@ export default function InboxSettingsPage() {
             <Settings className="w-5 h-5 text-slate-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Inbox Settings</h1>
+            <h1 className="text-2xl font-bold text-foreground">Inbox Settings</h1>
             <p className="text-slate-muted text-sm">Configure your inbox preferences</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Save className="w-4 h-4" />
           Save Changes
         </button>
@@ -69,13 +69,13 @@ export default function InboxSettingsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="w-5 h-5 text-blue-400" />
-          <h2 className="text-lg font-semibold text-white">Notifications & Alerts</h2>
+          <h2 className="text-lg font-semibold text-foreground">Notifications & Alerts</h2>
         </div>
         <div className="space-y-4">
           {settings.slice(0, 3).map((setting) => (
             <div key={setting.id} className="flex items-center justify-between py-3 border-b border-slate-border/50 last:border-0">
               <div>
-                <p className="text-white font-medium">{setting.label}</p>
+                <p className="text-foreground font-medium">{setting.label}</p>
                 <p className="text-sm text-slate-muted">{setting.description}</p>
               </div>
               <button
@@ -93,13 +93,13 @@ export default function InboxSettingsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <MessageSquare className="w-5 h-5 text-emerald-400" />
-          <h2 className="text-lg font-semibold text-white">Conversation Behavior</h2>
+          <h2 className="text-lg font-semibold text-foreground">Conversation Behavior</h2>
         </div>
         <div className="space-y-4">
           {settings.slice(3).map((setting) => (
             <div key={setting.id} className="flex items-center justify-between py-3 border-b border-slate-border/50 last:border-0">
               <div>
-                <p className="text-white font-medium">{setting.label}</p>
+                <p className="text-foreground font-medium">{setting.label}</p>
                 <p className="text-sm text-slate-muted">{setting.description}</p>
               </div>
               <button
@@ -118,7 +118,7 @@ export default function InboxSettingsPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Working Hours</h2>
+            <h2 className="text-lg font-semibold text-foreground">Working Hours</h2>
           </div>
           <button
             onClick={() => setWorkingHours((prev) => ({ ...prev, enabled: !prev.enabled }))}
@@ -137,7 +137,7 @@ export default function InboxSettingsPage() {
                   type="time"
                   value={workingHours.start}
                   onChange={(e) => setWorkingHours((prev) => ({ ...prev, start: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
               <div>
@@ -146,7 +146,7 @@ export default function InboxSettingsPage() {
                   type="time"
                   value={workingHours.end}
                   onChange={(e) => setWorkingHours((prev) => ({ ...prev, end: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
               <div>
@@ -154,7 +154,7 @@ export default function InboxSettingsPage() {
                 <select
                   value={workingHours.timezone}
                   onChange={(e) => setWorkingHours((prev) => ({ ...prev, timezone: e.target.value }))}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="Africa/Lagos">Africa/Lagos (WAT)</option>
                   <option value="Europe/London">Europe/London (GMT)</option>
@@ -181,7 +181,7 @@ export default function InboxSettingsPage() {
                       'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
                       workingHours.daysOff.includes(day)
                         ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                        : 'bg-slate-elevated text-slate-muted hover:text-white'
+                        : 'bg-slate-elevated text-slate-muted hover:text-foreground'
                     )}
                   >
                     {day.slice(0, 3)}
@@ -197,7 +197,7 @@ export default function InboxSettingsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <User className="w-5 h-5 text-violet-400" />
-          <h2 className="text-lg font-semibold text-white">Agent Profile</h2>
+          <h2 className="text-lg font-semibold text-foreground">Agent Profile</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -205,7 +205,7 @@ export default function InboxSettingsPage() {
             <input
               type="text"
               defaultValue="Support Agent"
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
           <div>
@@ -213,7 +213,7 @@ export default function InboxSettingsPage() {
             <input
               type="email"
               defaultValue="agent@company.com"
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
           <div className="md:col-span-2">
@@ -221,7 +221,7 @@ export default function InboxSettingsPage() {
             <textarea
               rows={3}
               defaultValue="Best regards,\nSupport Team"
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
         </div>

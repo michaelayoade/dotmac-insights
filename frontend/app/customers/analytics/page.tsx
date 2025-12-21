@@ -308,7 +308,7 @@ export default function CustomerAnalyticsPage() {
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
               activeTab === tab.key
                 ? 'bg-teal-electric/20 text-teal-electric border-b-2 border-teal-electric'
-                : 'text-slate-muted hover:text-white'
+                : 'text-slate-muted hover:text-foreground'
             }`}
           >
             {tab.label}
@@ -325,7 +325,7 @@ export default function CustomerAnalyticsPage() {
             <select
               value={months}
               onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
             >
               <option value={6}>Last 6 months</option>
               <option value={12}>Last 12 months</option>
@@ -438,7 +438,7 @@ export default function CustomerAnalyticsPage() {
                 <div className="space-y-2">
                   {activeByType.map((row) => (
                     <div key={row.type} className="flex items-center justify-between text-sm bg-slate-card/50 rounded-lg px-3 py-2 border border-slate-border/50">
-                      <span className="text-white capitalize">{row.type}</span>
+                      <span className="text-foreground capitalize">{row.type}</span>
                       <div className="flex items-center gap-4 text-slate-muted">
                         <span>{(row.count ?? (row as any).customer_count ?? 0).toLocaleString()} customers</span>
                         {row.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>}
@@ -456,7 +456,7 @@ export default function CustomerAnalyticsPage() {
                 <div className="space-y-2">
                   {activeTenure.map((row, idx) => (
                     <div key={`${row.bucket}-${idx}`} className="flex items-center justify-between text-sm bg-slate-card/50 rounded-lg px-3 py-2 border border-slate-border/50">
-                      <span className="text-white">{row.bucket || 'Unspecified'}</span>
+                      <span className="text-foreground">{row.bucket || 'Unspecified'}</span>
                       <div className="flex items-center gap-4 text-slate-muted">
                         <span>{(row.count ?? 0).toLocaleString()} customers</span>
                         {row.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>}
@@ -481,7 +481,7 @@ export default function CustomerAnalyticsPage() {
                       key: 'plan_name',
                       header: 'Plan',
                       sortable: true,
-                      render: (row) => <span className="text-white">{(row.plan_name as string) || 'Unknown plan'}</span>,
+                      render: (row) => <span className="text-foreground">{(row.plan_name as string) || 'Unknown plan'}</span>,
                     },
                     {
                       key: 'customer_count',
@@ -509,7 +509,7 @@ export default function CustomerAnalyticsPage() {
                 <div className="space-y-2">
                   {activeLocations.map((pop) => (
                     <div key={pop.pop_name || pop.pop_id} className="flex items-center justify-between text-sm bg-slate-card/50 rounded-lg px-3 py-2 border border-slate-border/50">
-                      <div className="text-white">{pop.pop_name || `POP ${pop.pop_id ?? ''}`}</div>
+                      <div className="text-foreground">{pop.pop_name || `POP ${pop.pop_id ?? ''}`}</div>
                       <div className="text-right text-slate-muted">
                         <span className="mr-3">{(pop.customer_count ?? 0).toLocaleString()} customers</span>
                         {pop.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(pop.mrr, 'NGN')}</span>}
@@ -536,7 +536,7 @@ export default function CustomerAnalyticsPage() {
                     <div className="space-y-2">
                       {serviceHealth?.no_recent_usage?.slice(0, 5).map((row, idx) => (
                         <div key={`${row.name}-${idx}`} className="flex items-center justify-between text-xs text-slate-muted">
-                          <span className="text-white">{row.name}</span>
+                          <span className="text-foreground">{row.name}</span>
                           <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>
                         </div>
                       )) || <p className="text-slate-muted text-xs">No entries</p>}
@@ -547,7 +547,7 @@ export default function CustomerAnalyticsPage() {
                     <div className="space-y-2">
                       {serviceHealth?.low_usage?.slice(0, 5).map((row, idx) => (
                         <div key={`${row.name}-${idx}`} className="flex items-center justify-between text-xs text-slate-muted">
-                          <span className="text-white">{row.name}</span>
+                          <span className="text-foreground">{row.name}</span>
                           <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>
                         </div>
                       )) || <p className="text-slate-muted text-xs">No entries</p>}
@@ -558,7 +558,7 @@ export default function CustomerAnalyticsPage() {
                     <div className="space-y-2">
                       {serviceHealth?.inactive_7_days?.slice(0, 5).map((row, idx) => (
                         <div key={`${row.name}-${idx}`} className="flex items-center justify-between text-xs text-slate-muted">
-                          <span className="text-white">{row.name}</span>
+                          <span className="text-foreground">{row.name}</span>
                           <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>
                         </div>
                       )) || <p className="text-slate-muted text-xs">No entries</p>}
@@ -575,19 +575,19 @@ export default function CustomerAnalyticsPage() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="bg-amber-warn/10 border border-amber-warn/30 rounded-lg p-3">
                     <p className="text-xs uppercase text-amber-warn">Blocking soon</p>
-                    <p className="text-white font-mono text-xl">{(paymentRisk.blocking_soon ?? 0).toLocaleString()}</p>
+                    <p className="text-foreground font-mono text-xl">{(paymentRisk.blocking_soon ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="bg-coral-alert/10 border border-coral-alert/30 rounded-lg p-3">
                     <p className="text-xs uppercase text-coral-alert">Overdue invoices</p>
-                    <p className="text-white font-mono text-xl">{(paymentRisk.overdue_invoices ?? 0).toLocaleString()}</p>
+                    <p className="text-foreground font-mono text-xl">{(paymentRisk.overdue_invoices ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
                     <p className="text-xs uppercase text-purple-300">Negative deposits</p>
-                    <p className="text-white font-mono text-xl">{(paymentRisk.negative_deposit ?? 0).toLocaleString()}</p>
+                    <p className="text-foreground font-mono text-xl">{(paymentRisk.negative_deposit ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="bg-teal-electric/10 border border-teal-electric/30 rounded-lg p-3">
                     <p className="text-xs uppercase text-teal-electric">MRR at risk</p>
-                    <p className="text-white font-mono text-xl">{formatCurrency(paymentRisk.mrr_at_risk ?? 0, 'NGN')}</p>
+                    <p className="text-foreground font-mono text-xl">{formatCurrency(paymentRisk.mrr_at_risk ?? 0, 'NGN')}</p>
                   </div>
                 </div>
               )}
@@ -603,7 +603,7 @@ export default function CustomerAnalyticsPage() {
                   {topActiveCustomers.slice(0, 10).map((cust, idx) => (
                     <div key={cust.customer_id ?? cust.name ?? idx} className="flex items-center justify-between text-sm bg-slate-card/50 rounded-lg px-3 py-2 border border-slate-border/50">
                       <div>
-                        <p className="text-white font-medium">{cust.name}</p>
+                        <p className="text-foreground font-medium">{cust.name}</p>
                         <p className="text-xs text-slate-muted">
                           {cust.last_seen ? `Last seen ${new Date(cust.last_seen).toLocaleDateString()}` : 'No last seen data'}
                         </p>
@@ -625,7 +625,7 @@ export default function CustomerAnalyticsPage() {
                 <div className="space-y-2">
                   {supportConcerns.slice(0, 10).map((row, idx) => (
                     <div key={row.customer_id ?? row.name ?? idx} className="flex items-center justify-between text-sm bg-slate-card/50 rounded-lg px-3 py-2 border border-slate-border/50">
-                      <div className="text-white">{row.name}</div>
+                      <div className="text-foreground">{row.name}</div>
                       <div className="text-right text-slate-muted flex items-center gap-3">
                         {row.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(row.mrr, 'NGN')}</span>}
                         <span className="px-2 py-1 bg-amber-warn/10 text-amber-warn rounded-lg border border-amber-warn/30 text-xs font-medium">
@@ -693,7 +693,7 @@ export default function CustomerAnalyticsPage() {
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
-                          <span className="text-white">{plan.plan_name}</span>
+                          <span className="text-foreground">{plan.plan_name}</span>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-slate-muted">{plan.customer_count} customers</span>
@@ -731,7 +731,7 @@ export default function CustomerAnalyticsPage() {
                   <div className="space-y-2">
                     {normalizedByType.map((type) => (
                       <div key={type.customer_type} className="flex items-center justify-between text-sm">
-                        <span className="text-white capitalize">{type.customer_type}</span>
+                        <span className="text-foreground capitalize">{type.customer_type}</span>
                         <div className="flex items-center gap-4">
                           <span className="text-slate-muted">{type.count} customers</span>
                           {type.mrr !== undefined && (
@@ -758,7 +758,7 @@ export default function CustomerAnalyticsPage() {
                       key: 'city',
                       header: 'City',
                       sortable: true,
-                      render: (row) => <span className="text-white capitalize">{(row.city as string) || 'Unknown'}</span>,
+                      render: (row) => <span className="text-foreground capitalize">{(row.city as string) || 'Unknown'}</span>,
                     },
                     {
                       key: 'state',
@@ -771,7 +771,7 @@ export default function CustomerAnalyticsPage() {
                       header: 'Customers',
                       sortable: true,
                       align: 'right',
-                      render: (row) => <span className="text-white">{(row.customer_count as number)?.toLocaleString() ?? 0}</span>,
+                      render: (row) => <span className="text-foreground">{(row.customer_count as number)?.toLocaleString() ?? 0}</span>,
                     },
                     {
                       key: 'mrr',
@@ -800,7 +800,7 @@ export default function CustomerAnalyticsPage() {
             <select
               value={cohortMonths}
               onChange={(e) => setCohortMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
             >
               <option value={12}>Last 12 months</option>
               <option value={24}>Last 24 months</option>
@@ -840,8 +840,8 @@ export default function CustomerAnalyticsPage() {
                 keyField="_id"
                 data={cohortRows as any[]}
                 columns={[
-                  { key: 'cohort', header: 'Cohort', sortable: true, render: (row) => <span className="text-white font-medium">{row.cohort as string}</span> },
-                  { key: 'total_customers', header: 'Total', sortable: true, align: 'right', render: (row) => <span className="text-white">{row.total_customers as number}</span> },
+                  { key: 'cohort', header: 'Cohort', sortable: true, render: (row) => <span className="text-foreground font-medium">{row.cohort as string}</span> },
+                  { key: 'total_customers', header: 'Total', sortable: true, align: 'right', render: (row) => <span className="text-foreground">{row.total_customers as number}</span> },
                   { key: 'active', header: 'Active', sortable: true, align: 'right', render: (row) => <span className="text-teal-electric">{row.active ?? '—'}</span> },
                   { key: 'new', header: 'New', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{(row as any).new ?? '—'}</span> },
                   { key: 'blocked', header: 'Blocked', sortable: true, align: 'right', render: (row) => <span className="text-slate-muted">{(row as any).blocked ?? '—'}</span> },
@@ -908,7 +908,7 @@ export default function CustomerAnalyticsPage() {
                 <div className="space-y-2">
                   {normalizedByPop.map((pop) => (
                     <div key={pop.pop_id ?? pop.pop_name} className="flex items-center justify-between text-sm">
-                      <div className="text-white">{pop.pop_name || `POP ${pop.pop_id}`}</div>
+                      <div className="text-foreground">{pop.pop_name || `POP ${pop.pop_id}`}</div>
                       <div className="text-right text-slate-muted">
                         <span className="mr-3">{pop.customer_count} customers</span>
                         {pop.mrr !== undefined && <span className="text-teal-electric">{formatCurrency(pop.mrr, 'NGN')}</span>}
@@ -930,7 +930,7 @@ export default function CustomerAnalyticsPage() {
                     return (
                       <div key={routerId} className="flex items-center justify-between text-sm border-b border-slate-border/60 pb-2">
                         <div>
-                          <p className="text-white font-medium">{routerRow.router_name || routerRow.name || routerId}</p>
+                          <p className="text-foreground font-medium">{routerRow.router_name || routerRow.name || routerId}</p>
                           <p className="text-xs text-slate-muted">POP {routerRow.pop_id || routerRow.pop}</p>
                         </div>
                         <div className="text-right text-slate-muted">
@@ -951,7 +951,7 @@ export default function CustomerAnalyticsPage() {
               <select
                 value={ticketDays}
                 onChange={(e) => setTicketDays(Number(e.target.value))}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-white"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-foreground"
               >
                 <option value={30}>30 days</option>
                 <option value={60}>60 days</option>
@@ -965,7 +965,7 @@ export default function CustomerAnalyticsPage() {
                 {normalizedTicketBuckets.map((b) => (
                   <div key={b.bucket} className="bg-slate-card/60 rounded-lg p-3 text-sm">
                     <p className="text-slate-muted capitalize">{b.bucket.replace(/_/g, ' ')}</p>
-                    <p className="text-white font-mono text-lg">{b.count.toLocaleString()}</p>
+                    <p className="text-foreground font-mono text-lg">{b.count.toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -982,7 +982,7 @@ export default function CustomerAnalyticsPage() {
                     <p className="text-xs uppercase text-slate-muted mb-1">Missing Contact by POP</p>
                     {(outreach as any).missing_contact?.by_pop?.map((row: any) => (
                       <div key={row.pop_name || row.pop_id} className="flex justify-between">
-                        <span className="text-white">{row.pop_name || `POP ${row.pop_id}`}</span>
+                        <span className="text-foreground">{row.pop_name || `POP ${row.pop_id}`}</span>
                         <span>{row.missing_count ?? row.missing_email ?? 0} missing</span>
                       </div>
                     )) || <p>No POP gaps</p>}
@@ -991,7 +991,7 @@ export default function CustomerAnalyticsPage() {
                     <p className="text-xs uppercase text-slate-muted mb-1">Missing Contact by Plan</p>
                     {(outreach as any).missing_contact?.by_plan?.map((row: any) => (
                       <div key={row.plan_name} className="flex justify-between">
-                        <span className="text-white">{row.plan_name}</span>
+                        <span className="text-foreground">{row.plan_name}</span>
                         <span>{row.missing_count ?? row.missing_email ?? 0} missing</span>
                       </div>
                     )) || <p>No plan gaps</p>}
@@ -1000,7 +1000,7 @@ export default function CustomerAnalyticsPage() {
                     <p className="text-xs uppercase text-slate-muted mb-1">Linkage Gaps</p>
                     {(outreach as any).linkage_gaps?.map((row: any) => (
                       <div key={row.customer_type} className="flex justify-between">
-                        <span className="text-white capitalize">{row.customer_type}</span>
+                        <span className="text-foreground capitalize">{row.customer_type}</span>
                         <span>{row.total ?? 0} missing links</span>
                       </div>
                     )) || <p>No linkage gaps</p>}
@@ -1020,7 +1020,7 @@ export default function CustomerAnalyticsPage() {
                       <div className="space-y-2">
                         {((revenueOverdue as any)?.by_segment || (revenueOverdue as any)?.segments || []).map((seg: any, idx: number) => (
                           <div key={idx} className="flex justify-between">
-                            <span className="text-white">
+                            <span className="text-foreground">
                               {seg.pop_name || seg.pop_id || ''} {seg.plan_name ? `• ${seg.plan_name}` : ''}
                             </span>
                             <span className="text-coral-alert font-mono">{formatCurrency(seg.balance || 0, 'NGN')}</span>
@@ -1036,7 +1036,7 @@ export default function CustomerAnalyticsPage() {
                         <select
                           value={paymentDays}
                           onChange={(e) => setPaymentDays(Number(e.target.value))}
-                          className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-xs text-white"
+                          className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-xs text-foreground"
                         >
                           <option value={90}>90 days</option>
                           <option value={180}>180 days</option>
@@ -1046,7 +1046,7 @@ export default function CustomerAnalyticsPage() {
                       <div className="space-y-2 max-h-[240px] overflow-y-auto">
                         {paymentTimeliness.map((row: any, idx: number) => (
                           <div key={idx} className="flex justify-between text-xs text-slate-muted bg-slate-card/60 rounded-lg p-2">
-                            <span className="text-white">{row.customer_type} {row.plan_name ? `• ${row.plan_name}` : ''}</span>
+                            <span className="text-foreground">{row.customer_type} {row.plan_name ? `• ${row.plan_name}` : ''}</span>
                             <span className="text-teal-electric">{(row.on_time_rate ?? 0).toFixed(1)}% on-time</span>
                           </div>
                         ))}

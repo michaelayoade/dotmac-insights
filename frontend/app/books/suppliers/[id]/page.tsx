@@ -124,7 +124,7 @@ export default function SupplierDetailPage() {
         <p className="text-red-400">Supplier not found</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -150,14 +150,14 @@ export default function SupplierDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/suppliers"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to suppliers
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Supplier</p>
-            <h1 className="text-xl font-semibold text-white">{supplier.name || supplier.supplier_name || `Supplier #${supplier.id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{supplier.name || supplier.supplier_name || `Supplier #${supplier.id}`}</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ export default function SupplierDetailPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save
@@ -213,7 +213,7 @@ export default function SupplierDetailPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleDelete}
-                className="px-3 py-1.5 rounded-lg bg-coral-alert text-white text-sm font-medium hover:bg-coral-alert/80"
+                className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
               >
                 Yes, Delete
               </button>
@@ -256,7 +256,7 @@ export default function SupplierDetailPage() {
       {isEditing ? (
         <div className="space-y-4">
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-            <h3 className="text-white font-semibold mb-4">Basic Information</h3>
+            <h3 className="text-foreground font-semibold mb-4">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs text-slate-muted">Supplier Name</label>
@@ -264,7 +264,7 @@ export default function SupplierDetailPage() {
                   name="supplier_name"
                   value={form.supplier_name || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -273,7 +273,7 @@ export default function SupplierDetailPage() {
                   name="supplier_code"
                   value={form.supplier_code || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -282,7 +282,7 @@ export default function SupplierDetailPage() {
                   name="supplier_type"
                   value={form.supplier_type || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="">Select type</option>
                   {SUPPLIER_TYPES.map((type) => (
@@ -296,14 +296,14 @@ export default function SupplierDetailPage() {
                   name="supplier_group"
                   value={form.supplier_group || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
           </div>
 
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-            <h3 className="text-white font-semibold mb-4">Contact & Location</h3>
+            <h3 className="text-foreground font-semibold mb-4">Contact & Location</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs text-slate-muted">Email</label>
@@ -312,7 +312,7 @@ export default function SupplierDetailPage() {
                   type="email"
                   value={form.email || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -321,7 +321,7 @@ export default function SupplierDetailPage() {
                   name="phone"
                   value={form.phone || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -330,7 +330,7 @@ export default function SupplierDetailPage() {
                   name="country"
                   value={form.country || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -339,14 +339,14 @@ export default function SupplierDetailPage() {
                   name="tax_id"
                   value={form.tax_id || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
           </div>
 
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-            <h3 className="text-white font-semibold mb-4">Settings</h3>
+            <h3 className="text-foreground font-semibold mb-4">Settings</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs text-slate-muted">Default Currency</label>
@@ -355,7 +355,7 @@ export default function SupplierDetailPage() {
                   value={form.default_currency || ''}
                   onChange={handleChange}
                   maxLength={3}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -364,7 +364,7 @@ export default function SupplierDetailPage() {
                   name="payment_terms"
                   value={form.payment_terms || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="flex items-center gap-2 pt-6">
@@ -385,7 +385,7 @@ export default function SupplierDetailPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
             <div className="flex items-center gap-2">
               <Building className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold">Details</h3>
+              <h3 className="text-foreground font-semibold">Details</h3>
             </div>
             <p className="text-slate-200 text-sm">
               {supplier.name || supplier.supplier_name} {supplier.code ? `(${supplier.code})` : ''}
@@ -400,7 +400,7 @@ export default function SupplierDetailPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-2">
             <div className="flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold">Financials</h3>
+              <h3 className="text-foreground font-semibold">Financials</h3>
             </div>
             <p className="text-sm text-slate-200">Currency: {currency}</p>
             <p className="text-sm text-slate-200">Outstanding: {formatCurrency(outstanding, currency)}</p>
@@ -414,7 +414,7 @@ export default function SupplierDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Receipt className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Notes</h3>
+            <h3 className="text-foreground font-semibold">Notes</h3>
           </div>
           <p className="text-slate-muted text-sm">{supplier.notes || 'No notes provided'}</p>
         </div>

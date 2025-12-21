@@ -40,17 +40,17 @@ export default function InboundEventDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-white hover:bg-slate-border"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <h1 className="text-2xl font-bold text-white">Event {data.id}</h1>
+          <h1 className="text-2xl font-bold text-foreground">Event {data.id}</h1>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => mutate()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
@@ -91,7 +91,7 @@ function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl p-4">
       <p className="text-xs text-slate-muted uppercase tracking-wide">{label}</p>
-      <p className="text-white text-base mt-1">{value}</p>
+      <p className="text-foreground text-base mt-1">{value}</p>
     </div>
   );
 }

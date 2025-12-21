@@ -88,7 +88,7 @@ export default function EmployeesPage() {
       header: 'Employee',
       render: (item: HrEmployee) => (
         <div className="flex flex-col">
-          <span className="text-white font-medium">{item.name}</span>
+          <span className="text-foreground font-medium">{item.name}</span>
           <span className="text-xs text-slate-muted">{item.employee_number || item.email || '-'}</span>
         </div>
       ),
@@ -146,7 +146,7 @@ export default function EmployeesPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function EmployeesPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Employees</h1>
+            <h1 className="text-xl font-semibold text-foreground">Employees</h1>
           </div>
           {!isCreating && (
             <button
@@ -197,13 +197,13 @@ export default function EmployeesPage() {
             placeholder="Search employees..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full sm:w-64 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full sm:w-64 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
 
         {(isCreating || editingId) && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">
+            <h3 className="text-sm font-medium text-foreground mb-3">
               {isCreating ? 'New Employee' : 'Edit Employee'}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -213,7 +213,7 @@ export default function EmployeesPage() {
                   type="text"
                   value={formData.first_name || ''}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   autoFocus
                 />
               </div>
@@ -223,7 +223,7 @@ export default function EmployeesPage() {
                   type="text"
                   value={formData.last_name || ''}
                   onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -232,7 +232,7 @@ export default function EmployeesPage() {
                   type="email"
                   value={formData.company_email || ''}
                   onChange={(e) => setFormData({ ...formData, company_email: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -241,7 +241,7 @@ export default function EmployeesPage() {
                   type="text"
                   value={formData.department || ''}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -250,7 +250,7 @@ export default function EmployeesPage() {
                   type="text"
                   value={formData.designation || ''}
                   onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div>
@@ -258,7 +258,7 @@ export default function EmployeesPage() {
                 <select
                   value={formData.status || 'Active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="Active">Active</option>
                   <option value="Left">Left</option>
@@ -270,7 +270,7 @@ export default function EmployeesPage() {
               <button
                 onClick={() => isCreating ? handleCreate() : handleUpdate(editingId!)}
                 disabled={!formData.first_name?.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCreating ? 'Create' : 'Save'}
               </button>

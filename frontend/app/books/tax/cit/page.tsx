@@ -50,7 +50,7 @@ export default function CITPage() {
     {
       key: 'year',
       header: 'Year',
-      render: (item: any) => <span className="text-white font-medium">{item.year}</span>,
+      render: (item: any) => <span className="text-foreground font-medium">{item.year}</span>,
     },
     {
       key: 'company_size',
@@ -73,7 +73,7 @@ export default function CITPage() {
       key: 'turnover',
       header: 'Turnover',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.turnover, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.turnover, 'NGN')}</span>,
     },
     {
       key: 'profit_before_tax',
@@ -89,7 +89,7 @@ export default function CITPage() {
       key: 'taxable_profit',
       header: 'Taxable Profit',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.taxable_profit, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.taxable_profit, 'NGN')}</span>,
     },
     {
       key: 'cit_rate',
@@ -137,14 +137,14 @@ export default function CITPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Building2 className="w-5 h-5 text-purple-400" />
-            <h1 className="text-xl font-semibold text-white">Company Income Tax (CIT)</h1>
+            <h1 className="text-xl font-semibold text-foreground">Company Income Tax (CIT)</h1>
           </div>
         </div>
         <button
@@ -164,7 +164,7 @@ export default function CITPage() {
               <TrendingUp className="w-4 h-4 text-slate-muted" />
               <p className="text-slate-muted text-sm">Turnover ({latestAssessment.year})</p>
             </div>
-            <p className="text-xl font-semibold text-white font-mono">
+            <p className="text-xl font-semibold text-foreground font-mono">
               {formatCurrency(latestAssessment.turnover, 'NGN')}
             </p>
           </div>
@@ -186,7 +186,7 @@ export default function CITPage() {
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">Company Size</p>
-            <p className="text-xl font-semibold text-white mt-1">
+            <p className="text-xl font-semibold text-foreground mt-1">
               {CIT_RATES.find(r => r.size === latestAssessment.company_size)?.label || latestAssessment.company_size}
             </p>
             <p className="text-xs text-slate-muted mt-1">Rate: {latestAssessment.cit_rate}%</p>
@@ -245,7 +245,7 @@ export default function CITPage() {
 
       {/* CIT Rate Guide */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-teal-electric" />
           Nigerian CIT Rate Guide
         </h3>
@@ -261,7 +261,7 @@ export default function CITPage() {
               )}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">{rate.label}</span>
+                <span className="text-foreground font-medium">{rate.label}</span>
                 <span className={cn(
                   'text-xl font-mono font-semibold',
                   rate.size === 'SMALL' ? 'text-emerald-400' :
@@ -340,11 +340,11 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
   return (
     <form onSubmit={handleSubmit} className="bg-slate-card border border-purple-500/30 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <Plus className="w-4 h-4 text-purple-400" />
           New CIT Assessment
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-white text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -387,7 +387,7 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
       <button
         type="button"
         onClick={() => setShowMore(!showMore)}
-        className="flex items-center gap-2 text-sm text-slate-muted hover:text-white"
+        className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         Adjustments
@@ -446,7 +446,7 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
           </div>
           <div>
             <span className="text-slate-muted">Taxable Profit: </span>
-            <span className="text-white font-mono">{formatCurrency(taxableProfit, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatCurrency(taxableProfit, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">CIT Liability: </span>

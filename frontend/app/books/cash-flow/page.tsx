@@ -47,7 +47,7 @@ function CashFlowLine({ label, amount, indent = 0, bold, colorClass }: CashFlowL
       className={cn('flex justify-between items-center py-2 border-b border-slate-border/30', bold && 'font-semibold')}
       style={{ paddingLeft: `${indent * 1.5}rem` }}
     >
-      <span className="text-slate-300">{label}</span>
+      <span className="text-foreground-secondary">{label}</span>
       <span className={cn('font-mono', color)}>{formatCurrency(amount)}</span>
     </div>
   );
@@ -170,7 +170,7 @@ export default function CashFlowPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2">
           <Wallet className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Statement of Cash Flows (IAS 7)</h2>
+          <h2 className="text-lg font-semibold text-foreground">Statement of Cash Flows (IAS 7)</h2>
           {data?.period && (
             <span className="text-slate-muted text-sm">
               {data.period.start_date} to {data.period.end_date}
@@ -206,7 +206,7 @@ export default function CashFlowPage() {
                 setEndDate('');
                 setFiscalYear('');
               }}
-              className="text-slate-muted text-sm hover:text-white"
+              className="text-slate-muted text-sm hover:text-foreground"
             >
               Clear
             </button>
@@ -288,7 +288,7 @@ export default function CashFlowPage() {
 
       {/* Cash Flow Summary */}
       <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-4">Cash Flow Summary</h3>
+        <h3 className="text-foreground font-semibold mb-4">Cash Flow Summary</h3>
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-slate-border">
             <span className="text-slate-muted">Opening Cash Balance</span>
@@ -313,7 +313,7 @@ export default function CashFlowPage() {
             </span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-border font-semibold">
-            <span className="text-white">Net Change in Cash</span>
+            <span className="text-foreground">Net Change in Cash</span>
             <span className={cn('font-mono', netChange >= 0 ? 'text-green-400' : 'text-red-400')}>
               {formatCurrency(netChange, currency)}
             </span>
@@ -328,7 +328,7 @@ export default function CashFlowPage() {
       {/* IAS 7 Supplementary Disclosures */}
       {disclosures && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Receipt className="w-5 h-5 text-teal-electric" />
             IAS 7 Supplementary Disclosures
           </h3>
@@ -338,7 +338,7 @@ export default function CashFlowPage() {
                 <Banknote className="w-4 h-4 text-red-400" />
                 <span className="text-slate-muted text-sm">Interest Paid</span>
               </div>
-              <p className="font-mono text-white">{formatCurrency(disclosures.interest_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatCurrency(disclosures.interest_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.interest_paid || 'operating'}
               </p>
@@ -348,7 +348,7 @@ export default function CashFlowPage() {
                 <Banknote className="w-4 h-4 text-green-400" />
                 <span className="text-slate-muted text-sm">Interest Received</span>
               </div>
-              <p className="font-mono text-white">{formatCurrency(disclosures.interest_received, currency)}</p>
+              <p className="font-mono text-foreground">{formatCurrency(disclosures.interest_received, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.interest_received || 'operating'}
               </p>
@@ -358,7 +358,7 @@ export default function CashFlowPage() {
                 <DollarSign className="w-4 h-4 text-purple-400" />
                 <span className="text-slate-muted text-sm">Dividends Paid</span>
               </div>
-              <p className="font-mono text-white">{formatCurrency(disclosures.dividends_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatCurrency(disclosures.dividends_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.dividends_paid || 'financing'}
               </p>
@@ -368,7 +368,7 @@ export default function CashFlowPage() {
                 <DollarSign className="w-4 h-4 text-green-400" />
                 <span className="text-slate-muted text-sm">Dividends Received</span>
               </div>
-              <p className="font-mono text-white">{formatCurrency(disclosures.dividends_received, currency)}</p>
+              <p className="font-mono text-foreground">{formatCurrency(disclosures.dividends_received, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.dividends_received || 'operating'}
               </p>
@@ -378,7 +378,7 @@ export default function CashFlowPage() {
                 <Receipt className="w-4 h-4 text-amber-400" />
                 <span className="text-slate-muted text-sm">Income Taxes Paid</span>
               </div>
-              <p className="font-mono text-white">{formatCurrency(disclosures.income_taxes_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatCurrency(disclosures.income_taxes_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.taxes_paid || 'operating'}
               </p>
@@ -390,7 +390,7 @@ export default function CashFlowPage() {
       {/* Non-Cash Transactions Note */}
       {data?.non_cash_transactions && (
         <div className="bg-slate-elevated border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-2 flex items-center gap-2">
             <Info className="w-5 h-5 text-slate-muted" />
             Non-Cash Transactions (IAS 7.43)
           </h3>
@@ -406,7 +406,7 @@ export default function CashFlowPage() {
       {/* Bank Summary */}
       {data?.bank_summary && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4">Bank Transaction Summary</h3>
+          <h3 className="text-foreground font-semibold mb-4">Bank Transaction Summary</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">

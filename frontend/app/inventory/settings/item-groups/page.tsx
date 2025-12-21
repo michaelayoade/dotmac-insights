@@ -85,11 +85,11 @@ export default function ItemGroupsPage() {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             autoFocus
           />
         ) : (
-          <span className="text-white font-medium">{item.name}</span>
+          <span className="text-foreground font-medium">{item.name}</span>
         ),
     },
     {
@@ -100,7 +100,7 @@ export default function ItemGroupsPage() {
           <select
             value={formData.parent_item_group || ''}
             onChange={(e) => setFormData({ ...formData, parent_item_group: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
           >
             <option value="">None</option>
             {groups.filter((g) => g.id !== item.id).map((g) => (
@@ -120,7 +120,7 @@ export default function ItemGroupsPage() {
             type="text"
             value={formData.default_uom || ''}
             onChange={(e) => setFormData({ ...formData, default_uom: e.target.value || null })}
-            className="w-32 bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-32 bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             placeholder="e.g., Nos"
           />
         ) : (
@@ -136,7 +136,7 @@ export default function ItemGroupsPage() {
             type="text"
             value={formData.default_warehouse || ''}
             onChange={(e) => setFormData({ ...formData, default_warehouse: e.target.value || null })}
-            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-teal-electric"
+            className="w-full bg-slate-elevated border border-slate-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-teal-electric"
             placeholder="Warehouse name"
           />
         ) : (
@@ -186,7 +186,7 @@ export default function ItemGroupsPage() {
             <>
               <button
                 onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-white"
+                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
@@ -211,7 +211,7 @@ export default function ItemGroupsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-teal-electric" />
-            <h1 className="text-xl font-semibold text-white">Item Groups</h1>
+            <h1 className="text-xl font-semibold text-foreground">Item Groups</h1>
           </div>
           {!isCreating && (
             <button
@@ -233,7 +233,7 @@ export default function ItemGroupsPage() {
 
         {isCreating && (
           <div className="bg-slate-card border border-slate-border rounded-lg p-4">
-            <h3 className="text-sm font-medium text-white mb-3">New Item Group</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">New Item Group</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs text-slate-muted mb-1">Name *</label>
@@ -241,7 +241,7 @@ export default function ItemGroupsPage() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="Item group name"
                   autoFocus
                 />
@@ -251,7 +251,7 @@ export default function ItemGroupsPage() {
                 <select
                   value={formData.parent_item_group || ''}
                   onChange={(e) => setFormData({ ...formData, parent_item_group: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   <option value="">None</option>
                   {groups.map((g) => (
@@ -265,7 +265,7 @@ export default function ItemGroupsPage() {
                   type="text"
                   value={formData.default_uom || ''}
                   onChange={(e) => setFormData({ ...formData, default_uom: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="e.g., Nos, Kg"
                 />
               </div>
@@ -275,7 +275,7 @@ export default function ItemGroupsPage() {
                   type="text"
                   value={formData.default_warehouse || ''}
                   onChange={(e) => setFormData({ ...formData, default_warehouse: e.target.value || null })}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="Warehouse name"
                 />
               </div>
@@ -284,7 +284,7 @@ export default function ItemGroupsPage() {
               <button
                 onClick={handleCreate}
                 disabled={!formData.name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
               </button>

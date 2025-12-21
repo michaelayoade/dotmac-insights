@@ -68,7 +68,7 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, class
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-slate-muted text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
           {trend && trendValue && (
             <div className={cn(
@@ -134,7 +134,7 @@ function AgingChart({ buckets }: { buckets: AgingBuckets }) {
   return (
     <div className="bg-slate-card rounded-xl border border-slate-border p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Invoice Aging</h3>
+        <h3 className="text-lg font-semibold text-foreground">Invoice Aging</h3>
         <Link href="/sales/invoices?overdue_only=true" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
           View Overdue <ArrowRight className="w-4 h-4" />
         </Link>
@@ -149,7 +149,7 @@ function AgingChart({ buckets }: { buckets: AgingBuckets }) {
             <div key={bucket.key}>
               <div className="flex items-center justify-between text-sm mb-1">
                 <span className="text-slate-muted capitalize">{bucket.label}</span>
-                <span className="text-white font-mono">
+                <span className="text-foreground font-mono">
                   {formatCurrency(amount)} ({count})
                 </span>
               </div>
@@ -166,7 +166,7 @@ function AgingChart({ buckets }: { buckets: AgingBuckets }) {
       <div className="mt-4 pt-4 border-t border-slate-border">
         <div className="flex justify-between">
           <span className="text-slate-muted">Total Outstanding</span>
-          <span className="text-white font-bold font-mono">{formatCurrency(total)}</span>
+          <span className="text-foreground font-bold font-mono">{formatCurrency(total)}</span>
         </div>
       </div>
     </div>
@@ -251,7 +251,7 @@ export default function SalesDashboardPage() {
       {crm?.stages && crm.stages.length > 0 && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Sales Pipeline</h3>
+            <h3 className="text-lg font-semibold text-foreground">Sales Pipeline</h3>
             <Link href="/sales/pipeline" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Pipeline <ArrowRight className="w-4 h-4" />
             </Link>
@@ -264,7 +264,7 @@ export default function SalesDashboardPage() {
                 className="bg-slate-elevated/50 rounded-lg p-3 border border-slate-border/50 hover:border-teal-electric/50 transition-all"
               >
                 <div className="text-xs text-slate-muted mb-1">{stage.name}</div>
-                <div className="text-lg font-semibold text-white">{stage.opportunity_count}</div>
+                <div className="text-lg font-semibold text-foreground">{stage.opportunity_count}</div>
                 <div className="text-xs text-teal-electric">{formatCurrency(stage.opportunity_value || 0, currency)}</div>
               </Link>
             ))}
@@ -310,7 +310,7 @@ export default function SalesDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link href="/sales/analytics" className="block">
           <div className="bg-slate-card rounded-xl border border-slate-border p-6 hover:border-teal-electric/50 transition-all">
-            <h3 className="text-lg font-semibold text-white mb-4">Days Sales Outstanding (DSO)</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Days Sales Outstanding (DSO)</h3>
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
                 <p className="text-5xl font-bold text-teal-electric">{finance?.metrics?.dso?.toFixed(0) || '-'}</p>
@@ -347,7 +347,7 @@ export default function SalesDashboardPage() {
       {revenue_trend && revenue_trend.length > 0 && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">Revenue Trend (6 Months)</h3>
+            <h3 className="text-lg font-semibold text-foreground">Revenue Trend (6 Months)</h3>
             <Link href="/sales/analytics" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Analytics <ArrowRight className="w-4 h-4" />
             </Link>
@@ -364,8 +364,8 @@ export default function SalesDashboardPage() {
               <tbody>
                 {revenue_trend.slice(-6).map((item, i: number) => (
                   <tr key={i} className="border-b border-slate-border/50 hover:bg-slate-elevated/30">
-                    <td className="py-3 px-2 text-white">{item.period}</td>
-                    <td className="py-3 px-2 text-right font-mono text-white">{formatCurrency(item.revenue, currency)}</td>
+                    <td className="py-3 px-2 text-foreground">{item.period}</td>
+                    <td className="py-3 px-2 text-right font-mono text-foreground">{formatCurrency(item.revenue, currency)}</td>
                     <td className="py-3 px-2 text-right font-mono text-teal-electric">{(item.payment_count ?? 0).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -381,7 +381,7 @@ export default function SalesDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Invoices</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Invoices</h3>
             </div>
             <Link href="/sales/invoices" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -394,7 +394,7 @@ export default function SalesDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">
+                    <p className="text-foreground text-sm font-medium">
                       {inv.invoice_number || `Invoice #${inv.id}`}
                     </p>
                     <p className="text-xs text-slate-muted">
@@ -402,7 +402,7 @@ export default function SalesDashboardPage() {
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(inv.total_amount || 0, inv.currency || currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(inv.total_amount || 0, inv.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{inv.status}</p>
                   </div>
                 </Link>
@@ -417,7 +417,7 @@ export default function SalesDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Payments</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Payments</h3>
             </div>
             <Link href="/sales/payments" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -430,7 +430,7 @@ export default function SalesDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">
+                    <p className="text-foreground text-sm font-medium">
                       {pay.receipt_number || `Payment #${pay.id}`}
                     </p>
                     <p className="text-xs text-slate-muted">
@@ -438,7 +438,7 @@ export default function SalesDashboardPage() {
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(pay.amount || 0, pay.currency || currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(pay.amount || 0, pay.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{pay.status}</p>
                   </div>
                 </Link>
@@ -455,7 +455,7 @@ export default function SalesDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Receipt className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Credit Notes</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Credit Notes</h3>
             </div>
             <Link href="/sales/credit-notes" className="text-teal-electric text-xs hover:text-teal-glow">View all</Link>
           </div>
@@ -468,7 +468,7 @@ export default function SalesDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div className="space-y-1">
-                    <p className="text-white text-sm font-medium">
+                    <p className="text-foreground text-sm font-medium">
                       {note.credit_number || `Credit #${note.id}`}
                     </p>
                     <p className="text-xs text-slate-muted">
@@ -476,7 +476,7 @@ export default function SalesDashboardPage() {
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(note.amount || 0, note.currency || currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(note.amount || 0, note.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{note.status}</p>
                   </div>
                 </Link>
@@ -491,7 +491,7 @@ export default function SalesDashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-teal-electric" />
-              <h3 className="text-white font-semibold text-sm">Recent Purchases</h3>
+              <h3 className="text-foreground font-semibold text-sm">Recent Purchases</h3>
             </div>
             <div className="flex items-center gap-3 text-xs">
               <Link href="/purchasing" className="text-teal-electric hover:text-teal-glow">Purchasing</Link>
@@ -508,13 +508,13 @@ export default function SalesDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div>
-                    <p className="text-white text-sm font-medium">Bill #{bill.id}</p>
+                    <p className="text-foreground text-sm font-medium">Bill #{bill.id}</p>
                     <p className="text-xs text-slate-muted">
                       {bill.supplier_name || 'Unknown'} • {formatDate(bill.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(bill.grand_total || 0, bill.currency || currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(bill.grand_total || 0, bill.currency || currency)}</p>
                     <p className="text-slate-muted text-xs capitalize">{bill.status}</p>
                   </div>
                 </Link>
@@ -522,13 +522,13 @@ export default function SalesDashboardPage() {
               {recent?.purchase_payments?.slice(0, 2).map((pay) => (
                 <div key={`pay-${pay.id}`} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2">
                   <div>
-                    <p className="text-white text-sm font-medium">Payment #{pay.id}</p>
+                    <p className="text-foreground text-sm font-medium">Payment #{pay.id}</p>
                     <p className="text-xs text-slate-muted">
                       {pay.supplier || 'Unknown'} • {formatDate(pay.posting_date)}
                     </p>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-white font-mono">{formatCurrency(pay.amount || 0, currency)}</p>
+                    <p className="text-foreground font-mono">{formatCurrency(pay.amount || 0, currency)}</p>
                   </div>
                 </div>
               ))}

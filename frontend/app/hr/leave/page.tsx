@@ -77,7 +77,7 @@ function MetricCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {hint && <p className="text-slate-muted text-xs mt-1">{hint}</p>}
         </div>
         <div className={cn('p-2 rounded-lg', tone.includes('amber') ? 'bg-amber-500/10' : tone.includes('violet') ? 'bg-violet-500/10' : tone.includes('emerald') ? 'bg-emerald-500/10' : 'bg-slate-elevated')}>
@@ -92,7 +92,7 @@ function ChartCard({ title, subtitle, children, className }: { title: string; su
   return (
     <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
       <div className="mb-4">
-        <h3 className="text-white font-semibold">{title}</h3>
+        <h3 className="text-foreground font-semibold">{title}</h3>
         {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
       </div>
       {children}
@@ -120,7 +120,7 @@ function CollapsibleSection({
       >
         <div className="flex items-center gap-3">
           <Icon className="w-5 h-5 text-amber-400" />
-          <span className="text-white font-semibold">{title}</span>
+          <span className="text-foreground font-semibold">{title}</span>
         </div>
         {isOpen ? <ChevronUp className="w-5 h-5 text-slate-muted" /> : <ChevronDown className="w-5 h-5 text-slate-muted" />}
       </button>
@@ -343,7 +343,7 @@ export default function HrLeavePage() {
       <div className="bg-gradient-to-br from-amber-500/10 via-violet-500/5 to-slate-card border border-amber-500/20 rounded-2xl p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-white">Leave Management</h2>
+            <h2 className="text-xl font-bold text-foreground">Leave Management</h2>
             <p className="text-slate-muted text-sm mt-1">Types, allocations, and applications</p>
           </div>
           {pendingCount > 0 && (
@@ -385,7 +385,7 @@ export default function HrLeavePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-slate-muted text-sm">Total Allocated</span>
-              <span className="text-white font-mono font-bold">{allocationSummary.totalAllocated}</span>
+              <span className="text-foreground font-mono font-bold">{allocationSummary.totalAllocated}</span>
             </div>
             <div className="h-3 bg-slate-elevated rounded-full overflow-hidden">
               <div
@@ -418,14 +418,14 @@ export default function HrLeavePage() {
             setAllocOffset(0);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
         <input
           type="text"
           placeholder="Search leave types"
           value={leaveSearch}
           onChange={(e) => setLeaveSearch(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
         <select
           value={allocationStatus}
@@ -433,7 +433,7 @@ export default function HrLeavePage() {
             setAllocationStatus(e.target.value);
             setAllocOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Allocation Status</option>
           <option value="draft">Draft</option>
@@ -446,7 +446,7 @@ export default function HrLeavePage() {
             setApplicationStatus(e.target.value);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Application Status</option>
           <option value="open">Open</option>
@@ -459,13 +459,13 @@ export default function HrLeavePage() {
       <CollapsibleSection title="Quick Actions" icon={ShieldCheck} defaultOpen={false}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
-            <p className="text-white font-semibold">Bulk Allocate Leave</p>
+            <p className="text-foreground font-semibold">Bulk Allocate Leave</p>
             <input
               type="text"
               placeholder="Employee IDs (comma-separated)"
               value={bulkIds}
               onChange={(e) => setBulkIds(e.target.value)}
-              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -473,14 +473,14 @@ export default function HrLeavePage() {
                 placeholder="Policy ID"
                 value={bulkPolicyId}
                 onChange={(e) => setBulkPolicyId(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="text"
                 placeholder="Company"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -488,13 +488,13 @@ export default function HrLeavePage() {
                 type="date"
                 value={bulkFrom}
                 onChange={(e) => setBulkFrom(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="date"
                 value={bulkTo}
                 onChange={(e) => setBulkTo(e.target.value)}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <button
@@ -506,21 +506,21 @@ export default function HrLeavePage() {
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
-            <p className="text-white font-semibold">New Leave Application</p>
+            <p className="text-foreground font-semibold">New Leave Application</p>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
                 placeholder="Employee"
                 value={appForm.employee}
                 onChange={(e) => setAppForm({ ...appForm, employee: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="text"
                 placeholder="Leave Type"
                 value={appForm.leave_type}
                 onChange={(e) => setAppForm({ ...appForm, leave_type: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -529,25 +529,25 @@ export default function HrLeavePage() {
                 placeholder="From"
                 value={appForm.from_date}
                 onChange={(e) => setAppForm({ ...appForm, from_date: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="date"
                 placeholder="To"
                 value={appForm.to_date}
                 onChange={(e) => setAppForm({ ...appForm, to_date: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <textarea
               placeholder="Description (optional)"
               value={appForm.description}
               onChange={(e) => setAppForm({ ...appForm, description: e.target.value })}
-              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white h-16"
+              className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground h-16"
             />
             <button
               onClick={handleCreateApplication}
-              className="bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
+              className="bg-violet-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
             >
               Submit Application
             </button>
@@ -561,11 +561,11 @@ export default function HrLeavePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Layers className="w-5 h-5 text-violet-400" />
-            <h3 className="text-white font-semibold">Leave Types</h3>
+            <h3 className="text-foreground font-semibold">Leave Types</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'leave_type', header: 'Leave Type', sortable: true, render: (item: any) => <span className="text-white">{item.leave_type || item.name}</span> },
+              { key: 'leave_type', header: 'Leave Type', sortable: true, render: (item: any) => <span className="text-foreground">{item.leave_type || item.name}</span> },
               {
                 key: 'is_lwp',
                 header: 'LWP',
@@ -595,17 +595,17 @@ export default function HrLeavePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-5 h-5 text-amber-400" />
-            <h3 className="text-white font-semibold">Holiday Lists</h3>
+            <h3 className="text-foreground font-semibold">Holiday Lists</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'holiday_list_name', header: 'Holiday List', render: (item: any) => <span className="text-white">{item.holiday_list_name}</span> },
+              { key: 'holiday_list_name', header: 'Holiday List', render: (item: any) => <span className="text-foreground">{item.holiday_list_name}</span> },
               { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
               {
                 key: 'holidays',
                 header: 'Holidays',
                 align: 'right' as const,
-                render: (item: any) => <span className="font-mono text-white">{item.holidays?.length ?? 0}</span>,
+                render: (item: any) => <span className="font-mono text-foreground">{item.holidays?.length ?? 0}</span>,
               },
             ]}
             data={(holidayList.items || []).map((item: any) => ({ ...item, id: item.id || item.holiday_list_name }))}
@@ -620,17 +620,17 @@ export default function HrLeavePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <FileSpreadsheet className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-white font-semibold">Leave Policies</h3>
+          <h3 className="text-foreground font-semibold">Leave Policies</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'leave_policy_name', header: 'Policy', render: (item: any) => <span className="text-white">{item.leave_policy_name}</span> },
+            { key: 'leave_policy_name', header: 'Policy', render: (item: any) => <span className="text-foreground">{item.leave_policy_name}</span> },
             { key: 'company', header: 'Company', render: (item: any) => <span className="text-slate-muted text-sm">{item.company || '—'}</span> },
             {
               key: 'details',
               header: 'Leave Types',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-white">{item.details?.length ?? 0}</span>,
+              render: (item: any) => <span className="font-mono text-foreground">{item.details?.length ?? 0}</span>,
             },
           ]}
           data={(leavePolicyList.items || []).map((item: any) => ({ ...item, id: item.id || item.leave_policy_name }))}
@@ -644,11 +644,11 @@ export default function HrLeavePage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          <h3 className="text-white font-semibold">Leave Allocations</h3>
+          <h3 className="text-foreground font-semibold">Leave Allocations</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-foreground">{item.employee_name || item.employee}</span> },
             { key: 'leave_type', header: 'Type', render: (item: any) => <span className="text-slate-muted text-sm">{item.leave_type}</span> },
             { key: 'from_date', header: 'From', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.from_date)}</span> },
             { key: 'to_date', header: 'To', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.to_date)}</span> },
@@ -656,7 +656,7 @@ export default function HrLeavePage() {
               key: 'total_leaves_allocated',
               header: 'Allocated',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-white">{item.total_leaves_allocated ?? item.new_leaves_allocated ?? 0}</span>,
+              render: (item: any) => <span className="font-mono text-foreground">{item.total_leaves_allocated ?? item.new_leaves_allocated ?? 0}</span>,
             },
             {
               key: 'unused_leaves',
@@ -694,7 +694,7 @@ export default function HrLeavePage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-amber-400" />
-            <h3 className="text-white font-semibold">Leave Applications</h3>
+            <h3 className="text-foreground font-semibold">Leave Applications</h3>
           </div>
           {applicationStatusData.length > 0 && (
             <div className="flex items-center gap-3">
@@ -709,7 +709,7 @@ export default function HrLeavePage() {
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-foreground">{item.employee_name || item.employee}</span> },
             { key: 'leave_type', header: 'Type', render: (item: any) => <span className="text-slate-muted text-sm">{item.leave_type}</span> },
             { key: 'from_date', header: 'From', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.from_date)}</span> },
             { key: 'to_date', header: 'To', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.to_date)}</span> },
@@ -717,7 +717,7 @@ export default function HrLeavePage() {
               key: 'total_leave_days',
               header: 'Days',
               align: 'right' as const,
-              render: (item: any) => <span className="font-mono text-white">{item.total_leave_days ?? 0}</span>,
+              render: (item: any) => <span className="font-mono text-foreground">{item.total_leave_days ?? 0}</span>,
             },
             {
               key: 'status',
@@ -765,19 +765,19 @@ export default function HrLeavePage() {
 
         {/* Bulk Actions */}
         <div className="mt-4 p-4 bg-slate-elevated border border-slate-border rounded-lg">
-          <p className="text-white font-semibold mb-3">Bulk Approve/Reject</p>
+          <p className="text-foreground font-semibold mb-3">Bulk Approve/Reject</p>
           <div className="flex flex-wrap gap-3 items-end">
             <input
               type="text"
               placeholder="Application IDs (comma-separated)"
               value={bulkActionIds}
               onChange={(e) => setBulkActionIds(e.target.value)}
-              className="flex-1 min-w-[200px] bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="flex-1 min-w-[200px] bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <select
               value={bulkAction}
               onChange={(e) => setBulkAction(e.target.value as 'approve' | 'reject')}
-              className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+              className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             >
               <option value="approve">Approve</option>
               <option value="reject">Reject</option>
@@ -786,7 +786,7 @@ export default function HrLeavePage() {
               onClick={handleBulkAppAction}
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-semibold transition-colors',
-                bulkAction === 'approve' ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-rose-500 text-white hover:bg-rose-400'
+                bulkAction === 'approve' ? 'bg-emerald-500 text-foreground hover:bg-emerald-400' : 'bg-rose-500 text-foreground hover:bg-rose-400'
               )}
             >
               Run Bulk {bulkAction === 'approve' ? 'Approve' : 'Reject'}

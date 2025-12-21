@@ -85,7 +85,7 @@ function MetricCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-2xl font-bold text-white mt-1 font-mono">{value}</p>
+          <p className="text-2xl font-bold text-foreground mt-1 font-mono">{value}</p>
           {trendValue && (
             <div className="flex items-center gap-1 mt-2">
               {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
@@ -108,7 +108,7 @@ function ChartCard({ title, subtitle, children, className }: { title: string; su
   return (
     <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
       <div className="mb-4">
-        <h3 className="text-white font-semibold">{title}</h3>
+        <h3 className="text-foreground font-semibold">{title}</h3>
         {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
       </div>
       {children}
@@ -136,7 +136,7 @@ function CollapsibleSection({
       >
         <div className="flex items-center gap-3">
           <Icon className="w-5 h-5 text-violet-400" />
-          <span className="text-white font-semibold">{title}</span>
+          <span className="text-foreground font-semibold">{title}</span>
         </div>
         {isOpen ? <ChevronUp className="w-5 h-5 text-slate-muted" /> : <ChevronDown className="w-5 h-5 text-slate-muted" />}
       </button>
@@ -459,7 +459,7 @@ export default function HrPayrollPage() {
       <div className="bg-gradient-to-br from-violet-500/10 via-emerald-500/5 to-slate-card border border-violet-500/20 rounded-2xl p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-xl font-bold text-white">Payroll Management</h2>
+            <h2 className="text-xl font-bold text-foreground">Payroll Management</h2>
             <p className="text-slate-muted text-sm mt-1">Salary structures, entries, and slips</p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -548,13 +548,13 @@ export default function HrPayrollPage() {
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                   <span className="text-slate-muted text-sm">{item.name}</span>
                 </div>
-                <span className="text-white font-mono font-bold">{item.value}</span>
+                <span className="text-foreground font-mono font-bold">{item.value}</span>
               </div>
             ))}
             <div className="pt-3 border-t border-slate-border">
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted text-sm">Total Components</span>
-                <span className="text-white font-mono font-bold">{componentList.total}</span>
+                <span className="text-foreground font-mono font-bold">{componentList.total}</span>
               </div>
             </div>
           </div>
@@ -568,9 +568,9 @@ export default function HrPayrollPage() {
                 <div key={item.name} className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-white text-sm">{item.name}</span>
+                    <span className="text-foreground text-sm">{item.name}</span>
                   </div>
-                  <span className="text-white font-mono font-bold">{item.value}</span>
+                  <span className="text-foreground font-mono font-bold">{item.value}</span>
                 </div>
               ))}
             </div>
@@ -585,14 +585,14 @@ export default function HrPayrollPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
           {/* Generate Slips */}
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
-            <p className="text-white font-semibold">Generate Salary Slips</p>
+            <p className="text-foreground font-semibold">Generate Salary Slips</p>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
                 placeholder="Payroll Entry ID"
                 value={generateForm.entryId}
                 onChange={(e) => setGenerateForm({ ...generateForm, entryId: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <div />
             </div>
@@ -601,13 +601,13 @@ export default function HrPayrollPage() {
                 type="date"
                 value={generateForm.start_date}
                 onChange={(e) => setGenerateForm({ ...generateForm, start_date: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="date"
                 value={generateForm.end_date}
                 onChange={(e) => setGenerateForm({ ...generateForm, end_date: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -616,21 +616,21 @@ export default function HrPayrollPage() {
                 placeholder="Department"
                 value={generateForm.department}
                 onChange={(e) => setGenerateForm({ ...generateForm, department: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="text"
                 placeholder="Branch"
                 value={generateForm.branch}
                 onChange={(e) => setGenerateForm({ ...generateForm, branch: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
               <input
                 type="text"
                 placeholder="Designation"
                 value={generateForm.designation}
                 onChange={(e) => setGenerateForm({ ...generateForm, designation: e.target.value })}
-                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
             <label className="flex items-center gap-2 text-sm text-slate-muted">
@@ -644,7 +644,7 @@ export default function HrPayrollPage() {
             </label>
             <button
               onClick={handleGenerateSlips}
-              className="bg-violet-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
+              className="bg-violet-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
             >
               Generate Slips
             </button>
@@ -653,28 +653,28 @@ export default function HrPayrollPage() {
           {/* Salary Slip Actions */}
           <div className="space-y-3">
             <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
-              <p className="text-white font-semibold">Mark Slip as Paid</p>
+              <p className="text-foreground font-semibold">Mark Slip as Paid</p>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
                   placeholder="Salary Slip ID"
                   value={slipActionForm.slipId}
                   onChange={(e) => setSlipActionForm({ ...slipActionForm, slipId: e.target.value })}
-                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
                 <input
                   type="text"
                   placeholder="Payment Reference"
                   value={slipActionForm.payment_reference}
                   onChange={(e) => setSlipActionForm({ ...slipActionForm, payment_reference: e.target.value })}
-                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <select
                   value={slipActionForm.payment_mode}
                   onChange={(e) => setSlipActionForm({ ...slipActionForm, payment_mode: e.target.value })}
-                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 >
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="cash">Cash</option>
@@ -682,7 +682,7 @@ export default function HrPayrollPage() {
                 </select>
                 <button
                   onClick={handleMarkSlipPaid}
-                  className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-400 transition-colors"
+                  className="bg-emerald-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-400 transition-colors"
                 >
                   Mark Paid
                 </button>
@@ -690,26 +690,26 @@ export default function HrPayrollPage() {
             </div>
 
             <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
-              <p className="text-white font-semibold">Void Slip</p>
+              <p className="text-foreground font-semibold">Void Slip</p>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
                   placeholder="Salary Slip ID"
                   value={slipActionForm.slipId}
                   onChange={(e) => setSlipActionForm({ ...slipActionForm, slipId: e.target.value })}
-                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
                 <input
                   type="text"
                   placeholder="Void Reason"
                   value={slipActionForm.void_reason}
                   onChange={(e) => setSlipActionForm({ ...slipActionForm, void_reason: e.target.value })}
-                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <button
                 onClick={handleVoidSlip}
-                className="bg-rose-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-400 transition-colors"
+                className="bg-rose-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-400 transition-colors"
               >
                 Void Slip
               </button>
@@ -724,11 +724,11 @@ export default function HrPayrollPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Banknote className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-white font-semibold">Salary Components</h3>
+            <h3 className="text-foreground font-semibold">Salary Components</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'salary_component', header: 'Component', render: (item: any) => <span className="text-white">{item.salary_component}</span> },
+              { key: 'salary_component', header: 'Component', render: (item: any) => <span className="text-foreground">{item.salary_component}</span> },
               {
                 key: 'type',
                 header: 'Type',
@@ -761,11 +761,11 @@ export default function HrPayrollPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <ClipboardList className="w-5 h-5 text-violet-400" />
-            <h3 className="text-white font-semibold">Salary Structures</h3>
+            <h3 className="text-foreground font-semibold">Salary Structures</h3>
           </div>
           <DataTable
             columns={[
-              { key: 'name', header: 'Structure', render: (item: any) => <span className="text-white">{item.name}</span> },
+              { key: 'name', header: 'Structure', render: (item: any) => <span className="text-foreground">{item.name}</span> },
               { key: 'currency', header: 'Currency', render: (item: any) => <span className="text-slate-muted text-sm">{item.currency || '—'}</span> },
               {
                 key: 'is_active',
@@ -801,18 +801,18 @@ export default function HrPayrollPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Briefcase className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-white font-semibold">Salary Structure Assignments</h3>
+          <h3 className="text-foreground font-semibold">Salary Structure Assignments</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-foreground">{item.employee_name || item.employee}</span> },
             { key: 'salary_structure', header: 'Structure', render: (item: any) => <span className="text-slate-muted text-sm">{item.salary_structure}</span> },
             {
               key: 'from_date',
               header: 'Period',
               render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.from_date)} – ${formatDate(item.to_date)}`}</span>,
             },
-            { key: 'base', header: 'Base', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.base ?? 0)}</span> },
+            { key: 'base', header: 'Base', align: 'right' as const, render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.base ?? 0)}</span> },
             { key: 'variable', header: 'Variable', align: 'right' as const, render: (item: any) => <span className="font-mono text-slate-muted">{formatCurrency(item.variable ?? 0)}</span> },
           ]}
           data={(assignmentList.items || []).map((item: any) => ({ ...item, id: item.id || `${item.employee}-${item.salary_structure}` }))}
@@ -838,11 +838,11 @@ export default function HrPayrollPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <FileSpreadsheet className="w-5 h-5 text-amber-400" />
-          <h3 className="text-white font-semibold">Payroll Entries</h3>
+          <h3 className="text-foreground font-semibold">Payroll Entries</h3>
         </div>
         <DataTable
           columns={[
-            { key: 'company', header: 'Company', render: (item: any) => <span className="text-white">{item.company}</span> },
+            { key: 'company', header: 'Company', render: (item: any) => <span className="text-foreground">{item.company}</span> },
             { key: 'posting_date', header: 'Posting', render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.posting_date)}</span> },
             { key: 'payroll_frequency', header: 'Frequency', render: (item: any) => <span className="text-slate-muted text-sm">{item.payroll_frequency}</span> },
             {
@@ -893,7 +893,7 @@ export default function HrPayrollPage() {
         <div className="flex flex-col gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Banknote className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-white font-semibold">Send Payroll to Books for Payment</h3>
+            <h3 className="text-foreground font-semibold">Send Payroll to Books for Payment</h3>
           </div>
           <p className="text-slate-muted text-sm">
             Select a payroll entry, review bank details, and hand off salary slips to the Books payment queue. Accounting will pay via Paystack/Flutterwave.
@@ -904,7 +904,7 @@ export default function HrPayrollPage() {
           <label className="flex flex-col gap-1 text-sm text-slate-muted">
             Payroll entry
             <select
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
               value={payoutForm.entryId}
               onChange={(e) => setPayoutForm(prev => ({ ...prev, entryId: e.target.value }))}
             >
@@ -919,7 +919,7 @@ export default function HrPayrollPage() {
           <label className="flex flex-col gap-1 text-sm text-slate-muted">
             Provider
             <select
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
               value={payoutForm.provider}
               onChange={(e) => setPayoutForm(prev => ({ ...prev, provider: e.target.value }))}
             >
@@ -931,7 +931,7 @@ export default function HrPayrollPage() {
           <label className="flex flex-col gap-1 text-sm text-slate-muted">
             Currency
             <input
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
               value={payoutForm.currency}
               onChange={(e) => setPayoutForm(prev => ({ ...prev, currency: e.target.value }))}
             />
@@ -954,14 +954,14 @@ export default function HrPayrollPage() {
                 const row = payoutRows[String(slip.id)] || { accountNumber: '', bankCode: '', accountName: '' };
                 return (
                   <tr key={slip.id} className="border-t border-slate-border/60">
-                    <td className="px-3 py-2 text-white">
+                    <td className="px-3 py-2 text-foreground">
                       <div className="font-medium">{slip.employee_name || slip.employee}</div>
                       <div className="text-xs text-slate-muted">{formatDate(slip.start_date)} – {formatDate(slip.end_date)}</div>
                     </td>
                     <td className="px-3 py-2 text-emerald-400 font-mono">{formatCurrency(slip.net_pay ?? 0, slip.currency || 'NGN')}</td>
                     <td className="px-3 py-2">
                       <input
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
                         value={row.accountNumber}
                         onChange={(e) => handlePayoutChange(slip.id, 'accountNumber', e.target.value)}
                         placeholder="0123456789"
@@ -969,7 +969,7 @@ export default function HrPayrollPage() {
                     </td>
                     <td className="px-3 py-2">
                       <input
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
                         value={row.bankCode}
                         onChange={(e) => handlePayoutChange(slip.id, 'bankCode', e.target.value)}
                         placeholder="058"
@@ -977,7 +977,7 @@ export default function HrPayrollPage() {
                     </td>
                     <td className="px-3 py-2">
                       <input
-                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white"
+                        className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground"
                         value={row.accountName}
                         onChange={(e) => handlePayoutChange(slip.id, 'accountName', e.target.value)}
                         placeholder="Account name"
@@ -1005,7 +1005,7 @@ export default function HrPayrollPage() {
           </div>
           <button
             onClick={submitPayouts}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-400 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-foreground hover:bg-emerald-400 transition-colors disabled:opacity-50"
             disabled={payoutStatus.state === 'submitting'}
           >
             <ArrowRight className="w-4 h-4" />
@@ -1019,7 +1019,7 @@ export default function HrPayrollPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Wallet2 className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-white font-semibold">Salary Slips</h3>
+            <h3 className="text-foreground font-semibold">Salary Slips</h3>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-slate-muted">
@@ -1032,13 +1032,13 @@ export default function HrPayrollPage() {
         </div>
         <DataTable
           columns={[
-            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-white">{item.employee_name || item.employee}</span> },
+            { key: 'employee', header: 'Employee', render: (item: any) => <span className="text-foreground">{item.employee_name || item.employee}</span> },
             {
               key: 'period',
               header: 'Period',
               render: (item: any) => <span className="text-slate-muted text-sm">{`${formatDate(item.start_date)} – ${formatDate(item.end_date)}`}</span>,
             },
-            { key: 'gross_pay', header: 'Gross', align: 'right' as const, render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.gross_pay ?? 0, item.currency || 'NGN')}</span> },
+            { key: 'gross_pay', header: 'Gross', align: 'right' as const, render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_pay ?? 0, item.currency || 'NGN')}</span> },
             { key: 'total_deduction', header: 'Deductions', align: 'right' as const, render: (item: any) => <span className="font-mono text-amber-400">-{formatCurrency(item.total_deduction ?? 0, item.currency || 'NGN')}</span> },
             { key: 'net_pay', header: 'Net Pay', align: 'right' as const, render: (item: any) => <span className="font-mono text-emerald-400 font-bold">{formatCurrency(item.net_pay ?? 0, item.currency || 'NGN')}</span> },
             {

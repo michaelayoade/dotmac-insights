@@ -151,7 +151,7 @@ function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; s
       <div className="flex items-center gap-2 mb-4">
         {Icon && <Icon className="w-4 h-4 text-violet-400" />}
         <div>
-          <h3 className="text-white font-semibold">{title}</h3>
+          <h3 className="text-foreground font-semibold">{title}</h3>
           {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
         </div>
       </div>
@@ -184,7 +184,7 @@ function ReconciliationGauge({ rate }: { rate: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{rate.toFixed(0)}%</span>
+        <span className="text-2xl font-bold text-foreground">{rate.toFixed(0)}%</span>
         <span className="text-[10px] text-slate-muted">Reconciled</span>
       </div>
     </div>
@@ -242,7 +242,7 @@ export default function CardAnalyticsPage() {
             <BarChart3 className="w-5 h-5 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Card Analytics</h1>
+            <h1 className="text-2xl font-bold text-foreground">Card Analytics</h1>
             <p className="text-slate-muted text-sm">Spend patterns, reconciliation & utilization</p>
           </div>
         </div>
@@ -252,7 +252,7 @@ export default function CardAnalyticsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-violet-400" />
-          <span className="text-white text-sm font-medium">Time Range</span>
+          <span className="text-foreground text-sm font-medium">Time Range</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div>
@@ -260,7 +260,7 @@ export default function CardAnalyticsPage() {
             <select
               value={months}
               onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
             >
               <option value={3}>3 months</option>
               <option value={6}>6 months</option>
@@ -272,7 +272,7 @@ export default function CardAnalyticsPage() {
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
             >
               <option value={7}>7 days</option>
               <option value={14}>14 days</option>
@@ -346,7 +346,7 @@ export default function CardAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Target className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Reconciliation Rate</h3>
+            <h3 className="text-foreground font-semibold">Reconciliation Rate</h3>
           </div>
           <ReconciliationGauge rate={overview?.transactions.reconciliation_rate ?? 0} />
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
@@ -470,7 +470,7 @@ export default function CardAnalyticsPage() {
               {spendTrend.slice(-6).map((v) => (
                 <div key={v.period} className="bg-slate-elevated rounded-lg p-2 text-center">
                   <p className="text-[10px] text-slate-muted">{v.period}</p>
-                  <p className="text-sm font-bold text-white">{(v.total_spend / 1000).toFixed(0)}K</p>
+                  <p className="text-sm font-bold text-foreground">{(v.total_spend / 1000).toFixed(0)}K</p>
                   <p className="text-[10px] text-emerald-400">{v.reconciliation_rate}% rec</p>
                 </div>
               ))}
@@ -558,14 +558,14 @@ export default function CardAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Card Utilization ({days}d)</h3>
+            <h3 className="text-foreground font-semibold">Card Utilization ({days}d)</h3>
           </div>
           {utilization?.length ? (
             <div className="space-y-3">
               {utilization.slice(0, 8).map((card) => (
                 <div key={card.card_id} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white truncate max-w-[200px]">
+                    <span className="text-foreground truncate max-w-[200px]">
                       {card.card_name} <span className="text-slate-muted">****{card.card_last4}</span>
                     </span>
                     <span className={cn(
@@ -596,7 +596,7 @@ export default function CardAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-white font-semibold">Top Spenders ({days}d)</h3>
+            <h3 className="text-foreground font-semibold">Top Spenders ({days}d)</h3>
           </div>
           {topSpenders?.spenders.length ? (
             <div className="overflow-x-auto">
@@ -611,7 +611,7 @@ export default function CardAnalyticsPage() {
                 <tbody>
                   {topSpenders.spenders.slice(0, 10).map((spender, idx) => (
                     <tr key={spender.card_id} className="border-t border-slate-border/40">
-                      <td className="py-2 text-white truncate max-w-[160px]">
+                      <td className="py-2 text-foreground truncate max-w-[160px]">
                         <span className="text-slate-muted mr-2">{idx + 1}.</span>
                         {spender.card_name}
                       </td>
@@ -633,11 +633,11 @@ export default function CardAnalyticsPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Receipt className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Statement Summary</h3>
+            <h3 className="text-foreground font-semibold">Statement Summary</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{statementSummary.statements.total}</p>
+              <p className="text-2xl font-bold text-foreground">{statementSummary.statements.total}</p>
               <p className="text-xs text-slate-muted">Total Statements</p>
             </div>
             <div className="text-center">
@@ -653,7 +653,7 @@ export default function CardAnalyticsPage() {
               <p className="text-xs text-slate-muted">Closed</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">{statementSummary.aggregates.total_transactions}</p>
+              <p className="text-2xl font-bold text-foreground">{statementSummary.aggregates.total_transactions}</p>
               <p className="text-xs text-slate-muted">Total Txns</p>
             </div>
             <div className="text-center">

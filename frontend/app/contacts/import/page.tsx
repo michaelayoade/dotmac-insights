@@ -247,7 +247,7 @@ export default function ImportPage() {
           step !== 'upload' && step !== 'complete' && (
             <button
               onClick={resetImport}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Start Over
             </button>
@@ -264,9 +264,9 @@ export default function ImportPage() {
                 className={cn(
                   'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium',
                   step === s
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-blue-500 text-foreground'
                     : ['upload', 'preview', 'mapping', 'importing', 'complete'].indexOf(step) > idx
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-emerald-500 text-foreground'
                       : 'bg-slate-elevated text-slate-muted'
                 )}
               >
@@ -279,7 +279,7 @@ export default function ImportPage() {
               <span
                 className={cn(
                   'ml-2 text-sm hidden md:inline',
-                  step === s ? 'text-white' : 'text-slate-muted'
+                  step === s ? 'text-foreground' : 'text-slate-muted'
                 )}
               >
                 {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -317,7 +317,7 @@ export default function ImportPage() {
             )}
           >
             <Upload className="w-12 h-12 text-slate-muted mx-auto mb-4" />
-            <h3 className="text-white font-semibold mb-2">Drop your CSV file here</h3>
+            <h3 className="text-foreground font-semibold mb-2">Drop your CSV file here</h3>
             <p className="text-slate-muted text-sm mb-4">or click to browse</p>
             <input
               type="file"
@@ -331,7 +331,7 @@ export default function ImportPage() {
             />
             <label
               htmlFor="file-upload"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-400 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg hover:bg-blue-400 transition-colors cursor-pointer"
             >
               <FileText className="w-4 h-4" />
               Select CSV File
@@ -342,7 +342,7 @@ export default function ImportPage() {
           <div className="bg-slate-card rounded-xl border border-slate-border p-5">
             <div className="flex items-center gap-2 mb-4">
               <Download className="w-4 h-4 text-blue-400" />
-              <h3 className="text-white font-semibold">Download Template</h3>
+              <h3 className="text-foreground font-semibold">Download Template</h3>
             </div>
             <p className="text-slate-muted text-sm mb-4">
               Use our template to ensure your data is formatted correctly.
@@ -350,17 +350,17 @@ export default function ImportPage() {
             <a
               href="data:text/csv;charset=utf-8,name,email,phone,company_name,contact_type,category,city,state,country,notes,tags,source%0AJohn Doe,john@example.com,+234 801 234 5678,Acme Corp,lead,business,Lagos,Lagos,Nigeria,Interested in enterprise plan,enterprise;priority,Website"
               download="contacts_template.csv"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg hover:bg-slate-muted/20 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg hover:bg-slate-muted/20 transition-colors"
             >
               <Download className="w-4 h-4" />
               Download Template
             </a>
 
             <div className="mt-4 pt-4 border-t border-slate-border">
-              <h4 className="text-white text-sm font-medium mb-2">Required Fields:</h4>
+              <h4 className="text-foreground text-sm font-medium mb-2">Required Fields:</h4>
               <p className="text-slate-muted text-sm">name</p>
 
-              <h4 className="text-white text-sm font-medium mt-3 mb-2">Optional Fields:</h4>
+              <h4 className="text-foreground text-sm font-medium mt-3 mb-2">Optional Fields:</h4>
               <p className="text-slate-muted text-sm">
                 email, phone, company_name, contact_type, category, city, state, country, notes, tags, source
               </p>
@@ -376,7 +376,7 @@ export default function ImportPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Table className="w-4 h-4 text-blue-400" />
-                <h3 className="text-white font-semibold">Data Preview</h3>
+                <h3 className="text-foreground font-semibold">Data Preview</h3>
               </div>
               <span className="text-slate-muted text-sm">{parsedData.length} rows found</span>
             </div>
@@ -401,7 +401,7 @@ export default function ImportPage() {
                   {parsedData.slice(0, 5).map((row, idx) => (
                     <tr key={idx} className="border-b border-slate-border/50">
                       {headers.slice(0, 6).map((header) => (
-                        <td key={header} className="py-2 px-3 text-white">
+                        <td key={header} className="py-2 px-3 text-foreground">
                           {row[header] || '-'}
                         </td>
                       ))}
@@ -422,13 +422,13 @@ export default function ImportPage() {
           <div className="flex justify-end gap-3">
             <button
               onClick={resetImport}
-              className="px-4 py-2 text-slate-muted hover:text-white transition-colors"
+              className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={() => setStep('mapping')}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg hover:bg-blue-400 transition-colors"
             >
               Continue to Mapping
               <ArrowRight className="w-4 h-4" />
@@ -443,7 +443,7 @@ export default function ImportPage() {
           <div className="bg-slate-card rounded-xl border border-slate-border p-5">
             <div className="flex items-center gap-2 mb-4">
               <Table className="w-4 h-4 text-blue-400" />
-              <h3 className="text-white font-semibold">Field Mapping</h3>
+              <h3 className="text-foreground font-semibold">Field Mapping</h3>
             </div>
             <p className="text-slate-muted text-sm mb-4">
               Match your CSV columns to contact fields. We've auto-detected some mappings.
@@ -466,7 +466,7 @@ export default function ImportPage() {
                         [field]: e.target.value,
                       }))
                     }
-                    className="flex-1 px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="flex-1 px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
                     <option value="">-- Select column --</option>
                     {headers.map((header) => (
@@ -482,12 +482,12 @@ export default function ImportPage() {
 
           {/* Import Options */}
           <div className="bg-slate-card rounded-xl border border-slate-border p-5">
-            <h3 className="text-white font-semibold mb-4">Import Options</h3>
+            <h3 className="text-foreground font-semibold mb-4">Import Options</h3>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white text-sm">Skip Duplicates</p>
+                  <p className="text-foreground text-sm">Skip Duplicates</p>
                   <p className="text-slate-muted text-xs">Skip rows that match existing contacts</p>
                 </div>
                 <button
@@ -520,7 +520,7 @@ export default function ImportPage() {
                           'px-3 py-1 rounded text-sm transition-colors',
                           duplicateCheckField === field
                             ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            : 'text-slate-muted hover:text-white bg-slate-elevated'
+                            : 'text-slate-muted hover:text-foreground bg-slate-elevated'
                         )}
                       >
                         {field}
@@ -536,7 +536,7 @@ export default function ImportPage() {
                   type="text"
                   value={defaultSource}
                   onChange={(e) => setDefaultSource(e.target.value)}
-                  className="w-full md:w-64 px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full md:w-64 px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   placeholder="e.g., CSV Import, Marketing Campaign"
                 />
               </div>
@@ -546,7 +546,7 @@ export default function ImportPage() {
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setStep('preview')}
-              className="px-4 py-2 text-slate-muted hover:text-white transition-colors"
+              className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
             >
               Back
             </button>
@@ -559,7 +559,7 @@ export default function ImportPage() {
                 setStep('importing');
                 handleImport();
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg hover:bg-blue-400 transition-colors"
             >
               <Upload className="w-4 h-4" />
               Import {parsedData.length} Contacts
@@ -572,7 +572,7 @@ export default function ImportPage() {
       {step === 'importing' && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-12 text-center">
           <Loader2 className="w-12 h-12 text-blue-400 mx-auto mb-4 animate-spin" />
-          <h3 className="text-white font-semibold mb-2">Importing Contacts</h3>
+          <h3 className="text-foreground font-semibold mb-2">Importing Contacts</h3>
           <p className="text-slate-muted text-sm">Please wait while we process your data...</p>
         </div>
       )}
@@ -582,7 +582,7 @@ export default function ImportPage() {
         <div className="space-y-6">
           <div className="bg-slate-card rounded-xl border border-slate-border p-8 text-center">
             <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-            <h3 className="text-white font-semibold text-xl mb-2">Import Complete!</h3>
+            <h3 className="text-foreground font-semibold text-xl mb-2">Import Complete!</h3>
             <p className="text-slate-muted text-sm mb-6">
               Your contacts have been imported successfully.
             </p>
@@ -605,13 +605,13 @@ export default function ImportPage() {
             <div className="flex justify-center gap-3">
               <button
                 onClick={resetImport}
-                className="px-4 py-2 bg-slate-elevated text-white rounded-lg hover:bg-slate-muted/20 transition-colors"
+                className="px-4 py-2 bg-slate-elevated text-foreground rounded-lg hover:bg-slate-muted/20 transition-colors"
               >
                 Import More
               </button>
               <Link
                 href="/contacts/all"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-400 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg hover:bg-blue-400 transition-colors"
               >
                 <Users className="w-4 h-4" />
                 View Contacts
@@ -623,7 +623,7 @@ export default function ImportPage() {
             <div className="bg-slate-card rounded-xl border border-slate-border p-5">
               <div className="flex items-center gap-2 mb-4">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <h3 className="text-white font-semibold">Import Errors</h3>
+                <h3 className="text-foreground font-semibold">Import Errors</h3>
               </div>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {result.errors.map((err, idx) => (
@@ -631,7 +631,7 @@ export default function ImportPage() {
                     key={idx}
                     className="flex items-center justify-between py-2 px-3 bg-slate-elevated rounded-lg text-sm"
                   >
-                    <span className="text-white">
+                    <span className="text-foreground">
                       Row {err.row + 1}: {err.name}
                     </span>
                     <span className="text-red-400">{err.error}</span>

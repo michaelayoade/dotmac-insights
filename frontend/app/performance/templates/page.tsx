@@ -49,7 +49,7 @@ export default function TemplatesPage() {
       render: (item: ScorecardTemplate) => (
         <div className="text-sm">
           {item.applicable_departments && item.applicable_departments.length > 0 ? (
-            <p className="text-slate-300">
+            <p className="text-foreground-secondary">
               {item.applicable_departments.slice(0, 2).join(', ')}
               {item.applicable_departments.length > 2 && (
                 <span className="text-slate-500"> +{item.applicable_departments.length - 2}</span>
@@ -71,7 +71,7 @@ export default function TemplatesPage() {
       header: 'KRAs',
       align: 'center' as const,
       render: (item: ScorecardTemplate) => (
-        <span className="text-white font-medium">{item.items?.length ?? 0}</span>
+        <span className="text-foreground font-medium">{item.items?.length ?? 0}</span>
       ),
     },
     {
@@ -111,13 +111,13 @@ export default function TemplatesPage() {
         <div className="flex items-center gap-2 justify-end">
           <button
             title="Clone template"
-            className="p-1 text-slate-400 hover:text-white"
+            className="p-1 text-slate-400 hover:text-foreground"
           >
             <Copy className="w-4 h-4" />
           </button>
           <Link
             href={`/performance/templates/${item.id}`}
-            className="text-slate-400 hover:text-white p-1"
+            className="text-slate-400 hover:text-foreground p-1"
           >
             <ChevronRight className="w-4 h-4" />
           </Link>
@@ -142,14 +142,14 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Scorecard Templates</h1>
+          <h1 className="text-xl font-semibold text-foreground">Scorecard Templates</h1>
           <p className="text-sm text-slate-400 mt-1">
             Define KRA structures for performance evaluation
           </p>
         </div>
         <Link
           href="/performance/templates/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Template
@@ -164,7 +164,7 @@ export default function TemplatesPage() {
             'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
             activeOnly
               ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-              : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-white'
+              : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-foreground'
           )}
         >
           {activeOnly ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
@@ -177,7 +177,7 @@ export default function TemplatesPage() {
         <div className="flex items-start gap-3">
           <FileText className="w-5 h-5 text-violet-400 mt-0.5" />
           <div>
-            <h3 className="font-medium text-white">About Templates</h3>
+            <h3 className="font-medium text-foreground">About Templates</h3>
             <p className="text-sm text-slate-400 mt-1">
               Templates define which KRAs are evaluated and their weightages. When generating
               scorecards for a period, the system matches employees to templates based on

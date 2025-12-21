@@ -131,7 +131,7 @@ function QuickActionCard({
         <Icon className={cn('w-5 h-5', colorClass)} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-white font-semibold">{title}</p>
+        <p className="text-foreground font-semibold">{title}</p>
         <p className="text-slate-muted text-sm truncate">{description}</p>
       </div>
       <ArrowRight className="w-4 h-4 text-slate-muted group-hover:text-teal-electric transition-colors" />
@@ -163,7 +163,7 @@ function SlaGauge({ attainment }: { attainment: number }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{attainment.toFixed(0)}%</span>
+        <span className="text-2xl font-bold text-foreground">{attainment.toFixed(0)}%</span>
         <span className="text-xs text-slate-muted">SLA Met</span>
       </div>
     </div>
@@ -272,7 +272,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Target className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">SLA Attainment</h3>
+              <h3 className="text-foreground font-semibold">SLA Attainment</h3>
             </div>
             <Link href="/support/sla" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Details <ArrowRight className="w-4 h-4" />
@@ -296,7 +296,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Queue Health</h3>
+              <h3 className="text-foreground font-semibold">Queue Health</h3>
             </div>
             <Link href="/support/routing" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Queues <ArrowRight className="w-4 h-4" />
@@ -311,11 +311,11 @@ export default function SupportDashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-muted text-sm">Avg Wait Time</span>
-              <span className="text-white font-bold">{(queue_health?.avg_wait_hours ?? 0).toFixed(1)}h</span>
+              <span className="text-foreground font-bold">{(queue_health?.avg_wait_hours ?? 0).toFixed(1)}h</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-muted text-sm">Agent Capacity</span>
-              <span className="text-white font-bold">{queue_health?.total_agents ?? summary?.agent_count ?? 0} agents</span>
+              <span className="text-foreground font-bold">{queue_health?.total_agents ?? summary?.agent_count ?? 0} agents</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-muted text-sm">Current Load</span>
@@ -331,7 +331,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Team Overview</h3>
+              <h3 className="text-foreground font-semibold">Team Overview</h3>
             </div>
             <Link href="/support/teams" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Teams <ArrowRight className="w-4 h-4" />
@@ -340,12 +340,12 @@ export default function SupportDashboardPage() {
           <div className="grid grid-cols-2 gap-4">
             <Link href="/support/teams" className="bg-slate-elevated/50 rounded-lg p-4 text-center hover:bg-slate-elevated transition-colors">
               <Users className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{summary?.team_count ?? 0}</p>
+              <p className="text-2xl font-bold text-foreground">{summary?.team_count ?? 0}</p>
               <p className="text-slate-muted text-xs">Teams</p>
             </Link>
             <Link href="/support/agents" className="bg-slate-elevated/50 rounded-lg p-4 text-center hover:bg-slate-elevated transition-colors">
               <Headphones className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{summary?.agent_count ?? 0}</p>
+              <p className="text-2xl font-bold text-foreground">{summary?.agent_count ?? 0}</p>
               <p className="text-slate-muted text-xs">Active Agents</p>
             </Link>
           </div>
@@ -379,7 +379,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Ticket Volume (6 Months)</h3>
+              <h3 className="text-foreground font-semibold">Ticket Volume (6 Months)</h3>
             </div>
             <Link href="/support/analytics" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View Analytics <ArrowRight className="w-4 h-4" />
@@ -419,7 +419,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Tickets by Category (30 Days)</h3>
+              <h3 className="text-foreground font-semibold">Tickets by Category (30 Days)</h3>
             </div>
             <Link href="/support/analytics?tab=categories" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -460,7 +460,7 @@ export default function SupportDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">SLA Performance (6 Months)</h3>
+              <h3 className="text-foreground font-semibold">SLA Performance (6 Months)</h3>
             </div>
             <Link href="/support/sla" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View SLA Details <ArrowRight className="w-4 h-4" />

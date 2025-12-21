@@ -101,7 +101,7 @@ export default function OrganizationsPage() {
             <Building2 className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <p className="text-white font-medium">{item.company_name || item.name}</p>
+            <p className="text-foreground font-medium">{item.company_name || item.name}</p>
             {item.email && (
               <span className="flex items-center gap-1 text-xs text-slate-muted mt-0.5">
                 <Mail className="w-3 h-3" />
@@ -147,7 +147,7 @@ export default function OrganizationsPage() {
       header: 'Territory',
       render: (item: UnifiedContact) => (
         item.territory ? (
-          <span className="flex items-center gap-1 text-sm text-slate-300">
+          <span className="flex items-center gap-1 text-sm text-foreground-secondary">
             <MapPin className="w-3 h-3 text-slate-muted" />
             {item.territory}
           </span>
@@ -159,7 +159,7 @@ export default function OrganizationsPage() {
       header: 'MRR',
       align: 'right' as const,
       render: (item: UnifiedContact) => (
-        <span className="font-mono text-white">{formatCurrency(item.mrr)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.mrr)}</span>
       ),
     },
     {
@@ -194,7 +194,7 @@ export default function OrganizationsPage() {
           canWrite ? (
             <Link
               href="/contacts/new?org=1"
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 text-foreground rounded-lg hover:bg-cyan-400 transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               Add Organization
@@ -211,7 +211,7 @@ export default function OrganizationsPage() {
               <Building2 className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{total}</p>
+              <p className="text-2xl font-bold text-foreground">{total}</p>
               <p className="text-xs text-slate-muted">Total Organizations</p>
             </div>
           </div>
@@ -222,7 +222,7 @@ export default function OrganizationsPage() {
               <Users className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{customerCount}</p>
+              <p className="text-2xl font-bold text-foreground">{customerCount}</p>
               <p className="text-xs text-slate-muted">Customers</p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function OrganizationsPage() {
               <Users className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{leadCount}</p>
+              <p className="text-2xl font-bold text-foreground">{leadCount}</p>
               <p className="text-xs text-slate-muted">Leads/Prospects</p>
             </div>
           </div>
@@ -244,7 +244,7 @@ export default function OrganizationsPage() {
               <DollarSign className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalMrr)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrr)}</p>
               <p className="text-xs text-slate-muted">Total MRR</p>
             </div>
           </div>
@@ -255,7 +255,7 @@ export default function OrganizationsPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-cyan-400" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 min-w-[200px] max-w-md relative">
@@ -265,13 +265,13 @@ export default function OrganizationsPage() {
               placeholder="Search organizations..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
           </form>
           <select
             value={typeFilter}
             onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
           >
             <option value="">All Types</option>
             <option value="lead">Lead</option>
@@ -282,7 +282,7 @@ export default function OrganizationsPage() {
           <select
             value={categoryFilter}
             onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
           >
             <option value="">All Categories</option>
             <option value="residential">Residential</option>
@@ -299,7 +299,7 @@ export default function OrganizationsPage() {
                 setCategoryFilter('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

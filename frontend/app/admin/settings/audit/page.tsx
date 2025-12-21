@@ -38,7 +38,7 @@ export default function SettingsAuditPage() {
       <header className="flex items-center gap-3">
         <History className="w-6 h-6 text-teal-electric" />
         <div>
-          <h1 className="text-2xl font-bold text-white">Audit Log</h1>
+          <h1 className="text-2xl font-bold text-foreground">Audit Log</h1>
           <p className="text-slate-muted text-sm">
             Track all changes made to application settings.
           </p>
@@ -86,7 +86,7 @@ export default function SettingsAuditPage() {
                     >
                       {entry.action}
                     </span>
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {entry.group_name}
                     </span>
                     <span className="text-slate-muted text-sm">
@@ -117,7 +117,7 @@ export default function SettingsAuditPage() {
                         <p className="text-xs text-slate-muted uppercase tracking-wider mb-2">
                           Previous Value
                         </p>
-                        <pre className="bg-slate-elevated rounded-lg p-3 text-xs text-slate-300 overflow-x-auto">
+                        <pre className="bg-slate-elevated rounded-lg p-3 text-xs text-foreground-secondary overflow-x-auto">
                           {formatJson(entry.old_value_redacted)}
                         </pre>
                       </div>
@@ -127,7 +127,7 @@ export default function SettingsAuditPage() {
                         <p className="text-xs text-slate-muted uppercase tracking-wider mb-2">
                           New Value
                         </p>
-                        <pre className="bg-slate-elevated rounded-lg p-3 text-xs text-slate-300 overflow-x-auto">
+                        <pre className="bg-slate-elevated rounded-lg p-3 text-xs text-foreground-secondary overflow-x-auto">
                           {formatJson(entry.new_value_redacted)}
                         </pre>
                       </div>

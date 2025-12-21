@@ -108,14 +108,14 @@ export default function ActivitiesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Activities</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Activities</h1>
           <p className="text-sm text-slate-400 mt-1">
             Track calls, meetings, tasks, and follow-ups
           </p>
         </div>
         <Link
           href="/sales/activities/new"
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Activity
@@ -126,7 +126,7 @@ export default function ActivitiesPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
           <div className="text-sm text-slate-400">Today</div>
-          <div className="text-2xl font-semibold text-white mt-1">
+          <div className="text-2xl font-semibold text-foreground mt-1">
             {upcoming?.items?.filter((a: Activity) => a.scheduled_at && isToday(new Date(a.scheduled_at))).length || 0}
           </div>
         </div>
@@ -165,7 +165,7 @@ export default function ActivitiesPage() {
                   <div className="flex items-center gap-3">
                     <Icon className="w-4 h-4 text-red-400" />
                     <div>
-                      <div className="text-white text-sm">{activity.subject}</div>
+                      <div className="text-foreground text-sm">{activity.subject}</div>
                       <div className="text-xs text-slate-400">
                         {activity.scheduled_at && formatDistanceToNow(activity.scheduled_at)}
                       </div>
@@ -193,13 +193,13 @@ export default function ActivitiesPage() {
             placeholder="Search activities..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           />
         </div>
         <select
           value={activityType}
           onChange={(e) => setActivityType(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Types</option>
           <option value="call">Calls</option>
@@ -212,7 +212,7 @@ export default function ActivitiesPage() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Status</option>
           <option value="planned">Planned</option>
@@ -259,7 +259,7 @@ export default function ActivitiesPage() {
                   {/* Main Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-white">{activity.subject}</span>
+                      <span className="font-medium text-foreground">{activity.subject}</span>
                       <span className={`px-2 py-0.5 rounded text-xs ${statusColors[activity.status]}`}>
                         {activity.status}
                       </span>
@@ -294,7 +294,7 @@ export default function ActivitiesPage() {
                   {/* Schedule */}
                   {activity.scheduled_at && (
                     <div className="text-right">
-                      <div className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-white'}`}>
+                      <div className={`text-sm font-medium ${isOverdue ? 'text-red-400' : 'text-foreground'}`}>
                         {getScheduleLabel(activity.scheduled_at)}
                       </div>
                       <div className="text-xs text-slate-500">
@@ -344,14 +344,14 @@ export default function ActivitiesPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
               <button
                 onClick={() => setPage(p => p + 1)}
                 disabled={page * 20 >= activities.total}
-                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

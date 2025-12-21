@@ -73,7 +73,7 @@ export default function ChartOfAccountsPage() {
           ) : (
             <Folder className="w-4 h-4 text-slate-muted" />
           )}
-          <span className={cn('text-white', item.is_group && 'font-semibold')}>
+          <span className={cn('text-foreground', item.is_group && 'font-semibold')}>
             {item.name || item.account_name}
           </span>
         </div>
@@ -138,7 +138,7 @@ export default function ChartOfAccountsPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total Accounts</p>
-          <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
+          <p className="text-2xl font-bold text-foreground">{data?.total || 0}</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Assets</p>
@@ -166,13 +166,13 @@ export default function ChartOfAccountsPage() {
             placeholder="Search accounts..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         <select
           value={accountType}
           onChange={(e) => setAccountType(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All Types</option>
           <option value="asset">Assets</option>

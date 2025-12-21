@@ -112,7 +112,7 @@ export default function ExpenseReportsPage() {
           <BarChart3 className="w-5 h-5 text-violet-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Expense Reports</h1>
+          <h1 className="text-2xl font-bold text-foreground">Expense Reports</h1>
           <p className="text-slate-muted text-sm">Generate and export expense data</p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function ExpenseReportsPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="w-4 h-4 text-violet-400" />
-              <h2 className="text-lg font-semibold text-white">Date Range</h2>
+              <h2 className="text-lg font-semibold text-foreground">Date Range</h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -133,7 +133,7 @@ export default function ExpenseReportsPage() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
               <div>
@@ -142,7 +142,7 @@ export default function ExpenseReportsPage() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
             </div>
@@ -156,7 +156,7 @@ export default function ExpenseReportsPage() {
                 <button
                   key={preset.label}
                   onClick={() => { const v = preset.getValue(); setStartDate(v.start); setEndDate(v.end); }}
-                  className="px-3 py-1.5 text-xs font-medium bg-slate-elevated hover:bg-slate-border/50 text-slate-muted hover:text-white rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium bg-slate-elevated hover:bg-slate-border/50 text-slate-muted hover:text-foreground rounded-lg transition-colors"
                 >
                   {preset.label}
                 </button>
@@ -168,7 +168,7 @@ export default function ExpenseReportsPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-4 h-4 text-violet-400" />
-              <h2 className="text-lg font-semibold text-white">Report Type</h2>
+              <h2 className="text-lg font-semibold text-foreground">Report Type</h2>
             </div>
             <div className="grid gap-3">
               {REPORT_TYPES.map((report) => {
@@ -192,7 +192,7 @@ export default function ExpenseReportsPage() {
                       <Icon className="w-5 h-5" />
                     </div>
                     <div className="flex-1">
-                      <p className={cn('font-medium', isSelected ? 'text-white' : 'text-slate-muted')}>{report.label}</p>
+                      <p className={cn('font-medium', isSelected ? 'text-foreground' : 'text-slate-muted')}>{report.label}</p>
                       <p className="text-xs text-slate-muted mt-0.5">{report.description}</p>
                     </div>
                     <ChevronRight className={cn('w-4 h-4', isSelected ? 'text-violet-400' : 'text-slate-muted')} />
@@ -206,7 +206,7 @@ export default function ExpenseReportsPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <Filter className="w-4 h-4 text-violet-400" />
-              <h2 className="text-lg font-semibold text-white">Export Options</h2>
+              <h2 className="text-lg font-semibold text-foreground">Export Options</h2>
             </div>
 
             <div className="space-y-4">
@@ -224,8 +224,8 @@ export default function ExpenseReportsPage() {
                         className={cn(
                           'flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors',
                           isSelected
-                            ? 'bg-violet-500/15 border-violet-500/40 text-white'
-                            : 'bg-slate-elevated border-slate-border text-slate-muted hover:text-white'
+                            ? 'bg-violet-500/15 border-violet-500/40 text-foreground'
+                            : 'bg-slate-elevated border-slate-border text-slate-muted hover:text-foreground'
                         )}
                       >
                         <config.icon className={cn('w-4 h-4', isSelected ? config.color : '')} />
@@ -242,7 +242,7 @@ export default function ExpenseReportsPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 >
                   <option value="">All statuses</option>
                   {selectedReport === 'claims' && (
@@ -296,7 +296,7 @@ export default function ExpenseReportsPage() {
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+              className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 hover:bg-violet-700 text-foreground font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
               {exporting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -314,7 +314,7 @@ export default function ExpenseReportsPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <PieChart className="w-4 h-4 text-violet-400" />
-              <h2 className="text-lg font-semibold text-white">Period Summary</h2>
+              <h2 className="text-lg font-semibold text-foreground">Period Summary</h2>
             </div>
 
             {summaryLoading ? (
@@ -328,18 +328,18 @@ export default function ExpenseReportsPage() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-sky-400" />
-                      <span className="text-sm font-medium text-white">Expense Claims</span>
+                      <span className="text-sm font-medium text-foreground">Expense Claims</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-sky-400 group-hover:translate-x-0.5 transition-all" />
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-slate-muted">Count</p>
-                      <p className="text-white font-semibold">{summary.claims.count}</p>
+                      <p className="text-foreground font-semibold">{summary.claims.count}</p>
                     </div>
                     <div>
                       <p className="text-slate-muted">Total Claimed</p>
-                      <p className="text-white font-semibold">{formatCurrency(summary.claims.total_claimed)}</p>
+                      <p className="text-foreground font-semibold">{formatCurrency(summary.claims.total_claimed)}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-slate-muted">Approved</p>
@@ -353,18 +353,18 @@ export default function ExpenseReportsPage() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Wallet2 className="w-4 h-4 text-amber-400" />
-                      <span className="text-sm font-medium text-white">Cash Advances</span>
+                      <span className="text-sm font-medium text-foreground">Cash Advances</span>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-slate-muted">Count</p>
-                      <p className="text-white font-semibold">{summary.advances.count}</p>
+                      <p className="text-foreground font-semibold">{summary.advances.count}</p>
                     </div>
                     <div>
                       <p className="text-slate-muted">Requested</p>
-                      <p className="text-white font-semibold">{formatCurrency(summary.advances.total_requested)}</p>
+                      <p className="text-foreground font-semibold">{formatCurrency(summary.advances.total_requested)}</p>
                     </div>
                     <div>
                       <p className="text-slate-muted">Disbursed</p>
@@ -380,12 +380,12 @@ export default function ExpenseReportsPage() {
                 {/* Top Categories */}
                 {summary.top_categories && summary.top_categories.length > 0 && (
                   <div className="p-4 bg-slate-elevated rounded-xl">
-                    <p className="text-sm font-medium text-white mb-3">Top Expense Categories</p>
+                    <p className="text-sm font-medium text-foreground mb-3">Top Expense Categories</p>
                     <div className="space-y-2">
                       {summary.top_categories.slice(0, 5).map((cat, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                           <span className="text-slate-muted truncate">{cat.category}</span>
-                          <span className="text-white font-medium">{formatCurrency(cat.total)}</span>
+                          <span className="text-foreground font-medium">{formatCurrency(cat.total)}</span>
                         </div>
                       ))}
                     </div>
@@ -395,12 +395,12 @@ export default function ExpenseReportsPage() {
                 {/* Status Breakdown */}
                 {summary.claims.by_status && summary.claims.by_status.length > 0 && (
                   <div className="p-4 bg-slate-elevated rounded-xl">
-                    <p className="text-sm font-medium text-white mb-3">Claims by Status</p>
+                    <p className="text-sm font-medium text-foreground mb-3">Claims by Status</p>
                     <div className="space-y-2">
                       {summary.claims.by_status.map((s, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                           <span className="text-slate-muted capitalize">{s.status.replace(/_/g, ' ')}</span>
-                          <span className="text-white">
+                          <span className="text-foreground">
                             <span className="font-medium">{s.count}</span>
                             <span className="text-slate-muted ml-2">({formatCurrency(s.amount)})</span>
                           </span>

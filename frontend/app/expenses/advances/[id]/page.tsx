@@ -15,10 +15,10 @@ export default function CashAdvanceDetailPage() {
 
   const actions = [];
   if (data.status === "draft") {
-    actions.push(<button key="submit" onClick={() => submitAdvance(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-white">Submit</button>);
+    actions.push(<button key="submit" onClick={() => submitAdvance(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-foreground">Submit</button>);
   }
   if (data.status === "pending_approval") {
-    actions.push(<button key="approve" onClick={() => approveAdvance(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-white">Approve</button>);
+    actions.push(<button key="approve" onClick={() => approveAdvance(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-foreground">Approve</button>);
     actions.push(
       <button
         key="reject"
@@ -26,7 +26,7 @@ export default function CashAdvanceDetailPage() {
           const reason = prompt("Enter rejection reason");
           if (reason) rejectAdvance(data.id, reason);
         }}
-        className="rounded-lg bg-red-600 px-3 py-2 text-white"
+        className="rounded-lg bg-red-600 px-3 py-2 text-foreground"
       >
         Reject
       </button>
@@ -42,7 +42,7 @@ export default function CashAdvanceDetailPage() {
           const amount = Number(amountStr);
           disburseAdvance(data.id, { amount });
         }}
-        className="rounded-lg bg-indigo-600 px-3 py-2 text-white"
+        className="rounded-lg bg-indigo-600 px-3 py-2 text-foreground"
       >
         Disburse
       </button>
@@ -58,7 +58,7 @@ export default function CashAdvanceDetailPage() {
           if (amountStr === null || refundStr === null) return;
           settleAdvance(data.id, { amount: Number(amountStr), refund_amount: Number(refundStr) });
         }}
-        className="rounded-lg bg-amber-600 px-3 py-2 text-white"
+        className="rounded-lg bg-amber-600 px-3 py-2 text-foreground"
       >
         Settle
       </button>

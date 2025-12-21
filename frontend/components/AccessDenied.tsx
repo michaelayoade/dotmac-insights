@@ -23,7 +23,7 @@ export function AccessDenied({ message, backHref, backLabel, className }: Access
         <Lock className="w-6 h-6" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-white text-lg font-semibold">Access denied</h2>
+        <h2 className="text-foreground text-lg font-semibold">Access denied</h2>
         <p className="text-slate-muted text-sm">
           {message || "You don't have permission to view this page."}
         </p>
@@ -32,14 +32,14 @@ export function AccessDenied({ message, backHref, backLabel, className }: Access
         {backHref ? (
           <Link
             href={backHref}
-            className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-white hover:bg-slate-elevated/80 transition-colors"
+            className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-foreground hover:bg-slate-elevated/80 transition-colors"
           >
             {backLabel || 'Back'}
           </Link>
         ) : null}
         <Link
           href="/"
-          className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-white hover:bg-slate-elevated/80 transition-colors"
+          className="rounded-lg bg-slate-elevated px-4 py-2 text-sm text-foreground hover:bg-slate-elevated/80 transition-colors"
         >
           Go home
         </Link>
@@ -50,7 +50,7 @@ export function AccessDenied({ message, backHref, backLabel, className }: Access
             const el = document.querySelector('[data-auth-token-cta]') as HTMLButtonElement | null;
             el?.click();
           }}
-          className="rounded-lg border border-slate-border px-4 py-2 text-sm text-slate-muted hover:text-white hover:border-teal-electric transition-colors"
+          className="rounded-lg border border-slate-border px-4 py-2 text-sm text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
           data-testid="set-token-cta"
         >
           Set token

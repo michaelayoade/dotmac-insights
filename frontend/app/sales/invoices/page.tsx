@@ -70,7 +70,7 @@ export default function InvoicesPage() {
       header: 'Customer',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="text-white text-sm">
+          <span className="text-foreground text-sm">
             {item.customer_name || item.customer?.name || (item.customer_id ? `Customer ${item.customer_id}` : '—')}
           </span>
           <span className="text-xs text-slate-muted font-mono">
@@ -93,7 +93,7 @@ export default function InvoicesPage() {
       sortable: true,
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white">{formatCurrency(item.total_amount || 0, item.currency)}</span>
+        <span className="font-mono text-foreground">{formatCurrency(item.total_amount || 0, item.currency)}</span>
       ),
     },
     {
@@ -170,7 +170,7 @@ export default function InvoicesPage() {
         </div>
       )}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Invoices</h1>
+        <h1 className="text-xl font-semibold text-foreground">Invoices</h1>
         <Link
           href="/sales/invoices/new"
           className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-teal-electric/50 text-sm text-teal-electric hover:text-teal-glow hover:border-teal-electric/70"
@@ -187,7 +187,7 @@ export default function InvoicesPage() {
             placeholder="Search invoices..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         <select
@@ -196,7 +196,7 @@ export default function InvoicesPage() {
             setStatus(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All Status</option>
           <option value="paid">Paid</option>
@@ -219,7 +219,7 @@ export default function InvoicesPage() {
         <select
           value={sortBy}
           onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="invoice_date">Invoice date</option>
           <option value="total_amount">Amount</option>
@@ -228,7 +228,7 @@ export default function InvoicesPage() {
         <select
           value={sortOrder}
           onChange={(e) => { setSortOrder(e.target.value as typeof sortOrder); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>

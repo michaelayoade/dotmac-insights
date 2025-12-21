@@ -46,7 +46,7 @@ export default function TrialBalancePage() {
       header: 'Account Name',
       sortable: true,
       render: (item: any) => (
-        <span className="text-white">{item.account_name}</span>
+        <span className="text-foreground">{item.account_name}</span>
       ),
     },
     {
@@ -85,7 +85,7 @@ export default function TrialBalancePage() {
       render: (item: any) => (
         <span className={cn(
           'font-mono font-semibold',
-          (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
+          (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
         )}>
           {formatCurrency(item.balance)}
         </span>
@@ -150,7 +150,7 @@ export default function TrialBalancePage() {
           </div>
           <p className={cn(
             'text-2xl font-bold',
-            difference === 0 ? 'text-white' : 'text-yellow-400'
+            difference === 0 ? 'text-foreground' : 'text-yellow-400'
           )}>
             {formatCurrency(difference)}
           </p>
@@ -167,12 +167,12 @@ export default function TrialBalancePage() {
           type="date"
           value={asOfDate}
           onChange={(e) => setAsOfDate(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         />
         {asOfDate && (
           <button
             onClick={() => setAsOfDate('')}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear
           </button>
@@ -192,7 +192,7 @@ export default function TrialBalancePage() {
       {data && (
         <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
           <div className="flex justify-between items-center">
-            <span className="text-white font-semibold">Total</span>
+            <span className="text-foreground font-semibold">Total</span>
             <div className="flex gap-8">
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Debit</p>

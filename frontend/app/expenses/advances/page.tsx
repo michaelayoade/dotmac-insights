@@ -98,7 +98,7 @@ export default function CashAdvancesPage() {
                 <tr key={advance.id} className="border-b border-slate-border/50 hover:bg-slate-elevated/30 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/expenses/advances/${advance.id}`} className="block">
-                      <p className="text-white font-medium hover:text-teal-400 transition-colors">
+                      <p className="text-foreground font-medium hover:text-teal-400 transition-colors">
                         {advance.advance_number || `Draft #${advance.id}`}
                       </p>
                       <p className="text-sm text-slate-muted">{advance.purpose}</p>
@@ -118,7 +118,7 @@ export default function CashAdvancesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {advance.requested_amount.toLocaleString()}
                     </span>
                     <span className="text-slate-muted text-sm ml-1">{advance.currency}</span>

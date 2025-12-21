@@ -182,7 +182,7 @@ export default function ImportBankTransactionsPage() {
   const renderStep1 = () => (
     <div className="space-y-6">
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-        <h2 className="text-white font-medium">1. Select Bank Account</h2>
+        <h2 className="text-foreground font-medium">1. Select Bank Account</h2>
         <select
           value={state.selectedAccount}
           onChange={(e) => setState((prev) => ({ ...prev, selectedAccount: e.target.value }))}
@@ -198,7 +198,7 @@ export default function ImportBankTransactionsPage() {
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-        <h2 className="text-white font-medium">2. Upload Statement File</h2>
+        <h2 className="text-foreground font-medium">2. Upload Statement File</h2>
         <FileUpload
           accept=".csv,.ofx,.qfx"
           maxSizeMB={10}
@@ -237,7 +237,7 @@ export default function ImportBankTransactionsPage() {
       <div className="flex justify-between">
         <button
           onClick={() => setState((prev) => ({ ...prev, step: 1 }))}
-          className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -260,20 +260,20 @@ export default function ImportBankTransactionsPage() {
     return (
       <div className="space-y-6">
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h2 className="text-white font-medium text-lg mb-4">Confirm Import</h2>
+          <h2 className="text-foreground font-medium text-lg mb-4">Confirm Import</h2>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between py-3 border-b border-slate-border">
               <span className="text-slate-muted">File</span>
-              <span className="text-white font-medium">{state.selectedFile?.name}</span>
+              <span className="text-foreground font-medium">{state.selectedFile?.name}</span>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-slate-border">
               <span className="text-slate-muted">Bank Account</span>
-              <span className="text-white font-medium">{state.selectedAccount}</span>
+              <span className="text-foreground font-medium">{state.selectedAccount}</span>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-slate-border">
               <span className="text-slate-muted">Format</span>
-              <span className="text-white font-medium uppercase">{state.fileFormat}</span>
+              <span className="text-foreground font-medium uppercase">{state.fileFormat}</span>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-slate-border">
               <span className="text-slate-muted">Transactions to Import</span>
@@ -310,7 +310,7 @@ export default function ImportBankTransactionsPage() {
           <button
             onClick={() => setState((prev) => ({ ...prev, step: 2 }))}
             disabled={state.isImporting}
-            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors disabled:opacity-60"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -347,7 +347,7 @@ export default function ImportBankTransactionsPage() {
           {result && result.imported_count > 0 ? (
             <>
               <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h2 className="text-white font-bold text-2xl mb-2">Import Complete</h2>
+              <h2 className="text-foreground font-bold text-2xl mb-2">Import Complete</h2>
               <p className="text-slate-muted">
                 Successfully imported {result.imported_count} transaction(s)
               </p>
@@ -355,7 +355,7 @@ export default function ImportBankTransactionsPage() {
           ) : (
             <>
               <XCircle className="w-16 h-16 text-coral-alert mx-auto mb-4" />
-              <h2 className="text-white font-bold text-2xl mb-2">Import Failed</h2>
+              <h2 className="text-foreground font-bold text-2xl mb-2">Import Failed</h2>
               <p className="text-slate-muted">No transactions were imported</p>
             </>
           )}
@@ -381,7 +381,7 @@ export default function ImportBankTransactionsPage() {
         {hasErrors && (
           <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
             <div className="p-4 border-b border-slate-border">
-              <h3 className="text-white font-medium">Error Details</h3>
+              <h3 className="text-foreground font-medium">Error Details</h3>
             </div>
             <div className="max-h-48 overflow-y-auto">
               {result.errors.map((err, idx) => (
@@ -414,7 +414,7 @@ export default function ImportBankTransactionsPage() {
                 error: null,
               })
             }
-            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
           >
             <Upload className="w-4 h-4" />
             Import Another
@@ -437,12 +437,12 @@ export default function ImportBankTransactionsPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/books/bank-transactions"
-          className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+          className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white">Import Bank Transactions</h1>
+          <h1 className="text-2xl font-bold text-foreground">Import Bank Transactions</h1>
           <p className="text-slate-muted text-sm">Import transactions from CSV or OFX files</p>
         </div>
       </div>
@@ -457,7 +457,7 @@ export default function ImportBankTransactionsPage() {
                 state.step === step
                   ? 'bg-teal-electric text-slate-950'
                   : state.step > step
-                    ? 'bg-green-500 text-white'
+                    ? 'bg-green-500 text-foreground'
                     : 'bg-slate-elevated text-slate-muted'
               )}
             >

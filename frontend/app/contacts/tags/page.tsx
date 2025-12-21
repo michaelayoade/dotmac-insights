@@ -118,7 +118,7 @@ export default function TagsPage() {
               <Hash className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalTags}</p>
+              <p className="text-2xl font-bold text-foreground">{totalTags}</p>
               <p className="text-xs text-slate-muted">Unique Tags</p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function TagsPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalTagged}</p>
+              <p className="text-2xl font-bold text-foreground">{totalTagged}</p>
               <p className="text-xs text-slate-muted">Tagged Contacts</p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function TagsPage() {
               <Tag className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{avgTagsPerContact}</p>
+              <p className="text-2xl font-bold text-foreground">{avgTagsPerContact}</p>
               <p className="text-xs text-slate-muted">Avg Tags/Contact</p>
             </div>
           </div>
@@ -153,14 +153,14 @@ export default function TagsPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Tag className="w-5 h-5 text-violet-400" />
-              <h3 className="text-white font-semibold">Contacts tagged: "{selectedTag}"</h3>
+              <h3 className="text-foreground font-semibold">Contacts tagged: "{selectedTag}"</h3>
               <span className="px-2 py-0.5 bg-violet-500/20 text-violet-400 rounded text-xs">
                 {contacts.length}
               </span>
             </div>
             <button
               onClick={() => setSelectedTag(null)}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear selection
             </button>
@@ -176,10 +176,10 @@ export default function TagsPage() {
                   className="flex items-center justify-between py-2 px-3 hover:bg-slate-elevated rounded-lg transition-colors"
                 >
                   <div>
-                    <p className="text-white font-medium">{contact.name}</p>
+                    <p className="text-foreground font-medium">{contact.name}</p>
                     <p className="text-xs text-slate-muted">{contact.email}</p>
                   </div>
-                  <span className="px-2 py-1 bg-slate-elevated rounded text-xs text-slate-300">
+                  <span className="px-2 py-1 bg-slate-elevated rounded text-xs text-foreground-secondary">
                     {contact.contact_type}
                   </span>
                 </Link>
@@ -211,7 +211,7 @@ export default function TagsPage() {
                 placeholder="Search tags..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               />
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function TagsPage() {
       {/* All Tags List */}
       {!selectedTag && filteredTags.length > 0 && (
         <div className="bg-slate-card rounded-xl border border-slate-border p-4">
-          <h3 className="text-white font-semibold mb-4">All Tags</h3>
+          <h3 className="text-foreground font-semibold mb-4">All Tags</h3>
           <div className="divide-y divide-slate-border">
             {filteredTags.map((tagData, idx) => (
               <div
@@ -261,7 +261,7 @@ export default function TagsPage() {
                   )}>
                     <Tag className="w-4 h-4" />
                   </div>
-                  <span className="text-white">{tagData.tag}</span>
+                  <span className="text-foreground">{tagData.tag}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-slate-muted">{tagData.count} contacts</span>

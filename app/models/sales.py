@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import String, Text, Enum, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
+from typing import List
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 import enum
@@ -10,6 +11,8 @@ from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
+    from app.models.document_lines import SalesOrderItem, QuotationItem
+    # Forward references for sales FKs (Territory and SalesPerson are defined later in this file)
 
 
 # ============= SALES ORDER STATUS =============
@@ -66,9 +69,17 @@ class SalesOrder(Base):
     status: Mapped[SalesOrderStatus] = mapped_column(Enum(SalesOrderStatus), default=SalesOrderStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
-    # Sales team
+    # Sales team (TEXT fields for ERPNext sync)
     sales_partner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     territory: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Sales team FKs (for local queries)
+    sales_partner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sales_persons.id"), nullable=True, index=True
+    )
+    territory_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("territories.id"), nullable=True, index=True
+    )
 
     # Source
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -78,6 +89,21 @@ class SalesOrder(Base):
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    items: Mapped[List["SalesOrderItem"]] = relationship(
+        back_populates="sales_order", cascade="all, delete-orphan"
+    )
+    sales_partner_rel: Mapped[Optional["SalesPerson"]] = relationship(
+        "SalesPerson",
+        foreign_keys=[sales_partner_id],
+        backref="sales_orders"
+    )
+    territory_rel: Mapped[Optional["Territory"]] = relationship(
+        "Territory",
+        foreign_keys=[territory_id],
+        backref="sales_orders"
+    )
 
     def __repr__(self) -> str:
         return f"<SalesOrder {self.erpnext_id} - {self.customer_name}>"
@@ -130,9 +156,17 @@ class Quotation(SoftDeleteMixin, Base):
     status: Mapped[QuotationStatus] = mapped_column(Enum(QuotationStatus), default=QuotationStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
-    # Sales team
+    # Sales team (TEXT fields for ERPNext sync)
     sales_partner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     territory: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
+    # Sales team FKs (for local queries)
+    sales_partner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sales_persons.id"), nullable=True, index=True
+    )
+    territory_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("territories.id"), nullable=True, index=True
+    )
 
     # Source
     source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -145,6 +179,21 @@ class Quotation(SoftDeleteMixin, Base):
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    items: Mapped[List["QuotationItem"]] = relationship(
+        back_populates="quotation", cascade="all, delete-orphan"
+    )
+    sales_partner_rel: Mapped[Optional["SalesPerson"]] = relationship(
+        "SalesPerson",
+        foreign_keys=[sales_partner_id],
+        backref="quotations"
+    )
+    territory_rel: Mapped[Optional["Territory"]] = relationship(
+        "Territory",
+        foreign_keys=[territory_id],
+        backref="quotations"
+    )
 
     def __repr__(self) -> str:
         return f"<Quotation {self.erpnext_id} - {self.party_name}>"

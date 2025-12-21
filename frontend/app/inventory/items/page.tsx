@@ -19,7 +19,7 @@ export default function InventoryItemsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Items</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Items</h1>
           <p className="text-slate-muted text-sm">Manage inventory items with stock levels</p>
         </div>
         <Link
@@ -40,7 +40,7 @@ export default function InventoryItemsPage() {
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -50,7 +50,7 @@ export default function InventoryItemsPage() {
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
                 hasStock === true
                   ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated"
+                  : "border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               )}
             >
               In Stock Only
@@ -61,7 +61,7 @@ export default function InventoryItemsPage() {
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
                 hasStock === false
                   ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
-                  : "border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated"
+                  : "border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               )}
             >
               Out of Stock
@@ -126,7 +126,7 @@ export default function InventoryItemsPage() {
                         {item.item_code}
                       </Link>
                     </td>
-                    <td className="py-3 text-white">{item.item_name}</td>
+                    <td className="py-3 text-foreground">{item.item_name}</td>
                     <td className="py-3 text-slate-muted">{item.item_group || "-"}</td>
                     <td className="py-3 text-slate-muted">{item.stock_uom || "-"}</td>
                     <td className="py-3 text-right">
@@ -137,7 +137,7 @@ export default function InventoryItemsPage() {
                         {(item.total_stock_qty ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </span>
                     </td>
-                    <td className="py-3 text-right font-mono text-white">
+                    <td className="py-3 text-right font-mono text-foreground">
                       {(item.valuation_rate ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3">

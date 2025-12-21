@@ -81,7 +81,7 @@ function ProgressRing({ percent, size = 80, strokeWidth = 8 }: { percent: number
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-lg font-bold text-white">{percent}%</span>
+        <span className="text-lg font-bold text-foreground">{percent}%</span>
       </div>
     </div>
   );
@@ -109,7 +109,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   const colors: Record<string, string> = {
     high: 'text-red-400 bg-red-500/10 border-red-500/30',
     medium: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
-    low: 'text-slate-300 bg-slate-500/10 border-slate-500/30',
+    low: 'text-foreground-secondary bg-slate-500/10 border-slate-500/30',
   };
   return (
     <span className={cn('px-2 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1', colors[priority] || colors.medium)}>
@@ -163,7 +163,7 @@ function TaskRow({ task }: { task: any }) {
     )}>
       <div className={cn('w-2 h-2 rounded-full', statusColors[task.status] || 'bg-slate-500')} />
       <div className="flex-1 min-w-0">
-        <p className="text-white font-medium truncate">{task.subject}</p>
+        <p className="text-foreground font-medium truncate">{task.subject}</p>
         <div className="flex items-center gap-3 text-xs text-slate-muted mt-1">
           {task.assigned_to && (
             <span className="flex items-center gap-1">
@@ -209,7 +209,7 @@ export default function ProjectDetailPage() {
         <p className="text-red-400">Invalid project ID.</p>
         <button
           onClick={() => router.push('/projects')}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to projects
@@ -239,7 +239,7 @@ export default function ProjectDetailPage() {
         <p className="text-red-400">Failed to load project</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -268,13 +268,13 @@ export default function ProjectDetailPage() {
         <div className="flex items-start gap-4">
           <Link
             href="/projects"
-            className="mt-1 inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="mt-1 inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-white">{data.project_name}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{data.project_name}</h1>
               <StatusBadge status={data.status} />
               <PriorityBadge priority={data.priority || 'medium'} />
             </div>
@@ -300,13 +300,13 @@ export default function ProjectDetailPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => mutate()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <Link
             href={`/projects/${id}/edit`}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-white hover:border-teal-electric/50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground hover:border-teal-electric/50 transition-colors"
           >
             <Edit className="w-4 h-4" />
             Edit
@@ -321,24 +321,24 @@ export default function ProjectDetailPage() {
           <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6">
             <div>
               <p className="text-slate-muted text-sm mb-1">Expected Start</p>
-              <p className="text-white font-semibold">{formatDate(data.expected_start_date)}</p>
+              <p className="text-foreground font-semibold">{formatDate(data.expected_start_date)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-1">Expected End</p>
-              <p className={cn('font-semibold', isOverdue ? 'text-red-400' : 'text-white')}>
+              <p className={cn('font-semibold', isOverdue ? 'text-red-400' : 'text-foreground')}>
                 {formatDate(data.expected_end_date)}
                 {isOverdue && <span className="ml-2 text-xs">(Overdue)</span>}
               </p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-1">Days Remaining</p>
-              <p className={cn('font-semibold', daysRemaining !== null && daysRemaining < 0 ? 'text-red-400' : daysRemaining !== null && daysRemaining < 7 ? 'text-amber-400' : 'text-white')}>
+              <p className={cn('font-semibold', daysRemaining !== null && daysRemaining < 0 ? 'text-red-400' : daysRemaining !== null && daysRemaining < 7 ? 'text-amber-400' : 'text-foreground')}>
                 {daysRemaining !== null ? (daysRemaining < 0 ? `${Math.abs(daysRemaining)} days overdue` : `${daysRemaining} days`) : '-'}
               </p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-1">Project Manager</p>
-              <p className="text-white font-semibold">{data.project_manager || '-'}</p>
+              <p className="text-foreground font-semibold">{data.project_manager || '-'}</p>
             </div>
           </div>
         </div>
@@ -390,7 +390,7 @@ export default function ProjectDetailPage() {
                 'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
                 activeTab === tab.key
                   ? 'border-teal-electric text-teal-electric'
-                  : 'border-transparent text-slate-muted hover:text-white'
+                  : 'border-transparent text-slate-muted hover:text-foreground'
               )}
             >
               <tab.icon className="w-4 h-4" />
@@ -405,40 +405,40 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Details */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-teal-electric" />
               Project Details
             </h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-slate-muted">Type</p>
-                <p className="text-white font-medium">{data.project_type || '-'}</p>
+                <p className="text-foreground font-medium">{data.project_type || '-'}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Customer</p>
-                <p className="text-white font-medium">{data.customer?.name || data.erpnext_customer || '-'}</p>
+                <p className="text-foreground font-medium">{data.customer?.name || data.erpnext_customer || '-'}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Cost Center</p>
-                <p className="text-white font-medium">{data.cost_center || '-'}</p>
+                <p className="text-foreground font-medium">{data.cost_center || '-'}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Company</p>
-                <p className="text-white font-medium">{data.company || '-'}</p>
+                <p className="text-foreground font-medium">{data.company || '-'}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Actual Start</p>
-                <p className="text-white font-medium">{formatDate(data.actual_start_date)}</p>
+                <p className="text-foreground font-medium">{formatDate(data.actual_start_date)}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Actual End</p>
-                <p className="text-white font-medium">{formatDate(data.actual_end_date)}</p>
+                <p className="text-foreground font-medium">{formatDate(data.actual_end_date)}</p>
               </div>
             </div>
             {data.notes && (
               <div className="pt-3 border-t border-slate-border">
                 <p className="text-slate-muted text-sm mb-2">Notes</p>
-                <p className="text-white text-sm whitespace-pre-wrap">{data.notes}</p>
+                <p className="text-foreground text-sm whitespace-pre-wrap">{data.notes}</p>
               </div>
             )}
           </div>
@@ -446,7 +446,7 @@ export default function ProjectDetailPage() {
           {/* Recent Tasks */}
           <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-white font-semibold flex items-center gap-2">
+              <h3 className="text-foreground font-semibold flex items-center gap-2">
                 <ListTodo className="w-4 h-4 text-teal-electric" />
                 Recent Tasks
               </h3>
@@ -488,7 +488,7 @@ export default function ProjectDetailPage() {
       {activeTab === 'tasks' && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <ListTodo className="w-4 h-4 text-teal-electric" />
               All Tasks ({taskStats.total})
             </h3>
@@ -544,11 +544,11 @@ export default function ProjectDetailPage() {
       {activeTab === 'team' && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <Users className="w-4 h-4 text-teal-electric" />
               Project Team ({data.users?.length || 0})
             </h3>
-            <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70">
+            <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70">
               <Plus className="w-4 h-4" />
               Add Member
             </button>
@@ -561,7 +561,7 @@ export default function ProjectDetailPage() {
                     {(user.full_name || user.user || '?')[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{user.full_name || user.user}</p>
+                    <p className="text-foreground font-medium truncate">{user.full_name || user.user}</p>
                     <p className="text-slate-muted text-sm truncate">{user.email || '-'}</p>
                   </div>
                   {user.project_status && (
@@ -607,26 +607,26 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
               Cost Breakdown
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-slate-muted">Expense Claims</p>
-                <p className="text-white font-semibold text-lg">{formatCurrency(data.total_expense_claim)}</p>
+                <p className="text-foreground font-semibold text-lg">{formatCurrency(data.total_expense_claim)}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Purchase Cost</p>
-                <p className="text-white font-semibold text-lg">{formatCurrency(data.total_purchase_cost)}</p>
+                <p className="text-foreground font-semibold text-lg">{formatCurrency(data.total_purchase_cost)}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Material Cost</p>
-                <p className="text-white font-semibold text-lg">{formatCurrency(data.total_consumed_material_cost)}</p>
+                <p className="text-foreground font-semibold text-lg">{formatCurrency(data.total_consumed_material_cost)}</p>
               </div>
               <div>
                 <p className="text-slate-muted">Billable Amount</p>
-                <p className="text-white font-semibold text-lg">{formatCurrency(data.total_billable_amount)}</p>
+                <p className="text-foreground font-semibold text-lg">{formatCurrency(data.total_billable_amount)}</p>
               </div>
             </div>
           </div>
@@ -654,7 +654,7 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-slate-muted text-sm">Budget Utilization</p>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-2xl font-bold text-foreground">
                     {(data.estimated_costing ?? 0) > 0
                       ? Math.round(((data.total_costing_amount || 0) / (data.estimated_costing ?? 1)) * 100)
                       : 0}%

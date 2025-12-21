@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Car,
-  ArrowLeft,
   Edit,
   Save,
   X,
@@ -28,6 +27,7 @@ import {
 import { useFleetVehicle, useFleetMutations } from '@/hooks/useApi';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { cn } from '@/lib/utils';
+import { BackButton, Button } from '@/components/ui';
 
 function formatCurrency(value: number | null | undefined, currency = 'NGN'): string {
   if (value === null || value === undefined) return '\u20A60';
@@ -75,7 +75,7 @@ function InfoRow({ icon: Icon, label, value, iconColor = 'text-slate-muted' }: I
       <Icon className={cn('w-5 h-5 mt-0.5', iconColor)} />
       <div className="flex-1">
         <p className="text-sm text-slate-muted">{label}</p>
-        <div className="text-white">{value}</div>
+        <div className="text-foreground">{value}</div>
       </div>
     </div>
   );
@@ -215,7 +215,7 @@ export default function VehicleDetailPage() {
         )}
         <div className="flex flex-col items-center justify-center py-12">
           <AlertTriangle className="w-12 h-12 text-slate-muted mb-4" />
-          <p className="text-white text-lg">Vehicle not found</p>
+          <p className="text-foreground text-lg">Vehicle not found</p>
           <Link href="/hr/fleet" className="mt-4 text-amber-400 hover:text-amber-300">
             Back to fleet
           </Link>
@@ -241,19 +241,14 @@ export default function VehicleDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href="/hr/fleet"
-            className="p-2 hover:bg-slate-elevated rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-muted" />
-          </Link>
+          <BackButton href="/hr/fleet" label="fleet" />
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
               <Car className="w-6 h-6 text-amber-400" />
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white">{vehicle.license_plate}</h1>
+                <h1 className="text-2xl font-bold text-foreground">{vehicle.license_plate}</h1>
                 <span className={cn(
                   'px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1',
                   vehicle.is_active
@@ -273,30 +268,23 @@ export default function VehicleDetailPage() {
         <div className="flex items-center gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={cancelEditing}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white hover:bg-slate-border transition-colors"
-              >
-                <X className="w-4 h-4" />
+              <Button variant="secondary" icon={X} onClick={cancelEditing}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                module="hr"
+                icon={Save}
                 onClick={handleSave}
                 disabled={saving || !isLicensePlateValid}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-black rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-50"
+                loading={saving}
               >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save'}
-              </button>
+                Save
+              </Button>
             </>
           ) : (
-            <button
-              onClick={startEditing}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white hover:bg-slate-border transition-colors"
-            >
-              <Edit className="w-4 h-4" />
+            <Button variant="secondary" icon={Edit} onClick={startEditing}>
               Edit
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -328,7 +316,7 @@ export default function VehicleDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Vehicle Details */}
           <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Vehicle Details</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Vehicle Details</h3>
             {isEditing ? (
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -338,7 +326,7 @@ export default function VehicleDetailPage() {
                     value={editForm.license_plate}
                     onChange={(e) => handleFormChange('license_plate', e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                   {formError && (
                     <p className="text-xs text-coral-alert mt-1">{formError}</p>
@@ -350,7 +338,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.make}
                     onChange={(e) => handleFormChange('make', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -359,7 +347,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.model}
                     onChange={(e) => handleFormChange('model', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -370,7 +358,7 @@ export default function VehicleDetailPage() {
                     max="2100"
                     value={editForm.model_year}
                     onChange={(e) => handleFormChange('model_year', e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -379,7 +367,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.color}
                     onChange={(e) => handleFormChange('color', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -388,7 +376,7 @@ export default function VehicleDetailPage() {
                     type="date"
                     value={editForm.acquisition_date}
                     onChange={(e) => handleFormChange('acquisition_date', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -410,7 +398,7 @@ export default function VehicleDetailPage() {
                         handleFormChange('odometer_value', vehicle?.odometer_value || 0);
                       }
                     }}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -419,7 +407,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.fuel_uom}
                     onChange={(e) => handleFormChange('fuel_uom', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -428,7 +416,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.location}
                     onChange={(e) => handleFormChange('location', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -437,7 +425,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.company}
                     onChange={(e) => handleFormChange('company', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div className="col-span-2">
@@ -448,7 +436,7 @@ export default function VehicleDetailPage() {
                       onChange={(e) => handleFormChange('is_active', e.target.checked)}
                       className="w-4 h-4 rounded border-slate-border bg-slate-elevated text-amber-500 focus:ring-amber-500/50"
                     />
-                    <span className="text-white">Active</span>
+                    <span className="text-foreground">Active</span>
                   </label>
                 </div>
               </div>
@@ -475,7 +463,7 @@ export default function VehicleDetailPage() {
                 'w-5 h-5',
                 insuranceExpired ? 'text-red-400' : insuranceExpiring ? 'text-amber-400' : 'text-emerald-400'
               )} />
-              <h3 className="text-lg font-semibold text-white">Insurance</h3>
+              <h3 className="text-lg font-semibold text-foreground">Insurance</h3>
             </div>
             {isEditing ? (
               <div className="grid grid-cols-2 gap-4">
@@ -485,7 +473,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.insurance_company}
                     onChange={(e) => handleFormChange('insurance_company', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -494,7 +482,7 @@ export default function VehicleDetailPage() {
                     type="text"
                     value={editForm.policy_no}
                     onChange={(e) => handleFormChange('policy_no', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -503,7 +491,7 @@ export default function VehicleDetailPage() {
                     type="date"
                     value={editForm.insurance_start_date}
                     onChange={(e) => handleFormChange('insurance_start_date', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
                 <div>
@@ -512,7 +500,7 @@ export default function VehicleDetailPage() {
                     type="date"
                     value={editForm.insurance_end_date}
                     onChange={(e) => handleFormChange('insurance_end_date', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                   />
                 </div>
               </div>
@@ -526,7 +514,7 @@ export default function VehicleDetailPage() {
                   label="End Date"
                   value={
                     <span className={cn(
-                      insuranceExpired ? 'text-red-400' : insuranceExpiring ? 'text-amber-400' : 'text-white'
+                      insuranceExpired ? 'text-red-400' : insuranceExpiring ? 'text-amber-400' : 'text-foreground'
                     )}>
                       {formatDate(vehicle.insurance_end_date)}
                       {insuranceDays !== null && (
@@ -548,7 +536,7 @@ export default function VehicleDetailPage() {
           <div className="bg-slate-card rounded-xl border border-slate-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <Users className="w-5 h-5 text-violet-400" />
-              <h3 className="text-lg font-semibold text-white">Driver</h3>
+              <h3 className="text-lg font-semibold text-foreground">Driver</h3>
             </div>
             {vehicle.driver_name ? (
               <div className="flex items-center gap-3">
@@ -556,7 +544,7 @@ export default function VehicleDetailPage() {
                   <Users className="w-5 h-5 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">{vehicle.driver_name}</p>
+                  <p className="text-foreground font-medium">{vehicle.driver_name}</p>
                   {vehicle.employee && (
                     <p className="text-slate-muted text-sm">ID: {vehicle.employee}</p>
                   )}
@@ -572,23 +560,23 @@ export default function VehicleDetailPage() {
 
           {/* Specifications */}
           <div className="bg-slate-card rounded-xl border border-slate-border p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Specifications</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Specifications</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Doors</span>
-                <span className="text-white">{vehicle.doors || '-'}</span>
+                <span className="text-foreground">{vehicle.doors || '-'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Wheels</span>
-                <span className="text-white">{vehicle.wheels || '-'}</span>
+                <span className="text-foreground">{vehicle.wheels || '-'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Fuel UOM</span>
-                <span className="text-white">{vehicle.fuel_uom || '-'}</span>
+                <span className="text-foreground">{vehicle.fuel_uom || '-'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Company</span>
-                <span className="text-white">{vehicle.company || '-'}</span>
+                <span className="text-foreground">{vehicle.company || '-'}</span>
               </div>
             </div>
           </div>
@@ -597,20 +585,20 @@ export default function VehicleDetailPage() {
           <div className="bg-slate-card rounded-xl border border-slate-border p-6">
             <div className="flex items-center gap-2 mb-4">
               <Clock className="w-5 h-5 text-slate-muted" />
-              <h3 className="text-lg font-semibold text-white">Timeline</h3>
+              <h3 className="text-lg font-semibold text-foreground">Timeline</h3>
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Acquisition</span>
-                <span className="text-white">{formatDate(vehicle.acquisition_date)}</span>
+                <span className="text-foreground">{formatDate(vehicle.acquisition_date)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Created</span>
-                <span className="text-white">{formatDate(vehicle.created_at)}</span>
+                <span className="text-foreground">{formatDate(vehicle.created_at)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-muted">Updated</span>
-                <span className="text-white">{formatDate(vehicle.updated_at)}</span>
+                <span className="text-foreground">{formatDate(vehicle.updated_at)}</span>
               </div>
             </div>
           </div>
@@ -619,7 +607,7 @@ export default function VehicleDetailPage() {
           {vehicle.erpnext_id && (
             <div className="bg-slate-card rounded-xl border border-slate-border p-6">
               <h3 className="text-sm font-semibold text-slate-muted mb-2">ERPNext Reference</h3>
-              <p className="text-white font-mono text-sm break-all">{vehicle.erpnext_id}</p>
+              <p className="text-foreground font-mono text-sm break-all">{vehicle.erpnext_id}</p>
             </div>
           )}
         </div>

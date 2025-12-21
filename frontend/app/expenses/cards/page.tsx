@@ -33,7 +33,7 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-white font-semibold truncate">{card.card_name}</p>
+            <p className="text-foreground font-semibold truncate">{card.card_name}</p>
             <StatusBadge status={card.status} />
           </div>
           <p className="text-slate-muted text-sm">
@@ -43,13 +43,13 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
       </Link>
       <div className="flex items-center gap-4">
         <div className="text-right">
-          <p className="text-white font-semibold">{card.credit_limit.toLocaleString()} {card.currency}</p>
+          <p className="text-foreground font-semibold">{card.credit_limit.toLocaleString()} {card.currency}</p>
           <p className="text-slate-muted text-xs">Credit limit</p>
         </div>
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/30 rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -60,7 +60,7 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
                 {card.status === 'active' && (
                   <button
                     onClick={() => { onAction('suspend', card); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Pause className="w-4 h-4" />
                     Suspend card
@@ -69,7 +69,7 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
                 {card.status === 'suspended' && (
                   <button
                     onClick={() => { onAction('activate', card); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Play className="w-4 h-4" />
                     Activate card
@@ -119,12 +119,12 @@ export default function CorporateCardsPage() {
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Corporate Cards</h1>
+            <h1 className="text-xl font-bold text-foreground">Corporate Cards</h1>
             <p className="text-slate-muted text-sm mt-1">Manage company card assignments and limits</p>
           </div>
           <Link
             href="/expenses/cards/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-white font-semibold shadow hover:bg-violet-400 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-500 px-4 py-2 text-foreground font-semibold shadow hover:bg-violet-400 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add card
@@ -137,14 +137,14 @@ export default function CorporateCardsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:outline-none focus:border-violet-500"
+          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-white transition-colors">
+        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-foreground transition-colors">
           <input
             type="checkbox"
             checked={includeInactive}
@@ -163,11 +163,11 @@ export default function CorporateCardsPage() {
         {!isLoading && (!cards || cards.length === 0) && (
           <div className="text-center py-12 bg-slate-card border border-slate-border rounded-2xl">
             <CreditCard className="w-12 h-12 mx-auto text-slate-muted mb-3" />
-            <p className="text-white font-semibold">No corporate cards</p>
+            <p className="text-foreground font-semibold">No corporate cards</p>
             <p className="text-slate-muted text-sm mt-1">Add a card to get started</p>
             <Link
               href="/expenses/cards/new"
-              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-violet-500 text-white font-semibold hover:bg-violet-400 transition-colors"
+              className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-violet-500 text-foreground font-semibold hover:bg-violet-400 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add card

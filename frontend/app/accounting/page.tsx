@@ -256,7 +256,7 @@ export default function AccountingDashboardPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
           <Scale className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Financial Ratios</h2>
+          <h2 className="text-lg font-semibold text-foreground">Financial Ratios</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <RatioCard
@@ -285,7 +285,7 @@ export default function AccountingDashboardPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-5 h-5 text-green-400" />
-            <h2 className="text-lg font-semibold text-white">Revenue (YTD)</h2>
+            <h2 className="text-lg font-semibold text-foreground">Revenue (YTD)</h2>
           </div>
           {loading ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
@@ -299,7 +299,7 @@ export default function AccountingDashboardPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <TrendingDown className="w-5 h-5 text-red-400" />
-            <h2 className="text-lg font-semibold text-white">Expenses (YTD)</h2>
+            <h2 className="text-lg font-semibold text-foreground">Expenses (YTD)</h2>
           </div>
           {loading ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
@@ -316,23 +316,23 @@ export default function AccountingDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Link href="/books/ledger" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <BookOpen className="w-6 h-6 text-teal-electric mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(ledgerEntryCount)}</p>
-          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Ledger Entries</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(ledgerEntryCount)}</p>
+          <p className="text-slate-muted text-sm group-hover:text-foreground transition-colors">Ledger Entries</p>
         </Link>
         <Link href="/books/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <Users className="w-6 h-6 text-orange-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(supplierCount)}</p>
-          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Suppliers</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(supplierCount)}</p>
+          <p className="text-slate-muted text-sm group-hover:text-foreground transition-colors">Suppliers</p>
         </Link>
         <Link href="/books/bank-accounts" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <Landmark className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(bankAccountCount)}</p>
-          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Bank Accounts</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(bankAccountCount)}</p>
+          <p className="text-slate-muted text-sm group-hover:text-foreground transition-colors">Bank Accounts</p>
         </Link>
         <Link href="/books/settings/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center group hover:border-slate-border/80 hover:bg-slate-elevated/80 transition-colors cursor-pointer">
           <FileText className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(fiscalYearCount)}</p>
-          <p className="text-slate-muted text-sm group-hover:text-white transition-colors">Fiscal Years</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(fiscalYearCount)}</p>
+          <p className="text-slate-muted text-sm group-hover:text-foreground transition-colors">Fiscal Years</p>
         </Link>
       </div>
 
@@ -341,7 +341,7 @@ export default function AccountingDashboardPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">Balance Sheet Summary</h2>
+            <h2 className="text-lg font-semibold text-foreground">Balance Sheet Summary</h2>
             <span className="text-slate-muted text-sm ml-auto">
               As of {data.fiscal_year?.end || data.generated_at}
             </span>
@@ -363,7 +363,7 @@ export default function AccountingDashboardPage() {
           <div className="mt-4 pt-4 border-t border-slate-border">
             <div className="flex items-center justify-between">
               <span className="text-slate-muted">Equity</span>
-              <span className="text-white font-medium">{formatCurrency(totalEquity)}</span>
+              <span className="text-foreground font-medium">{formatCurrency(totalEquity)}</span>
             </div>
           </div>
         </div>

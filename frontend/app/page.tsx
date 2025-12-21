@@ -115,13 +115,13 @@ export default function HomePage() {
               <Zap className="w-6 h-6 text-slate-900" />
             </div>
             <div className="flex flex-col">
-              <span className="font-display font-bold text-white tracking-tight text-lg">Dotmac</span>
+              <span className="font-display font-bold text-foreground tracking-tight text-lg">Dotmac</span>
               <span className="text-[10px] text-slate-muted uppercase tracking-widest">Business Operating System</span>
             </div>
           </Link>
           <button
             onClick={toggleTheme}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
@@ -139,7 +139,7 @@ export default function HomePage() {
                 <Building2 className="w-4 h-4" />
                 Enterprise Suite
               </div>
-              <h1 className="text-4xl font-bold text-white">
+              <h1 className="text-4xl font-bold text-foreground">
                 Your Business, <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">One Platform</span>
               </h1>
               <p className="text-slate-muted max-w-xl text-lg">
@@ -152,7 +152,7 @@ export default function HomePage() {
                   <TrendingUp className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{modulesWithAccess.filter(m => !m.stub).length}</p>
+                  <p className="text-2xl font-bold text-foreground">{modulesWithAccess.filter(m => !m.stub).length}</p>
                   <p className="text-xs text-slate-muted">Active Modules</p>
                 </div>
               </div>
@@ -161,7 +161,7 @@ export default function HomePage() {
                   <Clock className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">24/7</p>
+                  <p className="text-2xl font-bold text-foreground">24/7</p>
                   <p className="text-xs text-slate-muted">Always Available</p>
                 </div>
               </div>
@@ -183,7 +183,7 @@ export default function HomePage() {
             </div>
             <button
               onClick={handleResetDefault}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-white hover:bg-teal-500/20 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-foreground hover:bg-teal-500/20 rounded-lg transition-colors"
               title="Reset default workspace"
             >
               <X className="w-4 h-4" />
@@ -192,7 +192,7 @@ export default function HomePage() {
             {defaultModule && (
               <Link
                 href={defaultModule.href}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-white hover:bg-teal-500/20 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-foreground hover:bg-teal-500/20 rounded-lg transition-colors"
                 title="Go to default workspace"
               >
                 <ArrowRight className="w-4 h-4" />
@@ -212,7 +212,7 @@ export default function HomePage() {
             return (
               <section key={category}>
                 <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-lg font-semibold text-white">{meta.label}</h2>
+                  <h2 className="text-lg font-semibold text-foreground">{meta.label}</h2>
                   <span className="text-sm text-slate-muted">{meta.description}</span>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -250,7 +250,7 @@ export default function HomePage() {
 
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                               {module.name}
                           {locked && (
                             <span className="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-0.5">
@@ -276,7 +276,7 @@ export default function HomePage() {
                             <>
                               <Link
                                 href={module.href}
-                                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-xl text-white bg-slate-elevated hover:bg-slate-border transition-colors flex-1"
+                                className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-xl text-foreground bg-slate-elevated hover:bg-slate-border transition-colors flex-1"
                               >
                                 Open
                                 <ArrowRight className="w-4 h-4" />
@@ -287,7 +287,7 @@ export default function HomePage() {
                                   'p-2 rounded-xl border transition-colors',
                                   isDefault
                                     ? `${accent.border} ${accent.bg} ${accent.text}`
-                                    : 'border-slate-border text-slate-muted hover:border-slate-muted hover:text-white'
+                                    : 'border-slate-border text-slate-muted hover:border-slate-muted hover:text-foreground'
                                 )}
                                 title={isDefault ? 'Default workspace' : 'Set as default'}
                                 aria-label={isDefault ? 'Default workspace' : `Set ${module.name} as default`}
@@ -311,8 +311,8 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-muted">
             <p>Dotmac Business Operating System - Powering modern enterprises</p>
             <div className="flex items-center gap-4">
-              <Link href="/admin/settings/general" className="hover:text-white transition-colors">Settings</Link>
-              <Link href="/admin/security" className="hover:text-white transition-colors">Security</Link>
+              <Link href="/admin/settings/general" className="hover:text-foreground transition-colors">Settings</Link>
+              <Link href="/admin/security" className="hover:text-foreground transition-colors">Security</Link>
             </div>
           </div>
         </div>

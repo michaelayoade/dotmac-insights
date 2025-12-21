@@ -103,7 +103,7 @@ export default function BooksControlsPage() {
                 periods.map((p: any) => (
                   <div key={p.id || p.name} className="flex items-center justify-between border border-slate-border rounded-lg p-3">
                     <div>
-                      <p className="text-white font-medium">{p.name || p.label}</p>
+                      <p className="text-foreground font-medium">{p.name || p.label}</p>
                       <p className="text-slate-muted text-sm flex items-center gap-2">
                         <CalendarRange className="w-4 h-4" />
                         {p.start_date || p.start} → {p.end_date || p.end}
@@ -169,7 +169,7 @@ export default function BooksControlsPage() {
                 approvals.map((row: any) => (
                   <div key={row.id} className="border border-slate-border rounded-lg p-3 flex items-center justify-between">
                     <div>
-                      <p className="text-white font-medium">{row.document_number || row.document_id || row.id}</p>
+                      <p className="text-foreground font-medium">{row.document_number || row.document_id || row.id}</p>
                       <p className="text-slate-muted text-sm">
                         {row.doctype} · {formatCurrency(row.amount ?? 0, row.currency || 'NGN')}
                       </p>
@@ -344,7 +344,7 @@ export default function BooksControlsPage() {
               )}
             </div>
             <div className="mt-4">
-              <h4 className="text-sm text-white font-semibold mb-2">Audit Log</h4>
+              <h4 className="text-sm text-foreground font-semibold mb-2">Audit Log</h4>
               <Table
                 columns={['When', 'User', 'Action', 'Doc']}
                 rows={(auditLog?.data || auditLog || []).map((log: any) => [
@@ -406,7 +406,7 @@ function Card({
     <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Icon className="w-4 h-4 text-teal-electric" />
-        <h2 className="text-white font-semibold text-sm">{title}</h2>
+        <h2 className="text-foreground font-semibold text-sm">{title}</h2>
       </div>
       {children}
     </div>

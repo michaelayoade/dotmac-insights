@@ -68,14 +68,14 @@ export default function ProjectCreatePage() {
         <div className="flex items-center gap-3">
           <Link
             href="/projects"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to projects
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Projects</p>
-            <h1 className="text-xl font-semibold text-white">New Project</h1>
+            <h1 className="text-xl font-semibold text-foreground">New Project</h1>
           </div>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function ProjectCreatePage() {
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-teal-electric" />
             Project Details
           </h3>
@@ -99,7 +99,7 @@ export default function ProjectCreatePage() {
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               className={cn(
-                'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                 fieldErrors.projectName && 'border-red-500/60'
               )}
               placeholder="Network Upgrade"
@@ -112,7 +112,7 @@ export default function ProjectCreatePage() {
               <input
                 value={projectType}
                 onChange={(e) => setProjectType(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Internal / External"
               />
             </div>
@@ -121,7 +121,7 @@ export default function ProjectCreatePage() {
               <input
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="IT, Operations..."
               />
             </div>
@@ -132,7 +132,7 @@ export default function ProjectCreatePage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="open">Open</option>
                 <option value="completed">Completed</option>
@@ -145,7 +145,7 @@ export default function ProjectCreatePage() {
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -160,7 +160,7 @@ export default function ProjectCreatePage() {
                 type="number"
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -170,7 +170,7 @@ export default function ProjectCreatePage() {
                 type="number"
                 value={percentComplete}
                 onChange={(e) => setPercentComplete(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="0-100"
               />
             </div>
@@ -178,7 +178,7 @@ export default function ProjectCreatePage() {
         </div>
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-teal-electric" />
             Timeline & Costs
           </h3>
@@ -189,7 +189,7 @@ export default function ProjectCreatePage() {
                 type="date"
                 value={expectedStart}
                 onChange={(e) => setExpectedStart(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -198,7 +198,7 @@ export default function ProjectCreatePage() {
                 type="date"
                 value={expectedEnd}
                 onChange={(e) => setExpectedEnd(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function ProjectCreatePage() {
               type="number"
               value={estimatedCost}
               onChange={(e) => setEstimatedCost(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="0"
             />
           </div>
@@ -218,7 +218,7 @@ export default function ProjectCreatePage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={4}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="Internal notes"
             />
           </div>
@@ -228,7 +228,7 @@ export default function ProjectCreatePage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Cancel
           </button>

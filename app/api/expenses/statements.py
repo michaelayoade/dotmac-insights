@@ -22,7 +22,8 @@ from app.models.expense_management import (
     CardTransactionStatus,
     StatementStatus,
 )
-from app.auth import get_current_principal, Principal
+from app.auth import get_current_principal, Principal, Require
+from app.api.expenses.access import apply_employee_scope
 
 router = APIRouter()
 
@@ -33,17 +34,25 @@ def compute_import_hash(card_id: int, transaction_date: datetime, amount: Decima
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-@router.get("/", response_model=List[CorporateCardStatementRead])
+@router.get("/", response_model=List[CorporateCardStatementRead], dependencies=[Depends(Require("expenses:read"))])
 async def list_statements(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     card_id: Optional[int] = Query(default=None, description="Filter by card"),
     status: Optional[str] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ):
     """List corporate card statements with optional filters."""
-    query = db.query(CorporateCardStatement).order_by(
+    query = db.query(CorporateCardStatement).join(CorporateCard).order_by(
         CorporateCardStatement.period_start.desc()
+    )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
     )
 
     if card_id:
@@ -59,20 +68,32 @@ async def list_statements(
     return statements
 
 
-@router.get("/{statement_id}", response_model=CorporateCardStatementRead)
-async def get_statement(statement_id: int, db: Session = Depends(get_db)):
+@router.get("/{statement_id}", response_model=CorporateCardStatementRead, dependencies=[Depends(Require("expenses:read"))])
+async def get_statement(
+    statement_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
     """Get a single statement by ID."""
-    statement = (
+    query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .filter(CorporateCardStatement.id == statement_id)
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
     return statement
 
 
-@router.post("/", response_model=CorporateCardStatementRead, status_code=201)
+@router.post("/", response_model=CorporateCardStatementRead, status_code=201, dependencies=[Depends(Require("expenses:write"))])
 async def create_statement(
     payload: CorporateCardStatementCreate,
     db: Session = Depends(get_db),
@@ -80,7 +101,15 @@ async def create_statement(
 ):
     """Create a new statement period (without transactions)."""
     # Validate card exists
-    card = db.query(CorporateCard).filter(CorporateCard.id == payload.card_id).first()
+    card_query = db.query(CorporateCard).filter(CorporateCard.id == payload.card_id)
+    card_query = apply_employee_scope(
+        card_query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
+    )
+    card = card_query.first()
     if not card:
         raise HTTPException(status_code=400, detail="Corporate card not found")
 
@@ -118,7 +147,7 @@ async def create_statement(
     return statement
 
 
-@router.post("/import", response_model=CorporateCardStatementRead, status_code=201)
+@router.post("/import", response_model=CorporateCardStatementRead, status_code=201, dependencies=[Depends(Require("expenses:write"))])
 async def import_statement(
     payload: StatementImportPayload,
     db: Session = Depends(get_db),
@@ -126,7 +155,15 @@ async def import_statement(
 ):
     """Import a statement with transactions."""
     # Validate card exists
-    card = db.query(CorporateCard).filter(CorporateCard.id == payload.card_id).first()
+    card_query = db.query(CorporateCard).filter(CorporateCard.id == payload.card_id)
+    card_query = apply_employee_scope(
+        card_query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCard.created_by_id,
+    )
+    card = card_query.first()
     if not card:
         raise HTTPException(status_code=400, detail="Corporate card not found")
 
@@ -223,19 +260,27 @@ async def import_statement(
     return statement
 
 
-@router.post("/{statement_id}/reconcile", response_model=CorporateCardStatementRead)
+@router.post("/{statement_id}/reconcile", response_model=CorporateCardStatementRead, dependencies=[Depends(Require("expenses:write"))])
 async def reconcile_statement(
     statement_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Mark a statement as reconciled after reviewing all transactions."""
-    statement = (
+    query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .filter(CorporateCardStatement.id == statement_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
 
@@ -272,19 +317,27 @@ async def reconcile_statement(
     return statement
 
 
-@router.post("/{statement_id}/close", response_model=CorporateCardStatementRead)
+@router.post("/{statement_id}/close", response_model=CorporateCardStatementRead, dependencies=[Depends(Require("expenses:write"))])
 async def close_statement(
     statement_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Close a statement (final, prevents further changes)."""
-    statement = (
+    query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .filter(CorporateCardStatement.id == statement_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
 
@@ -303,19 +356,27 @@ async def close_statement(
     return statement
 
 
-@router.post("/{statement_id}/reopen", response_model=CorporateCardStatementRead)
+@router.post("/{statement_id}/reopen", response_model=CorporateCardStatementRead, dependencies=[Depends(Require("expenses:write"))])
 async def reopen_statement(
     statement_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Reopen a reconciled statement for adjustments."""
-    statement = (
+    query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .filter(CorporateCardStatement.id == statement_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
 
@@ -334,18 +395,27 @@ async def reopen_statement(
     return statement
 
 
-@router.get("/{statement_id}/transactions", response_model=List)
+@router.get("/{statement_id}/transactions", response_model=List, dependencies=[Depends(Require("expenses:read"))])
 async def get_statement_transactions(
     statement_id: int,
     status: Optional[str] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Get all transactions for a statement."""
-    statement = (
+    statement_query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .filter(CorporateCardStatement.id == statement_id)
-        .first()
     )
+    statement_query = apply_employee_scope(
+        statement_query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = statement_query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
 
@@ -364,19 +434,27 @@ async def get_statement_transactions(
     return query.all()
 
 
-@router.delete("/{statement_id}", status_code=204)
+@router.delete("/{statement_id}", status_code=204, dependencies=[Depends(Require("expenses:write"))])
 async def delete_statement(
     statement_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Delete a statement and its transactions (only if open)."""
-    statement = (
+    query = (
         db.query(CorporateCardStatement)
+        .join(CorporateCard)
         .options(selectinload(CorporateCardStatement.transactions))
         .filter(CorporateCardStatement.id == statement_id)
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=CorporateCard.employee_id,
+        created_by_field=CorporateCardStatement.created_by_id,
+    )
+    statement = query.first()
     if not statement:
         raise HTTPException(status_code=404, detail="Statement not found")
 

@@ -115,10 +115,10 @@ export default function RelationshipsPage() {
             <tbody className="divide-y divide-slate-border">
               {data?.entities.map((entity: EntityRelationship) => (
                 <tr key={entity.entity} className="hover:bg-slate-elevated/50">
-                  <td className="px-4 py-3 text-sm font-medium text-white capitalize">
+                  <td className="px-4 py-3 text-sm font-medium text-foreground capitalize">
                     {entity.entity.replace(/_/g, ' ')}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white">{entity.total.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{entity.total.toLocaleString()}</td>
                   <td className="px-4 py-3 text-sm text-teal-electric">{entity.linked.toLocaleString()}</td>
                   <td className="px-4 py-3 text-sm text-coral-alert">{entity.orphaned.toLocaleString()}</td>
                   <td className="px-4 py-3">
@@ -130,7 +130,7 @@ export default function RelationshipsPage() {
                           color={entity.link_rate > 80 ? 'green' : entity.link_rate > 50 ? 'yellow' : 'red'}
                         />
                       </div>
-                      <span className="text-sm text-white">{entity.link_rate.toFixed(1)}%</span>
+                      <span className="text-sm text-foreground">{entity.link_rate.toFixed(1)}%</span>
                     </div>
                   </td>
                 </tr>

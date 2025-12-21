@@ -16,7 +16,7 @@ export default function ChatChannelPage() {
             <MessageCircle className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Live Chat Widget</h1>
+            <h1 className="text-2xl font-bold text-foreground">Live Chat Widget</h1>
             <p className="text-slate-muted text-sm">Embed chat on your website</p>
           </div>
         </div>
@@ -31,7 +31,7 @@ export default function ChatChannelPage() {
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Chats Today</p>
-          <p className="text-2xl font-bold text-white">89</p>
+          <p className="text-2xl font-bold text-foreground">89</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Avg Wait Time</p>
@@ -48,7 +48,7 @@ export default function ChatChannelPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Code className="w-5 h-5 text-blue-400" />
-            <h2 className="text-lg font-semibold text-white">Embed Code</h2>
+            <h2 className="text-lg font-semibold text-foreground">Embed Code</h2>
           </div>
           <p className="text-sm text-slate-muted mb-4">
             Add this code to your website just before the closing &lt;/body&gt; tag.
@@ -56,7 +56,7 @@ export default function ChatChannelPage() {
           <div className="bg-slate-elevated rounded-lg p-4 font-mono text-sm text-slate-200 overflow-x-auto">
             {widgetCode}
           </div>
-          <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg text-sm font-medium hover:bg-slate-border transition-colors">
+          <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors">
             <Copy className="w-4 h-4" />
             Copy Code
           </button>
@@ -66,14 +66,14 @@ export default function ChatChannelPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Eye className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-semibold text-white">Widget Preview</h2>
+            <h2 className="text-lg font-semibold text-foreground">Widget Preview</h2>
           </div>
           <div className="bg-slate-elevated rounded-lg p-6 relative min-h-[300px]">
             {/* Mock chat widget */}
             <div className="absolute bottom-4 right-4 w-72">
               <div className="bg-white rounded-xl shadow-xl overflow-hidden">
                 <div className="bg-emerald-500 px-4 py-3">
-                  <p className="text-white font-semibold">Dotmac Support</p>
+                  <p className="text-foreground font-semibold">Dotmac Support</p>
                   <p className="text-emerald-100 text-sm">We typically reply in minutes</p>
                 </div>
                 <div className="p-4 space-y-3">
@@ -81,7 +81,7 @@ export default function ChatChannelPage() {
                     Hi! How can we help you today?
                   </div>
                   <div className="flex justify-end">
-                    <div className="bg-emerald-500 rounded-lg px-3 py-2 text-sm text-white max-w-[80%]">
+                    <div className="bg-emerald-500 rounded-lg px-3 py-2 text-sm text-foreground max-w-[80%]">
                       I have a question about pricing
                     </div>
                   </div>
@@ -103,7 +103,7 @@ export default function ChatChannelPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Palette className="w-5 h-5 text-violet-400" />
-          <h2 className="text-lg font-semibold text-white">Customization</h2>
+          <h2 className="text-lg font-semibold text-foreground">Customization</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -117,7 +117,7 @@ export default function ChatChannelPage() {
               <input
                 type="text"
                 defaultValue="#10b981"
-                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
           </div>
@@ -126,7 +126,7 @@ export default function ChatChannelPage() {
             <input
               type="text"
               defaultValue="Dotmac Support"
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
           <div>
@@ -134,7 +134,7 @@ export default function ChatChannelPage() {
             <input
               type="text"
               defaultValue="Hi! How can we help you today?"
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
         </div>

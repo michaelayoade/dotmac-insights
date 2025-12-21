@@ -24,7 +24,10 @@ class Supplier(Base):
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     supplier_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    supplier_group: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    supplier_group: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # ERPNext value
+    supplier_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("supplier_groups.id"), nullable=True, index=True
+    )  # FK for referential integrity
     supplier_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
@@ -56,8 +59,57 @@ class Supplier(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
+    # Relationships
+    supplier_group_rel: Mapped[Optional["SupplierGroup"]] = relationship(
+        "SupplierGroup",
+        foreign_keys=[supplier_group_id],
+        back_populates="suppliers"
+    )
+
     def __repr__(self) -> str:
         return f"<Supplier {self.supplier_name}>"
+
+
+# ============= SUPPLIER GROUP =============
+class SupplierGroup(Base):
+    """Supplier groups for categorizing vendors from ERPNext."""
+
+    __tablename__ = "supplier_groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    parent_supplier_group: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    parent_supplier_group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("supplier_groups.id"), nullable=True, index=True
+    )
+
+    is_group: Mapped[bool] = mapped_column(default=False)
+
+    # Tree structure (nested set)
+    lft: Mapped[Optional[int]] = mapped_column(nullable=True)
+    rgt: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    # Sync metadata
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    suppliers: Mapped[List["Supplier"]] = relationship(
+        back_populates="supplier_group_rel",
+        foreign_keys="[Supplier.supplier_group_id]"
+    )
+    parent: Mapped[Optional["SupplierGroup"]] = relationship(
+        "SupplierGroup",
+        remote_side="SupplierGroup.id",
+        foreign_keys=[parent_supplier_group_id],
+        backref="children"
+    )
+
+    def __repr__(self) -> str:
+        return f"<SupplierGroup {self.name}>"
 
 
 # ============= MODE OF PAYMENT =============
@@ -236,7 +288,10 @@ class JournalEntryItem(Base):
         ForeignKey("journal_entries.id"), nullable=False, index=True
     )
 
-    account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)  # ERPNext account name
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("accounts.id"), nullable=False, index=True
+    )  # FK for referential integrity
     debit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
     credit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
 
@@ -250,6 +305,11 @@ class JournalEntryItem(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     journal_entry: Mapped["JournalEntry"] = relationship(back_populates="items")
+    account_rel: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[account_id],
+        backref="journal_entry_items"
+    )
 
     def __repr__(self) -> str:
         return f"<JournalEntryItem {self.account} dr={self.debit} cr={self.credit}>"

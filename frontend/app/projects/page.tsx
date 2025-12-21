@@ -198,7 +198,7 @@ export default function ProjectsPage() {
       header: 'Project',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="font-mono text-white font-semibold">{item.erpnext_id || item.project_name}</span>
+          <span className="font-mono text-foreground font-semibold">{item.erpnext_id || item.project_name}</span>
           <span className="text-slate-muted text-sm line-clamp-1">{item.department || '-'}</span>
         </div>
       ),
@@ -232,7 +232,7 @@ export default function ProjectsPage() {
           pri === 'high'
             ? 'bg-red-500/10 text-red-400 border-red-500/30'
             : pri === 'low'
-            ? 'bg-slate-500/10 text-slate-300 border-slate-500/30'
+            ? 'bg-slate-500/10 text-foreground-secondary border-slate-500/30'
             : 'bg-amber-500/10 text-amber-400 border-amber-500/30';
         return (
           <span className={cn('px-2 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1', color)}>
@@ -304,14 +304,14 @@ export default function ProjectsPage() {
             <ClipboardList className="w-5 h-5 text-teal-electric" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Projects</h1>
+            <h1 className="text-2xl font-bold text-foreground">Projects</h1>
             <p className="text-slate-muted text-sm">Plan, track, and deliver projects across teams</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/projects/analytics"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white hover:border-teal-electric/50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground hover:border-teal-electric/50 transition-colors"
           >
             <BarChart3 className="w-4 h-4" />
             Analytics
@@ -376,17 +376,17 @@ export default function ProjectsPage() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-500" />
             <span className="text-slate-muted text-sm">Active:</span>
-            <span className="text-white font-semibold">{metrics.activeProjects}</span>
+            <span className="text-foreground font-semibold">{metrics.activeProjects}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500" />
             <span className="text-slate-muted text-sm">Completed:</span>
-            <span className="text-white font-semibold">{metrics.completedProjects}</span>
+            <span className="text-foreground font-semibold">{metrics.completedProjects}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-500" />
             <span className="text-slate-muted text-sm">On Hold:</span>
-            <span className="text-white font-semibold">{metrics.onHoldProjects}</span>
+            <span className="text-foreground font-semibold">{metrics.onHoldProjects}</span>
           </div>
           {metrics.overdueTasks > 0 && (
             <div className="flex items-center gap-2 ml-auto text-red-400">
@@ -404,7 +404,7 @@ export default function ProjectsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <input
@@ -414,7 +414,7 @@ export default function ProjectsPage() {
               setPage(1);
             }}
             placeholder="Search projects..."
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 col-span-2 lg:col-span-1"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 col-span-2 lg:col-span-1"
           />
           <select
             value={status}
@@ -422,7 +422,7 @@ export default function ProjectsPage() {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Statuses</option>
             <option value="open">Open</option>
@@ -436,7 +436,7 @@ export default function ProjectsPage() {
               setPriority(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Priorities</option>
             <option value="high">High</option>
@@ -450,7 +450,7 @@ export default function ProjectsPage() {
               setPage(1);
             }}
             placeholder="Department"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <input
             value={projectType}
@@ -459,7 +459,7 @@ export default function ProjectsPage() {
               setPage(1);
             }}
             placeholder="Project type"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           {(status || priority || department || projectType || search) && (
             <button
@@ -471,7 +471,7 @@ export default function ProjectsPage() {
                 setSearch('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors flex items-center gap-1"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
             >
               <XCircle className="w-4 h-4" />
               Clear

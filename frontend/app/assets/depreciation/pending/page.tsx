@@ -39,7 +39,7 @@ export default function PendingDepreciationPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Pending Depreciation</h1>
+          <h1 className="text-2xl font-bold text-foreground">Pending Depreciation</h1>
           <p className="text-sm text-slate-muted mt-1">
             Depreciation entries due as of selected date
           </p>
@@ -48,7 +48,7 @@ export default function PendingDepreciationPage() {
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
@@ -63,7 +63,7 @@ export default function PendingDepreciationPage() {
             type="date"
             value={asOfDate}
             onChange={(e) => setAsOfDate(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -72,7 +72,7 @@ export default function PendingDepreciationPage() {
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-sm text-slate-muted">Total Amount</p>
-          <p className="text-2xl font-bold text-white">{formatCurrency(totalPending)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPending)}</p>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export default function PendingDepreciationPage() {
       ) : pendingEntries.length === 0 ? (
         <div className="bg-slate-card border border-slate-border rounded-xl p-12 text-center">
           <CheckCircle className="w-8 h-8 mx-auto mb-3 text-emerald-400" />
-          <p className="font-medium text-white">All caught up!</p>
+          <p className="font-medium text-foreground">All caught up!</p>
           <p className="text-sm text-slate-muted mt-1">No pending depreciation entries as of {formatDate(asOfDate)}</p>
         </div>
       ) : (
@@ -95,7 +95,7 @@ export default function PendingDepreciationPage() {
               <div className="flex items-center justify-between px-4 py-3 bg-slate-elevated/30 border-b border-slate-border">
                 <Link
                   href={`/assets/list/${group.asset_id}`}
-                  className="font-medium text-white hover:text-indigo-300 transition-colors"
+                  className="font-medium text-foreground hover:text-indigo-300 transition-colors"
                 >
                   {group.asset_name}
                 </Link>
@@ -138,9 +138,9 @@ export default function PendingDepreciationPage() {
       {/* Quick Actions */}
       {pendingEntries.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-3">Bulk Actions</h3>
+          <h3 className="font-semibold text-foreground mb-3">Bulk Actions</h3>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-white transition-colors">
+            <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors">
               <CheckCircle className="w-4 h-4" />
               Book All Pending
             </button>

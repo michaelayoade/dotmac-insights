@@ -166,7 +166,7 @@ export default function FleetPage() {
             <Car className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <p className="text-white font-semibold">{item.license_plate}</p>
+            <p className="text-foreground font-semibold">{item.license_plate}</p>
             <p className="text-slate-muted text-xs">
               {[item.make, item.model, item.model_year].filter(Boolean).join(' ') || 'Unknown'}
             </p>
@@ -180,7 +180,7 @@ export default function FleetPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300">{item.driver_name || '-'}</span>
+          <span className="text-foreground-secondary">{item.driver_name || '-'}</span>
         </div>
       ),
     },
@@ -190,7 +190,7 @@ export default function FleetPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Fuel className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300">{item.fuel_type || '-'}</span>
+          <span className="text-foreground-secondary">{item.fuel_type || '-'}</span>
         </div>
       ),
     },
@@ -200,7 +200,7 @@ export default function FleetPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <span className="font-mono text-white">{formatNumber(item.odometer_value)}</span>
+          <span className="font-mono text-foreground">{formatNumber(item.odometer_value)}</span>
           <span className="text-slate-muted text-xs ml-1">{item.uom || 'km'}</span>
         </div>
       ),
@@ -223,7 +223,7 @@ export default function FleetPage() {
             )} />
             <span className={cn(
               'text-xs',
-              isExpired ? 'text-red-400' : isExpiring ? 'text-amber-400' : 'text-slate-300'
+              isExpired ? 'text-red-400' : isExpiring ? 'text-amber-400' : 'text-foreground-secondary'
             )}>
               {isExpired ? `Expired ${Math.abs(days)}d ago` : `${days}d left`}
             </span>
@@ -237,7 +237,7 @@ export default function FleetPage() {
       render: (item: any) => item.location ? (
         <div className="flex items-center gap-1">
           <MapPin className="w-3 h-3 text-slate-muted" />
-          <span className="text-slate-300 text-sm truncate max-w-[120px]">{item.location}</span>
+          <span className="text-foreground-secondary text-sm truncate max-w-[120px]">{item.location}</span>
         </div>
       ) : <span className="text-slate-muted">-</span>,
     },
@@ -279,7 +279,7 @@ export default function FleetPage() {
             <Car className="w-6 h-6 text-amber-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Fleet Management</h1>
+            <h1 className="text-2xl font-bold text-foreground">Fleet Management</h1>
             <p className="text-slate-muted text-sm">Vehicle tracking, insurance, and driver assignments</p>
           </div>
         </div>
@@ -327,7 +327,7 @@ export default function FleetPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Fuel className="w-4 h-4 text-amber-400" />
-            <h3 className="text-white font-semibold">By Fuel Type</h3>
+            <h3 className="text-foreground font-semibold">By Fuel Type</h3>
           </div>
           {fuelTypeChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
@@ -365,7 +365,7 @@ export default function FleetPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Car className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Top Makes</h3>
+            <h3 className="text-foreground font-semibold">Top Makes</h3>
           </div>
           {makeChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
@@ -404,7 +404,7 @@ export default function FleetPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-amber-400" />
-              <h3 className="text-white font-semibold">Insurance Alerts</h3>
+              <h3 className="text-foreground font-semibold">Insurance Alerts</h3>
             </div>
             {(expiringInsurance?.length || 0) > 0 && (
               <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs font-medium">
@@ -425,7 +425,7 @@ export default function FleetPage() {
                     <div className="flex items-center gap-2">
                       <Car className="w-4 h-4 text-slate-muted" />
                       <div>
-                        <p className="text-white text-sm font-medium">{vehicle.license_plate}</p>
+                        <p className="text-foreground text-sm font-medium">{vehicle.license_plate}</p>
                         <p className="text-slate-muted text-xs">{vehicle.make} {vehicle.model}</p>
                       </div>
                     </div>
@@ -436,7 +436,7 @@ export default function FleetPage() {
                       )}>
                         {days !== null ? `${days}d` : '-'}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-white transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-slate-muted group-hover:text-foreground transition-colors" />
                     </div>
                   </Link>
                 );
@@ -455,7 +455,7 @@ export default function FleetPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-amber-400" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1 min-w-[200px] max-w-md relative">
@@ -465,13 +465,13 @@ export default function FleetPage() {
               placeholder="Search vehicles..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
           </div>
           <select
             value={makeFilter}
             onChange={(e) => { setMakeFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             <option value="">All Makes</option>
             {makes?.map((make: string) => (
@@ -481,7 +481,7 @@ export default function FleetPage() {
           <select
             value={fuelFilter}
             onChange={(e) => { setFuelFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             <option value="">All Fuel Types</option>
             {fuelTypes?.map((fuel: string) => (
@@ -491,7 +491,7 @@ export default function FleetPage() {
           <select
             value={activeFilter}
             onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
@@ -506,7 +506,7 @@ export default function FleetPage() {
                 setActiveFilter('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

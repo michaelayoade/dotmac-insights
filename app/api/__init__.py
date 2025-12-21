@@ -22,10 +22,12 @@ from app.api import (
     projects,
     entitlements,
 )
+from app.api import auth as auth_router
 from app.api import expenses
 from app.api.tax import router as tax_router
 from app.api.integrations import router as integrations_router, public_router as public_integrations_router
 from app.assets import router as assets_router
+from app.api.asset_settings import router as asset_settings_router
 from app.api.crm import router as crm_router
 from app.api.field_service import router as field_service_router
 from app.api.inbox import router as inbox_router
@@ -68,6 +70,7 @@ api_router.include_router(support.router, prefix="/v1/support", tags=["support"]
 api_router.include_router(network.router, prefix="/v1/network", tags=["network"])
 api_router.include_router(inventory.router, prefix="/v1", tags=["inventory"])
 api_router.include_router(assets_router, prefix="/v1", tags=["assets"])
+api_router.include_router(asset_settings_router, prefix="/v1", tags=["asset-settings"])
 api_router.include_router(crm_router, prefix="/v1", tags=["crm"])
 api_router.include_router(inbox_router, prefix="/v1", tags=["inbox"])
 api_router.include_router(contacts_router, prefix="/v1")
@@ -92,6 +95,7 @@ api_router.include_router(support.router, prefix="/support", tags=["support"])
 api_router.include_router(network.router, prefix="/network", tags=["network"])
 api_router.include_router(inventory.router, tags=["inventory"])
 api_router.include_router(assets_router, tags=["assets"])
+api_router.include_router(asset_settings_router, tags=["asset-settings"])
 api_router.include_router(crm_router, tags=["crm"])  # CRM: leads, opportunities, activities
 api_router.include_router(inbox_router, tags=["inbox"])  # Omnichannel inbox
 api_router.include_router(contacts_router)  # Unified contacts (replaces CRM contacts)
@@ -129,5 +133,6 @@ api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix
 
 # Public (unauthenticated) routers
 public_api_router = APIRouter()
+public_api_router.include_router(auth_router.router)
 public_api_router.include_router(public_integrations_router)  # /integrations/webhooks
 public_api_router.include_router(public_omni_router)  # /omni/webhooks

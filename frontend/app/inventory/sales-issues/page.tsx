@@ -16,7 +16,7 @@ export default function SalesIssuesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Sales Issues</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Sales Issues</h1>
           <p className="text-slate-muted text-sm">Issue stock for sales invoices and record COGS</p>
         </div>
         <Link
@@ -30,7 +30,7 @@ export default function SalesIssuesPage() {
 
       {/* Workflow Explanation */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Sales Issue Workflow</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Sales Issue Workflow</h2>
 
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6">
           <div className="flex items-center gap-3 bg-slate-elevated rounded-lg p-3 flex-1">
@@ -38,7 +38,7 @@ export default function SalesIssuesPage() {
               <FileText className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-white font-medium">1. Create Invoice</p>
+              <p className="text-foreground font-medium">1. Create Invoice</p>
               <p className="text-xs text-slate-muted">Record sales invoice</p>
             </div>
           </div>
@@ -48,7 +48,7 @@ export default function SalesIssuesPage() {
               <ArrowUpFromLine className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-white font-medium">2. Issue Stock</p>
+              <p className="text-foreground font-medium">2. Issue Stock</p>
               <p className="text-xs text-slate-muted">Create stock issue</p>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function SalesIssuesPage() {
               <Package className="w-5 h-5 text-red-400" />
             </div>
             <div>
-              <p className="text-white font-medium">3. Reduce Inventory</p>
+              <p className="text-foreground font-medium">3. Reduce Inventory</p>
               <p className="text-xs text-slate-muted">Stock ledger updated</p>
             </div>
           </div>
@@ -68,24 +68,24 @@ export default function SalesIssuesPage() {
               <BookOpen className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-white font-medium">4. Post COGS</p>
+              <p className="text-foreground font-medium">4. Post COGS</p>
               <p className="text-xs text-slate-muted">DR COGS, CR Inventory</p>
             </div>
           </div>
         </div>
 
         <div className="border-t border-slate-border pt-4">
-          <h3 className="text-sm font-medium text-white mb-2">GL Entries Created</h3>
+          <h3 className="text-sm font-medium text-foreground mb-2">GL Entries Created</h3>
           <div className="bg-slate-elevated rounded-lg p-3 font-mono text-xs">
             <div className="flex justify-between text-slate-muted border-b border-slate-border/50 pb-2 mb-2">
               <span>Account</span>
               <span className="flex gap-8"><span>Debit</span><span>Credit</span></span>
             </div>
-            <div className="flex justify-between text-white">
+            <div className="flex justify-between text-foreground">
               <span>5100 - Cost of Goods Sold</span>
               <span className="flex gap-8"><span>XXX.XX</span><span>-</span></span>
             </div>
-            <div className="flex justify-between text-white">
+            <div className="flex justify-between text-foreground">
               <span>1310 - Inventory Asset</span>
               <span className="flex gap-8"><span>-</span><span>XXX.XX</span></span>
             </div>
@@ -95,22 +95,22 @@ export default function SalesIssuesPage() {
 
       {/* Impact Summary */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-emerald-400" />
           Financial Impact
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-slate-elevated rounded-lg p-3">
             <p className="text-xs text-slate-muted mb-1">Inventory Asset</p>
-            <p className="text-white font-medium">Decreases by cost value</p>
+            <p className="text-foreground font-medium">Decreases by cost value</p>
           </div>
           <div className="bg-slate-elevated rounded-lg p-3">
             <p className="text-xs text-slate-muted mb-1">Cost of Goods Sold</p>
-            <p className="text-white font-medium">Increases (expense)</p>
+            <p className="text-foreground font-medium">Increases (expense)</p>
           </div>
           <div className="bg-slate-elevated rounded-lg p-3">
             <p className="text-xs text-slate-muted mb-1">Gross Profit</p>
-            <p className="text-white font-medium">Revenue minus COGS</p>
+            <p className="text-foreground font-medium">Revenue minus COGS</p>
           </div>
         </div>
       </div>
@@ -126,7 +126,7 @@ export default function SalesIssuesPage() {
               <FileText className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-white font-medium">View Invoices</p>
+              <p className="text-foreground font-medium">View Invoices</p>
               <p className="text-xs text-slate-muted">Go to Accounts Receivable to see invoices</p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function SalesIssuesPage() {
               <ArrowUpFromLine className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-white font-medium">View Issues</p>
+              <p className="text-foreground font-medium">View Issues</p>
               <p className="text-xs text-slate-muted">See material issue stock entries</p>
             </div>
           </div>

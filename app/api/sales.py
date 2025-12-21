@@ -36,6 +36,7 @@ from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models.notification import NotificationEventType
 from app.services.notification_service import NotificationService
+from app.utils.company_context import ensure_company, get_company_context
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -713,7 +714,7 @@ def _serialize_sales_order(order: SalesOrder) -> Dict[str, Any]:
                 "item_code": it.item_code,
                 "item_name": it.item_name,
                 "description": it.description,
-                "qty": float(it.qty or 0),
+                "qty": float(it.quantity or 0),
                 "stock_qty": float(it.stock_qty or 0),
                 "uom": it.uom,
                 "stock_uom": it.stock_uom,
@@ -772,7 +773,7 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
                 "item_code": it.item_code,
                 "item_name": it.item_name,
                 "description": it.description,
-                "qty": float(it.qty or 0),
+                "qty": float(it.quantity or 0),
                 "stock_qty": float(it.stock_qty or 0),
                 "uom": it.uom,
                 "stock_uom": it.stock_uom,
@@ -1156,6 +1157,7 @@ async def create_invoice(
         due_date=_ensure_utc(payload.due_date),
         paid_date=_ensure_utc(payload.paid_date),
         category=payload.category,
+        company=get_company_context(allow_null=True),
     )
 
     db.add(invoice)
@@ -1831,7 +1833,7 @@ async def create_sales_order(
         customer_id=payload.customer_id,
         customer_name=payload.customer_name,
         order_type=payload.order_type,
-        company=payload.company,
+        company=payload.company or get_company_context(allow_null=True),
         currency=payload.currency,
         transaction_date=_parse_date_only(payload.transaction_date),
         delivery_date=_parse_date_only(payload.delivery_date),
@@ -1969,7 +1971,7 @@ async def create_quotation(
         party_name=payload.party_name,
         customer_name=payload.customer_name,
         order_type=payload.order_type,
-        company=payload.company,
+        company=payload.company or get_company_context(allow_null=True),
         currency=payload.currency,
         transaction_date=_parse_date_only(payload.transaction_date),
         valid_till=_parse_date_only(payload.valid_till),
@@ -2087,6 +2089,7 @@ async def create_credit_note(
         write_back_status="pending",
         created_by_id=principal.id,
         updated_by_id=principal.id,
+        company=get_company_context(allow_null=True),
     )
     db.add(note)
     db.commit()

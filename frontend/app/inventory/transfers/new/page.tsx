@@ -121,12 +121,12 @@ export default function NewTransferPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/inventory/transfers"
-          className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+          className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-white">New Transfer Request</h1>
+          <h1 className="text-2xl font-semibold text-foreground">New Transfer Request</h1>
           <p className="text-slate-muted text-sm">Create a stock transfer between warehouses</p>
         </div>
       </div>
@@ -139,7 +139,7 @@ export default function NewTransferPage() {
         )}
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <ArrowRightLeft className="w-5 h-5 text-amber-400" />
             Transfer Details
           </h2>
@@ -150,7 +150,7 @@ export default function NewTransferPage() {
               <select
                 value={fromWarehouse}
                 onChange={(e) => setFromWarehouse(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 required
                 disabled={warehousesLoading}
               >
@@ -167,7 +167,7 @@ export default function NewTransferPage() {
               <select
                 value={toWarehouse}
                 onChange={(e) => setToWarehouse(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                 required
                 disabled={warehousesLoading}
               >
@@ -185,7 +185,7 @@ export default function NewTransferPage() {
                 type="date"
                 value={requiredDate}
                 onChange={(e) => setRequiredDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               />
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function NewTransferPage() {
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Optional notes"
-                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               />
             </div>
           </div>
@@ -203,7 +203,7 @@ export default function NewTransferPage() {
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Items</h2>
+            <h2 className="text-lg font-semibold text-foreground">Items</h2>
             <button
               type="button"
               onClick={addItem}
@@ -245,7 +245,7 @@ export default function NewTransferPage() {
                         <select
                           value={item.item_code}
                           onChange={(e) => updateItem(idx, "item_code", e.target.value)}
-                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-white text-sm"
+                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-foreground text-sm"
                           disabled={itemsLoading}
                         >
                           <option value="">Select item</option>
@@ -263,7 +263,7 @@ export default function NewTransferPage() {
                           step="0.01"
                           value={item.qty}
                           onChange={(e) => updateItem(idx, "qty", parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-white text-sm text-right"
+                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-foreground text-sm text-right"
                         />
                       </td>
                       <td className="py-2">
@@ -271,13 +271,13 @@ export default function NewTransferPage() {
                           type="text"
                           value={item.uom}
                           onChange={(e) => updateItem(idx, "uom", e.target.value)}
-                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-white text-sm"
+                          className="w-full px-2 py-1.5 rounded border border-slate-border bg-slate-elevated text-foreground text-sm"
                         />
                       </td>
                       <td className="py-2 text-right font-mono text-slate-muted">
                         {item.valuation_rate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-2 text-right font-mono text-white">
+                      <td className="py-2 text-right font-mono text-foreground">
                         {(item.qty * item.valuation_rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-2">
@@ -297,11 +297,11 @@ export default function NewTransferPage() {
                     <td colSpan={2} className="py-3 text-right text-slate-muted font-medium">
                       Total:
                     </td>
-                    <td className="py-3 text-right font-mono text-white">
+                    <td className="py-3 text-right font-mono text-foreground">
                       {totalQty.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td></td>
-                    <td className="py-3 text-right font-mono text-white font-semibold">
+                    <td className="py-3 text-right font-mono text-foreground font-semibold">
                       {totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td></td>
@@ -315,7 +315,7 @@ export default function NewTransferPage() {
         <div className="flex items-center justify-end gap-4">
           <Link
             href="/inventory/transfers"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
           >
             Cancel
           </Link>

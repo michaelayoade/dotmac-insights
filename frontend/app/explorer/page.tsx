@@ -225,7 +225,7 @@ export default function ExplorerPage() {
       {/* Sidebar - Table List */}
       <div className="w-80 flex-shrink-0 flex flex-col bg-slate-card border border-slate-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-slate-border">
-          <h2 className="font-display text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">
             <Database className="w-5 h-5 text-teal-electric" />
             Data Models
           </h2>
@@ -239,7 +239,7 @@ export default function ExplorerPage() {
               placeholder="Search tables..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
         </div>
@@ -262,7 +262,7 @@ export default function ExplorerPage() {
               <div key={category} className="mb-2">
                 <button
                   onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-muted hover:text-white transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-muted hover:text-foreground transition-colors"
                 >
                   {expandedCategories.has(category) ? (
                     <ChevronDown className="w-4 h-4" />
@@ -287,7 +287,7 @@ export default function ExplorerPage() {
                           'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all',
                           selectedTable === table.name
                             ? 'bg-teal-electric/20 text-teal-electric'
-                            : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                            : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
                         )}
                       >
                         <span className="truncate">{table.name}</span>
@@ -308,7 +308,7 @@ export default function ExplorerPage() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Database className="w-12 h-12 text-slate-muted mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Select a Table</h3>
+              <h3 className="text-xl font-semibold text-foreground mb-2">Select a Table</h3>
               <p className="text-slate-muted">Choose a data model from the sidebar to explore</p>
             </div>
           </div>
@@ -336,7 +336,7 @@ export default function ExplorerPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => refetchTableData()}
-                      className="p-2 text-slate-muted hover:text-white transition-colors"
+                      className="p-2 text-slate-muted hover:text-foreground transition-colors"
                       title="Refresh"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -348,7 +348,7 @@ export default function ExplorerPage() {
                           'p-2 rounded-md transition-colors',
                           viewMode === 'table'
                             ? 'bg-teal-electric/20 text-teal-electric'
-                            : 'text-slate-muted hover:text-white'
+                            : 'text-slate-muted hover:text-foreground'
                         )}
                       >
                         <Table className="w-4 h-4" />
@@ -359,7 +359,7 @@ export default function ExplorerPage() {
                           'p-2 rounded-md transition-colors',
                           viewMode === 'json'
                             ? 'bg-teal-electric/20 text-teal-electric'
-                            : 'text-slate-muted hover:text-white'
+                            : 'text-slate-muted hover:text-foreground'
                         )}
                       >
                         <FileJson className="w-4 h-4" />
@@ -382,7 +382,7 @@ export default function ExplorerPage() {
                       setTableSearchQuery(e.target.value);
                       setOffset(0);
                     }}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
 
@@ -391,7 +391,7 @@ export default function ExplorerPage() {
                   <select
                     value={selectedDateColumn}
                     onChange={(e) => setSelectedDateColumn(e.target.value)}
-                    className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   >
                     <option value="">No date filter</option>
                     {selectedTableInfo.date_columns.map((col: string) => (
@@ -414,7 +414,7 @@ export default function ExplorerPage() {
                     setLimit(Number(e.target.value));
                     setOffset(0);
                   }}
-                  className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="px-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   {[25, 50, 100, 250, 500].map((n) => (
                     <option key={n} value={n}>
@@ -428,7 +428,7 @@ export default function ExplorerPage() {
                   <button
                     onClick={() => handleExport('csv')}
                     disabled={exporting || !tableData?.data?.length}
-                    className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-white border border-slate-border rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg transition-colors disabled:opacity-50"
                   >
                     <Download className="w-4 h-4" />
                     CSV
@@ -436,7 +436,7 @@ export default function ExplorerPage() {
                   <button
                     onClick={() => handleExport('json')}
                     disabled={exporting || !tableData?.data?.length}
-                    className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-white border border-slate-border rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg transition-colors disabled:opacity-50"
                   >
                     <FileJson className="w-4 h-4" />
                     JSON
@@ -493,7 +493,7 @@ export default function ExplorerPage() {
                         <button
                           onClick={() => setOffset(Math.max(0, offset - limit))}
                           disabled={offset === 0}
-                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Previous
                         </button>
@@ -503,7 +503,7 @@ export default function ExplorerPage() {
                         <button
                           onClick={() => setOffset(offset + limit)}
                           disabled={offset + limit >= tableData.total}
-                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Next
                         </button>

@@ -82,9 +82,9 @@ export default function ContactsFunnelPage() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-slate-muted" />
-                      <span className="text-white">{stage.label}</span>
+                      <span className="text-foreground">{stage.label}</span>
                     </div>
-                    <span className="text-white font-medium">{formatNumber(stage.value)}</span>
+                    <span className="text-foreground font-medium">{formatNumber(stage.value)}</span>
                   </div>
                   <div className="h-10 bg-slate-elevated rounded-lg overflow-hidden border border-slate-border">
                     <div

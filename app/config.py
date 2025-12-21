@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # Environment
     environment: str = "development"  # development, staging, production
 
+    # Tenant/company context (single-tenant)
+    default_company: Optional[str] = None
+
     # Currency
     # Default currency for Nigerian financial transactions.
     # API schemas may use different defaults for international modules (e.g., tax_core uses USD).
@@ -177,3 +180,5 @@ if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):
         raise ValueError("DATABASE_URL must be set to a non-sqlite database in production")
     if not settings.cors_origins_list:
         raise ValueError("CORS_ORIGINS must be configured in production to restrict origins")
+    if not settings.default_company:
+        raise ValueError("DEFAULT_COMPANY must be configured in production")

@@ -154,7 +154,7 @@ function ChartCard({ title, subtitle, icon: Icon, href, children }: { title: str
         <div className="flex items-center gap-2">
           {Icon && <Icon className="w-5 h-5 text-teal-electric" />}
           <div>
-            <h3 className="text-white font-semibold">{title}</h3>
+            <h3 className="text-foreground font-semibold">{title}</h3>
             {subtitle && <p className="text-slate-muted text-sm">{subtitle}</p>}
           </div>
         </div>
@@ -308,7 +308,7 @@ export default function AccountingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Scale className="w-5 h-5 text-teal-electric" />
-              <h2 className="text-lg font-semibold text-white">Financial Ratios</h2>
+              <h2 className="text-lg font-semibold text-foreground">Financial Ratios</h2>
             </div>
             <div className="text-teal-electric text-sm flex items-center gap-1">
               View Analysis <ArrowRight className="w-4 h-4" />
@@ -421,7 +421,7 @@ export default function AccountingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Landmark className="w-5 h-5 text-teal-electric" />
-              <h3 className="text-white font-semibold">Bank Accounts</h3>
+              <h3 className="text-foreground font-semibold">Bank Accounts</h3>
             </div>
             <Link href="/books/bank-accounts" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -436,11 +436,11 @@ export default function AccountingDashboardPage() {
                   className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 hover:border-teal-electric/50 transition-all"
                 >
                   <div>
-                    <p className="text-white text-sm font-medium">{account.account_name}</p>
+                    <p className="text-foreground text-sm font-medium">{account.account_name}</p>
                     <p className="text-slate-muted text-xs">{account.bank_name} •••• {account.account_number}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-mono text-sm">{formatCurrency(account.balance, account.currency)}</p>
+                    <p className="text-foreground font-mono text-sm">{formatCurrency(account.balance, account.currency)}</p>
                   </div>
                 </Link>
               ))}
@@ -459,7 +459,7 @@ export default function AccountingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ArrowUpRight className="w-5 h-5 text-blue-400" />
-              <h3 className="text-white font-semibold">Top Customers (Outstanding)</h3>
+              <h3 className="text-foreground font-semibold">Top Customers (Outstanding)</h3>
             </div>
             <Link href="/books/receivables" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -478,11 +478,11 @@ export default function AccountingDashboardPage() {
                       {index + 1}
                     </div>
                     <div>
-                      <p className="text-white text-sm font-medium truncate max-w-[180px]">{customer.customer_name}</p>
+                      <p className="text-foreground text-sm font-medium truncate max-w-[180px]">{customer.customer_name}</p>
                       <p className="text-slate-muted text-xs">{customer.invoice_count} invoices</p>
                     </div>
                   </div>
-                  <p className="text-white font-mono text-sm">{formatCurrency(customer.outstanding)}</p>
+                  <p className="text-foreground font-mono text-sm">{formatCurrency(customer.outstanding)}</p>
                 </Link>
               ))}
             </div>
@@ -497,7 +497,7 @@ export default function AccountingDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ArrowDownRight className="w-5 h-5 text-amber-400" />
-              <h3 className="text-white font-semibold">Top Suppliers (Outstanding)</h3>
+              <h3 className="text-foreground font-semibold">Top Suppliers (Outstanding)</h3>
             </div>
             <Link href="/books/payables" className="text-teal-electric text-sm hover:text-teal-glow flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
@@ -516,11 +516,11 @@ export default function AccountingDashboardPage() {
                       {index + 1}
                     </div>
                     <div>
-                      <p className="text-white text-sm font-medium truncate max-w-[180px]">{supplier.supplier_name}</p>
+                      <p className="text-foreground text-sm font-medium truncate max-w-[180px]">{supplier.supplier_name}</p>
                       <p className="text-slate-muted text-xs">{supplier.bill_count} bills</p>
                     </div>
                   </div>
-                  <p className="text-white font-mono text-sm">{formatCurrency(supplier.outstanding)}</p>
+                  <p className="text-foreground font-mono text-sm">{formatCurrency(supplier.outstanding)}</p>
                 </Link>
               ))}
             </div>
@@ -536,22 +536,22 @@ export default function AccountingDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Link href="/purchasing/suppliers" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Users className="w-6 h-6 text-teal-electric mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(counts?.suppliers)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(counts?.suppliers)}</p>
           <p className="text-slate-muted text-sm">Suppliers</p>
         </Link>
         <Link href="/books/general-ledger" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <BookOpen className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(counts?.gl_entries)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(counts?.gl_entries)}</p>
           <p className="text-slate-muted text-sm">GL Entries (YTD)</p>
         </Link>
         <Link href="/books/bank-accounts" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Landmark className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(cash?.bank_accounts?.length)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(cash?.bank_accounts?.length)}</p>
           <p className="text-slate-muted text-sm">Bank Accounts</p>
         </Link>
         <Link href="/books/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Scale className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-white">{formatNumber(fiscal_years?.length)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(fiscal_years?.length)}</p>
           <p className="text-slate-muted text-sm">Fiscal Years</p>
         </Link>
       </div>

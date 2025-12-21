@@ -110,7 +110,7 @@ export default function TerritoriesPage() {
               <MapPin className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{territories.length}</p>
+              <p className="text-2xl font-bold text-foreground">{territories.length}</p>
               <p className="text-xs text-slate-muted">Territories</p>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function TerritoriesPage() {
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{totalContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
               <p className="text-xs text-slate-muted">Total Contacts</p>
             </div>
           </div>
@@ -132,7 +132,7 @@ export default function TerritoriesPage() {
               <DollarSign className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalMrr)}</p>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrr)}</p>
               <p className="text-xs text-slate-muted">Total MRR</p>
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function TerritoriesPage() {
               <TrendingUp className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{avgPerTerritory}</p>
+              <p className="text-2xl font-bold text-foreground">{avgPerTerritory}</p>
               <p className="text-xs text-slate-muted">Avg per Territory</p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function TerritoriesPage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-5">
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-white font-semibold">Top Territories by Contacts</h3>
+          <h3 className="text-foreground font-semibold">Top Territories by Contacts</h3>
         </div>
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
@@ -183,7 +183,7 @@ export default function TerritoriesPage() {
               placeholder="Search territories..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             />
           </div>
         </div>
@@ -200,13 +200,13 @@ export default function TerritoriesPage() {
                   <MapPin className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">{territory.territory}</p>
+                  <p className="text-foreground font-medium">{territory.territory}</p>
                   <p className="text-sm text-slate-muted">{territory.count} contacts</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-white font-mono">{formatCurrency(territory.mrr)}</p>
+                  <p className="text-foreground font-mono">{formatCurrency(territory.mrr)}</p>
                   <p className="text-xs text-slate-muted">MRR</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-emerald-400 transition-colors" />

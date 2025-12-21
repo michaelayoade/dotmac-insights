@@ -18,7 +18,7 @@ function StatusBadge({ status }: { status: string }) {
     pending: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
     completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
     failed: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <AlertTriangle className="w-3 h-3" /> },
-    refunded: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <XCircle className="w-3 h-3" /> },
+    refunded: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <XCircle className="w-3 h-3" /> },
   };
   const style = config[normalizedStatus] || config.pending;
   return (
@@ -53,7 +53,7 @@ export default function BooksPaymentsPage() {
       header: 'Receipt',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="font-mono text-white">{item.receipt_number || `#${item.id}`}</span>
+          <span className="font-mono text-foreground">{item.receipt_number || `#${item.id}`}</span>
           <span className="text-slate-muted text-sm">{formatDate(item.payment_date)}</span>
         </div>
       ),
@@ -74,7 +74,7 @@ export default function BooksPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-white font-mono">{formatCurrency(item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatCurrency(item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">{item.payment_method || '—'}</div>
         </div>
       ),
@@ -97,7 +97,7 @@ export default function BooksPaymentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AR Payments</h1>
+          <h1 className="text-2xl font-bold text-foreground">AR Payments</h1>
           <p className="text-slate-muted text-sm">Record and review customer payments</p>
         </div>
         <Link
@@ -112,7 +112,7 @@ export default function BooksPaymentsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input

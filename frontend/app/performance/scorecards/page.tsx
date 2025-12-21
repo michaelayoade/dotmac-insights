@@ -62,7 +62,7 @@ export default function ScorecardsPage() {
           <div>
             <Link
               href={`/performance/scorecards/${item.id}`}
-              className="text-white font-medium hover:text-violet-400"
+              className="text-foreground font-medium hover:text-violet-400"
             >
               {item.employee_name || 'Unknown'}
             </Link>
@@ -76,7 +76,7 @@ export default function ScorecardsPage() {
       header: 'Department',
       render: (item: Scorecard) => (
         <div className="text-sm">
-          <p className="text-slate-300">{item.department || '-'}</p>
+          <p className="text-foreground-secondary">{item.department || '-'}</p>
           <p className="text-xs text-slate-500">{item.designation || '-'}</p>
         </div>
       ),
@@ -86,7 +86,7 @@ export default function ScorecardsPage() {
       header: 'Period',
       render: (item: Scorecard) => (
         <div className="text-sm">
-          <p className="text-slate-300">{item.period_name}</p>
+          <p className="text-foreground-secondary">{item.period_name}</p>
           <p className="text-xs text-slate-500 font-mono">{item.period_code}</p>
         </div>
       ),
@@ -131,7 +131,7 @@ export default function ScorecardsPage() {
       render: (item: Scorecard) => (
         <Link
           href={`/performance/scorecards/${item.id}`}
-          className="text-slate-400 hover:text-white p-1"
+          className="text-slate-400 hover:text-foreground p-1"
         >
           <ChevronRight className="w-4 h-4" />
         </Link>
@@ -155,7 +155,7 @@ export default function ScorecardsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Employee Scorecards</h1>
+          <h1 className="text-xl font-semibold text-foreground">Employee Scorecards</h1>
           <p className="text-sm text-slate-400 mt-1">
             View and manage performance scorecards
           </p>
@@ -170,7 +170,7 @@ export default function ScorecardsPage() {
             setPeriodId(e.target.value ? Number(e.target.value) : undefined);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.map((p) => (
@@ -185,7 +185,7 @@ export default function ScorecardsPage() {
             setStatusFilter(e.target.value as ScorecardStatus | '');
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -203,7 +203,7 @@ export default function ScorecardsPage() {
             setDepartmentFilter(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         />
         {(periodId || statusFilter || departmentFilter) && (
           <button
@@ -213,7 +213,7 @@ export default function ScorecardsPage() {
               setDepartmentFilter('');
               setOffset(0);
             }}
-            className="text-slate-400 text-sm hover:text-white transition-colors"
+            className="text-slate-400 text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>
@@ -225,7 +225,7 @@ export default function ScorecardsPage() {
         <div className="flex gap-3 flex-wrap text-sm">
           <div className="px-3 py-1.5 bg-slate-elevated rounded-lg border border-slate-border">
             <span className="text-slate-400">Total:</span>
-            <span className="text-white font-medium ml-1">{data.total}</span>
+            <span className="text-foreground font-medium ml-1">{data.total}</span>
           </div>
         </div>
       )}

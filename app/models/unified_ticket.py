@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from app.models.employee import Employee
     from app.models.ticket import Ticket
     from app.models.conversation import Conversation
+    from app.models.agent import Team
 
 
 # =============================================================================
@@ -183,7 +184,10 @@ class UnifiedTicket(Base):
         nullable=True,
         index=True
     )
-    assigned_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    assigned_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)  # TEXT for display
+    assigned_team_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("teams.id"), nullable=True, index=True
+    )  # FK for local queries
     assigned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Creator (if internal)
@@ -320,9 +324,16 @@ class UnifiedTicket(Base):
         foreign_keys=[unified_contact_id]
     )
     assigned_to: Mapped[Optional["Employee"]] = relationship(
+        back_populates="assigned_unified_tickets",
         foreign_keys=[assigned_to_id]
     )
+    assigned_team_rel: Mapped[Optional["Team"]] = relationship(
+        "Team",
+        foreign_keys=[assigned_team_id],
+        backref="unified_tickets"
+    )
     created_by: Mapped[Optional["Employee"]] = relationship(
+        back_populates="created_unified_tickets",
         foreign_keys=[created_by_id]
     )
 

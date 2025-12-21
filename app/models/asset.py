@@ -4,9 +4,12 @@ from sqlalchemy import String, Text, Enum, Date, ForeignKey, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.employee import Employee
 
 
 # ============= ASSET CATEGORY =============
@@ -115,7 +118,10 @@ class Asset(Base):
     # Company and Location
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
-    custodian: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Employee who manages the asset
+    custodian: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # ERPNext employee name
+    custodian_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employees.id"), nullable=True, index=True
+    )  # FK for local queries
     department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -177,6 +183,11 @@ class Asset(Base):
     )
     depreciation_schedules: Mapped[List["AssetDepreciationSchedule"]] = relationship(
         back_populates="asset", cascade="all, delete-orphan"
+    )
+    custodian_employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        foreign_keys=[custodian_id],
+        backref="custodian_assets"
     )
 
     def __repr__(self) -> str:

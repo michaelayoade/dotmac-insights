@@ -98,7 +98,7 @@ export default function CreditNoteEditPage() {
         <p className="text-red-400">Failed to load credit note</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -113,12 +113,12 @@ export default function CreditNoteEditPage() {
         <div className="flex items-center gap-3">
           <Link
             href={`/sales/credit-notes/${data.id}`}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to credit note
           </Link>
-          <h1 className="text-xl font-semibold text-white">Edit Credit Note</h1>
+          <h1 className="text-xl font-semibold text-foreground">Edit Credit Note</h1>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export default function CreditNoteEditPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             <Receipt className="w-4 h-4 text-teal-electric" />
             Credit Note Details
           </h3>
@@ -142,7 +142,7 @@ export default function CreditNoteEditPage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.customerId && 'border-red-500/60'
                 )}
               >
@@ -161,7 +161,7 @@ export default function CreditNoteEditPage() {
                 type="number"
                 value={invoiceId}
                 onChange={(e) => setInvoiceId(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function CreditNoteEditPage() {
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.amount && 'border-red-500/60'
                 )}
               />
@@ -185,7 +185,7 @@ export default function CreditNoteEditPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="draft">Draft</option>
                 <option value="issued">Issued</option>
@@ -200,7 +200,7 @@ export default function CreditNoteEditPage() {
                 value={issueDate}
                 onChange={(e) => setIssueDate(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.issueDate && 'border-red-500/60'
                 )}
               />
@@ -214,7 +214,7 @@ export default function CreditNoteEditPage() {
                 type="date"
                 value={appliedDate}
                 onChange={(e) => setAppliedDate(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -223,7 +223,7 @@ export default function CreditNoteEditPage() {
                 type="text"
                 value={creditNumber}
                 onChange={(e) => setCreditNumber(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional"
               />
             </div>
@@ -234,7 +234,7 @@ export default function CreditNoteEditPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               placeholder="Optional notes"
             />
           </div>
@@ -244,7 +244,7 @@ export default function CreditNoteEditPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel

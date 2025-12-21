@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, FileText, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, FileText, Plus, Trash2 } from 'lucide-react';
 import { useFinanceCustomers, useFinanceInvoiceMutations } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { BackButton, Button } from '@/components/ui';
 
 type LineItem = {
   id: string;
@@ -118,14 +118,8 @@ export default function InvoiceCreatePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link
-            href="/sales/invoices"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to invoices
-          </Link>
-          <h1 className="text-xl font-semibold text-white">New Invoice</h1>
+          <BackButton href="/sales/invoices" label="invoices" />
+          <h1 className="text-xl font-semibold text-foreground">New Invoice</h1>
         </div>
       </div>
 
@@ -139,7 +133,7 @@ export default function InvoiceCreatePage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
               Invoice Details
             </h3>
@@ -149,7 +143,7 @@ export default function InvoiceCreatePage() {
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
                 className={cn(
-                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                  'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                   fieldErrors.customerId && 'border-red-500/60'
                 )}
               >
@@ -169,7 +163,7 @@ export default function InvoiceCreatePage() {
                   type="text"
                   value={invoiceNumber}
                   onChange={(e) => setInvoiceNumber(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   placeholder="Optional"
                 />
               </div>
@@ -178,7 +172,7 @@ export default function InvoiceCreatePage() {
                 <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="draft">Draft</option>
                 <option value="pending">Pending</option>
@@ -198,7 +192,7 @@ export default function InvoiceCreatePage() {
                   value={invoiceDate}
                   onChange={(e) => setInvoiceDate(e.target.value)}
                   className={cn(
-                    'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                    'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                     fieldErrors.invoiceDate && 'border-red-500/60'
                   )}
                 />
@@ -211,7 +205,7 @@ export default function InvoiceCreatePage() {
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   className={cn(
-                    'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                    'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                     fieldErrors.dueDate && 'border-red-500/60'
                   )}
                 />
@@ -224,42 +218,42 @@ export default function InvoiceCreatePage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 placeholder="Optional notes"
               />
             </div>
           </div>
 
           <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
               Summary
             </h3>
             <div className="flex justify-between text-sm">
               <span className="text-slate-muted">Subtotal</span>
-              <span className="text-white font-mono">{formatCurrency(totals.subtotal, currency)}</span>
+              <span className="text-foreground font-mono">{formatCurrency(totals.subtotal, currency)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-muted">Tax</span>
-              <span className="text-white font-mono">{formatCurrency(totals.tax, currency)}</span>
+              <span className="text-foreground font-mono">{formatCurrency(totals.tax, currency)}</span>
             </div>
             <div className="flex justify-between text-base font-semibold">
-              <span className="text-white">Total</span>
-              <span className="text-white font-mono">{formatCurrency(total, currency)}</span>
+              <span className="text-foreground">Total</span>
+              <span className="text-foreground font-mono">{formatCurrency(total, currency)}</span>
             </div>
           </div>
         </div>
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-white font-semibold flex items-center gap-2">
+            <h3 className="text-foreground font-semibold flex items-center gap-2">
               <FileText className="w-4 h-4 text-teal-electric" />
               Line Items
             </h3>
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-white hover:border-teal-electric/50"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-foreground hover:border-teal-electric/50"
             >
               <Plus className="w-4 h-4" />
               Add line
@@ -276,7 +270,7 @@ export default function InvoiceCreatePage() {
                     value={item.description}
                     onChange={(e) => updateLine(item.id, { description: e.target.value })}
                     className={cn(
-                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                       fieldErrors[`line-${idx}-description`] && 'border-red-500/60'
                     )}
                     placeholder="Item or service"
@@ -290,7 +284,7 @@ export default function InvoiceCreatePage() {
                     value={item.quantity}
                     onChange={(e) => updateLine(item.id, { quantity: Number(e.target.value) })}
                     className={cn(
-                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                       fieldErrors[`line-${idx}-quantity`] && 'border-red-500/60'
                     )}
                   />
@@ -303,7 +297,7 @@ export default function InvoiceCreatePage() {
                     value={item.unit_price}
                     onChange={(e) => updateLine(item.id, { unit_price: Number(e.target.value) })}
                     className={cn(
-                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
+                      'w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50',
                       fieldErrors[`line-${idx}-unit_price`] && 'border-red-500/60'
                     )}
                   />
@@ -315,12 +309,12 @@ export default function InvoiceCreatePage() {
                     min={0}
                     value={item.tax_rate}
                     onChange={(e) => updateLine(item.id, { tax_rate: Number(e.target.value) })}
-                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                    className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-slate-muted">Line Total</label>
-                  <div className="text-white font-mono pt-2">
+                  <div className="text-foreground font-mono pt-2">
                     {formatCurrency((item.quantity || 0) * (item.unit_price || 0) * (1 + (item.tax_rate || 0) / 100), currency)}
                   </div>
                 </div>
@@ -340,21 +334,22 @@ export default function InvoiceCreatePage() {
         </div>
 
         <div className="flex items-center justify-end gap-3 sticky bottom-4 bg-slate-deep/80 backdrop-blur-sm p-3 rounded-lg border border-slate-border/60">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            module="sales"
             disabled={submitting}
-            className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
+            loading={submitting}
           >
-            {submitting ? 'Saving...' : 'Save Invoice'}
-          </button>
+            Save Invoice
+          </Button>
         </div>
       </form>
     </div>

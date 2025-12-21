@@ -23,7 +23,7 @@ export default function Error({
           <AlertTriangle className="w-8 h-8 text-coral-alert" />
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Something went wrong</h1>
         <p className="text-slate-muted mb-6">
           An unexpected error occurred. Please try again or return to the dashboard.
         </p>
@@ -41,14 +41,14 @@ export default function Error({
         <div className="flex gap-3 justify-center">
           <button
             onClick={reset}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg font-medium hover:bg-teal-glow transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg font-medium hover:bg-teal-glow transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Try again
           </button>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg font-medium hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg font-medium hover:bg-slate-border transition-colors"
           >
             <Home className="w-4 h-4" />
             Dashboard

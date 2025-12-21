@@ -19,6 +19,13 @@ from app.models.omni import (
     OmniParticipant,
     InboxContact,
 )
+from app.api.inbox.websocket import (
+    broadcast_assignment,
+    broadcast_conversation_update,
+    broadcast_new_message,
+    broadcast_stats_update,
+    build_inbox_stats_snapshot,
+)
 from app.models.agent import Agent, Team
 from app.models.ticket import Ticket, TicketStatus, TicketPriority
 from app.models.sales import ERPNextLead
@@ -297,7 +304,14 @@ async def update_conversation(
     db.commit()
     db.refresh(conv)
 
-    return serialize_conversation(conv)
+    conversation_payload = serialize_conversation(conv)
+    await broadcast_conversation_update(
+        conversation_payload,
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
+
+    return conversation_payload
 
 
 @router.post(
@@ -338,7 +352,18 @@ async def assign_conversation(
     db.commit()
     db.refresh(conv)
 
-    return serialize_conversation(conv)
+    conversation_payload = serialize_conversation(conv)
+    if conv.assigned_agent_id:
+        await broadcast_assignment(
+            conversation_id=conv.id,
+            agent_id=conv.assigned_agent_id,
+            conversation_data=conversation_payload,
+        )
+    else:
+        await broadcast_conversation_update(conversation_payload)
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
+
+    return conversation_payload
 
 
 @router.post(
@@ -375,8 +400,22 @@ async def send_reply(
 
     db.commit()
     db.refresh(msg)
+    db.refresh(conv)
 
-    return serialize_message(msg)
+    message_payload = serialize_message(msg)
+    conversation_payload = serialize_conversation(conv)
+    await broadcast_new_message(
+        message_payload,
+        conversation_id=conv.id,
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_conversation_update(
+        conversation_payload,
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
+
+    return message_payload
 
 
 @router.post(
@@ -402,6 +441,15 @@ async def mark_conversation_read(
     ).update({"read_at": datetime.utcnow()})
 
     db.commit()
+
+    db.refresh(conv)
+
+    conversation_payload = serialize_conversation(conv)
+    await broadcast_conversation_update(
+        conversation_payload,
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
     return {"success": True, "conversation_id": conversation_id}
 
@@ -525,6 +573,12 @@ async def delete_conversation(
     conv.status = "closed"
     db.commit()
 
+    await broadcast_conversation_update(
+        serialize_conversation(conv),
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
+
     return None
 
 
@@ -543,5 +597,11 @@ async def archive_conversation(
 
     conv.status = "closed"
     db.commit()
+
+    await broadcast_conversation_update(
+        serialize_conversation(conv),
+        assigned_agent_id=conv.assigned_agent_id,
+    )
+    await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
     return {"success": True, "conversation_id": conversation_id}

@@ -37,7 +37,7 @@ function VoucherTypeBadge({ type }: { type: string }) {
     'Sales Invoice': { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <Receipt className="w-3 h-3" /> },
     'Purchase Invoice': { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <ShoppingCart className="w-3 h-3" /> },
   };
-  const style = config[type] || { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileText className="w-3 h-3" /> };
+  const style = config[type] || { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileText className="w-3 h-3" /> };
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', style.bg, style.border, style.text)}>
       {style.icon}
@@ -132,7 +132,7 @@ export default function JournalEntriesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total Entries</p>
-          <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
+          <p className="text-2xl font-bold text-foreground">{data?.total || 0}</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Debit</p>
@@ -189,7 +189,7 @@ export default function JournalEntriesPage() {
           {(startDate || endDate || voucherType) && (
             <button
               onClick={() => { setStartDate(''); setEndDate(''); setVoucherType(''); setOffset(0); }}
-              className="px-3 py-2 text-slate-muted text-sm hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+              className="px-3 py-2 text-slate-muted text-sm hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
             >
               Clear Filters
             </button>

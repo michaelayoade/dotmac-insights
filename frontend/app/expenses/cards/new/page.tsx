@@ -2,16 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, CreditCard, Save } from 'lucide-react';
+import { CreditCard, Save } from 'lucide-react';
 import { useCorporateCardMutations } from '@/hooks/useExpenses';
 import type { CorporateCardCreatePayload } from '@/lib/expenses.types';
+import { BackButton, Button } from '@/components/ui';
+import { EmployeeSearch } from '@/components/EntitySearch';
+import { useEmployeeOptions } from '@/hooks/usePickers';
 
 export default function NewCardPage() {
   const router = useRouter();
   const { createCard } = useCorporateCardMutations();
+  const { employees, isLoading: employeesLoading } = useEmployeeOptions();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: number; name: string } | null>(null);
 
   const [formData, setFormData] = useState<CorporateCardCreatePayload>({
     card_number_last4: '',
@@ -51,8 +55,8 @@ export default function NewCardPage() {
       if (!formData.card_name.trim()) {
         throw new Error('Card name is required');
       }
-      if (!formData.employee_id || formData.employee_id <= 0) {
-        throw new Error('Valid employee ID is required');
+      if (!selectedEmployee) {
+        throw new Error('Please select an employee');
       }
 
       const card = await createCard(formData);
@@ -67,19 +71,16 @@ export default function NewCardPage() {
   return (
     <div className="space-y-6">
       {/* Back link */}
-      <Link href="/expenses/cards" className="inline-flex items-center gap-2 text-slate-muted hover:text-white transition-colors">
-        <ArrowLeft className="w-4 h-4" />
-        Back to cards
-      </Link>
+      <BackButton href="/expenses/cards" label="cards" />
 
       {/* Header */}
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-violet-500/15 text-violet-300">
+          <div className="p-4 rounded-2xl bg-sky-500/15 text-sky-300">
             <CreditCard className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Add Corporate Card</h1>
+            <h1 className="text-2xl font-bold text-foreground">Add Corporate Card</h1>
             <p className="text-slate-muted mt-1">Assign a new corporate card to an employee</p>
           </div>
         </div>
@@ -95,7 +96,7 @@ export default function NewCardPage() {
 
         {/* Card Information */}
         <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Card Information</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Card Information</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-slate-muted mb-1">Card Name *</label>
@@ -105,7 +106,7 @@ export default function NewCardPage() {
                 value={formData.card_name}
                 onChange={handleChange}
                 placeholder="e.g., John's Expense Card"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
                 required
               />
             </div>
@@ -118,7 +119,7 @@ export default function NewCardPage() {
                 onChange={handleChange}
                 placeholder="1234"
                 maxLength={4}
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
                 required
               />
             </div>
@@ -128,7 +129,7 @@ export default function NewCardPage() {
                 name="card_type"
                 value={formData.card_type || ''}
                 onChange={handleChange}
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground focus:outline-none focus:border-violet-500"
               >
                 <option value="credit">Credit</option>
                 <option value="debit">Debit</option>
@@ -141,7 +142,7 @@ export default function NewCardPage() {
                 name="card_provider"
                 value={formData.card_provider || ''}
                 onChange={handleChange}
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground focus:outline-none focus:border-violet-500"
               >
                 <option value="">Select provider</option>
                 <option value="visa">Visa</option>
@@ -158,19 +159,25 @@ export default function NewCardPage() {
                 value={formData.bank_name || ''}
                 onChange={handleChange}
                 placeholder="e.g., First Bank"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-muted mb-1">Employee ID *</label>
-              <input
-                type="number"
-                name="employee_id"
-                value={formData.employee_id || ''}
-                onChange={handleChange}
-                placeholder="Enter employee ID"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
-                required
+              <label className="block text-sm text-slate-muted mb-1">Employee *</label>
+              <EmployeeSearch
+                employees={employees.map((e: any) => ({
+                  id: e.id,
+                  name: e.name,
+                  email: e.email,
+                  department: e.department,
+                }))}
+                value={selectedEmployee}
+                onSelect={(emp) => {
+                  setSelectedEmployee(emp);
+                  setFormData((prev) => ({ ...prev, employee_id: emp?.id || 0 }));
+                }}
+                loading={employeesLoading}
+                placeholder="Select employee..."
               />
             </div>
           </div>
@@ -178,7 +185,7 @@ export default function NewCardPage() {
 
         {/* Limits */}
         <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Limits</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Limits</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-slate-muted mb-1">Credit Limit *</label>
@@ -189,14 +196,14 @@ export default function NewCardPage() {
                   value={formData.credit_limit || ''}
                   onChange={handleChange}
                   placeholder="0"
-                  className="flex-1 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                  className="flex-1 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
                   required
                 />
                 <select
                   name="currency"
                   value={formData.currency}
                   onChange={handleChange}
-                  className="w-24 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white focus:outline-none focus:border-violet-500"
+                  className="w-24 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground focus:outline-none focus:border-violet-500"
                 >
                   <option value="NGN">NGN</option>
                   <option value="USD">USD</option>
@@ -213,7 +220,7 @@ export default function NewCardPage() {
                 value={formData.single_transaction_limit ?? ''}
                 onChange={handleChange}
                 placeholder="No limit"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
               />
             </div>
             <div>
@@ -224,7 +231,7 @@ export default function NewCardPage() {
                 value={formData.daily_limit ?? ''}
                 onChange={handleChange}
                 placeholder="No limit"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
               />
             </div>
             <div>
@@ -235,7 +242,7 @@ export default function NewCardPage() {
                 value={formData.monthly_limit ?? ''}
                 onChange={handleChange}
                 placeholder="No limit"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
               />
             </div>
           </div>
@@ -243,7 +250,7 @@ export default function NewCardPage() {
 
         {/* Dates & Accounting */}
         <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Dates & Accounting</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Dates & Accounting</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-slate-muted mb-1">Issue Date *</label>
@@ -252,7 +259,7 @@ export default function NewCardPage() {
                 name="issue_date"
                 value={formData.issue_date}
                 onChange={handleChange}
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground focus:outline-none focus:border-violet-500"
                 required
               />
             </div>
@@ -263,7 +270,7 @@ export default function NewCardPage() {
                 name="expiry_date"
                 value={formData.expiry_date || ''}
                 onChange={handleChange}
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground focus:outline-none focus:border-violet-500"
               />
             </div>
             <div className="sm:col-span-2">
@@ -274,7 +281,7 @@ export default function NewCardPage() {
                 value={formData.liability_account || ''}
                 onChange={handleChange}
                 placeholder="e.g., Corporate Card Payable"
-                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white placeholder-slate-muted focus:outline-none focus:border-violet-500"
+                className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground placeholder-slate-muted focus:outline-none focus:border-violet-500"
               />
             </div>
           </div>
@@ -282,20 +289,18 @@ export default function NewCardPage() {
 
         {/* Actions */}
         <div className="flex justify-end gap-3">
-          <Link
-            href="/expenses/cards"
-            className="px-4 py-2 rounded-xl border border-slate-border text-slate-muted hover:text-white hover:border-slate-400 transition-colors"
-          >
+          <Button variant="secondary" onClick={() => router.back()}>
             Cancel
-          </Link>
-          <button
+          </Button>
+          <Button
             type="submit"
+            module="expenses"
+            icon={Save}
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-6 py-2 rounded-xl bg-violet-500 text-white font-semibold hover:bg-violet-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            loading={isSubmitting}
           >
-            <Save className="w-4 h-4" />
-            {isSubmitting ? 'Creating...' : 'Create Card'}
-          </button>
+            Create Card
+          </Button>
         </div>
       </form>
     </div>

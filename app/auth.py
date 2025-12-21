@@ -34,6 +34,7 @@ logger = structlog.get_logger()
 
 # Security schemes
 bearer_scheme = HTTPBearer(auto_error=False)
+AUTH_COOKIE_NAME = "dotmac_access_token"
 
 
 # ============================================================================
@@ -343,7 +344,7 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
     On first login, creates a user record linked to better-auth via external_id.
     On subsequent logins, updates user info from JWT claims.
 
-    Note: The very first user to authenticate becomes a superuser automatically.
+    Note: Users are created without superuser privileges. Promote explicitly via admin tooling.
     """
     # First try to find by external_id
     user = db.query(User).filter(User.external_id == claims.sub).first()
@@ -358,17 +359,17 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
             logger.info("user_external_id_updated", user_id=user.id, external_id=claims.sub)
 
     if not user:
-        # Check if this is the first user in the system
+        # Check if this is the first user in the system (for bootstrap audit)
         is_first_user = db.query(User).count() == 0
 
-        # Create new user (first user becomes superuser)
+        # Create new user
         user = User(
             external_id=claims.sub,
             email=claims.email or f"{claims.sub}@unknown",
             name=claims.name,
             picture=claims.picture,
             is_active=True,
-            is_superuser=is_first_user,
+            is_superuser=False,
             last_login_at=datetime.utcnow(),
         )
         db.add(user)
@@ -376,7 +377,12 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
         db.refresh(user)
 
         if is_first_user:
-            logger.info("first_superuser_created", user_id=user.id, external_id=claims.sub, email=claims.email)
+            logger.warning(
+                "first_user_created_without_superuser",
+                user_id=user.id,
+                external_id=claims.sub,
+                email=claims.email,
+            )
         else:
             logger.info("user_created", user_id=user.id, external_id=claims.sub)
     else:
@@ -415,9 +421,14 @@ async def get_current_principal(
     Raises:
         HTTPException: If no valid authentication provided
     """
-    # Try Bearer token
+    token = None
     if credentials and credentials.credentials:
         token = credentials.credentials
+    else:
+        token = request.cookies.get(AUTH_COOKIE_NAME)
+
+    # Try Bearer token or cookie token
+    if token:
 
         # Check if it's a service token (shorter, no dots)
         if "." not in token:

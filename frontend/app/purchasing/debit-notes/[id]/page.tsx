@@ -74,7 +74,7 @@ export default function PurchasingDebitNoteDetailPage() {
         <p className="text-red-400">Failed to load debit note</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -123,14 +123,14 @@ export default function PurchasingDebitNoteDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/purchasing/debit-notes"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to debit notes
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Debit Note</p>
-            <h1 className="text-xl font-semibold text-white">{data.erpnext_id || `DN #${id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{data.erpnext_id || `DN #${id}`}</h1>
             {(data as any).write_back_status && (
               <span className={writeBackClass}>Write-back: {(data as any).write_back_status}</span>
             )}
@@ -142,13 +142,13 @@ export default function PurchasingDebitNoteDetailPage() {
         {summaryRows.map((row) => (
           <div key={row.label}>
             <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className="text-white font-semibold">{row.value}</p>
+            <p className="text-foreground font-semibold">{row.value}</p>
           </div>
         ))}
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <h3 className="text-white font-semibold">Quick update</h3>
+        <h3 className="text-foreground font-semibold">Quick update</h3>
         {actionError && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-2 text-sm">{actionError}</div>
         )}
@@ -158,7 +158,7 @@ export default function PurchasingDebitNoteDetailPage() {
             <select
               value={statusInput}
               onChange={(e) => setStatusInput(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               <option value="draft">Draft</option>
               <option value="submitted">Submitted</option>
@@ -173,7 +173,7 @@ export default function PurchasingDebitNoteDetailPage() {
               type="number"
               value={outstandingInput}
               onChange={(e) => setOutstandingInput(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <div className="space-y-1">
@@ -182,7 +182,7 @@ export default function PurchasingDebitNoteDetailPage() {
               type="number"
               value={paidInput}
               onChange={(e) => setPaidInput(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <div className="md:col-span-4 flex justify-end">
@@ -201,7 +201,7 @@ export default function PurchasingDebitNoteDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Items</h3>
+            <h3 className="text-foreground font-semibold">Items</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -217,11 +217,11 @@ export default function PurchasingDebitNoteDetailPage() {
               <tbody>
                 {(data as any).items.map((item: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-white font-mono">{item.item_code || '-'}</td>
+                    <td className="px-2 py-2 text-foreground font-mono">{item.item_code || '-'}</td>
                     <td className="px-2 py-2 text-slate-200">{item.item_name || item.description || '-'}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.qty ?? item.quantity ?? 0}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.rate ?? item.unit_price ?? 0}</td>
-                    <td className="px-2 py-2 text-right text-white font-mono">{item.amount ?? item.net_amount ?? 0}</td>
+                    <td className="px-2 py-2 text-right text-foreground font-mono">{item.amount ?? item.net_amount ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

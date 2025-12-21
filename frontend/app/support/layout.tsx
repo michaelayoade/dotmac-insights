@@ -110,13 +110,13 @@ function LiveMetrics() {
     <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 bg-slate-elevated rounded-lg mr-2">
       <div className="flex items-center gap-1.5">
         <Inbox className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-sm font-medium text-white">{openCount}</span>
+        <span className="text-sm font-medium text-foreground">{openCount}</span>
         <span className="text-xs text-slate-muted">open</span>
       </div>
       <div className="w-px h-4 bg-slate-border" />
       <div className="flex items-center gap-1.5">
         <AlertTriangle className={cn('w-3.5 h-3.5', overdueCount > 0 ? 'text-rose-400' : 'text-slate-muted')} />
-        <span className={cn('text-sm font-medium', overdueCount > 0 ? 'text-rose-400' : 'text-white')}>{overdueCount}</span>
+        <span className={cn('text-sm font-medium', overdueCount > 0 ? 'text-rose-400' : 'text-foreground')}>{overdueCount}</span>
         <span className="text-xs text-slate-muted">overdue</span>
       </div>
       <div className="w-px h-4 bg-slate-border" />
@@ -142,7 +142,7 @@ function MobileOverdueBadge() {
   return (
     <Link href="/support/sla" className="lg:hidden relative p-2 text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors">
       <AlertTriangle className="w-5 h-5" />
-      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-foreground text-[9px] font-bold flex items-center justify-center">
         {overdueCount > 9 ? '9+' : overdueCount}
       </span>
     </Link>

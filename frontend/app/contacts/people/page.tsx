@@ -75,7 +75,7 @@ export default function PeoplePage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-white font-medium">{item.name}</p>
+              <p className="text-foreground font-medium">{item.name}</p>
               {item.is_primary_contact && (
                 <Star className="w-3 h-3 text-amber-400" fill="currentColor" />
               )}
@@ -98,7 +98,7 @@ export default function PeoplePage() {
       header: 'Organization',
       render: (item: UnifiedContact) => (
         item.company_name ? (
-          <span className="flex items-center gap-2 text-sm text-slate-300">
+          <span className="flex items-center gap-2 text-sm text-foreground-secondary">
             <Building2 className="w-4 h-4 text-slate-muted" />
             {item.company_name}
           </span>
@@ -129,7 +129,7 @@ export default function PeoplePage() {
           <a
             href={`tel:${item.phone || item.mobile}`}
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-sm text-slate-300 hover:text-white"
+            className="flex items-center gap-1 text-sm text-foreground-secondary hover:text-foreground"
           >
             <Phone className="w-3 h-3 text-slate-muted" />
             {item.phone || item.mobile}
@@ -141,7 +141,7 @@ export default function PeoplePage() {
       key: 'department',
       header: 'Department',
       render: (item: UnifiedContact) => (
-        <span className="text-sm text-slate-300">{item.department || '-'}</span>
+        <span className="text-sm text-foreground-secondary">{item.department || '-'}</span>
       ),
     },
     {
@@ -193,7 +193,7 @@ export default function PeoplePage() {
           canWrite ? (
             <Link
               href="/contacts/new?type=person"
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-400 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-foreground rounded-lg hover:bg-purple-400 transition-colors"
             >
               <UserPlus className="w-4 h-4" />
               Add Person
@@ -210,7 +210,7 @@ export default function PeoplePage() {
               <UserCircle className="w-5 h-5 text-purple-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{total}</p>
+              <p className="text-2xl font-bold text-foreground">{total}</p>
               <p className="text-xs text-slate-muted">Total People</p>
             </div>
           </div>
@@ -221,7 +221,7 @@ export default function PeoplePage() {
               <Star className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{primaryContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{primaryContacts}</p>
               <p className="text-xs text-slate-muted">Primary Contacts</p>
             </div>
           </div>
@@ -232,7 +232,7 @@ export default function PeoplePage() {
               <CheckCircle className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{decisionMakers}</p>
+              <p className="text-2xl font-bold text-foreground">{decisionMakers}</p>
               <p className="text-xs text-slate-muted">Decision Makers</p>
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function PeoplePage() {
               <Briefcase className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{billingContacts}</p>
+              <p className="text-2xl font-bold text-foreground">{billingContacts}</p>
               <p className="text-xs text-slate-muted">Billing Contacts</p>
             </div>
           </div>
@@ -254,7 +254,7 @@ export default function PeoplePage() {
       <div className="bg-slate-card rounded-xl border border-slate-border p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-purple-400" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 min-w-[200px] max-w-md relative">
@@ -264,7 +264,7 @@ export default function PeoplePage() {
               placeholder="Search people..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
           </form>
           {search && (
@@ -274,7 +274,7 @@ export default function PeoplePage() {
                 setSearchInput('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

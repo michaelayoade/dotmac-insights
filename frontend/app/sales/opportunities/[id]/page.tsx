@@ -116,7 +116,7 @@ export default function OpportunityDetailPage() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-white">{opportunity.name}</h1>
+            <h1 className="text-2xl font-semibold text-foreground">{opportunity.name}</h1>
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[opportunity.status] || statusColors.open}`}>
               {opportunity.status}
             </span>
@@ -167,7 +167,7 @@ export default function OpportunityDetailPage() {
       {/* Pipeline Progress */}
       {opportunity.status === 'open' && stages && (
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4">Pipeline Progress</h2>
+          <h2 className="text-lg font-medium text-foreground mb-4">Pipeline Progress</h2>
           <div className="flex items-center gap-2">
             {stages.filter((s: PipelineStage) => !s.is_won && !s.is_lost).map((stage: PipelineStage, index: number) => {
               const isActive = stage.id === opportunity.stage_id;
@@ -181,7 +181,7 @@ export default function OpportunityDetailPage() {
                     isActive
                       ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
                       : isPast
-                      ? 'bg-slate-700/30 border-slate-600 text-white'
+                      ? 'bg-slate-700/30 border-slate-600 text-foreground'
                       : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-600'
                   }`}
                 >
@@ -199,7 +199,7 @@ export default function OpportunityDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Deal Value Card */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-lg font-medium text-white mb-4">Deal Value</h2>
+            <h2 className="text-lg font-medium text-foreground mb-4">Deal Value</h2>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <div className="text-sm text-slate-400">Deal Value</div>
@@ -209,7 +209,7 @@ export default function OpportunityDetailPage() {
               </div>
               <div>
                 <div className="text-sm text-slate-400">Probability</div>
-                <div className="text-2xl font-semibold text-white mt-1">
+                <div className="text-2xl font-semibold text-foreground mt-1">
                   {opportunity.probability || 0}%
                 </div>
               </div>
@@ -225,8 +225,8 @@ export default function OpportunityDetailPage() {
           {/* Description */}
           {opportunity.description && (
             <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-              <h2 className="text-lg font-medium text-white mb-4">Description</h2>
-              <p className="text-slate-300 whitespace-pre-wrap">{opportunity.description}</p>
+              <h2 className="text-lg font-medium text-foreground mb-4">Description</h2>
+              <p className="text-foreground-secondary whitespace-pre-wrap">{opportunity.description}</p>
             </div>
           )}
 
@@ -234,11 +234,11 @@ export default function OpportunityDetailPage() {
           {opportunity.status === 'lost' && opportunity.lost_reason && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
               <h2 className="text-lg font-medium text-red-400 mb-4">Lost Reason</h2>
-              <p className="text-slate-300">{opportunity.lost_reason}</p>
+              <p className="text-foreground-secondary">{opportunity.lost_reason}</p>
               {opportunity.competitor && (
                 <div className="mt-2">
                   <span className="text-sm text-slate-400">Competitor: </span>
-                  <span className="text-white">{opportunity.competitor}</span>
+                  <span className="text-foreground">{opportunity.competitor}</span>
                 </div>
               )}
             </div>
@@ -247,7 +247,7 @@ export default function OpportunityDetailPage() {
           {/* Activity Timeline */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-white">Activity Timeline</h2>
+              <h2 className="text-lg font-medium text-foreground">Activity Timeline</h2>
               <Link
                 href={`/sales/activities?opportunity_id=${oppId}`}
                 className="text-sm text-emerald-400 hover:text-emerald-300"
@@ -266,7 +266,7 @@ export default function OpportunityDetailPage() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-white font-medium">{activity.subject}</span>
+                        <span className="text-foreground font-medium">{activity.subject}</span>
                         <span className="text-xs text-slate-500">
                           {activity.created_at && formatDistanceToNow(activity.created_at)}
                         </span>
@@ -286,12 +286,12 @@ export default function OpportunityDetailPage() {
         <div className="space-y-6">
           {/* Details Card */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-lg font-medium text-white mb-4">Details</h2>
+            <h2 className="text-lg font-medium text-foreground mb-4">Details</h2>
             <dl className="space-y-4">
               {opportunity.expected_close_date && (
                 <div>
                   <dt className="text-xs text-slate-500">Expected Close</dt>
-                  <dd className="text-white mt-1 flex items-center gap-1">
+                  <dd className="text-foreground mt-1 flex items-center gap-1">
                     <Calendar className="w-4 h-4 text-slate-400" />
                     {formatDate(opportunity.expected_close_date, 'MMM d, yyyy')}
                   </dd>
@@ -300,7 +300,7 @@ export default function OpportunityDetailPage() {
               {opportunity.actual_close_date && (
                 <div>
                   <dt className="text-xs text-slate-500">Actual Close</dt>
-                  <dd className="text-white mt-1">
+                  <dd className="text-foreground mt-1">
                     {formatDate(opportunity.actual_close_date, 'MMM d, yyyy')}
                   </dd>
                 </div>
@@ -308,18 +308,18 @@ export default function OpportunityDetailPage() {
               {opportunity.source && (
                 <div>
                   <dt className="text-xs text-slate-500">Source</dt>
-                  <dd className="text-white mt-1">{opportunity.source}</dd>
+                  <dd className="text-foreground mt-1">{opportunity.source}</dd>
                 </div>
               )}
               {opportunity.campaign && (
                 <div>
                   <dt className="text-xs text-slate-500">Campaign</dt>
-                  <dd className="text-white mt-1">{opportunity.campaign}</dd>
+                  <dd className="text-foreground mt-1">{opportunity.campaign}</dd>
                 </div>
               )}
               <div>
                 <dt className="text-xs text-slate-500">Created</dt>
-                <dd className="text-white mt-1">
+                <dd className="text-foreground mt-1">
                   {opportunity.created_at && formatDate(opportunity.created_at, 'MMM d, yyyy')}
                 </dd>
               </div>
@@ -329,15 +329,15 @@ export default function OpportunityDetailPage() {
           {/* Contacts */}
           {contacts && contacts.items?.length > 0 && (
             <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-              <h2 className="text-lg font-medium text-white mb-4">Contacts</h2>
+              <h2 className="text-lg font-medium text-foreground mb-4">Contacts</h2>
               <div className="space-y-3">
                 {contacts.items.map((contact: Contact) => (
                   <div key={contact.id} className="flex items-center gap-3 p-2 bg-slate-700/30 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-white text-sm">
+                    <div className="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-foreground text-sm">
                       {contact.full_name?.charAt(0) || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{contact.full_name}</div>
+                      <div className="text-sm font-medium text-foreground truncate">{contact.full_name}</div>
                       {contact.designation && (
                         <div className="text-xs text-slate-400 truncate">{contact.designation}</div>
                       )}
@@ -353,14 +353,14 @@ export default function OpportunityDetailPage() {
 
           {/* Related Documents */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-lg font-medium text-white mb-4">Related</h2>
+            <h2 className="text-lg font-medium text-foreground mb-4">Related</h2>
             <div className="space-y-2">
               {opportunity.quotation_id && (
                 <Link
                   href={`/sales/quotations/${opportunity.quotation_id}`}
                   className="flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors"
                 >
-                  <span className="flex items-center gap-2 text-white">
+                  <span className="flex items-center gap-2 text-foreground">
                     <FileText className="w-4 h-4 text-amber-400" />
                     Quotation
                   </span>
@@ -372,7 +372,7 @@ export default function OpportunityDetailPage() {
                   href={`/sales/orders/${opportunity.sales_order_id}`}
                   className="flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors"
                 >
-                  <span className="flex items-center gap-2 text-white">
+                  <span className="flex items-center gap-2 text-foreground">
                     <ShoppingCart className="w-4 h-4 text-violet-400" />
                     Sales Order
                   </span>
@@ -396,28 +396,28 @@ export default function OpportunityDetailPage() {
 
           {/* Quick Actions */}
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-lg font-medium text-white mb-4">Quick Actions</h2>
+            <h2 className="text-lg font-medium text-foreground mb-4">Quick Actions</h2>
             <div className="space-y-2">
               <Link
                 href={`/sales/activities?opportunity_id=${oppId}&new=call`}
                 className="flex items-center gap-3 p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors"
               >
                 <Phone className="w-4 h-4 text-emerald-400" />
-                <span className="text-white">Log Call</span>
+                <span className="text-foreground">Log Call</span>
               </Link>
               <Link
                 href={`/sales/activities?opportunity_id=${oppId}&new=meeting`}
                 className="flex items-center gap-3 p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors"
               >
                 <Calendar className="w-4 h-4 text-blue-400" />
-                <span className="text-white">Schedule Meeting</span>
+                <span className="text-foreground">Schedule Meeting</span>
               </Link>
               <Link
                 href={`/sales/activities?opportunity_id=${oppId}&new=email`}
                 className="flex items-center gap-3 p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors"
               >
                 <Mail className="w-4 h-4 text-amber-400" />
-                <span className="text-white">Send Email</span>
+                <span className="text-foreground">Send Email</span>
               </Link>
             </div>
           </div>
@@ -428,26 +428,26 @@ export default function OpportunityDetailPage() {
       {showWonModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-white mb-4">Mark as Won</h3>
+            <h3 className="text-lg font-medium text-foreground mb-4">Mark as Won</h3>
             <div className="mb-4">
               <label className="block text-sm text-slate-400 mb-2">Close Date</label>
               <input
                 type="date"
                 value={actualCloseDate}
                 onChange={(e) => setActualCloseDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowWonModal(false)}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleMarkWon}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors"
               >
                 Mark as Won
               </button>
@@ -460,7 +460,7 @@ export default function OpportunityDetailPage() {
       {showLostModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-white mb-4">Mark as Lost</h3>
+            <h3 className="text-lg font-medium text-foreground mb-4">Mark as Lost</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-slate-400 mb-2">Lost Reason</label>
@@ -468,7 +468,7 @@ export default function OpportunityDetailPage() {
                   value={lostReason}
                   onChange={(e) => setLostReason(e.target.value)}
                   placeholder="Why was this opportunity lost?"
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
                   rows={3}
                 />
               </div>
@@ -479,20 +479,20 @@ export default function OpportunityDetailPage() {
                   value={competitor}
                   onChange={(e) => setCompetitor(e.target.value)}
                   placeholder="Who did we lose to?"
-                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                  className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowLostModal(false)}
-                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleMarkLost}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-foreground rounded-lg transition-colors"
               >
                 Mark as Lost
               </button>

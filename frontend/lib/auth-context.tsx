@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { hasAuthToken, clearAuthToken, setAuthToken, onAuthError } from './api';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
+import { ApiError, clearAuthToken, fetchApi, onAuthError, setAuthToken } from './api';
 
 // Scope definitions - maps to backend RBAC scopes
 export type Scope =
@@ -25,30 +25,62 @@ export type Scope =
   | 'accounting:write'
   | 'purchasing:read'
   | 'purchasing:write'
+  | 'payments:read'
+  | 'payments:write'
+  | 'openbanking:read'
+  | 'openbanking:write'
+  | 'gateway:read'
+  | 'gateway:write'
+  | 'inventory:read'
+  | 'inventory:write'
+  | 'sales:read'
+  | 'sales:write'
   | '*';
 
-const ALL_SCOPES: Scope[] = [
-  'customers:read',
-  'customers:write',
-  'contacts:read',
-  'contacts:write',
-  'analytics:read',
-  'sync:read',
-  'sync:write',
-  'explore:read',
-  'admin:read',
-  'admin:write',
-  'hr:read',
-  'hr:write',
-  'support:read',
-  'support:write',
-  'inbox:read',
-  'inbox:write',
-  'accounting:read',
-  'accounting:write',
-  'purchasing:read',
-  'purchasing:write',
-];
+/**
+ * Human-readable display names for permission scopes.
+ * Used in UI to show friendly names instead of raw scope strings.
+ */
+export const SCOPE_DISPLAY_NAMES: Record<string, string> = {
+  'customers:read': 'View Customers',
+  'customers:write': 'Manage Customers',
+  'contacts:read': 'View Contacts',
+  'contacts:write': 'Manage Contacts',
+  'analytics:read': 'View Analytics',
+  'sync:read': 'View Sync Status',
+  'sync:write': 'Manage Sync',
+  'explore:read': 'Data Explorer',
+  'admin:read': 'View Admin',
+  'admin:write': 'Manage Admin',
+  'hr:read': 'View HR',
+  'hr:write': 'Manage HR',
+  'support:read': 'View Support',
+  'support:write': 'Manage Support',
+  'inbox:read': 'View Inbox',
+  'inbox:write': 'Manage Inbox',
+  'accounting:read': 'View Accounting',
+  'accounting:write': 'Manage Accounting',
+  'purchasing:read': 'View Purchasing',
+  'purchasing:write': 'Manage Purchasing',
+  'payments:read': 'View Payments',
+  'payments:write': 'Manage Payments',
+  'openbanking:read': 'View Open Banking',
+  'openbanking:write': 'Manage Open Banking',
+  'gateway:read': 'View Payment Gateway',
+  'gateway:write': 'Manage Payment Gateway',
+  'inventory:read': 'View Inventory',
+  'inventory:write': 'Manage Inventory',
+  'sales:read': 'View Sales',
+  'sales:write': 'Manage Sales',
+  '*': 'Full Access',
+};
+
+/**
+ * Get human-readable display name for a scope
+ */
+export function getScopeDisplayName(scope: string): string {
+  return SCOPE_DISPLAY_NAMES[scope] || scope.replace(':', ': ').replace(/_/g, ' ');
+}
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -60,30 +92,15 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   hasScope: (scope: Scope) => boolean;
   hasAnyScope: (scopes: Scope[]) => boolean;
-  login: (token: string, scopes?: Scope[]) => void;
-  logout: () => void;
-  checkAuth: () => void;
+  login: (token: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Decode JWT to extract scopes (without verification - that's done server-side)
-function decodeJwtPayload(token: string): { scopes?: string[]; exp?: number } | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-// Check if token is expired
-function isTokenExpired(token: string): boolean {
-  const payload = decodeJwtPayload(token);
-  if (!payload?.exp) return false;
-  return Date.now() >= payload.exp * 1000;
+interface MeResponse {
+  permissions: string[];
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -93,65 +110,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     scopes: [],
     error: null,
   });
+  const devToken = process.env.NEXT_PUBLIC_DEV_TOKEN || '';
+  const canUseDevToken = devToken.length > 0 && process.env.NODE_ENV !== 'production';
+  const devAuthAttempted = useRef(false);
 
-  const checkAuth = useCallback(() => {
+  const checkAuth = useCallback(async () => {
     if (typeof window === 'undefined') {
       setState(prev => ({ ...prev, isLoading: false }));
       return;
     }
 
-    const token = localStorage.getItem('dotmac_access_token');
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-    if (!token) {
+    try {
+      const me = await fetchApi<MeResponse>('/admin/me');
+      const scopes = (me.permissions || []) as Scope[];
       setState({
-        isAuthenticated: false,
+        isAuthenticated: true,
         isLoading: false,
-        scopes: [],
+        scopes,
         error: null,
       });
-      return;
-    }
-
-    // Check token expiration
-    if (isTokenExpired(token)) {
-      clearAuthToken();
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      const isAuthError = apiError?.status === 401;
+      if (isAuthError && canUseDevToken && !devAuthAttempted.current) {
+        devAuthAttempted.current = true;
+        try {
+          await setAuthToken(devToken);
+          const me = await fetchApi<MeResponse>('/admin/me');
+          const scopes = (me.permissions || []) as Scope[];
+          setState({
+            isAuthenticated: true,
+            isLoading: false,
+            scopes,
+            error: null,
+          });
+          return;
+        } catch (authError) {
+          const message = authError instanceof Error ? authError.message : 'Dev auto-login failed';
+          setState({
+            isAuthenticated: false,
+            isLoading: false,
+            scopes: [],
+            error: message,
+          });
+          return;
+        }
+      }
       setState({
         isAuthenticated: false,
         isLoading: false,
         scopes: [],
-        error: 'Session expired',
+        error: isAuthError ? null : 'Unable to verify session',
       });
-      return;
     }
+  }, [canUseDevToken, devToken]);
 
-    // Decode token to get scopes
-    const payload = decodeJwtPayload(token);
-    const scopes = (payload?.scopes || []) as Scope[];
+  const login = useCallback(async (token: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    try {
+      await setAuthToken(token);
+      await checkAuth();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Authentication failed';
+      setState({
+        isAuthenticated: false,
+        isLoading: false,
+        scopes: [],
+        error: message,
+      });
+    }
+  }, [checkAuth]);
 
-    setState({
-      isAuthenticated: true,
-      isLoading: false,
-      scopes,
-      error: null,
-    });
-  }, []);
-
-  const login = useCallback((token: string, scopes?: Scope[]) => {
-    setAuthToken(token);
-
-    // If scopes not provided, try to decode from token
-    const tokenScopes = scopes || (decodeJwtPayload(token)?.scopes as Scope[]) || [];
-
-    setState({
-      isAuthenticated: true,
-      isLoading: false,
-      scopes: tokenScopes,
-      error: null,
-    });
-  }, []);
-
-  const logout = useCallback(() => {
-    clearAuthToken();
+  const logout = useCallback(async () => {
+    await clearAuthToken();
     setState({
       isAuthenticated: false,
       isLoading: false,
@@ -161,38 +194,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasScope = useCallback((scope: Scope): boolean => {
-    return state.scopes.includes(scope);
+    // Wildcard grants all permissions
+    if (state.scopes.includes('*' as Scope)) return true;
+    // Check for exact match
+    if (state.scopes.includes(scope)) return true;
+    // Check for module wildcard (e.g., 'admin:*' matches 'admin:read')
+    const [module] = scope.split(':');
+    if (state.scopes.includes(`${module}:*` as Scope)) return true;
+    return false;
   }, [state.scopes]);
 
   const hasAnyScope = useCallback((scopes: Scope[]): boolean => {
-    return scopes.some(scope => state.scopes.includes(scope));
-  }, [state.scopes]);
+    return scopes.some(scope => hasScope(scope));
+  }, [hasScope]);
 
   // Initial auth check
   useEffect(() => {
-    checkAuth();
+    void checkAuth();
   }, [checkAuth]);
 
   // Listen for auth errors
   useEffect(() => {
     const unsubscribe = onAuthError((event) => {
       if (event === 'unauthorized' || event === 'token_expired') {
-        logout();
+        void logout();
       }
     });
     return unsubscribe;
   }, [logout]);
-
-  // Listen for storage changes (cross-tab sync)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'dotmac_access_token') {
-        checkAuth();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [checkAuth]);
 
   return (
     <AuthContext.Provider

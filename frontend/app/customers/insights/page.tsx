@@ -118,7 +118,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
               activeTab === tab.key
                 ? 'bg-teal-electric/20 text-teal-electric border-b-2 border-teal-electric'
-                : 'text-slate-muted hover:text-white'
+                : 'text-slate-muted hover:text-foreground'
             }`}
           >
             {tab.label}
@@ -144,7 +144,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   segmentsView === view.key
                     ? 'bg-teal-electric text-slate-deep'
-                    : 'bg-slate-elevated text-slate-muted hover:text-white'
+                    : 'bg-slate-elevated text-slate-muted hover:text-foreground'
                 }`}
               >
                 {view.label}
@@ -169,7 +169,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                   <div key={`${label}-${index}`} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between gap-3">
-                        <span className="text-sm font-medium text-white truncate">
+                        <span className="text-sm font-medium text-foreground truncate">
                           {label}
                         </span>
                         <div className="flex items-center gap-3 text-sm text-slate-muted">
@@ -244,7 +244,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-slate-muted mb-1">Customers with tickets (30d)</p>
-                <p className="text-2xl font-mono text-white">
+                <p className="text-2xl font-mono text-foreground">
                   {healthData?.support_intensity.customers_with_tickets_30d || 0}
                 </p>
               </div>
@@ -320,7 +320,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                 {Object.entries(completenessData.system_linkage).map(([key, value]: [string, { percent?: number; count?: number }]) => (
                   <div key={key} className="bg-slate-elevated rounded-lg p-3">
                     <div className="text-xs uppercase text-slate-muted mb-1">{key.replace(/_/g, ' ')}</div>
-                    <div className="text-white text-lg font-mono">{(value.percent ?? 0).toFixed(1)}%</div>
+                    <div className="text-foreground text-lg font-mono">{(value.percent ?? 0).toFixed(1)}%</div>
                     <div className="text-xs text-slate-muted">{(value.count ?? 0).toLocaleString()} linked</div>
                   </div>
                 ))}
@@ -335,7 +335,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                     <span className="text-teal-electric mt-0.5 capitalize">{rec.priority}</span>
                     <div className="flex-1">
-                      <div className="text-white font-medium">{rec.field}</div>
+                      <div className="text-foreground font-medium">{rec.field}</div>
                       <div>{rec.issue}</div>
                       <div className="text-xs text-slate-muted mt-0.5">{rec.action}</div>
                     </div>
@@ -355,7 +355,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
             <select
               value={planMonths}
               onChange={(e) => setPlanMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
             >
               <option value={3}>Last 3 months</option>
               <option value={6}>Last 6 months</option>
@@ -402,7 +402,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                   </div>
                   <div>
                     <p className="text-sm text-slate-muted">Net MRR Change</p>
-                    <p className="text-2xl font-mono text-white">
+                    <p className="text-2xl font-mono text-foreground">
                       {formatCurrency(planChangesData.revenue_impact.net_mrr_change, 'NGN')}
                     </p>
                   </div>
@@ -420,7 +420,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                     {planChangesData.common_transitions.map((t, i: number) => (
                       <div key={`${t.transition}-${i}`} className="flex items-center justify-between py-2 border-b border-slate-border last:border-0">
                         <div>
-                          <p className="text-white text-sm font-medium">{t.transition}</p>
+                          <p className="text-foreground text-sm font-medium">{t.transition}</p>
                           <p className="text-xs text-slate-muted capitalize">{t.type}</p>
                         </div>
                         <span className="text-sm text-slate-muted">{t.count} customers</span>
@@ -448,11 +448,11 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                       <tbody className="divide-y divide-slate-border">
                         {planChangesData.recent_changes.map((change: CustomerPlanChange) => (
                           <tr key={`${change.customer_id}-${change.date}`} className="hover:bg-slate-elevated/50">
-                            <td className="px-4 py-3 text-white font-medium">{change.customer_id}</td>
+                            <td className="px-4 py-3 text-foreground font-medium">{change.customer_id}</td>
                             <td className="px-4 py-3 text-slate-muted text-sm">
                               {change.from_plan} → {change.to_plan}
                             </td>
-                            <td className="px-4 py-3 text-right text-sm font-mono text-white">
+                            <td className="px-4 py-3 text-right text-sm font-mono text-foreground">
                               {formatCurrency(change.price_change, 'NGN')}
                             </td>
                             <td className="px-4 py-3 text-xs text-slate-muted capitalize">{change.change_type}</td>

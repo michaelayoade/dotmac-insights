@@ -19,7 +19,7 @@ export default function AssignedPage() {
             <User className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">My Assigned</h1>
+            <h1 className="text-2xl font-bold text-foreground">My Assigned</h1>
             <p className="text-slate-muted text-sm">Conversations assigned to you</p>
           </div>
         </div>
@@ -39,14 +39,14 @@ export default function AssignedPage() {
             )}
           >
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-white font-semibold">
+              <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-foreground font-semibold">
                 {conv.contact.charAt(0)}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">{conv.contact}</span>
+                  <span className="font-semibold text-foreground">{conv.contact}</span>
                   {conv.unread > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-white">
+                    <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-foreground">
                       {conv.unread}
                     </span>
                   )}

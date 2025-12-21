@@ -56,14 +56,14 @@ export default function NewSupplierPage() {
       <div className="flex items-center gap-3">
         <Link
           href="/books/suppliers"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Suppliers</p>
-          <h1 className="text-xl font-semibold text-white">New Supplier</h1>
+          <h1 className="text-xl font-semibold text-foreground">New Supplier</h1>
         </div>
       </div>
 
@@ -91,7 +91,7 @@ export default function NewSupplierPage() {
                 value={form.supplier_name}
                 onChange={handleChange}
                 required
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -101,7 +101,7 @@ export default function NewSupplierPage() {
                 value={form.supplier_code || ''}
                 onChange={handleChange}
                 placeholder="Auto-generated if empty"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -110,7 +110,7 @@ export default function NewSupplierPage() {
                 name="supplier_type"
                 value={form.supplier_type || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 {SUPPLIER_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -124,7 +124,7 @@ export default function NewSupplierPage() {
                 value={form.supplier_group || ''}
                 onChange={handleChange}
                 placeholder="e.g., Services, Materials"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function NewSupplierPage() {
                 type="email"
                 value={form.email || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -149,7 +149,7 @@ export default function NewSupplierPage() {
                 name="phone"
                 value={form.phone || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -158,7 +158,7 @@ export default function NewSupplierPage() {
                 name="country"
                 value={form.country || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -168,7 +168,7 @@ export default function NewSupplierPage() {
                 value={form.tax_id || ''}
                 onChange={handleChange}
                 placeholder="TIN / VAT Number"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -185,7 +185,7 @@ export default function NewSupplierPage() {
                 onChange={handleChange}
                 placeholder="NGN"
                 maxLength={3}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -195,7 +195,7 @@ export default function NewSupplierPage() {
                 value={form.payment_terms || ''}
                 onChange={handleChange}
                 placeholder="e.g., Net 30"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function NewSupplierPage() {
           </button>
           <Link
             href="/books/suppliers"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Cancel
           </Link>

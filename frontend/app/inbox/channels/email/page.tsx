@@ -18,11 +18,11 @@ export default function EmailChannelPage() {
             <Mail className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Email Channel</h1>
+            <h1 className="text-2xl font-bold text-foreground">Email Channel</h1>
             <p className="text-slate-muted text-sm">Connect and manage email accounts</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Plus className="w-4 h-4" />
           Connect Account
         </button>
@@ -32,7 +32,7 @@ export default function EmailChannelPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Connected Accounts</p>
-          <p className="text-2xl font-bold text-white">{EMAIL_ACCOUNTS.filter((a) => a.status === 'connected').length}</p>
+          <p className="text-2xl font-bold text-foreground">{EMAIL_ACCOUNTS.filter((a) => a.status === 'connected').length}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Emails Today</p>
@@ -51,7 +51,7 @@ export default function EmailChannelPage() {
       {/* Account list */}
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-slate-border">
-          <h2 className="text-white font-semibold">Connected Accounts</h2>
+          <h2 className="text-foreground font-semibold">Connected Accounts</h2>
         </div>
         {EMAIL_ACCOUNTS.map((account) => (
           <div key={account.id} className="flex items-center justify-between p-4 border-b border-slate-border/50 last:border-0">
@@ -60,7 +60,7 @@ export default function EmailChannelPage() {
                 <Mail className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-white font-medium">{account.name}</p>
+                <p className="text-foreground font-medium">{account.name}</p>
                 <p className="text-sm text-slate-muted">{account.email}</p>
               </div>
             </div>
@@ -75,10 +75,10 @@ export default function EmailChannelPage() {
                 <p className="text-xs text-slate-muted mt-1">{account.lastSync}</p>
               </div>
               <div className="flex items-center gap-1">
-                <button className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors" title="Sync now">
+                <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Sync now">
                   <RefreshCw className="w-4 h-4" />
                 </button>
-                <button className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors" title="Settings">
+                <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Settings">
                   <Settings className="w-4 h-4" />
                 </button>
                 <button className="p-2 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors" title="Remove">
@@ -92,34 +92,34 @@ export default function EmailChannelPage() {
 
       {/* Setup guide */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="text-white font-semibold mb-4">Supported Providers</h3>
+        <h3 className="text-foreground font-semibold mb-4">Supported Providers</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="p-4 rounded-lg border border-slate-border hover:border-blue-500/50 transition-colors text-center cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-red-500/10 mx-auto mb-2 flex items-center justify-center">
               <Mail className="w-5 h-5 text-red-400" />
             </div>
-            <p className="text-white text-sm font-medium">Gmail</p>
+            <p className="text-foreground text-sm font-medium">Gmail</p>
             <p className="text-xs text-slate-muted">OAuth 2.0</p>
           </div>
           <div className="p-4 rounded-lg border border-slate-border hover:border-blue-500/50 transition-colors text-center cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-blue-500/10 mx-auto mb-2 flex items-center justify-center">
               <Mail className="w-5 h-5 text-blue-400" />
             </div>
-            <p className="text-white text-sm font-medium">Outlook</p>
+            <p className="text-foreground text-sm font-medium">Outlook</p>
             <p className="text-xs text-slate-muted">Microsoft 365</p>
           </div>
           <div className="p-4 rounded-lg border border-slate-border hover:border-blue-500/50 transition-colors text-center cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-slate-500/10 mx-auto mb-2 flex items-center justify-center">
               <Mail className="w-5 h-5 text-slate-400" />
             </div>
-            <p className="text-white text-sm font-medium">IMAP/SMTP</p>
+            <p className="text-foreground text-sm font-medium">IMAP/SMTP</p>
             <p className="text-xs text-slate-muted">Custom server</p>
           </div>
           <div className="p-4 rounded-lg border border-slate-border hover:border-blue-500/50 transition-colors text-center cursor-pointer">
             <div className="w-10 h-10 rounded-lg bg-violet-500/10 mx-auto mb-2 flex items-center justify-center">
               <Mail className="w-5 h-5 text-violet-400" />
             </div>
-            <p className="text-white text-sm font-medium">Yahoo Mail</p>
+            <p className="text-foreground text-sm font-medium">Yahoo Mail</p>
             <p className="text-xs text-slate-muted">OAuth 2.0</p>
           </div>
         </div>

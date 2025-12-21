@@ -33,7 +33,7 @@ export default function ReorderPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Reorder Alerts</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Reorder Alerts</h1>
         <p className="text-slate-muted text-sm">Items below reorder level that need restocking</p>
       </div>
 
@@ -45,7 +45,7 @@ export default function ReorderPage() {
               <AlertTriangle className="w-5 h-5 text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {alerts.filter((a: any) => (a.current_stock ?? 0) <= (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Critical (below safety stock)</p>
@@ -58,7 +58,7 @@ export default function ReorderPage() {
               <TrendingDown className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {alerts.filter((a: any) => (a.current_stock ?? 0) > (a.safety_stock ?? 0)).length}
               </p>
               <p className="text-xs text-slate-muted">Low (below reorder level)</p>
@@ -71,7 +71,7 @@ export default function ReorderPage() {
               <Package className="w-5 h-5 text-slate-muted" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{alerts.length}</p>
+              <p className="text-2xl font-bold text-foreground">{alerts.length}</p>
               <p className="text-xs text-slate-muted">Total items needing reorder</p>
             </div>
           </div>
@@ -96,7 +96,7 @@ export default function ReorderPage() {
         {!isLoading && !error && alerts.length === 0 && (
           <div className="text-center py-12">
             <Bell className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-            <p className="text-white font-medium">All stock levels are healthy!</p>
+            <p className="text-foreground font-medium">All stock levels are healthy!</p>
             <p className="text-slate-muted text-sm mt-1">No items are below their reorder level</p>
           </div>
         )}
@@ -140,7 +140,7 @@ export default function ReorderPage() {
                           {alert.item_group || "All"}
                         </div>
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(alert.current_stock ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-right font-mono text-slate-muted">
@@ -149,7 +149,7 @@ export default function ReorderPage() {
                       <td className="py-3 text-right font-mono text-slate-muted">
                         {(alert.safety_stock ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(alert.reorder_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3">
@@ -177,7 +177,7 @@ export default function ReorderPage() {
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+        <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
           <Bell className="w-4 h-4 text-amber-400" />
           How reorder alerts work
         </h3>

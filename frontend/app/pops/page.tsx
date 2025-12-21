@@ -30,7 +30,7 @@ export default function POPsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="font-display text-3xl font-bold text-white">POP Performance</h1>
+        <h1 className="font-display text-3xl font-bold text-foreground">POP Performance</h1>
         <p className="text-slate-muted mt-1">
           Network locations and their key metrics
         </p>
@@ -132,7 +132,7 @@ export default function POPsPage() {
                   <MapPin className="w-5 h-5 text-teal-electric" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-white">{pop.name}</h4>
+                  <h4 className="font-semibold text-foreground">{pop.name}</h4>
                   {pop.city && (
                     <p className="text-slate-muted text-xs">{pop.city}</p>
                   )}
@@ -146,7 +146,7 @@ export default function POPsPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-muted">Customers</span>
-                  <span className="font-mono text-white">{pop.active_customers}</span>
+                  <span className="font-mono text-foreground">{pop.active_customers}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-muted">Churn</span>
@@ -181,7 +181,7 @@ export default function POPsPage() {
                     <Radio className="w-4 h-4 text-teal-electric" />
                   </div>
                   <div>
-                    <p className="text-white font-medium font-body">{item.name as string}</p>
+                    <p className="text-foreground font-medium font-body">{item.name as string}</p>
                     <p className="text-slate-muted text-xs">{String(item.city || item.code || '—')}</p>
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default function POPsPage() {
               align: 'right',
               render: (item) => (
                 <div className="text-right">
-                  <p className="text-white font-mono">{String(item.active_customers)}</p>
+                  <p className="text-foreground font-mono">{String(item.active_customers)}</p>
                   <p className="text-slate-muted text-xs">{String(item.total_customers)} total</p>
                 </div>
               ),

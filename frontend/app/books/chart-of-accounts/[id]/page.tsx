@@ -121,7 +121,7 @@ export default function AccountDetailPage() {
         <p className="text-red-400">Failed to load account</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -140,14 +140,14 @@ export default function AccountDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/chart-of-accounts"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to chart
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Account</p>
-            <h1 className="text-xl font-semibold text-white">{acct.name || acct.account_name || `Account #${acct.id}`}</h1>
+            <h1 className="text-xl font-semibold text-foreground">{acct.name || acct.account_name || `Account #${acct.id}`}</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export default function AccountDetailPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-white text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Save
@@ -203,7 +203,7 @@ export default function AccountDetailPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleDelete}
-                className="px-3 py-1.5 rounded-lg bg-coral-alert text-white text-sm font-medium hover:bg-coral-alert/80"
+                className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
               >
                 Yes, Delete
               </button>
@@ -242,7 +242,7 @@ export default function AccountDetailPage() {
                 name="account_name"
                 value={form.account_name || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -251,7 +251,7 @@ export default function AccountDetailPage() {
                 name="account_number"
                 value={form.account_number || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -260,7 +260,7 @@ export default function AccountDetailPage() {
                 name="root_type"
                 value={form.root_type || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 {ROOT_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -273,7 +273,7 @@ export default function AccountDetailPage() {
                 name="account_type"
                 value={form.account_type || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -282,7 +282,7 @@ export default function AccountDetailPage() {
                 name="parent_account"
                 value={form.parent_account || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1">
@@ -291,7 +291,7 @@ export default function AccountDetailPage() {
                 name="currency"
                 value={form.currency || ''}
                 onChange={handleChange}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="flex items-center gap-2 pt-6">
@@ -309,35 +309,35 @@ export default function AccountDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Account</p>
-              <p className="text-white font-semibold">{acct.name || acct.account_name || `Account #${acct.id}`}</p>
+              <p className="text-foreground font-semibold">{acct.name || acct.account_name || `Account #${acct.id}`}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Type</p>
-              <p className={cn('text-white font-semibold capitalize')}>{data.account_type || data.root_type || '—'}</p>
+              <p className={cn('text-foreground font-semibold capitalize')}>{data.account_type || data.root_type || '—'}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Currency</p>
-              <p className="text-white font-semibold">{data.currency || 'NGN'}</p>
+              <p className="text-foreground font-semibold">{data.currency || 'NGN'}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Balance</p>
-              <p className="text-white font-semibold">{formatCurrency(acct.balance ?? acct.debit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(acct.balance ?? acct.debit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Debit</p>
-              <p className="text-white font-semibold">{formatCurrency(acct.debit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(acct.debit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Credit</p>
-              <p className="text-white font-semibold">{formatCurrency(acct.credit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatCurrency(acct.credit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Parent</p>
-              <p className="text-white font-semibold">{data.parent_account || '—'}</p>
+              <p className="text-foreground font-semibold">{data.parent_account || '—'}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Company</p>
-              <p className="text-white font-semibold">{acct.company || '—'}</p>
+              <p className="text-foreground font-semibold">{acct.company || '—'}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Status</p>
@@ -357,7 +357,7 @@ export default function AccountDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Recent Ledger Entries</h3>
+            <h3 className="text-foreground font-semibold">Recent Ledger Entries</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -375,7 +375,7 @@ export default function AccountDetailPage() {
                 {ledger.map((entry: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
                     <td className="px-2 py-2 text-slate-200">{formatDate(entry.posting_date)}</td>
-                    <td className="px-2 py-2 text-white font-mono flex items-center gap-2">
+                    <td className="px-2 py-2 text-foreground font-mono flex items-center gap-2">
                       {entry.voucher_type && <FileText className="w-3 h-3 text-slate-muted" />}
                       <span>{entry.voucher_type || ''} {entry.voucher_no || ''}</span>
                     </td>

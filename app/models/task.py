@@ -12,6 +12,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.expense import Expense
+    from app.models.employee import Employee
 
 
 # ============= TASK STATUS =============
@@ -65,9 +66,17 @@ class Task(Base):
     status: Mapped[TaskStatus] = mapped_column(default=TaskStatus.OPEN, index=True)
     priority: Mapped[TaskPriority] = mapped_column(default=TaskPriority.MEDIUM, index=True)
 
-    # Assignment
+    # Assignment (TEXT fields for ERPNext sync)
     assigned_to: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     completed_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Assignment FKs (for local queries)
+    assigned_to_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employees.id"), nullable=True, index=True
+    )
+    completed_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employees.id"), nullable=True, index=True
+    )
 
     # Progress tracking
     progress: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))  # 0-100%
@@ -132,6 +141,18 @@ class Task(Base):
         foreign_keys="TaskDependency.dependent_task_id"
     )
     expenses: Mapped[List["Expense"]] = relationship(back_populates="task_rel")
+
+    # Employee relationships
+    assigned_employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        foreign_keys=[assigned_to_id],
+        backref="assigned_tasks"
+    )
+    completed_by_employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        foreign_keys=[completed_by_id],
+        backref="completed_tasks"
+    )
 
     def __repr__(self) -> str:
         return f"<Task {self.subject} ({self.status.value})>"

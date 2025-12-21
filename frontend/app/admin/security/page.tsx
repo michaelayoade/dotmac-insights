@@ -48,7 +48,7 @@ function MetricCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-3xl font-bold text-white mt-1">{value}</p>
+          <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
         </div>
         <div
           className={cn(
@@ -126,7 +126,7 @@ function QuickActionCard({
           />
         </div>
         <div className="flex-1">
-          <h3 className="text-white font-semibold flex items-center gap-2">
+          <h3 className="text-foreground font-semibold flex items-center gap-2">
             {title}
             <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-muted" />
           </h3>
@@ -180,7 +180,7 @@ export default function SecurityPage() {
             <ShieldCheck className="w-6 h-6 text-slate-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Security & Controls</h1>
+            <h1 className="text-2xl font-bold text-foreground">Security & Controls</h1>
             <p className="text-slate-muted text-sm">
               Access management, audit trails, and data protections
             </p>
@@ -189,7 +189,7 @@ export default function SecurityPage() {
         <button
           onClick={() => refetchRoles()}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors self-start"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors self-start"
         >
           <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
           Refresh
@@ -200,7 +200,7 @@ export default function SecurityPage() {
       <div className="bg-gradient-to-br from-slate-card via-slate-card to-slate-elevated/50 border border-slate-border rounded-2xl p-6">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="w-5 h-5 text-teal-electric" />
-          <h2 className="text-lg font-semibold text-white">Security Overview</h2>
+          <h2 className="text-lg font-semibold text-foreground">Security Overview</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
@@ -234,7 +234,7 @@ export default function SecurityPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-white mb-4">Access Management</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Access Management</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionCard
             title="Roles & Permissions"
@@ -274,7 +274,7 @@ export default function SecurityPage() {
           <div className="px-5 py-4 border-b border-slate-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-teal-electric" />
-              <h3 className="font-semibold text-white">Roles</h3>
+              <h3 className="font-semibold text-foreground">Roles</h3>
             </div>
             <Link
               href="/admin/roles"
@@ -328,7 +328,7 @@ export default function SecurityPage() {
                       />
                     </div>
                     <div>
-                      <p className="text-white font-medium text-sm flex items-center gap-2">
+                      <p className="text-foreground font-medium text-sm flex items-center gap-2">
                         {role.name}
                         {role.is_system && (
                           <span className="px-1.5 py-0.5 rounded bg-slate-elevated text-slate-muted text-[10px]">
@@ -342,7 +342,7 @@ export default function SecurityPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-mono text-sm">{role.user_count}</p>
+                    <p className="text-foreground font-mono text-sm">{role.user_count}</p>
                     <p className="text-slate-muted text-xs">users</p>
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export default function SecurityPage() {
           <div className="px-5 py-4 border-b border-slate-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <History className="w-5 h-5 text-amber-400" />
-              <h3 className="font-semibold text-white">Recent Activity</h3>
+              <h3 className="font-semibold text-foreground">Recent Activity</h3>
             </div>
             <Link
               href="/admin/settings/audit"
@@ -413,7 +413,7 @@ export default function SecurityPage() {
                       )}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm">
+                      <p className="text-foreground text-sm">
                         <span
                           className={cn(
                             'font-medium capitalize',
@@ -447,13 +447,13 @@ export default function SecurityPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Lock className="w-5 h-5 text-slate-400" />
-          <h3 className="font-semibold text-white">Security Best Practices</h3>
+          <h3 className="font-semibold text-foreground">Security Best Practices</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-elevated/50">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5" />
             <div>
-              <p className="text-white text-sm font-medium">Role-Based Access</p>
+              <p className="text-foreground text-sm font-medium">Role-Based Access</p>
               <p className="text-slate-muted text-xs">
                 Assign permissions through roles, not directly to users
               </p>
@@ -462,7 +462,7 @@ export default function SecurityPage() {
           <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-elevated/50">
             <Eye className="w-5 h-5 text-blue-400 mt-0.5" />
             <div>
-              <p className="text-white text-sm font-medium">Monitor Audit Logs</p>
+              <p className="text-foreground text-sm font-medium">Monitor Audit Logs</p>
               <p className="text-slate-muted text-xs">
                 Review configuration changes regularly for anomalies
               </p>
@@ -471,7 +471,7 @@ export default function SecurityPage() {
           <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-elevated/50">
             <Key className="w-5 h-5 text-amber-400 mt-0.5" />
             <div>
-              <p className="text-white text-sm font-medium">Least Privilege</p>
+              <p className="text-foreground text-sm font-medium">Least Privilege</p>
               <p className="text-slate-muted text-xs">
                 Grant only the minimum permissions needed for each role
               </p>

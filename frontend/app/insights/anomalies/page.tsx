@@ -52,7 +52,7 @@ export default function AnomaliesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-card rounded-lg border border-slate-border p-4">
           <div className="text-sm text-slate-muted">Total Issues</div>
-          <div className="text-2xl font-bold text-white">{data?.summary.total_issues || 0}</div>
+          <div className="text-2xl font-bold text-foreground">{data?.summary.total_issues || 0}</div>
         </div>
         <div className="bg-slate-card rounded-lg border border-coral-alert/30 p-4">
           <div className="text-sm text-slate-muted">Critical</div>

@@ -51,7 +51,7 @@ export default function SalesQuotationDetailPage() {
         <p className="text-red-400">Failed to load quotation</p>
         <button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -88,14 +88,14 @@ export default function SalesQuotationDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/quotations"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to quotations
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Sales Quotation</p>
-            <h1 className="text-xl font-semibold text-white">
+            <h1 className="text-xl font-semibold text-foreground">
               {data.quotation_number || data.erpnext_id || `Quote #${data.id}`}
             </h1>
           </div>
@@ -115,7 +115,7 @@ export default function SalesQuotationDetailPage() {
         {summary.map((row) => (
           <div key={row.label}>
             <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">{row.label}</p>
-            <p className={cn('text-white font-semibold break-all', row.label === 'Status' && 'capitalize')}>
+            <p className={cn('text-foreground font-semibold break-all', row.label === 'Status' && 'capitalize')}>
               {row.value}
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function SalesQuotationDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <StickyNote className="w-4 h-4 text-teal-electric" />
-            <h3 className="text-white font-semibold">Items</h3>
+            <h3 className="text-foreground font-semibold">Items</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -142,11 +142,11 @@ export default function SalesQuotationDetailPage() {
               <tbody>
                 {items.map((item: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-white font-mono">{item.item_code || '-'}</td>
+                    <td className="px-2 py-2 text-foreground font-mono">{item.item_code || '-'}</td>
                     <td className="px-2 py-2 text-slate-200">{item.item_name || item.description || '-'}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.qty ?? item.stock_qty ?? 0}</td>
                     <td className="px-2 py-2 text-right text-slate-200">{item.rate ?? item.price_list_rate ?? 0}</td>
-                    <td className="px-2 py-2 text-right text-white font-mono">{item.amount ?? item.net_amount ?? 0}</td>
+                    <td className="px-2 py-2 text-right text-foreground font-mono">{item.amount ?? item.net_amount ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

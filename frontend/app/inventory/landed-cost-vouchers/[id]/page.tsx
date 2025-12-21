@@ -28,13 +28,13 @@ export default function LandedCostVoucherDetailPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/inventory/landed-cost-vouchers"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
           <Boxes className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Voucher {id}</h1>
+          <h1 className="text-xl font-semibold text-foreground">Voucher {id}</h1>
         </div>
         {data?.status === 'draft' ? (
           <button
@@ -98,7 +98,7 @@ function Info({ label, value }: { label: string; value: any }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-[0.08em] text-slate-muted">{label}</p>
-      <p className="text-white font-semibold">{value}</p>
+      <p className="text-foreground font-semibold">{value}</p>
     </div>
   );
 }

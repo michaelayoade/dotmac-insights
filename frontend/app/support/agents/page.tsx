@@ -132,7 +132,7 @@ export default function SupportAgentsPage() {
             <Users className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Agents</h1>
+            <h1 className="text-2xl font-bold text-foreground">Agents</h1>
             <p className="text-slate-muted text-sm">Manage support agents, capacity, and status</p>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function SupportAgentsPage() {
         <form onSubmit={handleSubmit} className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Plus className="w-4 h-4 text-teal-electric" />
-            <span className="text-white font-semibold">Add New Agent</span>
+            <span className="text-foreground font-semibold">Add New Agent</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
@@ -183,7 +183,7 @@ export default function SupportAgentsPage() {
                 value={form.display_name}
                 onChange={(e) => setForm({ ...form, display_name: e.target.value })}
                 placeholder="John Doe"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1.5">
@@ -193,7 +193,7 @@ export default function SupportAgentsPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="john@example.com"
                 type="email"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1.5">
@@ -202,7 +202,7 @@ export default function SupportAgentsPage() {
                 value={form.employee_id}
                 onChange={(e) => setForm({ ...form, employee_id: e.target.value })}
                 placeholder="123"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
             <div className="space-y-1.5">
@@ -212,7 +212,7 @@ export default function SupportAgentsPage() {
                 onChange={(e) => setForm({ ...form, capacity: e.target.value })}
                 placeholder="10"
                 type="number"
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               />
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function SupportAgentsPage() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white text-sm"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground text-sm"
               >
                 Cancel
               </button>
@@ -250,7 +250,7 @@ export default function SupportAgentsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-3">
           <div className="relative flex-1 min-w-[200px]">
@@ -260,13 +260,13 @@ export default function SupportAgentsPage() {
               placeholder="Search by name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="all">All Status</option>
             <option value="active">Active Only</option>
@@ -280,7 +280,7 @@ export default function SupportAgentsPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-cyan-400" />
-            <h3 className="text-white font-semibold">Agents</h3>
+            <h3 className="text-foreground font-semibold">Agents</h3>
           </div>
           <span className="text-xs text-slate-muted">{filteredAgents.length} agents</span>
         </div>
@@ -310,7 +310,7 @@ export default function SupportAgentsPage() {
                         <User className="w-5 h-5 text-cyan-400" />
                       </div>
                       <div>
-                        <p className="text-white font-semibold">{agent.display_name || agent.email || 'Agent'}</p>
+                        <p className="text-foreground font-semibold">{agent.display_name || agent.email || 'Agent'}</p>
                         <p className="text-slate-muted text-xs">{agent.email || 'No email'}</p>
                       </div>
                     </div>
@@ -330,7 +330,7 @@ export default function SupportAgentsPage() {
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-muted">Capacity</span>
-                      <span className="text-white font-mono">
+                      <span className="text-foreground font-mono">
                         {agent.capacity ?? '-'} tickets
                       </span>
                     </div>
@@ -348,7 +348,7 @@ export default function SupportAgentsPage() {
                     <button
                       onClick={() => updateAgent(agent.id, { is_active: !agent.is_active })}
                       disabled={!canWrite}
-                      className="px-3 py-1.5 rounded-lg border border-slate-border text-xs text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 rounded-lg border border-slate-border text-xs text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {agent.is_active ? 'Deactivate' : 'Activate'}
                     </button>

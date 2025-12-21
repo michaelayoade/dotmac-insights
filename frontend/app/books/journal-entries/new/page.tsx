@@ -134,14 +134,14 @@ export default function NewJournalEntryPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/journal-entries"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to journal entries
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">New Journal Entry</p>
-            <h1 className="text-xl font-semibold text-white">Record Journal Entry</h1>
+            <h1 className="text-xl font-semibold text-foreground">Record Journal Entry</h1>
           </div>
         </div>
       </div>
@@ -159,13 +159,13 @@ export default function NewJournalEntryPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white font-semibold">Lines</p>
+              <p className="text-sm text-foreground font-semibold">Lines</p>
               <p className="text-xs text-slate-muted">Accounts must balance (debits = credits)</p>
             </div>
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-white hover:bg-slate-elevated"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-foreground hover:bg-slate-elevated"
             >
               <Plus className="w-4 h-4" />
               Add line
@@ -231,7 +231,7 @@ export default function NewJournalEntryPage() {
 
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
           <div className="space-y-2">
-            <p className="text-sm text-white font-semibold">Summary</p>
+            <p className="text-sm text-foreground font-semibold">Summary</p>
             <p className="text-xs text-slate-muted">Debits must equal credits before posting.</p>
           </div>
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-2">
@@ -257,7 +257,7 @@ export default function NewJournalEntryPage() {
         <div className="flex justify-end gap-3">
           <Link
             href="/books/journal-entries"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Cancel
           </Link>
@@ -295,7 +295,7 @@ function TotalRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-slate-muted">{label}</span>
-      <span className="font-mono text-white">{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      <span className="font-mono text-foreground">{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
     </div>
   );
 }

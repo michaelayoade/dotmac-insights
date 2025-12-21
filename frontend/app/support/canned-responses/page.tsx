@@ -103,7 +103,7 @@ export default function SupportCannedResponsesPage() {
           <MessageCircle className="w-5 h-5 text-violet-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white">Canned Responses</h1>
+          <h1 className="text-2xl font-bold text-foreground">Canned Responses</h1>
           <p className="text-slate-muted text-sm">Shortcodes, templates, and quick replies</p>
         </div>
       </div>
@@ -130,7 +130,7 @@ export default function SupportCannedResponsesPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
@@ -141,14 +141,14 @@ export default function SupportCannedResponsesPage() {
               placeholder="Search responses..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
           {/* Scope */}
           <select
             value={scope}
             onChange={(e) => setScope(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All scopes</option>
             <option value="personal">Personal</option>
@@ -159,7 +159,7 @@ export default function SupportCannedResponsesPage() {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All categories</option>
             {(categoryList ?? []).map((cat: any) => (
@@ -174,7 +174,7 @@ export default function SupportCannedResponsesPage() {
                 setScope('');
                 setCategory('');
               }}
-              className="px-3 py-2 text-sm text-slate-muted hover:text-white border border-slate-border rounded-lg hover:bg-slate-elevated transition-colors"
+              className="px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:bg-slate-elevated transition-colors"
             >
               Clear filters
             </button>
@@ -187,7 +187,7 @@ export default function SupportCannedResponsesPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-violet-400" />
-            <h3 className="text-white font-semibold">Responses</h3>
+            <h3 className="text-foreground font-semibold">Responses</h3>
           </div>
           <span className="text-xs text-slate-muted">{(list ?? []).length} responses</span>
         </div>
@@ -209,7 +209,7 @@ export default function SupportCannedResponsesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-semibold">{resp.name}</p>
+                        <p className="text-foreground font-semibold">{resp.name}</p>
                         {resp.shortcode && (
                           <button
                             onClick={() => copyToClipboard(resp.shortcode)}

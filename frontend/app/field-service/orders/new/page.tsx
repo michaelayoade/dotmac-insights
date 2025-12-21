@@ -183,12 +183,12 @@ export default function NewServiceOrderPage() {
       <div className="mb-6">
         <Link
           href="/field-service/orders"
-          className="inline-flex items-center gap-1 text-slate-muted hover:text-white text-sm mb-2 transition-colors"
+          className="inline-flex items-center gap-1 text-slate-muted hover:text-foreground text-sm mb-2 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to orders
         </Link>
-        <h2 className="text-xl font-semibold text-white">New Service Order</h2>
+        <h2 className="text-xl font-semibold text-foreground">New Service Order</h2>
         <p className="text-sm text-slate-muted">Create a new field service order</p>
       </div>
 
@@ -202,7 +202,7 @@ export default function NewServiceOrderPage() {
       <form onSubmit={(e) => handleSubmit(e)} className="space-y-6">
         {/* Basic Info */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <ClipboardList className="w-4 h-4 text-teal-electric" />
             Basic Information
           </h3>
@@ -218,7 +218,7 @@ export default function NewServiceOrderPage() {
                 onChange={handleChange}
                 required
                 placeholder="e.g., AC Installation at Customer Office"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -227,7 +227,7 @@ export default function NewServiceOrderPage() {
                 name="order_type"
                 value={formData.order_type}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               >
                 {orderTypes.map(type => (
                   <option key={type.value} value={type.value}>{type.label}</option>
@@ -240,7 +240,7 @@ export default function NewServiceOrderPage() {
                 name="priority"
                 value={formData.priority}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               >
                 {priorities.map(p => (
                   <option key={p.value} value={p.value}>{p.label}</option>
@@ -255,7 +255,7 @@ export default function NewServiceOrderPage() {
                 onChange={handleChange}
                 rows={3}
                 placeholder="Describe the service to be performed..."
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
               />
             </div>
           </div>
@@ -263,7 +263,7 @@ export default function NewServiceOrderPage() {
 
         {/* Customer Info */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <User className="w-4 h-4 text-teal-electric" />
             Customer Information
           </h3>
@@ -274,7 +274,7 @@ export default function NewServiceOrderPage() {
                 name="customer_id"
                 value={formData.customer_id}
                 onChange={handleCustomerChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               >
                 <option value="">Select a customer...</option>
                 {customers?.map((customer: any) => (
@@ -291,7 +291,7 @@ export default function NewServiceOrderPage() {
                 name="contact_name"
                 value={formData.contact_name}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -301,7 +301,7 @@ export default function NewServiceOrderPage() {
                 name="contact_phone"
                 value={formData.contact_phone}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div className="md:col-span-2">
@@ -311,7 +311,7 @@ export default function NewServiceOrderPage() {
                 name="contact_email"
                 value={formData.contact_email}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function NewServiceOrderPage() {
 
         {/* Location */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-teal-electric" />
             Service Location
           </h3>
@@ -332,7 +332,7 @@ export default function NewServiceOrderPage() {
                 value={formData.address}
                 onChange={handleChange}
                 placeholder="Street address"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -342,7 +342,7 @@ export default function NewServiceOrderPage() {
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -352,7 +352,7 @@ export default function NewServiceOrderPage() {
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -363,7 +363,7 @@ export default function NewServiceOrderPage() {
                 value={formData.latitude}
                 onChange={handleChange}
                 placeholder="e.g., 6.5244"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -374,7 +374,7 @@ export default function NewServiceOrderPage() {
                 value={formData.longitude}
                 onChange={handleChange}
                 placeholder="e.g., 3.3792"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
           </div>
@@ -382,7 +382,7 @@ export default function NewServiceOrderPage() {
 
         {/* Schedule */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-teal-electric" />
             Schedule
           </h3>
@@ -394,7 +394,7 @@ export default function NewServiceOrderPage() {
                 name="scheduled_date"
                 value={formData.scheduled_date}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -405,7 +405,7 @@ export default function NewServiceOrderPage() {
                 value={formData.estimated_duration}
                 onChange={handleChange}
                 placeholder="e.g., 60"
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -415,7 +415,7 @@ export default function NewServiceOrderPage() {
                 name="scheduled_start_time"
                 value={formData.scheduled_start_time}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
             <div>
@@ -425,7 +425,7 @@ export default function NewServiceOrderPage() {
                 name="scheduled_end_time"
                 value={formData.scheduled_end_time}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               />
             </div>
           </div>
@@ -433,7 +433,7 @@ export default function NewServiceOrderPage() {
 
         {/* Assignment */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <User className="w-4 h-4 text-teal-electric" />
             Assignment
           </h3>
@@ -444,7 +444,7 @@ export default function NewServiceOrderPage() {
                 name="assigned_team_id"
                 value={formData.assigned_team_id}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               >
                 <option value="">Select a team...</option>
                 {teams?.map((team: any) => (
@@ -459,7 +459,7 @@ export default function NewServiceOrderPage() {
                 value={formData.assigned_technician_id}
                 onChange={handleChange}
                 disabled={!formData.assigned_team_id}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50 disabled:opacity-50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50 disabled:opacity-50"
               >
                 <option value="">Select a technician...</option>
                 {technicians?.map((tech: any) => (
@@ -475,7 +475,7 @@ export default function NewServiceOrderPage() {
                 name="checklist_template_id"
                 value={formData.checklist_template_id}
                 onChange={handleChange}
-                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+                className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
               >
                 <option value="">No checklist</option>
                 {checklistTemplates?.map((template: any) => (
@@ -488,7 +488,7 @@ export default function NewServiceOrderPage() {
 
         {/* Notes */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <h3 className="text-foreground font-semibold mb-4 flex items-center gap-2">
             <Clock className="w-4 h-4 text-teal-electric" />
             Internal Notes
           </h3>
@@ -498,7 +498,7 @@ export default function NewServiceOrderPage() {
             onChange={handleChange}
             rows={3}
             placeholder="Add any internal notes for the technician..."
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
+            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50 resize-none"
           />
         </div>
 
@@ -506,7 +506,7 @@ export default function NewServiceOrderPage() {
         <div className="flex items-center justify-end gap-3">
           <Link
             href="/field-service/orders"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors"
+            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Cancel
           </Link>

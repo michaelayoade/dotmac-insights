@@ -117,7 +117,7 @@ export function FileUpload({
               <span className="text-teal-electric text-xs font-mono font-bold">{getFileIcon(selectedFile.name)}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium truncate">{selectedFile.name}</p>
+              <p className="text-foreground font-medium truncate">{selectedFile.name}</p>
               <p className="text-slate-muted text-sm">{formatFileSize(selectedFile.size)}</p>
             </div>
             <button
@@ -176,7 +176,7 @@ export function FileUpload({
           </div>
 
           <div className="space-y-1">
-            <p className="text-white font-medium">
+            <p className="text-foreground font-medium">
               {isDragging ? 'Drop file here' : 'Drop file here or click to browse'}
             </p>
             <p className="text-slate-muted text-sm">

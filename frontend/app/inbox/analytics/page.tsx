@@ -110,7 +110,7 @@ function ChartErrorState({ message, onRetry }: { message: string; onRetry?: () =
       {onRetry && (
         <button
           onClick={onRetry}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-xs text-white transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-xs text-foreground transition-colors"
         >
           <RefreshCw className="w-3 h-3" />
           Retry
@@ -237,7 +237,7 @@ export default function InboxAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Volume trend */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-4">Conversation Volume</h3>
+          <h3 className="text-foreground font-semibold mb-4">Conversation Volume</h3>
           {volumeLoading ? (
             <ChartSkeleton />
           ) : volumeError ? (
@@ -271,7 +271,7 @@ export default function InboxAnalyticsPage() {
 
         {/* Channel performance */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-4">Channel Performance</h3>
+          <h3 className="text-foreground font-semibold mb-4">Channel Performance</h3>
           {channelsLoading ? (
             <ChartSkeleton />
           ) : channelsError ? (
@@ -313,7 +313,7 @@ export default function InboxAnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Channel breakdown */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-4">Channel Breakdown</h3>
+          <h3 className="text-foreground font-semibold mb-4">Channel Breakdown</h3>
           {summaryLoading ? (
             <ChartSkeleton height={220} />
           ) : summaryError ? (
@@ -355,7 +355,7 @@ export default function InboxAnalyticsPage() {
 
         {/* Top performing agents */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-4">Top Agents</h3>
+          <h3 className="text-foreground font-semibold mb-4">Top Agents</h3>
           {agentsLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
@@ -388,10 +388,10 @@ export default function InboxAnalyticsPage() {
                     )}>
                       {idx + 1}
                     </span>
-                    <span className="text-white truncate max-w-[120px]">{agent.name}</span>
+                    <span className="text-foreground truncate max-w-[120px]">{agent.name}</span>
                   </div>
                   <div className="text-right">
-                    <p className="text-white font-medium">{agent.conversations}</p>
+                    <p className="text-foreground font-medium">{agent.conversations}</p>
                     <p className="text-xs text-slate-muted">
                       {agent.avg_response_time_hours ? `${agent.avg_response_time_hours}h avg` : 'N/A'}
                     </p>
@@ -404,7 +404,7 @@ export default function InboxAnalyticsPage() {
 
         {/* Resolution stats */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="text-white font-semibold mb-4">Status Distribution</h3>
+          <h3 className="text-foreground font-semibold mb-4">Status Distribution</h3>
           {summaryLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
@@ -430,7 +430,7 @@ export default function InboxAnalyticsPage() {
                   <div key={item.name}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-slate-200 text-sm">{item.name}</span>
-                      <span className="text-white font-medium">{item.value}%</span>
+                      <span className="text-foreground font-medium">{item.value}%</span>
                     </div>
                     <div className="h-2 bg-slate-elevated rounded-full overflow-hidden">
                       <div

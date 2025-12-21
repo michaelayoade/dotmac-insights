@@ -27,7 +27,7 @@ export function RevenueChart({ data, height = 240, currency = 'NGN' }: BasicChar
     <ChartShell title="Revenue" height={height}>
       <div className="text-center space-y-1">
         <p className="text-xs text-slate-muted">Latest</p>
-        <p className="text-2xl font-semibold text-white">{formatCurrency(latest?.total || 0, currency)}</p>
+        <p className="text-2xl font-semibold text-foreground">{formatCurrency(latest?.total || 0, currency)}</p>
       </div>
     </ChartShell>
   );
@@ -39,7 +39,7 @@ export function ChurnChart({ data, height = 240 }: BasicChartProps) {
     <ChartShell title="Churn" height={height}>
       <div className="text-center space-y-1">
         <p className="text-xs text-slate-muted">Avg churn</p>
-        <p className="text-2xl font-semibold text-white">{avg.toFixed(1)}</p>
+        <p className="text-2xl font-semibold text-foreground">{avg.toFixed(1)}</p>
       </div>
     </ChartShell>
   );
@@ -52,7 +52,7 @@ export function DSOChart({ data, height = 240, avgDSO }: BasicChartProps & { avg
     <ChartShell title="DSO" height={height}>
       <div className="text-center space-y-1">
         <p className="text-xs text-slate-muted">Days Sales Outstanding</p>
-        <p className="text-2xl font-semibold text-white">{current ? `${current.toFixed(1)} days` : '—'}</p>
+        <p className="text-2xl font-semibold text-foreground">{current ? `${current.toFixed(1)} days` : '—'}</p>
         {avgDSO !== undefined && <p className="text-xs text-slate-muted">Avg: {avgDSO.toFixed(1)} days</p>}
       </div>
     </ChartShell>
@@ -65,7 +65,7 @@ export function SLAGauge({ data, height = 240, value, size }: BasicChartProps & 
   return (
     <ChartShell title="SLA Attainment" height={size || height}>
       <div className="text-center space-y-1">
-        <p className="text-2xl font-semibold text-white">{rate}</p>
+        <p className="text-2xl font-semibold text-foreground">{rate}</p>
         <p className="text-xs text-slate-muted">Met: {data?.sla_attainment?.met ?? 0}</p>
       </div>
     </ChartShell>
@@ -79,7 +79,7 @@ export function FunnelChart({ data, height = 240 }: BasicChartProps) {
       <div className="flex flex-col gap-2 w-full">
         {steps.map((step: any) => (
           <div key={step.name} className="flex items-center justify-between rounded-md bg-slate-card px-3 py-2">
-            <span className="text-sm text-white">{step.name}</span>
+            <span className="text-sm text-foreground">{step.name}</span>
             <span className="font-mono text-teal-electric">{step.value ?? 0}</span>
           </div>
         ))}
@@ -96,7 +96,7 @@ export function AgentBarChart({ data, height = 240 }: BasicChartProps) {
       <div className="flex flex-col gap-2 w-full">
         {top.map((agent: any) => (
           <div key={agent.name || agent.agent} className="flex items-center justify-between text-sm">
-            <span className="text-white">{agent.name || agent.agent}</span>
+            <span className="text-foreground">{agent.name || agent.agent}</span>
             <span className="font-mono text-teal-electric">{agent.count || agent.closed || 0}</span>
           </div>
         ))}
@@ -112,7 +112,7 @@ export function ExpenseTrendChart({ data, height = 240, currency = 'NGN' }: Basi
     <ChartShell title="Expenses" height={height}>
       <div className="text-center space-y-1">
         <p className="text-xs text-slate-muted">Latest total</p>
-        <p className="text-2xl font-semibold text-white">{formatCurrency(latest?.total || 0, currency)}</p>
+        <p className="text-2xl font-semibold text-foreground">{formatCurrency(latest?.total || 0, currency)}</p>
       </div>
     </ChartShell>
   );
@@ -125,7 +125,7 @@ export function PopChart({ data, height = 240 }: BasicChartProps) {
       <div className="flex flex-col gap-2 w-full">
         {top.map((pop: any) => (
           <div key={pop.id || pop.name} className="flex items-center justify-between text-sm">
-            <span className="text-white">{pop.name || pop.id}</span>
+            <span className="text-foreground">{pop.name || pop.id}</span>
             <span className={cn('font-mono', (pop.churn_rate || 0) > 5 ? 'text-coral-alert' : 'text-teal-electric')}>
               {formatPercent(pop.churn_rate || 0)}
             </span>

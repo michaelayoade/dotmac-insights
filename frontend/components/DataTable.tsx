@@ -190,7 +190,7 @@ export function DataTable<T = any>({
                     col.align === 'center' && 'text-center',
                     col.align === 'right' && 'text-right',
                     !col.align && 'text-left',
-                    col.sortable && 'cursor-pointer hover:text-white transition-colors select-none'
+                    col.sortable && 'cursor-pointer hover:text-foreground transition-colors select-none'
                   )}
                   style={{ width: col.width }}
                   onClick={() => col.sortable && handleSort(col.key)}
@@ -317,7 +317,7 @@ export function Pagination({
                 onLimitChange(Number(e.target.value));
                 onPageChange(0); // Reset to first page when changing limit
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             >
               {limitOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -333,7 +333,7 @@ export function Pagination({
           <button
             onClick={() => onPageChange(Math.max(0, offset - limit))}
             disabled={offset === 0}
-            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             Previous
           </button>
@@ -351,7 +351,7 @@ export function Pagination({
                   'w-8 h-8 text-sm rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric',
                   currentPage === page
                     ? 'bg-teal-electric/20 text-teal-electric border border-teal-electric/30'
-                    : 'text-slate-muted hover:text-white hover:bg-slate-elevated'
+                    : 'text-slate-muted hover:text-foreground hover:bg-slate-elevated'
                 )}
               >
                 {page}
@@ -362,7 +362,7 @@ export function Pagination({
           <button
             onClick={() => onPageChange(offset + limit)}
             disabled={offset + limit >= total}
-            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
+            className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric"
           >
             Next
           </button>

@@ -133,7 +133,7 @@ function InboxEmptyState({ title, description }: { title: string; description: s
   return (
     <div className="flex flex-col items-center justify-center h-full text-slate-muted p-6">
       <InboxIcon className="w-12 h-12 mb-3 opacity-50" />
-      <p className="text-sm font-medium text-white mb-1">{title}</p>
+      <p className="text-sm font-medium text-foreground mb-1">{title}</p>
       <p className="text-xs text-slate-muted">{description}</p>
     </div>
   );
@@ -322,7 +322,7 @@ export default function InboxPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ConversationStatus | 'all')}
                 aria-label="Filter by status"
-                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 <option value="all">All Status</option>
                 <option value="open">Open</option>
@@ -334,7 +334,7 @@ export default function InboxPage() {
                 value={channelFilter}
                 onChange={(e) => setChannelFilter(e.target.value)}
                 aria-label="Filter by channel"
-                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 <option value="all">All Channels</option>
                 <option value="email">Email</option>
@@ -379,7 +379,7 @@ export default function InboxPage() {
                     <div className="flex items-start gap-3">
                       {/* Avatar */}
                       <div className="relative shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-white font-semibold">
+                        <div className="w-10 h-10 rounded-full bg-slate-elevated flex items-center justify-center text-foreground font-semibold">
                           {(conv.contact_name || conv.contact_email || '?').charAt(0).toUpperCase()}
                         </div>
                         <div
@@ -399,7 +399,7 @@ export default function InboxPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className={cn('font-semibold truncate', conv.unread_count > 0 ? 'text-white' : 'text-slate-200')}>
+                            <span className={cn('font-semibold truncate', conv.unread_count > 0 ? 'text-foreground' : 'text-slate-200')}>
                               {conv.contact_name || conv.contact_email || 'Unknown'}
                             </span>
                             {conv.is_starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />}
@@ -418,7 +418,7 @@ export default function InboxPage() {
                         <div className="flex items-center gap-2 mt-2">
                           <div className={cn('w-2 h-2 rounded-full', STATUS_COLORS[conv.status as ConversationStatus] || 'bg-slate-500')} />
                           {conv.unread_count > 0 && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-white">
+                            <span className="px-1.5 py-0.5 rounded-full bg-blue-500 text-[10px] font-semibold text-foreground">
                               {conv.unread_count}
                             </span>
                           )}
@@ -456,12 +456,12 @@ export default function InboxPage() {
               <div className="p-4 border-b border-slate-border">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-slate-elevated flex items-center justify-center text-white font-semibold text-lg">
+                    <div className="w-12 h-12 rounded-full bg-slate-elevated flex items-center justify-center text-foreground font-semibold text-lg">
                       {(selectedConversation.contact_name || selectedConversation.contact_email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-semibold text-white">
+                        <h2 className="text-lg font-semibold text-foreground">
                           {selectedConversation.contact_name || selectedConversation.contact_email || 'Unknown'}
                         </h2>
                         {selectedConversation.assigned_agent && (
@@ -478,7 +478,7 @@ export default function InboxPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleToggleStar}
-                      className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                      className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                       title={selectedConversation.is_starred ? 'Unstar' : 'Star'}
                       aria-label={selectedConversation.is_starred ? 'Unstar conversation' : 'Star conversation'}
                     >
@@ -491,7 +491,7 @@ export default function InboxPage() {
                     <div className="relative">
                       <button
                         onClick={() => setShowActions(!showActions)}
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         aria-label="More actions"
                         aria-expanded={showActions}
                       >
@@ -501,26 +501,26 @@ export default function InboxPage() {
                         <div className="absolute right-0 top-full mt-1 w-48 bg-slate-card border border-slate-border rounded-lg shadow-xl z-10 py-1">
                           <button
                             onClick={handleCreateTicket}
-                            className="w-full px-4 py-2 text-sm text-left text-white hover:bg-slate-elevated flex items-center gap-2"
+                            className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <Ticket className="w-4 h-4" />
                             Create Support Ticket
                           </button>
                           <button
                             onClick={handleCreateLead}
-                            className="w-full px-4 py-2 text-sm text-left text-white hover:bg-slate-elevated flex items-center gap-2"
+                            className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <UserPlus className="w-4 h-4" />
                             Create Sales Lead
                           </button>
-                          <button className="w-full px-4 py-2 text-sm text-left text-white hover:bg-slate-elevated flex items-center gap-2">
+                          <button className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2">
                             <User className="w-4 h-4" />
                             Assign to Agent
                           </button>
                           <hr className="my-1 border-slate-border" />
                           <button
                             onClick={handleArchive}
-                            className="w-full px-4 py-2 text-sm text-left text-white hover:bg-slate-elevated flex items-center gap-2"
+                            className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <Archive className="w-4 h-4" />
                             Archive
@@ -538,7 +538,7 @@ export default function InboxPage() {
                 {/* Subject and metadata */}
                 <div className="mt-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-white font-medium">{selectedConversation.subject || 'No subject'}</h3>
+                    <h3 className="text-foreground font-medium">{selectedConversation.subject || 'No subject'}</h3>
                     <div className="flex items-center gap-3 mt-2 text-xs text-slate-muted">
                       <span className="flex items-center gap-1">
                         <div className={cn('w-2 h-2 rounded-full', STATUS_COLORS[selectedConversation.status as ConversationStatus] || 'bg-slate-500')} />
@@ -584,14 +584,14 @@ export default function InboxPage() {
                         <div
                           className={cn(
                             'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0',
-                            isAgent ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-elevated text-white'
+                            isAgent ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-elevated text-foreground'
                           )}
                         >
                           {(msg.sender_name || (isAgent ? 'A' : 'C')).charAt(0).toUpperCase()}
                         </div>
                         <div className={cn('flex-1 max-w-[70%]', isAgent && 'flex flex-col items-end')}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-white">
+                            <span className="text-sm font-medium text-foreground">
                               {msg.sender_name || (isAgent ? 'Agent' : 'Customer')}
                             </span>
                             <span className="text-xs text-slate-muted">{formatMessageTime(msg.created_at)}</span>
@@ -623,26 +623,26 @@ export default function InboxPage() {
                     aria-label="Reply message"
                     rows={3}
                     disabled={isSending}
-                    className="w-full bg-transparent px-4 py-3 text-sm text-white placeholder:text-slate-muted resize-none focus:outline-none disabled:opacity-50"
+                    className="w-full bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-slate-muted resize-none focus:outline-none disabled:opacity-50"
                   />
                   <div className="flex items-center justify-between px-4 pb-3">
                     <div className="flex items-center gap-2">
                       <button
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/50 rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Attach file"
                         aria-label="Attach file"
                       >
                         <Paperclip className="w-4 h-4" />
                       </button>
                       <button
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/50 rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Insert emoji"
                         aria-label="Insert emoji"
                       >
                         <Smile className="w-4 h-4" />
                       </button>
                       <button
-                        className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/50 rounded-lg transition-colors"
+                        className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Canned response"
                         aria-label="Use canned response"
                       >
@@ -651,7 +651,7 @@ export default function InboxPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <select
-                        className="bg-slate-border/50 border-0 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="bg-slate-border/50 border-0 rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         aria-label="Send action"
                       >
                         <option>Send & Keep Open</option>
@@ -661,7 +661,7 @@ export default function InboxPage() {
                       <button
                         onClick={handleSendReply}
                         disabled={!replyText.trim() || isSending}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {isSending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -679,7 +679,7 @@ export default function InboxPage() {
             <div className="flex-1 flex items-center justify-center text-slate-muted">
               <div className="text-center">
                 <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg font-medium text-white mb-2">Select a conversation</p>
+                <p className="text-lg font-medium text-foreground mb-2">Select a conversation</p>
                 <p className="text-sm">Choose from the list to view details</p>
               </div>
             </div>

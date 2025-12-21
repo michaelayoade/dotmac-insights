@@ -63,7 +63,7 @@ export default function ReviewQueuePage() {
           <div>
             <Link
               href={`/performance/scorecards/${item.scorecard_id}`}
-              className="text-white font-medium hover:text-violet-400"
+              className="text-foreground font-medium hover:text-violet-400"
             >
               {item.employee_name}
             </Link>
@@ -76,14 +76,14 @@ export default function ReviewQueuePage() {
       key: 'designation',
       header: 'Designation',
       render: (item: ReviewQueueItem) => (
-        <span className="text-slate-300 text-sm">{item.designation || '-'}</span>
+        <span className="text-foreground-secondary text-sm">{item.designation || '-'}</span>
       ),
     },
     {
       key: 'period',
       header: 'Period',
       render: (item: ReviewQueueItem) => (
-        <span className="text-slate-300 text-sm">{item.period_name}</span>
+        <span className="text-foreground-secondary text-sm">{item.period_name}</span>
       ),
     },
     {
@@ -152,7 +152,7 @@ export default function ReviewQueuePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Review Queue</h1>
+          <h1 className="text-xl font-semibold text-foreground">Review Queue</h1>
           <p className="text-sm text-slate-400 mt-1">
             Scorecards pending manager review and approval
           </p>
@@ -168,7 +168,7 @@ export default function ReviewQueuePage() {
                 <Clock className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{data.pending_count}</p>
+                <p className="text-2xl font-bold text-foreground">{data.pending_count}</p>
                 <p className="text-sm text-slate-400">Pending Review</p>
               </div>
             </div>
@@ -179,7 +179,7 @@ export default function ReviewQueuePage() {
                 <ClipboardCheck className="w-5 h-5 text-violet-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{data.in_review_count}</p>
+                <p className="text-2xl font-bold text-foreground">{data.in_review_count}</p>
                 <p className="text-sm text-slate-400">In Review</p>
               </div>
             </div>
@@ -190,7 +190,7 @@ export default function ReviewQueuePage() {
                 <User className="w-5 h-5 text-slate-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{data.total}</p>
+                <p className="text-2xl font-bold text-foreground">{data.total}</p>
                 <p className="text-sm text-slate-400">Total in Queue</p>
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function ReviewQueuePage() {
             setPeriodId(e.target.value ? Number(e.target.value) : undefined);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.filter(p => ['active', 'scoring', 'review'].includes(p.status)).map((p) => (
@@ -221,7 +221,7 @@ export default function ReviewQueuePage() {
       {data && data.items.length === 0 && (
         <div className="text-center py-16 bg-slate-card border border-slate-border rounded-xl">
           <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-400 opacity-50" />
-          <h2 className="text-xl font-semibold text-white mb-2">All Caught Up!</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-2">All Caught Up!</h2>
           <p className="text-slate-400">No scorecards pending review at this time.</p>
         </div>
       )}

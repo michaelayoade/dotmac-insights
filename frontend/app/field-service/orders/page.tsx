@@ -67,7 +67,7 @@ export default function ServiceOrdersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Service Orders</h2>
+          <h2 className="text-xl font-semibold text-foreground">Service Orders</h2>
           <p className="text-sm text-slate-muted">
             {total} order{total !== 1 ? 's' : ''} total
           </p>
@@ -93,7 +93,7 @@ export default function ServiceOrdersPage() {
                 placeholder="Search orders, customers, technicians..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
               />
             </div>
           </div>
@@ -102,7 +102,7 @@ export default function ServiceOrdersPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
           >
             <option value="all">All Status</option>
             {Object.entries(statusConfig).map(([value, { label }]) => (
@@ -114,7 +114,7 @@ export default function ServiceOrdersPage() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white focus:outline-none focus:border-teal-electric/50"
+            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
           >
             <option value="all">All Priority</option>
             <option value="emergency">Emergency</option>
@@ -171,7 +171,7 @@ export default function ServiceOrdersPage() {
                           href={`/field-service/orders/${order.id}`}
                           className="block"
                         >
-                          <p className="text-white font-medium hover:text-teal-electric transition-colors">
+                          <p className="text-foreground font-medium hover:text-teal-electric transition-colors">
                             {order.order_number}
                           </p>
                           <p className="text-sm text-slate-muted truncate max-w-[200px]">
@@ -180,7 +180,7 @@ export default function ServiceOrdersPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-white text-sm">{order.customer_name || 'N/A'}</p>
+                        <p className="text-foreground text-sm">{order.customer_name || 'N/A'}</p>
                         <div className="flex items-center gap-1 text-xs text-slate-muted mt-0.5">
                           <MapPin className="w-3 h-3" />
                           {order.city || 'Unknown'}
@@ -188,7 +188,7 @@ export default function ServiceOrdersPage() {
                       </td>
                       <td className="px-4 py-4">
                         {order.scheduled_date ? (
-                          <div className="flex items-center gap-1 text-sm text-white">
+                          <div className="flex items-center gap-1 text-sm text-foreground">
                             <Calendar className="w-3.5 h-3.5 text-slate-muted" />
                             {new Date(order.scheduled_date).toLocaleDateString('en-NG', {
                               month: 'short',
@@ -210,7 +210,7 @@ export default function ServiceOrdersPage() {
                             <div className="w-6 h-6 rounded-full bg-slate-elevated flex items-center justify-center">
                               <User className="w-3.5 h-3.5 text-slate-muted" />
                             </div>
-                            <span className="text-sm text-white">{order.technician_name}</span>
+                            <span className="text-sm text-foreground">{order.technician_name}</span>
                           </div>
                         ) : (
                           <span className="text-sm text-amber-400 flex items-center gap-1">
@@ -253,17 +253,17 @@ export default function ServiceOrdersPage() {
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <span className="text-sm text-white px-2">
+                  <span className="text-sm text-foreground px-2">
                     Page {page} of {totalPages}
                   </span>
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

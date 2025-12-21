@@ -19,7 +19,7 @@ function FormLabel({ children }: { children: React.ReactNode }) {
 function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = (status || '').toLowerCase();
   const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
     pending: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
     paid: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
     partially_paid: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-300', icon: <Clock className="w-3 h-3" /> },
@@ -68,7 +68,7 @@ export default function BooksInvoicesPage() {
       key: 'customer',
       header: 'Customer Name',
       render: (item: any) => (
-        <div className="flex items-center gap-2 text-white">
+        <div className="flex items-center gap-2 text-foreground">
           <User className="w-3 h-3 text-slate-muted" />
           <span className="font-medium">{item.customer_name || item.customer?.name || 'Unknown'}</span>
         </div>
@@ -80,7 +80,7 @@ export default function BooksInvoicesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-white font-mono">{formatCurrency(item.total_amount ?? item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatCurrency(item.total_amount ?? item.amount, item.currency)}</div>
           <div className="text-xs text-emerald-400">Paid: {formatCurrency(item.amount_paid ?? 0, item.currency)}</div>
         </div>
       ),
@@ -106,7 +106,7 @@ export default function BooksInvoicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AR Invoices</h1>
+          <h1 className="text-2xl font-bold text-foreground">AR Invoices</h1>
           <p className="text-slate-muted text-sm">Create and manage sales invoices</p>
         </div>
         <Link

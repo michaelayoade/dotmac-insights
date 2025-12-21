@@ -35,7 +35,7 @@ export default function BooksDocsPage() {
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-muted">Books</p>
-              <h1 className="text-xl font-semibold text-white">Docs & Exports</h1>
+              <h1 className="text-xl font-semibold text-foreground">Docs & Exports</h1>
             </div>
           </div>
           <p className="text-sm text-slate-muted">
@@ -57,7 +57,7 @@ export default function BooksDocsPage() {
                 <item.icon className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-white">{item.title}</p>
+                <p className="font-medium text-foreground">{item.title}</p>
                 <p className="text-sm text-slate-muted">{item.description}</p>
               </div>
               <ExternalLink className="h-4 w-4 text-slate-muted" />
@@ -76,7 +76,7 @@ export default function BooksDocsPage() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-muted">Help</p>
-            <h2 className="text-lg font-semibold text-white">How to use Books</h2>
+            <h2 className="text-lg font-semibold text-foreground">How to use Books</h2>
           </div>
         </div>
         <div className="mt-4 space-y-3 text-sm text-slate-muted">

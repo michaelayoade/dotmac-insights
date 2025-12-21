@@ -45,7 +45,7 @@ def upgrade() -> None:
         "invoices",
         ["due_date", "status", "currency"],
         unique=False,
-        postgresql_where=sa.text("status IN ('pending','overdue','partially_paid')"),
+        postgresql_where=sa.text("status IN ('PENDING','OVERDUE','PARTIALLY_PAID')"),
     )
 
     # Purchase invoices: AP outstanding & overdue
@@ -171,7 +171,7 @@ def downgrade() -> None:
     op.drop_index(
         "ix_invoices_due_status_currency",
         table_name="invoices",
-        postgresql_where=sa.text("status IN ('pending','overdue','partially_paid')"),
+        postgresql_where=sa.text("status IN ('PENDING','OVERDUE','PARTIALLY_PAID')"),
     )
     op.drop_index("ix_invoices_status_currency", table_name="invoices")
     op.drop_index("ix_payments_status_date", table_name="payments")

@@ -94,7 +94,7 @@ export default function CompletenessPage() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-slate-muted">Completion Score</span>
-              <span className="font-semibold text-white">{overallScore.toFixed(1)}%</span>
+              <span className="font-semibold text-foreground">{overallScore.toFixed(1)}%</span>
             </div>
             <ProgressBar
               value={overallScore}
@@ -142,7 +142,7 @@ export default function CompletenessPage() {
               <li key={i} className="flex items-start gap-2 text-sm text-slate-muted">
                 <span className="text-teal-electric mt-0.5 capitalize">{rec.priority}</span>
                 <div className="flex-1">
-                  <div className="text-white font-medium">{rec.field}</div>
+                  <div className="text-foreground font-medium">{rec.field}</div>
                   <div>{rec.issue}</div>
                   <div className="text-xs text-slate-muted mt-0.5">{rec.action}</div>
                 </div>
@@ -159,7 +159,7 @@ export default function CompletenessPage() {
             {Object.entries(data.system_linkage).map(([key, value]: [string, any]) => (
               <div key={key} className="bg-slate-elevated rounded-lg p-3">
                 <div className="text-xs uppercase text-slate-muted mb-1">{key.replace(/_/g, ' ')}</div>
-                <div className="text-white text-lg font-mono">{value.percent?.toFixed(1) ?? 0}%</div>
+                <div className="text-foreground text-lg font-mono">{value.percent?.toFixed(1) ?? 0}%</div>
                 <div className="text-xs text-slate-muted">{value.count?.toLocaleString() || 0} linked</div>
               </div>
             ))}

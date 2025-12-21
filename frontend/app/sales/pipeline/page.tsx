@@ -85,7 +85,7 @@ export default function PipelinePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Sales Pipeline</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Sales Pipeline</h1>
           <p className="text-sm text-slate-400 mt-1">
             Drag opportunities between stages to update their progress
           </p>
@@ -93,13 +93,13 @@ export default function PipelinePage() {
         <div className="flex items-center gap-3">
           <Link
             href="/sales/opportunities"
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg transition-colors"
           >
             List View
           </Link>
           <Link
             href="/sales/opportunities/new"
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Deal
@@ -113,7 +113,7 @@ export default function PipelinePage() {
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <span className="text-sm text-slate-400">Total Pipeline:</span>
-            <span className="text-white font-medium">{formatCurrency(pipelineView.total_value)}</span>
+            <span className="text-foreground font-medium">{formatCurrency(pipelineView.total_value)}</span>
           </div>
           <div className="h-4 w-px bg-slate-700" />
           <div className="flex items-center gap-2">
@@ -123,7 +123,7 @@ export default function PipelinePage() {
           <div className="h-4 w-px bg-slate-700" />
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-400">Deals:</span>
-            <span className="text-white font-medium">{kanban?.total_opportunities || 0}</span>
+            <span className="text-foreground font-medium">{kanban?.total_opportunities || 0}</span>
           </div>
         </div>
       )}
@@ -144,7 +144,7 @@ export default function PipelinePage() {
               {/* Column Header */}
               <div className="p-4 bg-slate-800/50 rounded-t-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-white">{column.stage_name}</h3>
+                  <h3 className="font-medium text-foreground">{column.stage_name}</h3>
                   <span className="text-xs text-slate-400 bg-slate-700/50 px-2 py-0.5 rounded-full">
                     {column.count}
                   </span>
@@ -175,7 +175,7 @@ export default function PipelinePage() {
                       <Link href={`/sales/opportunities/${opp.id}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-white text-sm truncate">{opp.name}</h4>
+                            <h4 className="font-medium text-foreground text-sm truncate">{opp.name}</h4>
                             {opp.customer_name && (
                               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1 truncate">
                                 <Building2 className="w-3 h-3 flex-shrink-0" />
@@ -215,7 +215,7 @@ export default function PipelinePage() {
               {/* Column Footer - Add Deal */}
               <Link
                 href={`/sales/opportunities/new?stage_id=${column.stage_id}`}
-                className="flex items-center justify-center gap-2 p-3 bg-slate-800/30 hover:bg-slate-800/50 text-slate-400 hover:text-white transition-colors rounded-b-xl"
+                className="flex items-center justify-center gap-2 p-3 bg-slate-800/30 hover:bg-slate-800/50 text-slate-400 hover:text-foreground transition-colors rounded-b-xl"
               >
                 <Plus className="w-4 h-4" />
                 <span className="text-sm">Add Deal</span>

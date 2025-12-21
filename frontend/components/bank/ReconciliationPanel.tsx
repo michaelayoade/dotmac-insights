@@ -171,7 +171,7 @@ export function ReconciliationPanel({
       >
         <div className="flex items-center gap-2">
           <Link2 className="w-5 h-5 text-teal-electric" />
-          <span className="text-white font-medium">Reconciliation</span>
+          <span className="text-foreground font-medium">Reconciliation</span>
           <span className="text-slate-muted text-sm">
             ({formatCurrency(unallocatedAmount)} unallocated)
           </span>
@@ -190,7 +190,7 @@ export function ReconciliationPanel({
             <div className="flex flex-wrap gap-4 text-sm">
               <div>
                 <span className="text-slate-muted">Transaction Amount:</span>{' '}
-                <span className="text-white font-medium">{formatCurrency(transactionAmount)}</span>
+                <span className="text-foreground font-medium">{formatCurrency(transactionAmount)}</span>
               </div>
               <div>
                 <span className="text-slate-muted">Already Allocated:</span>{' '}
@@ -254,7 +254,7 @@ export function ReconciliationPanel({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             {getDocumentIcon(suggestion.document_type)}
-                            <span className="text-white font-medium truncate">{suggestion.document_name}</span>
+                            <span className="text-foreground font-medium truncate">{suggestion.document_name}</span>
                             <span
                               className={cn(
                                 'text-xs px-1.5 py-0.5 rounded border',
@@ -286,7 +286,7 @@ export function ReconciliationPanel({
                         {/* Outstanding Amount */}
                         <div className="text-right shrink-0">
                           <p className="text-slate-muted text-xs">Outstanding</p>
-                          <p className="text-white font-mono">{formatCurrency(suggestion.outstanding_amount)}</p>
+                          <p className="text-foreground font-mono">{formatCurrency(suggestion.outstanding_amount)}</p>
                         </div>
 
                         {/* Allocation Input */}
@@ -355,13 +355,13 @@ export function ReconciliationPanel({
                   <span className="text-slate-muted">Allocating </span>
                   <span className="text-teal-electric font-medium">{formatCurrency(totalNewAllocation)}</span>
                   <span className="text-slate-muted"> to </span>
-                  <span className="text-white">{allocations.size} document(s)</span>
+                  <span className="text-foreground">{allocations.size} document(s)</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setAllocations(new Map())}
-                    className="px-3 py-2 text-sm text-slate-muted hover:text-white border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+                    className="px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
                     disabled={isSubmitting}
                   >
                     Clear

@@ -54,7 +54,7 @@ export default function TrialBalancePage() {
       header: 'Account Name',
       sortable: true,
       render: (item: any) => (
-        <span className="text-white">{item.account_name}</span>
+        <span className="text-foreground">{item.account_name}</span>
       ),
     },
     {
@@ -93,7 +93,7 @@ export default function TrialBalancePage() {
       render: (item: any) => (
         <span className={cn(
           'font-mono font-semibold',
-          (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
+          (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
         )}>
           {formatCurrency(item.balance)}
         </span>
@@ -163,7 +163,7 @@ export default function TrialBalancePage() {
           </div>
           <p className={cn(
             'text-2xl font-bold',
-            difference === 0 ? 'text-white' : 'text-yellow-400'
+            difference === 0 ? 'text-foreground' : 'text-yellow-400'
           )}>
             {formatCurrency(difference)}
           </p>
@@ -189,7 +189,7 @@ export default function TrialBalancePage() {
         {asOfDate && (
           <button
             onClick={() => { setFilters({ asOfDate: '', drill: false }); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear
           </button>
@@ -197,14 +197,14 @@ export default function TrialBalancePage() {
         <div className="flex gap-2">
           <button
             onClick={() => exportBalance('csv')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <Download className="w-4 h-4" />
             CSV
           </button>
           <button
             onClick={() => exportBalance('pdf')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <BarChart2 className="w-4 h-4" />
             PDF
@@ -225,7 +225,7 @@ export default function TrialBalancePage() {
       {data && (
         <div className="bg-slate-elevated border border-slate-border rounded-xl p-4">
           <div className="flex justify-between items-center">
-            <span className="text-white font-semibold">Total</span>
+            <span className="text-foreground font-semibold">Total</span>
             <div className="flex gap-8">
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Debit</p>

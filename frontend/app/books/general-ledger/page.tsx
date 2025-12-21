@@ -91,7 +91,7 @@ export default function GeneralLedgerPage() {
       render: (item: AccountingGeneralLedgerEntry) => (
         <div>
           <span className="font-mono text-teal-electric text-sm">{item.account}</span>
-          <span className="text-white ml-2">{item.account_name || ''}</span>
+          <span className="text-foreground ml-2">{item.account_name || ''}</span>
         </div>
       ),
     },
@@ -99,7 +99,7 @@ export default function GeneralLedgerPage() {
       key: 'description',
       header: 'Description',
       render: (item: AccountingGeneralLedgerEntry) => (
-        <span className="text-slate-300 text-sm truncate max-w-[250px] block">
+        <span className="text-foreground-secondary text-sm truncate max-w-[250px] block">
           {item.remarks || item.voucher_no || item.party || '-'}
         </span>
       ),
@@ -138,7 +138,7 @@ export default function GeneralLedgerPage() {
         <span
           className={cn(
             'font-mono font-semibold',
-            (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
+            (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
           )}
         >
           {item.balance !== undefined && item.balance !== null ? formatCurrency(item.balance) : '-'}
@@ -175,7 +175,7 @@ export default function GeneralLedgerPage() {
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border">
             <span className="text-xs uppercase tracking-[0.08em] text-slate-muted">Entries</span>
-            <span className="text-white font-semibold">{data?.total || 0}</span>
+            <span className="text-foreground font-semibold">{data?.total || 0}</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
             <span className="text-xs uppercase tracking-[0.08em] text-blue-300">Debits</span>
@@ -220,7 +220,7 @@ export default function GeneralLedgerPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setPresetRange(30)}
-            className="text-xs px-3 py-1.5 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="text-xs px-3 py-1.5 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             Last 30d
           </button>
@@ -233,7 +233,7 @@ export default function GeneralLedgerPage() {
               setEndDate(toInput(now));
               setOffset(0);
             }}
-            className="text-xs px-3 py-1.5 rounded-md border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="text-xs px-3 py-1.5 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             YTD
           </button>
@@ -250,7 +250,7 @@ export default function GeneralLedgerPage() {
         {(startDate || endDate || accountCode) && (
           <button
             onClick={() => { setStartDate(''); setEndDate(''); setAccountCode(''); setOffset(0); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>
@@ -258,14 +258,14 @@ export default function GeneralLedgerPage() {
         <div className="flex gap-2 ml-auto">
           <button
             onClick={() => exportLedger('csv')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <Download className="w-4 h-4" />
             CSV
           </button>
           <button
             onClick={() => exportLedger('pdf')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <BarChart2 className="w-4 h-4" />
             PDF

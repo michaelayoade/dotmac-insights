@@ -151,7 +151,7 @@ export function StatCard({
 
       <div className="space-y-1">
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-          <span className="font-mono text-2xl md:text-3xl font-bold text-white counter-value leading-tight break-words max-w-full">
+          <span className="font-mono text-2xl md:text-3xl font-bold text-foreground counter-value leading-tight break-words max-w-full">
             {typeof value === 'number' && animateValue ? (
               <AnimatedNumber value={value} />
             ) : (
@@ -220,7 +220,7 @@ export function StatInline({
   variant?: StatCardVariant;
 }) {
   const colors: Record<StatCardVariant, string> = {
-    default: 'text-white',
+    default: 'text-foreground',
     success: 'text-teal-electric',
     warning: 'text-amber-warn',
     danger: 'text-coral-alert',

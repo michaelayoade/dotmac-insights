@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from app.models.task import Task
     from app.models.ticket import Ticket
     from app.models.employee import Employee
+    from app.models.asset import Asset
+    from app.models.vehicle import Vehicle
 
 
 # =============================================================================
@@ -144,7 +146,10 @@ class FieldTeam(Base):
 
     # Relationships
     members: Mapped[List["FieldTeamMember"]] = relationship(back_populates="team", cascade="all, delete-orphan")
-    supervisor: Mapped[Optional["Employee"]] = relationship(foreign_keys=[supervisor_id])
+    supervisor: Mapped[Optional["Employee"]] = relationship(
+        back_populates="supervised_field_teams",
+        foreign_keys=[supervisor_id]
+    )
     default_zones: Mapped[List["ServiceZone"]] = relationship(back_populates="default_team")
     service_orders: Mapped[List["ServiceOrder"]] = relationship(back_populates="team")
 
@@ -169,7 +174,7 @@ class FieldTeamMember(Base):
 
     # Relationships
     team: Mapped["FieldTeam"] = relationship(back_populates="members")
-    employee: Mapped["Employee"] = relationship()
+    employee: Mapped["Employee"] = relationship(back_populates="field_team_memberships")
 
     __table_args__ = (
         Index("ix_field_team_members_team_employee", "team_id", "employee_id", unique=True),
@@ -208,7 +213,7 @@ class TechnicianSkill(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    employee: Mapped["Employee"] = relationship()
+    employee: Mapped["Employee"] = relationship(back_populates="technician_skills")
 
     __table_args__ = (
         Index("ix_technician_skills_employee_skill", "employee_id", "skill_type"),
@@ -293,6 +298,10 @@ class ServiceOrder(Base):
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
 
+    # Asset/Vehicle links (for service history tracking)
+    asset_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assets.id"), nullable=True, index=True)
+    vehicle_id: Mapped[Optional[int]] = mapped_column(ForeignKey("vehicles.id"), nullable=True, index=True)
+
     # Assignment
     assigned_technician_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
     assigned_team_id: Mapped[Optional[int]] = mapped_column(ForeignKey("field_teams.id"), nullable=True, index=True)
@@ -356,9 +365,14 @@ class ServiceOrder(Base):
     project: Mapped[Optional["Project"]] = relationship()
     task: Mapped[Optional["Task"]] = relationship()
     ticket: Mapped[Optional["Ticket"]] = relationship()
-    technician: Mapped[Optional["Employee"]] = relationship(foreign_keys=[assigned_technician_id])
+    technician: Mapped[Optional["Employee"]] = relationship(
+        back_populates="service_orders",
+        foreign_keys=[assigned_technician_id]
+    )
     team: Mapped[Optional["FieldTeam"]] = relationship(back_populates="service_orders")
     zone: Mapped[Optional["ServiceZone"]] = relationship()
+    asset: Mapped[Optional["Asset"]] = relationship(backref="service_orders")
+    vehicle_rel: Mapped[Optional["Vehicle"]] = relationship(backref="service_orders")
     checklist_items: Mapped[List["ServiceChecklist"]] = relationship(back_populates="service_order", cascade="all, delete-orphan")
     photos: Mapped[List["ServicePhoto"]] = relationship(back_populates="service_order", cascade="all, delete-orphan")
     time_entries: Mapped[List["ServiceTimeEntry"]] = relationship(back_populates="service_order", cascade="all, delete-orphan")
@@ -527,7 +541,7 @@ class ServiceTimeEntry(Base):
 
     # Relationships
     service_order: Mapped["ServiceOrder"] = relationship(back_populates="time_entries")
-    employee: Mapped["Employee"] = relationship()
+    employee: Mapped["Employee"] = relationship(back_populates="service_time_entries")
 
     def __repr__(self) -> str:
         return f"<ServiceTimeEntry {self.entry_type.value} - {self.duration_hours}h>"

@@ -23,7 +23,7 @@ export default function InventorySettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Settings className="w-5 h-5 text-teal-electric" />
-        <h1 className="text-xl font-semibold text-white">Inventory Settings</h1>
+        <h1 className="text-xl font-semibold text-foreground">Inventory Settings</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -38,7 +38,7 @@ export default function InventorySettingsPage() {
                 <card.icon className="w-6 h-6 text-teal-electric" />
               </div>
               <div>
-                <h3 className="text-white font-medium group-hover:text-teal-electric transition-colors">
+                <h3 className="text-foreground font-medium group-hover:text-teal-electric transition-colors">
                   {card.title}
                 </h3>
                 <p className="text-sm text-slate-muted mt-1">{card.description}</p>

@@ -255,7 +255,7 @@ export default function ReceiptUpload({
             <Upload className={cn('w-6 h-6', dragActive ? 'text-violet-400' : 'text-slate-muted')} />
           </div>
           <div>
-            <p className="text-sm text-white font-medium">
+            <p className="text-sm text-foreground font-medium">
               {canAddMore ? 'Drop receipts here or click to upload' : 'Maximum files reached'}
             </p>
             <p className="text-xs text-slate-muted mt-1">
@@ -288,7 +288,7 @@ export default function ReceiptUpload({
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-white truncate" title={att.file_name}>
+                      <p className="text-xs text-foreground truncate" title={att.file_name}>
                         {att.file_name}
                       </p>
                       {att.file_size && (
@@ -300,7 +300,7 @@ export default function ReceiptUpload({
                     {isImage && (
                       <button
                         onClick={() => setPreviewUrl(`/api/attachments/${att.id}/file`)}
-                        className="p-1 bg-slate-card rounded text-slate-muted hover:text-white transition-colors"
+                        className="p-1 bg-slate-card rounded text-slate-muted hover:text-foreground transition-colors"
                         title="Preview"
                       >
                         <ZoomIn className="w-3 h-3" />
@@ -357,7 +357,7 @@ export default function ReceiptUpload({
 
                 {/* File Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{pending.file.name}</p>
+                  <p className="text-sm text-foreground truncate">{pending.file.name}</p>
                   <p className="text-xs text-slate-muted">{formatFileSize(pending.file.size)}</p>
                   {pending.error && (
                     <p className="text-xs text-rose-400 mt-1">{pending.error}</p>
@@ -390,7 +390,7 @@ export default function ReceiptUpload({
                   )}
                   <button
                     onClick={() => removePending(pending.id)}
-                    className="p-1 text-slate-muted hover:text-white transition-colors"
+                    className="p-1 text-slate-muted hover:text-foreground transition-colors"
                     title="Remove"
                   >
                     <X className="w-4 h-4" />
@@ -411,7 +411,7 @@ export default function ReceiptUpload({
           <div className="relative max-w-4xl max-h-[90vh]">
             <button
               onClick={() => setPreviewUrl(null)}
-              className="absolute -top-10 right-0 p-2 text-white/70 hover:text-white"
+              className="absolute -top-10 right-0 p-2 text-foreground/70 hover:text-foreground"
             >
               <X className="w-6 h-6" />
             </button>

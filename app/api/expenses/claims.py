@@ -21,6 +21,7 @@ from app.services.errors import ValidationError
 from app.services.expense_service import ExpenseService
 from app.services.expense_posting_service import ExpensePostingService
 from app.auth import get_current_principal, Principal, Require
+from app.api.expenses.access import apply_employee_scope, assert_employee_access
 
 router = APIRouter()
 
@@ -44,8 +45,16 @@ def list_claims(
     offset: int = Query(default=0, ge=0),
     status: Optional[str] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ):
     query = db.query(ExpenseClaim).options(selectinload(ExpenseClaim.lines)).order_by(ExpenseClaim.created_at.desc())
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
     if status:
         try:
             from app.models.expense_management import ExpenseClaimStatus
@@ -67,13 +76,24 @@ def list_claims(
 
 
 @router.get("/{claim_id}", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:read"))])
-def get_claim(claim_id: int, db: Session = Depends(get_db)):
-    claim = (
+def get_claim(
+    claim_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
     transfer = None
@@ -83,7 +103,7 @@ def get_claim(claim_id: int, db: Session = Depends(get_db)):
     return claim
 
 
-@router.post("/", response_model=ExpenseClaimRead, status_code=201)
+@router.post("/", response_model=ExpenseClaimRead, status_code=201, dependencies=[Depends(Require("expenses:write"))])
 async def create_claim(
     payload: ExpenseClaimCreate,
     db: Session = Depends(get_db),
@@ -91,9 +111,12 @@ async def create_claim(
 ):
     service = ExpenseService(db)
     try:
+        assert_employee_access(principal, db, payload.employee_id)
         claim = service.create_claim(payload)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if principal.type == "user":
+        claim.created_by_id = principal.id
     db.commit()
     db.refresh(claim)
     return (
@@ -104,20 +127,27 @@ async def create_claim(
     )
 
 
-@router.post("/{claim_id}/submit", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/submit", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def submit_claim(
     claim_id: int,
     company_code: Optional[str] = None,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -131,19 +161,26 @@ async def submit_claim(
     return claim
 
 
-@router.post("/{claim_id}/approve", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/approve", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def approve_claim(
     claim_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -157,20 +194,27 @@ async def approve_claim(
     return claim
 
 
-@router.post("/{claim_id}/reject", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/reject", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def reject_claim(
     claim_id: int,
     reason: str,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -187,20 +231,27 @@ async def reject_claim(
     return claim
 
 
-@router.post("/{claim_id}/return", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/return", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def return_claim(
     claim_id: int,
     reason: str,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -217,19 +268,26 @@ async def return_claim(
     return claim
 
 
-@router.post("/{claim_id}/recall", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/recall", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def recall_claim(
     claim_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -243,19 +301,26 @@ async def recall_claim(
     return claim
 
 
-@router.post("/{claim_id}/post", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/post", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def post_claim(
     claim_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -269,20 +334,27 @@ async def post_claim(
     return claim
 
 
-@router.post("/{claim_id}/reverse", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/reverse", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def reverse_claim(
     claim_id: int,
     reason: str,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -299,7 +371,7 @@ async def reverse_claim(
     return claim
 
 
-@router.post("/{claim_id}/pay-now", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/pay-now", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def pay_claim_now(
     claim_id: int,
     payload: ExpenseClaimPayNow,
@@ -307,13 +379,20 @@ async def pay_claim_now(
     principal: Principal = Depends(get_current_principal),
 ):
     """Pay an approved or posted expense claim via transfer provider."""
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
@@ -410,20 +489,27 @@ async def pay_claim_now(
         await client.close()
 
 
-@router.post("/{claim_id}/verify-transfer", response_model=ExpenseClaimRead)
+@router.post("/{claim_id}/verify-transfer", response_model=ExpenseClaimRead, dependencies=[Depends(Require("expenses:write"))])
 async def verify_claim_transfer(
     claim_id: int,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ):
     """Verify transfer status for an expense claim payout."""
-    claim = (
+    query = (
         db.query(ExpenseClaim)
         .options(selectinload(ExpenseClaim.lines))
         .filter(ExpenseClaim.id == claim_id)
         .with_for_update()
-        .first()
     )
+    query = apply_employee_scope(
+        query,
+        principal,
+        db,
+        employee_field=ExpenseClaim.employee_id,
+        created_by_field=ExpenseClaim.created_by_id,
+    )
+    claim = query.first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
     if not claim.payment_reference:

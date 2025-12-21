@@ -33,7 +33,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-slate-muted text-sm mt-1">
           Configure application settings for email, payments, notifications, and more.
         </p>
@@ -67,7 +67,7 @@ export default function SettingsPage() {
                       <Icon className="w-5 h-5 text-teal-electric" />
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold">{group.label}</h3>
+                      <h3 className="text-foreground font-semibold">{group.label}</h3>
                       <p className="text-slate-muted text-sm">{group.description}</p>
                     </div>
                   </div>

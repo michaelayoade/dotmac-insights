@@ -32,7 +32,7 @@ function BankAccountCard({ account }: BankAccountCardProps) {
             <Landmark className="w-6 h-6 text-teal-electric" />
           </div>
           <div>
-            <h3 className="text-white font-semibold">{account.account_name || account.name}</h3>
+            <h3 className="text-foreground font-semibold">{account.account_name || account.name}</h3>
             <p className="text-slate-muted text-sm">{account.bank_name}</p>
           </div>
         </div>
@@ -50,17 +50,17 @@ function BankAccountCard({ account }: BankAccountCardProps) {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-slate-muted text-sm">Account Number</span>
-          <span className="font-mono text-white">
+          <span className="font-mono text-foreground">
             {account.account_number ? `****${String(account.account_number).slice(-4)}` : '-'}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-muted text-sm">Account Type</span>
-          <span className="text-white capitalize">{account.account_type || 'Checking'}</span>
+          <span className="text-foreground capitalize">{account.account_type || 'Checking'}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-slate-muted text-sm">Currency</span>
-          <span className="text-white">{account.currency || 'NGN'}</span>
+          <span className="text-foreground">{account.currency || 'NGN'}</span>
         </div>
 
         <div className="pt-3 mt-3 border-t border-slate-border">
@@ -109,7 +109,7 @@ export default function BankAccountsPage() {
             <Building2 className="w-5 h-5 text-slate-muted" />
             <p className="text-slate-muted text-sm">Total Accounts</p>
           </div>
-          <p className="text-3xl font-bold text-white">{accounts.length}</p>
+          <p className="text-3xl font-bold text-foreground">{accounts.length}</p>
           <p className="text-slate-muted text-sm mt-1">{activeCount} active</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">

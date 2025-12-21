@@ -58,11 +58,11 @@ function StatCard({
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <p className="text-sm text-slate-muted">{title}</p>
-          <p className="text-2xl font-bold text-white">{value}</p>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
           {subtitle && <p className="text-xs text-slate-muted">{subtitle}</p>}
         </div>
         <div className={cn("p-3 rounded-xl bg-gradient-to-br", colorClasses[color].split(" ").slice(0, 2).join(" "))}>
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-5 h-5 text-foreground" />
         </div>
       </div>
     </div>
@@ -90,7 +90,7 @@ function AlertCard<T>({
     <div className="bg-slate-card border border-slate-border rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-white">{title}</h3>
+          <h3 className="font-semibold text-foreground">{title}</h3>
           {count > 0 && (
             <span className="px-2 py-0.5 text-xs font-medium bg-coral-alert/20 text-coral-alert rounded-full">
               {count}
@@ -136,13 +136,13 @@ export default function AssetsDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Asset Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">Asset Dashboard</h1>
           <p className="text-sm text-slate-muted mt-1">Overview of fixed assets, depreciation, and maintenance</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-white transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors disabled:opacity-50"
         >
           <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           Refresh
@@ -185,11 +185,11 @@ export default function AssetsDashboard() {
       {/* Status Breakdown */}
       {summaryData?.by_status && summaryData.by_status.length > 0 && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4">Assets by Status</h3>
+          <h3 className="font-semibold text-foreground mb-4">Assets by Status</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {summaryData.by_status.map((item) => (
               <div key={item.status} className="bg-slate-elevated rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-white">{item.count}</p>
+                <p className="text-lg font-bold text-foreground">{item.count}</p>
                 <p className="text-xs text-slate-muted capitalize">{item.status.replace(/_/g, " ")}</p>
               </div>
             ))}
@@ -209,7 +209,7 @@ export default function AssetsDashboard() {
           renderItem={(item) => (
             <div key={item.asset_id} className="flex items-center justify-between py-2 px-3 bg-slate-elevated rounded-lg">
               <div>
-                <p className="text-sm font-medium text-white">{item.asset_name}</p>
+                <p className="text-sm font-medium text-foreground">{item.asset_name}</p>
                 <p className="text-xs text-slate-muted">{item.schedule_date}</p>
               </div>
               <span className="text-sm font-medium text-amber-300">
@@ -229,7 +229,7 @@ export default function AssetsDashboard() {
           renderItem={(item) => (
             <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-slate-elevated rounded-lg">
               <div>
-                <p className="text-sm font-medium text-white">{item.asset_name}</p>
+                <p className="text-sm font-medium text-foreground">{item.asset_name}</p>
                 <p className="text-xs text-slate-muted">{item.location ?? "No location"}</p>
               </div>
               <Wrench className="w-4 h-4 text-amber-300" />
@@ -247,7 +247,7 @@ export default function AssetsDashboard() {
           renderItem={(item) => (
             <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-slate-elevated rounded-lg">
               <div>
-                <p className="text-sm font-medium text-white">{item.asset_name}</p>
+                <p className="text-sm font-medium text-foreground">{item.asset_name}</p>
                 <p className="text-xs text-slate-muted">Expires: {item.warranty_expiry_date}</p>
               </div>
               <span className="text-xs px-2 py-1 bg-coral-alert/20 text-coral-alert rounded-full">
@@ -267,7 +267,7 @@ export default function AssetsDashboard() {
           renderItem={(item) => (
             <div key={item.id} className="flex items-center justify-between py-2 px-3 bg-slate-elevated rounded-lg">
               <div>
-                <p className="text-sm font-medium text-white">{item.asset_name}</p>
+                <p className="text-sm font-medium text-foreground">{item.asset_name}</p>
                 <p className="text-xs text-slate-muted">Expires: {item.insurance_end_date}</p>
               </div>
               <span className="text-xs px-2 py-1 bg-coral-alert/20 text-coral-alert rounded-full">
@@ -280,7 +280,7 @@ export default function AssetsDashboard() {
 
       {/* Quick Actions */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4">Quick Actions</h3>
+        <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Link
             href="/assets/list?status=draft"

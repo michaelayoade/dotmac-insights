@@ -276,6 +276,31 @@ export interface InsuranceExpiringResponse {
   count: number;
 }
 
+// Asset Settings Types
+export interface AssetSettings {
+  id: number;
+  company?: string | null;
+  default_depreciation_method: string;
+  default_finance_book?: string | null;
+  depreciation_posting_date: string;
+  auto_post_depreciation: boolean;
+  enable_cwip_by_default: boolean;
+  maintenance_alert_days: number;
+  warranty_alert_days: number;
+  insurance_alert_days: number;
+}
+
+export interface AssetSettingsUpdate {
+  default_depreciation_method?: string;
+  default_finance_book?: string | null;
+  depreciation_posting_date?: string;
+  auto_post_depreciation?: boolean;
+  enable_cwip_by_default?: boolean;
+  maintenance_alert_days?: number;
+  warranty_alert_days?: number;
+  insurance_alert_days?: number;
+}
+
 // =============================================================================
 // ASSETS API
 // =============================================================================
@@ -411,6 +436,24 @@ export const assetsApi = {
     fetchApi<InsuranceExpiringResponse>('/assets/insurance/expiring', {
       params: days ? { days } : undefined,
     }),
+
+  // -------------------------------------------------------------------------
+  // Settings
+  // -------------------------------------------------------------------------
+
+  /** Get asset settings */
+  getSettings: (company?: string) =>
+    fetchApi<AssetSettings>('/assets/settings', {
+      params: company ? { company } : undefined,
+    }),
+
+  /** Update asset settings */
+  updateSettings: (body: AssetSettingsUpdate, company?: string) =>
+    fetchApi<AssetSettings>('/assets/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      params: company ? { company } : undefined,
+    }),
 };
 
 // =============================================================================
@@ -444,3 +487,7 @@ export const getWarrantyExpiring = assetsApi.getWarrantyExpiring;
 
 // Insurance
 export const getInsuranceExpiring = assetsApi.getInsuranceExpiring;
+
+// Settings
+export const getAssetSettings = assetsApi.getSettings;
+export const updateAssetSettings = assetsApi.updateSettings;

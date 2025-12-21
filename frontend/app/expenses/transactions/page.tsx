@@ -10,7 +10,7 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { CorporateCardTransaction, CardTransactionStatus } from '@/lib/expenses.types';
 
 const STATUS_CONFIG: Record<CardTransactionStatus, { bg: string; text: string; label: string }> = {
-  imported: { bg: 'bg-slate-500/15', text: 'text-slate-300', label: 'Imported' },
+  imported: { bg: 'bg-slate-500/15', text: 'text-foreground-secondary', label: 'Imported' },
   matched: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Matched' },
   unmatched: { bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Unmatched' },
   disputed: { bg: 'bg-red-500/15', text: 'text-red-300', label: 'Disputed' },
@@ -36,7 +36,7 @@ function TransactionRow({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-white font-semibold truncate">{transaction.merchant_name || 'Unknown merchant'}</p>
+            <p className="text-foreground font-semibold truncate">{transaction.merchant_name || 'Unknown merchant'}</p>
             <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyle.bg, statusStyle.text)}>
               {statusStyle.label}
             </span>
@@ -48,7 +48,7 @@ function TransactionRow({
       </div>
       <div className="flex items-center gap-4">
         <div className="text-right">
-          <p className="text-white font-semibold">{transaction.amount.toLocaleString()} {transaction.currency}</p>
+          <p className="text-foreground font-semibold">{transaction.amount.toLocaleString()} {transaction.currency}</p>
           {transaction.original_currency && transaction.original_currency !== transaction.currency && (
             <p className="text-slate-muted text-xs">
               {transaction.original_amount?.toLocaleString()} {transaction.original_currency}
@@ -58,7 +58,7 @@ function TransactionRow({
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 text-slate-muted hover:text-white hover:bg-slate-border/30 rounded-lg transition-colors"
+            className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -69,7 +69,7 @@ function TransactionRow({
                 {transaction.status !== 'matched' && transaction.status !== 'excluded' && transaction.status !== 'personal' && (
                   <button
                     onClick={() => { onAction('match', transaction); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Link2 className="w-4 h-4" />
                     Match to expense
@@ -78,7 +78,7 @@ function TransactionRow({
                 {transaction.status === 'matched' && (
                   <button
                     onClick={() => { onAction('unmatch', transaction); setMenuOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Unlink className="w-4 h-4" />
                     Unmatch
@@ -106,7 +106,7 @@ function TransactionRow({
                   <>
                     <button
                       onClick={() => { onAction('exclude', transaction); setMenuOpen(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-white hover:bg-slate-elevated transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                     >
                       <XCircle className="w-4 h-4" />
                       Exclude
@@ -178,7 +178,7 @@ export default function TransactionsPage() {
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Card Transactions</h1>
+            <h1 className="text-xl font-bold text-foreground">Card Transactions</h1>
             <p className="text-slate-muted text-sm mt-1">View and manage corporate card transactions</p>
           </div>
         </div>
@@ -189,7 +189,7 @@ export default function TransactionsPage() {
         <select
           value={cardFilter}
           onChange={(e) => setCardFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:outline-none focus:border-violet-500"
+          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
         >
           <option value="">All cards</option>
           {cards?.map((card) => (
@@ -201,7 +201,7 @@ export default function TransactionsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-white text-sm focus:outline-none focus:border-violet-500"
+          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
         >
           <option value="">All statuses</option>
           <option value="imported">Imported</option>
@@ -211,7 +211,7 @@ export default function TransactionsPage() {
           <option value="excluded">Excluded</option>
           <option value="personal">Personal</option>
         </select>
-        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-white transition-colors">
+        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-foreground transition-colors">
           <input
             type="checkbox"
             checked={unmatchedOnly}
@@ -230,7 +230,7 @@ export default function TransactionsPage() {
         {!isLoading && (!transactions || transactions.length === 0) && (
           <div className="text-center py-12 bg-slate-card border border-slate-border rounded-2xl">
             <Receipt className="w-12 h-12 mx-auto text-slate-muted mb-3" />
-            <p className="text-white font-semibold">No transactions found</p>
+            <p className="text-foreground font-semibold">No transactions found</p>
             <p className="text-slate-muted text-sm mt-1">Import a statement or adjust filters</p>
           </div>
         )}

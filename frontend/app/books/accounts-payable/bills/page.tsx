@@ -15,7 +15,7 @@ function formatDate(value?: string | null) {
 function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = (status || '').toLowerCase();
   const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-slate-300', icon: <FileEdit className="w-3 h-3" /> },
+    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
     submitted: { bg: 'bg-blue-500/10', border: 'border-blue-500/40', text: 'text-blue-300', icon: <Clock className="w-3 h-3" /> },
     unpaid: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
     paid: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -56,7 +56,7 @@ export default function BooksBillsPage() {
       header: 'Bill',
       render: (item: any) => (
         <div className="flex flex-col">
-          <span className="font-mono text-white">{item.erpnext_id || item.name || `#${item.id}`}</span>
+          <span className="font-mono text-foreground">{item.erpnext_id || item.name || `#${item.id}`}</span>
           <span className="text-slate-muted text-sm">{formatDate(item.posting_date)}</span>
         </div>
       ),
@@ -77,7 +77,7 @@ export default function BooksBillsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-white font-mono">{formatCurrency(item.grand_total ?? item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatCurrency(item.grand_total ?? item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">Outstanding: {formatCurrency(item.outstanding_amount ?? 0, item.currency)}</div>
         </div>
       ),
@@ -103,7 +103,7 @@ export default function BooksBillsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">AP Bills</h1>
+          <h1 className="text-2xl font-bold text-foreground">AP Bills</h1>
           <p className="text-slate-muted text-sm">Capture vendor bills</p>
         </div>
         <Link
@@ -118,7 +118,7 @@ export default function BooksBillsPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input

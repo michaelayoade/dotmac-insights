@@ -29,6 +29,14 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
+    if settings.environment == "production" and (settings.e2e_jwt_secret or settings.e2e_auth_enabled):
+        logger.error(
+            "e2e_auth_disallowed_in_production",
+            e2e_auth_enabled=settings.e2e_auth_enabled,
+            e2e_jwt_secret_configured=bool(settings.e2e_jwt_secret),
+        )
+        raise RuntimeError("E2E auth must be disabled in production")
+
     logger.info(
         "starting_application",
         app="dotmac-insights",

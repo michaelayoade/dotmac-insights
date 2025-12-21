@@ -102,7 +102,7 @@ export default function NewLeadPage() {
           <ArrowLeft className="w-5 h-5 text-slate-400" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-white">New Lead</h1>
+          <h1 className="text-2xl font-semibold text-foreground">New Lead</h1>
           <p className="text-sm text-slate-400 mt-1">Capture a new potential customer</p>
         </div>
       </div>
@@ -116,7 +116,7 @@ export default function NewLeadPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Info */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-emerald-400" />
             Basic Information
           </h2>
@@ -129,7 +129,7 @@ export default function NewLeadPage() {
                 value={formData.lead_name}
                 onChange={handleChange}
                 placeholder="John Smith"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -142,7 +142,7 @@ export default function NewLeadPage() {
                   value={formData.company_name}
                   onChange={handleChange}
                   placeholder="Acme Corp"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -151,7 +151,7 @@ export default function NewLeadPage() {
 
         {/* Contact Info */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5 text-emerald-400" />
             Contact Information
           </h2>
@@ -166,7 +166,7 @@ export default function NewLeadPage() {
                   value={formData.email_id}
                   onChange={handleChange}
                   placeholder="john@example.com"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function NewLeadPage() {
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="+234 800 000 0000"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -194,7 +194,7 @@ export default function NewLeadPage() {
                   value={formData.mobile_no}
                   onChange={handleChange}
                   placeholder="+234 800 000 0000"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -208,7 +208,7 @@ export default function NewLeadPage() {
                   value={formData.website}
                   onChange={handleChange}
                   placeholder="https://example.com"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function NewLeadPage() {
 
         {/* Source & Classification */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <Tag className="w-5 h-5 text-emerald-400" />
             Source & Classification
           </h2>
@@ -228,7 +228,7 @@ export default function NewLeadPage() {
                 name="source"
                 value={formData.source}
                 onChange={handleChange}
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
                 <option value="">Select source...</option>
                 {sources?.map((src: { id: number; name: string }) => (
@@ -252,7 +252,7 @@ export default function NewLeadPage() {
                 value={formData.campaign}
                 onChange={handleChange}
                 placeholder="Q4 2025 Promo"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -263,7 +263,7 @@ export default function NewLeadPage() {
                 value={formData.industry}
                 onChange={handleChange}
                 placeholder="Technology"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -274,7 +274,7 @@ export default function NewLeadPage() {
                 value={formData.territory}
                 onChange={handleChange}
                 placeholder="Lagos"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function NewLeadPage() {
 
         {/* Address */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-emerald-400" />
             Address
           </h2>
@@ -295,7 +295,7 @@ export default function NewLeadPage() {
                 value={formData.address_line1}
                 onChange={handleChange}
                 placeholder="123 Main Street"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div className="md:col-span-2">
@@ -306,7 +306,7 @@ export default function NewLeadPage() {
                 value={formData.address_line2}
                 onChange={handleChange}
                 placeholder="Suite 100"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -317,7 +317,7 @@ export default function NewLeadPage() {
                 value={formData.city}
                 onChange={handleChange}
                 placeholder="Lagos"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -328,7 +328,7 @@ export default function NewLeadPage() {
                 value={formData.state}
                 onChange={handleChange}
                 placeholder="Lagos"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -339,7 +339,7 @@ export default function NewLeadPage() {
                 value={formData.postal_code}
                 onChange={handleChange}
                 placeholder="100001"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <div>
@@ -350,7 +350,7 @@ export default function NewLeadPage() {
                 value={formData.country}
                 onChange={handleChange}
                 placeholder="Nigeria"
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
@@ -358,7 +358,7 @@ export default function NewLeadPage() {
 
         {/* Notes */}
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-emerald-400" />
             Notes
           </h2>
@@ -368,7 +368,7 @@ export default function NewLeadPage() {
             onChange={handleChange}
             placeholder="Additional notes about this lead..."
             rows={4}
-            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
           />
         </div>
 
@@ -376,14 +376,14 @@ export default function NewLeadPage() {
         <div className="flex items-center justify-end gap-4">
           <Link
             href="/sales/leads"
-            className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? 'Creating...' : 'Create Lead'}

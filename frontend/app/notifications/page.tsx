@@ -68,7 +68,7 @@ export default function NotificationsPage() {
               )}
             >
               <div className="space-y-1">
-                <p className="text-white font-semibold">{n.title || n.event_type}</p>
+                <p className="text-foreground font-semibold">{n.title || n.event_type}</p>
                 {n.message && <p className="text-slate-muted text-sm">{n.message}</p>}
                 <p className="text-xs text-slate-muted flex items-center gap-1">
                   <Clock className="w-3 h-3" />
@@ -90,7 +90,7 @@ export default function NotificationsPage() {
         <div id="prefs" className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Settings className="w-4 h-4 text-teal-electric" />
-            <h2 className="text-white font-semibold text-sm">Preferences</h2>
+            <h2 className="text-foreground font-semibold text-sm">Preferences</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             {Object.entries(prefs || {}).map(([eventType, enabled]) => (

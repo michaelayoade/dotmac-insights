@@ -89,7 +89,7 @@ export default function NewExpenseClaimPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-white">New Expense Claim</h2>
+        <h2 className="text-xl font-semibold text-foreground">New Expense Claim</h2>
         <p className="text-sm text-slate-muted">Capture claim header and detailed lines.</p>
       </div>
 
@@ -98,7 +98,7 @@ export default function NewExpenseClaimPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Title</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
@@ -115,7 +115,7 @@ export default function NewExpenseClaimPage() {
             <span className="text-slate-muted">Claim Date</span>
             <input
               type="date"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.claim_date}
               onChange={(e) => setForm((prev) => ({ ...prev, claim_date: e.target.value }))}
             />
@@ -123,7 +123,7 @@ export default function NewExpenseClaimPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Currency</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.currency}
               onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
             />
@@ -131,7 +131,7 @@ export default function NewExpenseClaimPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-slate-muted">Base Currency</span>
             <input
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.base_currency}
               onChange={(e) => setForm((prev) => ({ ...prev, base_currency: e.target.value }))}
             />
@@ -141,7 +141,7 @@ export default function NewExpenseClaimPage() {
             <input
               type="number"
               step="0.0001"
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.conversion_rate}
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, conversion_rate: Number(e.target.value) || 1 }))
@@ -151,7 +151,7 @@ export default function NewExpenseClaimPage() {
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span className="text-slate-muted">Description</span>
             <textarea
-              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+              className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
               value={form.description || ""}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
             />
@@ -161,7 +161,7 @@ export default function NewExpenseClaimPage() {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-white">Line Items</h3>
+          <h3 className="text-lg font-medium text-foreground">Line Items</h3>
           <button
             onClick={addLine}
             className="rounded-lg border border-teal-electric/30 bg-teal-electric/10 px-3 py-1 text-sm font-medium text-teal-electric"
@@ -178,7 +178,7 @@ export default function NewExpenseClaimPage() {
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-slate-muted">Category</span>
                     <select
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.category_id || 0}
                       onChange={(e) => updateLine(idx, { category_id: Number(e.target.value) })}
                     >
@@ -194,7 +194,7 @@ export default function NewExpenseClaimPage() {
                     <span className="text-slate-muted">Expense Date</span>
                     <input
                       type="date"
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.expense_date}
                       onChange={(e) => updateLine(idx, { expense_date: e.target.value })}
                     />
@@ -202,7 +202,7 @@ export default function NewExpenseClaimPage() {
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-slate-muted">Funding Method</span>
                     <select
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.funding_method}
                       onChange={(e) => updateLine(idx, { funding_method: e.target.value as FundingMethod })}
                     >
@@ -215,7 +215,7 @@ export default function NewExpenseClaimPage() {
                   <label className="flex flex-col gap-1 text-sm md:col-span-2">
                     <span className="text-slate-muted">Description</span>
                     <input
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.description}
                       onChange={(e) => updateLine(idx, { description: e.target.value })}
                     />
@@ -225,7 +225,7 @@ export default function NewExpenseClaimPage() {
                     <input
                       type="number"
                       step="0.01"
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.claimed_amount}
                       onChange={(e) => updateLine(idx, { claimed_amount: Number(e.target.value) || 0 })}
                     />
@@ -233,7 +233,7 @@ export default function NewExpenseClaimPage() {
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-slate-muted">Currency</span>
                     <input
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.currency || ""}
                       onChange={(e) => updateLine(idx, { currency: e.target.value })}
                     />
@@ -241,7 +241,7 @@ export default function NewExpenseClaimPage() {
                   <label className="flex flex-col gap-1 text-sm">
                     <span className="text-slate-muted">Receipt?</span>
                     <select
-                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                      className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                       value={line.has_receipt ? "yes" : "no"}
                       onChange={(e) => updateLine(idx, { has_receipt: e.target.value === "yes" })}
                     >
@@ -253,7 +253,7 @@ export default function NewExpenseClaimPage() {
                     <label className="flex flex-col gap-1 text-sm md:col-span-2">
                       <span className="text-slate-muted">Missing Receipt Reason</span>
                       <input
-                        className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-white"
+                        className="rounded-lg border border-slate-border bg-slate-elevated px-3 py-2 text-foreground"
                         value={line.receipt_missing_reason || ""}
                         onChange={(e) => updateLine(idx, { receipt_missing_reason: e.target.value })}
                       />

@@ -74,7 +74,7 @@ export default function GeneralLedgerPage() {
       render: (item: AccountingGeneralLedgerEntry) => (
         <div>
           <span className="font-mono text-teal-electric text-sm">{item.account}</span>
-          <span className="text-white ml-2">{item.account_name || ''}</span>
+          <span className="text-foreground ml-2">{item.account_name || ''}</span>
         </div>
       ),
     },
@@ -82,7 +82,7 @@ export default function GeneralLedgerPage() {
       key: 'description',
       header: 'Description',
       render: (item: AccountingGeneralLedgerEntry) => (
-        <span className="text-slate-300 text-sm truncate max-w-[250px] block">
+        <span className="text-foreground-secondary text-sm truncate max-w-[250px] block">
           {item.remarks || item.voucher_no || item.party || '-'}
         </span>
       ),
@@ -121,7 +121,7 @@ export default function GeneralLedgerPage() {
         <span
           className={cn(
             'font-mono font-semibold',
-            (item.balance || 0) >= 0 ? 'text-white' : 'text-red-400'
+            (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
           )}
         >
           {item.balance !== undefined && item.balance !== null ? formatCurrency(item.balance) : '-'}
@@ -153,7 +153,7 @@ export default function GeneralLedgerPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-sm">Total Entries</p>
-            <p className="text-2xl font-bold text-white">{data?.total || 0}</p>
+            <p className="text-2xl font-bold text-foreground">{data?.total || 0}</p>
           </div>
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
             <p className="text-blue-400 text-sm">Total Debits</p>
@@ -185,14 +185,14 @@ export default function GeneralLedgerPage() {
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setOffset(0); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <span className="text-slate-muted">to</span>
           <input
             type="date"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setOffset(0); }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         <div className="flex-1 min-w-[160px] max-w-xs">
@@ -201,13 +201,13 @@ export default function GeneralLedgerPage() {
             placeholder="Filter by account code..."
             value={accountCode}
             onChange={(e) => { setAccountCode(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
         </div>
         {(startDate || endDate || accountCode) && (
           <button
             onClick={() => { setStartDate(''); setEndDate(''); setAccountCode(''); setOffset(0); }}
-            className="text-slate-muted text-sm hover:text-white transition-colors"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
           </button>

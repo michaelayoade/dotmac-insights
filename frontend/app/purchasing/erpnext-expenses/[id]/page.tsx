@@ -197,21 +197,21 @@ export default function ERPNextExpenseDetailPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/purchasing/erpnext-expenses"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">ERPNext Expense Claim</p>
-            <h1 className="text-xl font-semibold text-white">#{expense.id}</h1>
+            <h1 className="text-xl font-semibold text-foreground">#{expense.id}</h1>
           </div>
         </div>
         {!editing && (
           <div className="flex items-center gap-2">
             <button
               onClick={handleStartEdit}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-teal-electric/50"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-teal-electric/50"
             >
               <Edit3 className="w-4 h-4" />
               Edit
@@ -250,7 +250,7 @@ export default function ERPNextExpenseDetailPage() {
                 <AlertTriangle className="w-5 h-5 text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Delete Expense Claim</h3>
+                <h3 className="text-lg font-semibold text-foreground">Delete Expense Claim</h3>
                 <p className="text-sm text-slate-muted">This action cannot be undone.</p>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function ERPNextExpenseDetailPage() {
                 onClick={handleDelete}
                 disabled={deleting}
                 className={cn(
-                  'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600',
+                  'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-foreground font-semibold hover:bg-red-600',
                   deleting && 'opacity-60 cursor-not-allowed'
                 )}
               >
@@ -268,7 +268,7 @@ export default function ERPNextExpenseDetailPage() {
               </button>
               <button
                 onClick={() => setDeleteConfirm(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               >
                 Cancel
               </button>
@@ -289,7 +289,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="employee_name"
                   value={form.employee_name || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -298,7 +298,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="erpnext_employee"
                   value={form.erpnext_employee || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -313,7 +313,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="expense_type"
                   value={form.expense_type || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -323,7 +323,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="posting_date"
                   value={form.posting_date || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -332,7 +332,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="status"
                   value={form.status || 'draft'}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 >
                   {EXPENSE_STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -361,7 +361,7 @@ export default function ERPNextExpenseDetailPage() {
                 value={form.description || ''}
                 onChange={handleChange}
                 rows={2}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
               />
             </div>
             <div className="mt-4 space-y-1">
@@ -371,7 +371,7 @@ export default function ERPNextExpenseDetailPage() {
                 value={form.remark || ''}
                 onChange={handleChange}
                 rows={2}
-                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
+                className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 resize-none"
               />
             </div>
           </div>
@@ -388,7 +388,7 @@ export default function ERPNextExpenseDetailPage() {
                   onChange={handleChange}
                   min={0}
                   step={0.01}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -400,7 +400,7 @@ export default function ERPNextExpenseDetailPage() {
                   onChange={handleChange}
                   min={0}
                   step={0.01}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -412,7 +412,7 @@ export default function ERPNextExpenseDetailPage() {
                   onChange={handleChange}
                   min={0}
                   step={0.01}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -424,7 +424,7 @@ export default function ERPNextExpenseDetailPage() {
                   onChange={handleChange}
                   min={0}
                   step={0.01}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -434,7 +434,7 @@ export default function ERPNextExpenseDetailPage() {
                   value={form.currency || 'NGN'}
                   onChange={handleChange}
                   maxLength={3}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -449,7 +449,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="company"
                   value={form.company || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
               <div className="space-y-1">
@@ -458,7 +458,7 @@ export default function ERPNextExpenseDetailPage() {
                   name="cost_center"
                   value={form.cost_center || ''}
                   onChange={handleChange}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                 />
               </div>
             </div>
@@ -478,7 +478,7 @@ export default function ERPNextExpenseDetailPage() {
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70"
+              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               Cancel
             </button>
@@ -508,7 +508,7 @@ export default function ERPNextExpenseDetailPage() {
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-muted">Posting Date</p>
-              <p className="text-sm text-white">{formatDate(expense.posting_date)}</p>
+              <p className="text-sm text-foreground">{formatDate(expense.posting_date)}</p>
             </div>
           </div>
 
@@ -546,7 +546,7 @@ export default function ERPNextExpenseDetailPage() {
                 <Clock className="w-4 h-4 text-slate-muted" />
                 <p className="text-slate-muted text-sm">Advance</p>
               </div>
-              <p className="text-xl font-bold text-white">
+              <p className="text-xl font-bold text-foreground">
                 {formatCurrency(expense.total_advance_amount, expense.currency || 'NGN')}
               </p>
             </div>
@@ -561,7 +561,7 @@ export default function ERPNextExpenseDetailPage() {
                   <User className="w-5 h-5 text-teal-electric" />
                   <div>
                     <p className="text-xs text-slate-muted">Employee Name</p>
-                    <p className="text-white">{expense.employee_name || '-'}</p>
+                    <p className="text-foreground">{expense.employee_name || '-'}</p>
                   </div>
                 </div>
                 {expense.erpnext_employee && (
@@ -569,7 +569,7 @@ export default function ERPNextExpenseDetailPage() {
                     <Receipt className="w-5 h-5 text-slate-muted" />
                     <div>
                       <p className="text-xs text-slate-muted">ERPNext Employee</p>
-                      <p className="text-white font-mono">{expense.erpnext_employee}</p>
+                      <p className="text-foreground font-mono">{expense.erpnext_employee}</p>
                     </div>
                   </div>
                 )}
@@ -578,7 +578,7 @@ export default function ERPNextExpenseDetailPage() {
                     <Receipt className="w-5 h-5 text-slate-muted" />
                     <div>
                       <p className="text-xs text-slate-muted">ERPNext ID</p>
-                      <p className="text-white font-mono">{expense.erpnext_id}</p>
+                      <p className="text-foreground font-mono">{expense.erpnext_id}</p>
                     </div>
                   </div>
                 )}
@@ -593,7 +593,7 @@ export default function ERPNextExpenseDetailPage() {
                     <Building2 className="w-5 h-5 text-teal-electric" />
                     <div>
                       <p className="text-xs text-slate-muted">Company</p>
-                      <p className="text-white">{expense.company}</p>
+                      <p className="text-foreground">{expense.company}</p>
                     </div>
                   </div>
                 )}
@@ -602,7 +602,7 @@ export default function ERPNextExpenseDetailPage() {
                     <Briefcase className="w-5 h-5 text-slate-muted" />
                     <div>
                       <p className="text-xs text-slate-muted">Cost Center</p>
-                      <p className="text-white">{expense.cost_center}</p>
+                      <p className="text-foreground">{expense.cost_center}</p>
                     </div>
                   </div>
                 )}
@@ -611,7 +611,7 @@ export default function ERPNextExpenseDetailPage() {
                     <Receipt className="w-5 h-5 text-slate-muted" />
                     <div>
                       <p className="text-xs text-slate-muted">Expense Type</p>
-                      <p className="text-white">{expense.expense_type}</p>
+                      <p className="text-foreground">{expense.expense_type}</p>
                     </div>
                   </div>
                 )}
@@ -626,13 +626,13 @@ export default function ERPNextExpenseDetailPage() {
               {expense.description && (
                 <div className="mb-4">
                   <p className="text-xs text-slate-muted mb-1">Description</p>
-                  <p className="text-white">{expense.description}</p>
+                  <p className="text-foreground">{expense.description}</p>
                 </div>
               )}
               {expense.remark && (
                 <div>
                   <p className="text-xs text-slate-muted mb-1">Remark</p>
-                  <p className="text-white">{expense.remark}</p>
+                  <p className="text-foreground">{expense.remark}</p>
                 </div>
               )}
             </div>

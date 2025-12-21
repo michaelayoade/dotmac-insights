@@ -35,9 +35,9 @@ function getStatusBadge(status: string) {
     case "returned":
       return { label: "Returned", className: "bg-amber-500/20 text-amber-300", icon: RotateCcw };
     case "inactive":
-      return { label: "Inactive", className: "bg-slate-500/20 text-slate-300", icon: XCircle };
+      return { label: "Inactive", className: "bg-slate-500/20 text-foreground-secondary", icon: XCircle };
     default:
-      return { label: status, className: "bg-slate-500/20 text-slate-300", icon: Hash };
+      return { label: status, className: "bg-slate-500/20 text-foreground-secondary", icon: Hash };
   }
 }
 
@@ -58,7 +58,7 @@ export default function SerialsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Serial Number Tracking</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Serial Number Tracking</h1>
           <p className="text-slate-muted text-sm">Track individual items by unique serial numbers</p>
         </div>
         <Link
@@ -77,19 +77,19 @@ export default function SerialsPage() {
             placeholder="Filter by item code..."
             value={itemCode}
             onChange={(e) => setItemCode(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
           <input
             type="text"
             placeholder="Filter by warehouse..."
             value={warehouse}
             onChange={(e) => setWarehouse(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -153,7 +153,7 @@ export default function SerialsPage() {
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-slate-muted" />
                           <div>
-                            <span className="text-white">{serial.item_code}</span>
+                            <span className="text-foreground">{serial.item_code}</span>
                             {serial.item_name && (
                               <span className="text-slate-muted ml-2 text-xs">{serial.item_name}</span>
                             )}

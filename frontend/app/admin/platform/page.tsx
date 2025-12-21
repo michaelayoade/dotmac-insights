@@ -83,7 +83,7 @@ function MetricCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-muted text-sm">{label}</p>
-          <div className="text-2xl font-bold text-white mt-1">{value}</div>
+          <div className="text-2xl font-bold text-foreground mt-1">{value}</div>
           {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
         </div>
         <div
@@ -127,7 +127,7 @@ function FeatureFlagRow({ flag }: { flag: PlatformFeatureFlag }) {
           )}
         </div>
         <div>
-          <p className="text-white font-medium text-sm font-mono">{flag.name}</p>
+          <p className="text-foreground font-medium text-sm font-mono">{flag.name}</p>
           <p className="text-slate-muted text-xs">{flag.description}</p>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function PlatformStatusPage() {
             <Cloud className="w-6 h-6 text-teal-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Platform Status</h1>
+            <h1 className="text-2xl font-bold text-foreground">Platform Status</h1>
             <p className="text-slate-muted text-sm">
               Monitor platform health, license status, and feature flags
             </p>
@@ -192,14 +192,14 @@ export default function PlatformStatusPage() {
           <button
             onClick={() => refetchStatus()}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
             Refresh
           </button>
           <Link
             href="/admin/security"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-white hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <Shield className="w-4 h-4" />
             Security
@@ -225,7 +225,7 @@ export default function PlatformStatusPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-teal-electric" />
-            <h2 className="text-lg font-semibold text-white">Platform Connection</h2>
+            <h2 className="text-lg font-semibold text-foreground">Platform Connection</h2>
           </div>
           {status && (
             <StatusBadge status={status.platform_configured ? 'connected' : 'disconnected'} />
@@ -279,7 +279,7 @@ export default function PlatformStatusPage() {
           <div className="px-5 py-4 border-b border-slate-border flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Key className="w-5 h-5 text-amber-400" />
-              <h3 className="font-semibold text-white">License Details</h3>
+              <h3 className="font-semibold text-foreground">License Details</h3>
             </div>
             <StatusBadge status={status.license.status} />
           </div>
@@ -287,11 +287,11 @@ export default function PlatformStatusPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Status</p>
-                <p className="text-white font-medium capitalize">{status.license.status}</p>
+                <p className="text-foreground font-medium capitalize">{status.license.status}</p>
               </div>
               <div>
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Message</p>
-                <p className="text-white font-medium">{status.license.message}</p>
+                <p className="text-foreground font-medium">{status.license.message}</p>
               </div>
               <div>
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Grace Period</p>
@@ -310,7 +310,7 @@ export default function PlatformStatusPage() {
               </div>
               <div>
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Configured</p>
-                <p className="text-white font-medium">{status.license.configured ? 'Yes' : 'No'}</p>
+                <p className="text-foreground font-medium">{status.license.configured ? 'Yes' : 'No'}</p>
               </div>
             </div>
 
@@ -335,25 +335,25 @@ export default function PlatformStatusPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Lock className="w-5 h-5 text-slate-400" />
-            <h3 className="font-semibold text-white">Instance Information</h3>
+            <h3 className="font-semibold text-foreground">Instance Information</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {status.instance_id && (
               <div className="p-3 bg-slate-elevated/50 rounded-lg">
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Instance ID</p>
-                <p className="text-white font-mono text-sm truncate">{status.instance_id}</p>
+                <p className="text-foreground font-mono text-sm truncate">{status.instance_id}</p>
               </div>
             )}
             {status.tenant_id && (
               <div className="p-3 bg-slate-elevated/50 rounded-lg">
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Tenant ID</p>
-                <p className="text-white font-mono text-sm truncate">{status.tenant_id}</p>
+                <p className="text-foreground font-mono text-sm truncate">{status.tenant_id}</p>
               </div>
             )}
             {status.platform_url && (
               <div className="p-3 bg-slate-elevated/50 rounded-lg">
                 <p className="text-slate-muted text-xs uppercase tracking-wide mb-1">Platform URL</p>
-                <p className="text-white font-mono text-sm truncate">{status.platform_url}</p>
+                <p className="text-foreground font-mono text-sm truncate">{status.platform_url}</p>
               </div>
             )}
           </div>
@@ -365,7 +365,7 @@ export default function PlatformStatusPage() {
         <div className="px-5 py-4 border-b border-slate-border flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flag className="w-5 h-5 text-violet-400" />
-            <h3 className="font-semibold text-white">Feature Flags</h3>
+            <h3 className="font-semibold text-foreground">Feature Flags</h3>
             {featureFlags && (
               <span className="text-xs px-2 py-0.5 rounded bg-slate-elevated text-slate-muted">
                 Source: {featureFlags.source}
@@ -434,7 +434,7 @@ export default function PlatformStatusPage() {
               <Shield className="w-5 h-5 text-teal-400" />
             </div>
             <div className="flex-1">
-              <h4 className="text-white font-medium flex items-center gap-2">
+              <h4 className="text-foreground font-medium flex items-center gap-2">
                 Security & Controls
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-muted" />
               </h4>
@@ -452,7 +452,7 @@ export default function PlatformStatusPage() {
               <Settings className="w-5 h-5 text-violet-400" />
             </div>
             <div className="flex-1">
-              <h4 className="text-white font-medium flex items-center gap-2">
+              <h4 className="text-foreground font-medium flex items-center gap-2">
                 System Settings
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-muted" />
               </h4>
@@ -470,7 +470,7 @@ export default function PlatformStatusPage() {
               <RefreshCw className="w-5 h-5 text-amber-400" />
             </div>
             <div className="flex-1">
-              <h4 className="text-white font-medium flex items-center gap-2">
+              <h4 className="text-foreground font-medium flex items-center gap-2">
                 Data Sync
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-muted" />
               </h4>

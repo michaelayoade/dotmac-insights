@@ -41,7 +41,7 @@ export default function HealthPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-card rounded-lg border border-slate-border p-4">
           <div className="text-sm text-slate-muted">Active Customers</div>
-          <div className="text-2xl font-bold text-white">{totalActive}</div>
+          <div className="text-2xl font-bold text-foreground">{totalActive}</div>
         </div>
         <div className="bg-slate-card rounded-lg border border-slate-border p-4">
           <div className="text-sm text-slate-muted">On-time Rate</div>
@@ -94,7 +94,7 @@ export default function HealthPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-slate-muted">Customers with tickets (30d)</p>
-              <p className="text-2xl font-mono text-white">{si.customers_with_tickets_30d}</p>
+              <p className="text-2xl font-mono text-foreground">{si.customers_with_tickets_30d}</p>
             </div>
             <div>
               <p className="text-sm text-slate-muted">High support customers</p>

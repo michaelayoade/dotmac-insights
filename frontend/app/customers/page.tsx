@@ -104,7 +104,7 @@ function MetricCard({
   variant?: 'default' | 'success' | 'warning' | 'danger';
 }) {
   const variantStyles = {
-    default: 'text-white',
+    default: 'text-foreground',
     success: 'text-teal-electric',
     warning: 'text-amber-warn',
     danger: 'text-coral-alert',
@@ -369,7 +369,7 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold text-white">Customers</h1>
+          <h1 className="font-display text-3xl font-bold text-foreground">Customers</h1>
           <p className="text-slate-muted mt-1">
             Manage and analyze your customer base
           </p>
@@ -378,7 +378,7 @@ export default function CustomersPage() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-elevated rounded-lg">
               <Activity className="w-4 h-4 text-teal-electric" />
-              <span className="text-sm text-white font-medium">
+              <span className="text-sm text-foreground font-medium">
                 {overview.total_customers}
               </span>
               <span className="text-xs text-slate-muted">total</span>
@@ -493,7 +493,7 @@ export default function CustomersPage() {
                   placeholder="Search by name, email, phone..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
                 />
               </div>
 
@@ -504,7 +504,7 @@ export default function CustomersPage() {
                   setStatusFilter(e.target.value as StatusOption);
                   setOffset(0);
                 }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -520,7 +520,7 @@ export default function CustomersPage() {
                   setTypeFilter(e.target.value);
                   setOffset(0);
                 }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
               >
                 <option value="all">All Types</option>
                 <option value="residential">Residential</option>
@@ -535,40 +535,40 @@ export default function CustomersPage() {
                 value={cohortFilter}
                 onChange={(e) => { setCohortFilter(e.target.value); setOffset(0); }}
                 placeholder="Cohort (YYYY-MM)"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
               <input
                 type="text"
                 value={cityFilter}
                 onChange={(e) => { setCityFilter(e.target.value); setOffset(0); }}
                 placeholder="City"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
               <input
                 type="text"
                 value={baseStationFilter}
                 onChange={(e) => { setBaseStationFilter(e.target.value); setOffset(0); }}
                 placeholder="Base Station"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
               <input
                 type="date"
                 value={signupStart}
                 onChange={(e) => { setSignupStart(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
               <input
                 type="date"
                 value={signupEnd}
                 onChange={(e) => { setSignupEnd(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
+                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
             </div>
 
             <div className="flex justify-between items-center pt-4">
               <button
                 onClick={resetFilters}
-                className="text-sm text-slate-muted hover:text-white transition-colors"
+                className="text-sm text-slate-muted hover:text-foreground transition-colors"
               >
                 Clear all filters
               </button>
@@ -618,7 +618,7 @@ export default function CustomersPage() {
                         {(item.name as string).charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-white font-medium font-body">{item.name as string}</p>
+                        <p className="text-foreground font-medium font-body">{item.name as string}</p>
                         <p className="text-slate-muted text-xs">
                           {(item.city || item.state) ? `${item.city || ''}${item.city && item.state ? ', ' : ''}${item.state || ''}` : 'Location unknown'}
                         </p>
@@ -699,12 +699,12 @@ export default function CustomersPage() {
             <Card className="sticky top-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-display font-semibold text-white">Customer View</h3>
+                  <h3 className="font-display font-semibold text-foreground">Customer View</h3>
                   <p className="text-slate-muted text-xs">Full 360 payload</p>
                 </div>
                 <button
                   onClick={() => { setSelectedCustomerId(null); setDetailTab('profile'); }}
-                  className="text-slate-muted hover:text-white transition-colors text-xl leading-none"
+                  className="text-slate-muted hover:text-foreground transition-colors text-xl leading-none"
                   aria-label="Close details"
                 >
                   ×
@@ -717,7 +717,7 @@ export default function CustomersPage() {
                   {selectedCustomer.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-white font-semibold truncate">{selectedCustomer.name}</h4>
+                  <h4 className="text-foreground font-semibold truncate">{selectedCustomer.name}</h4>
                   <p className="text-slate-muted text-sm truncate">
                     {customer360?.profile?.base_station || selectedCustomer.city || selectedCustomer.state || 'Location unknown'}
                   </p>
@@ -761,8 +761,8 @@ export default function CustomersPage() {
                     className={cn(
                       'px-3 py-1.5 text-xs rounded-md border transition-colors',
                       detailTab === tab.key
-                        ? 'border-teal-electric/50 bg-teal-electric/10 text-white'
-                        : 'border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70'
+                        ? 'border-teal-electric/50 bg-teal-electric/10 text-foreground'
+                        : 'border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70'
                     )}
                   >
                     {tab.label}
@@ -779,7 +779,7 @@ export default function CustomersPage() {
                       {selectedCustomer.email && (
                         <div className="flex items-center gap-3 text-sm">
                           <Mail className="w-4 h-4 text-slate-muted" />
-                          <span className="text-white">{selectedCustomer.email}</span>
+                          <span className="text-foreground">{selectedCustomer.email}</span>
                         </div>
                       )}
                       {customer360?.profile?.billing_email && (
@@ -791,14 +791,14 @@ export default function CustomersPage() {
                       {selectedCustomer.phone && (
                         <div className="flex items-center gap-3 text-sm">
                           <Phone className="w-4 h-4 text-slate-muted" />
-                          <span className="text-white">{selectedCustomer.phone}</span>
+                          <span className="text-foreground">{selectedCustomer.phone}</span>
                         </div>
                       )}
                       {customer360?.profile?.address && (
                         <div className="flex items-start gap-3 text-sm">
                           <MapPin className="w-4 h-4 text-slate-muted mt-0.5" />
                           <div className="text-slate-muted">
-                            <p className="text-white">{customer360.profile.address}</p>
+                            <p className="text-foreground">{customer360.profile.address}</p>
                             {customer360.profile.address_2 && <p>{customer360.profile.address_2}</p>}
                             <p>{[customer360.profile.city, customer360.profile.state, (customer360.profile as any).country].filter(Boolean).join(', ')}</p>
                           </div>
@@ -844,7 +844,7 @@ export default function CustomersPage() {
                     {customer360?.finance?.billing_health && (
                       <div className="bg-slate-elevated/70 rounded-lg p-3 border border-slate-border/60 text-sm text-slate-muted">
                         <p className="text-xs uppercase text-slate-muted mb-2">Billing Health</p>
-                        <div className="grid grid-cols-2 gap-2 text-white font-mono">
+                        <div className="grid grid-cols-2 gap-2 text-foreground font-mono">
                           <span>Blocking in: {customer360.finance.billing_health.days_until_blocking ?? '—'} days</span>
                           <span>Deposit: {formatCurrency(customer360.finance.billing_health.deposit_balance ?? 0)}</span>
                           <span>Blocking date: {customer360.finance.billing_health.blocking_date ? formatDate(customer360.finance.billing_health.blocking_date) : '—'}</span>
@@ -860,7 +860,7 @@ export default function CustomersPage() {
                           {recentInvoices.slice(0, 4).map((inv: any) => (
                             <div key={inv.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
-                                <p className="text-white font-mono">{inv.invoice_number || `#${inv.id}`}</p>
+                                <p className="text-foreground font-mono">{inv.invoice_number || `#${inv.id}`}</p>
                                 <p className="text-xs text-slate-muted">{inv.due_date ? formatDate(inv.due_date) : 'No due date'}</p>
                               </div>
                               <div className="text-right">
@@ -879,7 +879,7 @@ export default function CustomersPage() {
                         <div className="space-y-2">
                           {customer360.finance.recent_payments.slice(0, 3).map((pay: any) => (
                             <div key={pay.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
-                              <div className="text-white font-mono">{formatCurrency(pay.amount)}</div>
+                              <div className="text-foreground font-mono">{formatCurrency(pay.amount)}</div>
                               <div className="text-right text-xs text-slate-muted">
                                 <div>{pay.payment_method || '—'}</div>
                                 <div>{pay.payment_date ? formatDate(pay.payment_date) : '—'}</div>
@@ -909,7 +909,7 @@ export default function CustomersPage() {
                           {customer360.services.subscriptions.map((sub: any) => (
                             <div key={sub.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
-                                <p className="text-white font-medium">{sub.plan_name}</p>
+                                <p className="text-foreground font-medium">{sub.plan_name}</p>
                                 <p className="text-xs text-slate-muted">
                                   {sub.start_date ? formatDate(sub.start_date) : 'Start N/A'}
                                   {sub.end_date ? ` → ${formatDate(sub.end_date)}` : ''}
@@ -928,7 +928,7 @@ export default function CustomersPage() {
                     {usageData && (
                       <div className="bg-slate-elevated/70 rounded-lg p-3 text-xs text-slate-muted">
                         <p className="text-xs uppercase mb-2">Usage (last 30d)</p>
-                        <div className="flex justify-between text-white font-mono">
+                        <div className="flex justify-between text-foreground font-mono">
                           <span>Down: {usageData.totals?.download_gb?.toFixed(1)} GB</span>
                           <span>Up: {usageData.totals?.upload_gb?.toFixed(1)} GB</span>
                           <span>Total: {usageData.totals?.total_gb?.toFixed(1)} GB</span>
@@ -954,7 +954,7 @@ export default function CustomersPage() {
                         <div className="space-y-2">
                           {customer360.network.ip_addresses.map((ip: any) => (
                             <div key={ip.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
-                              <div className="text-white font-mono">{ip.ip}</div>
+                              <div className="text-foreground font-mono">{ip.ip}</div>
                               <div className="text-xs text-slate-muted text-right">
                                 <div>{ip.hostname || '—'}</div>
                                 <div>{ip.status}</div>
@@ -971,7 +971,7 @@ export default function CustomersPage() {
                           {customer360.network.routers.map((r: any) => (
                             <div key={r.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
-                                <p className="text-white font-medium">{r.name}</p>
+                                <p className="text-foreground font-medium">{r.name}</p>
                                 <p className="text-xs text-slate-muted">{r.model} • {r.location || 'Unknown location'}</p>
                               </div>
                               <StatusBadge status={r.status} size="sm" />
@@ -997,7 +997,7 @@ export default function CustomersPage() {
                         {customer360.support.tickets.slice(0, 5).map((t: any) => (
                           <div key={t.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                             <div className="min-w-0">
-                              <p className="text-white font-medium truncate">{t.subject}</p>
+                              <p className="text-foreground font-medium truncate">{t.subject}</p>
                               <p className="text-xs text-slate-muted">{t.priority} • {formatDate(t.created_at)}</p>
                             </div>
                             <StatusBadge status={t.status} size="sm" />
@@ -1023,7 +1023,7 @@ export default function CustomersPage() {
                         {customer360.projects.projects.slice(0, 5).map((p: any) => (
                           <div key={p.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                             <div className="min-w-0">
-                              <p className="text-white font-medium truncate">{p.name}</p>
+                              <p className="text-foreground font-medium truncate">{p.name}</p>
                               <p className="text-xs text-slate-muted">{p.type} • {p.priority}</p>
                               <p className="text-xs text-slate-muted">
                                 {p.expected_start ? formatDate(p.expected_start) : '—'} → {p.expected_end ? formatDate(p.expected_end) : '—'}
@@ -1053,7 +1053,7 @@ export default function CustomersPage() {
                           {customer360.crm.conversations.slice(0, 4).map((c: any) => (
                             <div key={c.id} className="flex items-center justify-between bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
                               <div>
-                                <p className="text-white capitalize">{c.channel}</p>
+                                <p className="text-foreground capitalize">{c.channel}</p>
                                 <p className="text-xs text-slate-muted">{c.status} • {c.assignee || 'Unassigned'}</p>
                               </div>
                               <Badge variant="default" size="sm">{c.message_count} msgs</Badge>
@@ -1068,7 +1068,7 @@ export default function CustomersPage() {
                         <div className="space-y-2">
                           {customer360.crm.notes.slice(0, 4).map((n: any) => (
                             <div key={n.id} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm">
-                              <p className="text-white font-medium">{n.title || n.type || 'Note'}</p>
+                              <p className="text-foreground font-medium">{n.title || n.type || 'Note'}</p>
                               <p className="text-xs text-slate-muted">{n.comment || 'No comment'}</p>
                             </div>
                           ))}
@@ -1085,7 +1085,7 @@ export default function CustomersPage() {
                       customer360.timeline.slice(0, 10).map((event: any, idx: number) => (
                         <div key={`${event.type}-${idx}`} className="bg-slate-card/60 rounded-lg px-3 py-2 text-sm flex items-start justify-between">
                           <div className="min-w-0">
-                            <p className="text-white font-medium capitalize">{event.type}: {event.title}</p>
+                            <p className="text-foreground font-medium capitalize">{event.type}: {event.title}</p>
                             <p className="text-xs text-slate-muted">{event.description || 'No description'}</p>
                           </div>
                           <div className="text-xs text-slate-muted text-right">

@@ -55,7 +55,7 @@ export default function KRAsPage() {
           <p className="text-violet-400 font-mono text-sm">{item.code}</p>
           <Link
             href={`/performance/kras/${item.id}`}
-            className="text-white font-medium hover:text-violet-400"
+            className="text-foreground font-medium hover:text-violet-400"
           >
             {item.name}
           </Link>
@@ -90,7 +90,7 @@ export default function KRAsPage() {
       render: (item: KRADefinition) => (
         <div className="flex items-center justify-center gap-1">
           <Link2 className="w-3.5 h-3.5 text-slate-500" />
-          <span className="text-white font-medium">{item.kpi_count}</span>
+          <span className="text-foreground font-medium">{item.kpi_count}</span>
         </div>
       ),
     },
@@ -116,7 +116,7 @@ export default function KRAsPage() {
       render: (item: KRADefinition) => (
         <Link
           href={`/performance/kras/${item.id}`}
-          className="text-slate-400 hover:text-white p-1"
+          className="text-slate-400 hover:text-foreground p-1"
         >
           <ChevronRight className="w-4 h-4" />
         </Link>
@@ -140,14 +140,14 @@ export default function KRAsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Key Result Areas</h1>
+          <h1 className="text-xl font-semibold text-foreground">Key Result Areas</h1>
           <p className="text-sm text-slate-400 mt-1">
             KRAs group related KPIs for structured evaluation
           </p>
         </div>
         <Link
           href="/performance/kras/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New KRA
@@ -166,7 +166,7 @@ export default function KRAsPage() {
               setSearch(e.target.value);
               setOffset(0);
             }}
-            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
           />
         </div>
         <select
@@ -175,7 +175,7 @@ export default function KRAsPage() {
             setCategoryFilter(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Categories</option>
           {categories.map((cat) => (
@@ -198,7 +198,7 @@ export default function KRAsPage() {
                 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors',
                 categoryFilter === category
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-white'
+                  : 'bg-slate-elevated text-slate-400 border border-slate-border hover:text-foreground'
               )}
             >
               <Target className="w-3.5 h-3.5" />

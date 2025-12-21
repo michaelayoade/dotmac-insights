@@ -66,6 +66,13 @@ export interface FieldServiceOrder {
   labor_cost?: number;
   parts_cost?: number;
   total_cost?: number;
+  asset_id?: number;
+  asset_name?: string;
+  asset_code?: string;
+  vehicle_id?: number;
+  vehicle_name?: string;
+  license_plate?: string;
+  vehicle_model?: string;
   customer_rating?: number;
   customer_feedback?: string | null;
   notes?: string;

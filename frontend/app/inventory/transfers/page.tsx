@@ -31,7 +31,7 @@ const STATUS_OPTIONS = [
 function getStatusBadge(status: string) {
   switch (status) {
     case "draft":
-      return { label: "Draft", className: "bg-slate-500/20 text-slate-300", icon: Clock };
+      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary", icon: Clock };
     case "pending_approval":
       return { label: "Pending", className: "bg-amber-500/20 text-amber-300", icon: Clock };
     case "approved":
@@ -45,7 +45,7 @@ function getStatusBadge(status: string) {
     case "cancelled":
       return { label: "Cancelled", className: "bg-red-500/20 text-red-300", icon: XCircle };
     default:
-      return { label: status, className: "bg-slate-500/20 text-slate-300", icon: Clock };
+      return { label: status, className: "bg-slate-500/20 text-foreground-secondary", icon: Clock };
   }
 }
 
@@ -85,7 +85,7 @@ export default function TransfersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Warehouse Transfers</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Warehouse Transfers</h1>
           <p className="text-slate-muted text-sm">Transfer stock between warehouses with approval workflow</p>
         </div>
         <Link
@@ -102,7 +102,7 @@ export default function TransfersPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -169,8 +169,8 @@ export default function TransfersPage() {
                           #{transfer.id}
                         </Link>
                       </td>
-                      <td className="py-3 text-white">{transfer.from_warehouse || "-"}</td>
-                      <td className="py-3 text-white">{transfer.to_warehouse || "-"}</td>
+                      <td className="py-3 text-foreground">{transfer.from_warehouse || "-"}</td>
+                      <td className="py-3 text-foreground">{transfer.to_warehouse || "-"}</td>
                       <td className="py-3">
                         {transfer.request_date ? (
                           <div className="flex items-center gap-2 text-slate-muted">
@@ -181,10 +181,10 @@ export default function TransfersPage() {
                           <span className="text-slate-muted">-</span>
                         )}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(transfer.total_qty ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="py-3 text-right font-mono text-white">
+                      <td className="py-3 text-right font-mono text-foreground">
                         {(transfer.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3">

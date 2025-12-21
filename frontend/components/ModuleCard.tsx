@@ -71,7 +71,7 @@ export function ModuleCard({
       {/* Content */}
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-lg font-semibold text-white group-hover:text-teal-electric transition-colors">
+          <h3 className="text-lg font-semibold text-foreground group-hover:text-teal-electric transition-colors">
             {name}
           </h3>
           {badge && (

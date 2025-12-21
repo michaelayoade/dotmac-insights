@@ -11,8 +11,8 @@ export default function NotFound() {
           <FileQuestion className="w-8 h-8 text-blue-400" />
         </div>
 
-        <h1 className="text-6xl font-bold text-white mb-2">404</h1>
-        <h2 className="text-xl font-semibold text-white mb-2">Page not found</h2>
+        <h1 className="text-6xl font-bold text-foreground mb-2">404</h1>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Page not found</h2>
         <p className="text-slate-muted mb-6">
           The page you're looking for doesn't exist or has been moved.
         </p>
@@ -20,14 +20,14 @@ export default function NotFound() {
         <div className="flex gap-3 justify-center">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-white rounded-lg font-medium hover:bg-teal-glow transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg font-medium hover:bg-teal-glow transition-colors"
           >
             <Home className="w-4 h-4" />
             Dashboard
           </Link>
           <button
             onClick={() => typeof window !== 'undefined' && window.history.back()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-white rounded-lg font-medium hover:bg-slate-border transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg font-medium hover:bg-slate-border transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Go back

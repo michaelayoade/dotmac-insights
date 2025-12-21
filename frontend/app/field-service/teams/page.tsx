@@ -45,7 +45,7 @@ export default function TeamsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-white">Field Teams</h2>
+          <h2 className="text-xl font-semibold text-foreground">Field Teams</h2>
           <p className="text-sm text-slate-muted">
             Manage teams and technicians
           </p>
@@ -67,7 +67,7 @@ export default function TeamsPage() {
               'flex items-center gap-2 px-4 py-2 rounded text-sm transition-colors',
               viewMode === 'teams'
                 ? 'bg-teal-electric text-slate-950'
-                : 'text-slate-muted hover:text-white'
+                : 'text-slate-muted hover:text-foreground'
             )}
           >
             <Users className="w-4 h-4" />
@@ -79,7 +79,7 @@ export default function TeamsPage() {
               'flex items-center gap-2 px-4 py-2 rounded text-sm transition-colors',
               viewMode === 'technicians'
                 ? 'bg-teal-electric text-slate-950'
-                : 'text-slate-muted hover:text-white'
+                : 'text-slate-muted hover:text-foreground'
             )}
           >
             <User className="w-4 h-4" />
@@ -95,7 +95,7 @@ export default function TeamsPage() {
               placeholder="Search technicians..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-white placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
+              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
             />
           </div>
         )}
@@ -108,7 +108,7 @@ export default function TeamsPage() {
           <div className="lg:col-span-1">
             <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
               <div className="p-4 border-b border-slate-border">
-                <h3 className="font-semibold text-white">All Teams</h3>
+                <h3 className="font-semibold text-foreground">All Teams</h3>
               </div>
               <div className="divide-y divide-slate-border">
                 {teamsLoading ? (
@@ -124,7 +124,7 @@ export default function TeamsPage() {
                       )}
                     >
                       <div>
-                        <p className="text-white font-medium">{team.name}</p>
+                        <p className="text-foreground font-medium">{team.name}</p>
                         <p className="text-sm text-slate-muted">
                           {team.members?.length || 0} members
                         </p>
@@ -149,10 +149,10 @@ export default function TeamsPage() {
                 <div className="bg-slate-card border border-slate-border rounded-xl p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-semibold text-white">{selectedTeam.name}</h3>
+                      <h3 className="text-xl font-semibold text-foreground">{selectedTeam.name}</h3>
                       <p className="text-slate-muted">{selectedTeam.description || 'No description'}</p>
                     </div>
-                    <button className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-white hover:border-slate-border/70 transition-colors">
+                    <button className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors">
                       <Edit2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -163,7 +163,7 @@ export default function TeamsPage() {
                         <Users className="w-4 h-4" />
                         Members
                       </div>
-                      <p className="text-2xl font-bold text-white">
+                      <p className="text-2xl font-bold text-foreground">
                         {selectedTeam.members?.length || 0}
                       </p>
                     </div>
@@ -172,7 +172,7 @@ export default function TeamsPage() {
                         <ClipboardList className="w-4 h-4" />
                         Active Orders
                       </div>
-                      <p className="text-2xl font-bold text-white">
+                      <p className="text-2xl font-bold text-foreground">
                         {selectedTeam.active_orders || 0}
                       </p>
                     </div>
@@ -181,7 +181,7 @@ export default function TeamsPage() {
                         <Star className="w-4 h-4 text-amber-400" />
                         Avg Rating
                       </div>
-                      <p className="text-2xl font-bold text-white">
+                      <p className="text-2xl font-bold text-foreground">
                         {selectedTeam.avg_rating?.toFixed(1) || 'N/A'}
                       </p>
                     </div>
@@ -191,7 +191,7 @@ export default function TeamsPage() {
                 {/* Service Zones */}
                 {selectedTeam.zones?.length > 0 && (
                   <div className="bg-slate-card border border-slate-border rounded-xl p-6">
-                    <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-teal-electric" />
                       Service Zones
                     </h4>
@@ -199,7 +199,7 @@ export default function TeamsPage() {
                       {selectedTeam.zones.map((zone: any) => (
                         <span
                           key={zone.id}
-                          className="px-3 py-1.5 rounded-full bg-slate-elevated text-sm text-white"
+                          className="px-3 py-1.5 rounded-full bg-slate-elevated text-sm text-foreground"
                         >
                           {zone.name}
                         </span>
@@ -211,7 +211,7 @@ export default function TeamsPage() {
                 {/* Team Members */}
                 <div className="bg-slate-card border border-slate-border rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-white flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground flex items-center gap-2">
                       <Users className="w-4 h-4 text-teal-electric" />
                       Team Members
                     </h4>
@@ -233,7 +233,7 @@ export default function TeamsPage() {
                               <User className="w-5 h-5 text-slate-muted" />
                             </div>
                             <div>
-                              <p className="text-white font-medium">{member.employee_name}</p>
+                              <p className="text-foreground font-medium">{member.employee_name}</p>
                               <p className="text-xs text-slate-muted capitalize">
                                 {member.role?.replace('_', ' ') || 'Technician'}
                               </p>
@@ -292,7 +292,7 @@ export default function TeamsPage() {
                     <User className="w-6 h-6 text-slate-muted" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-white font-semibold">{tech.name}</p>
+                    <p className="text-foreground font-semibold">{tech.name}</p>
                     <p className="text-sm text-slate-muted">{tech.team_name || 'No team'}</p>
                   </div>
                   <span className={cn(
@@ -346,20 +346,20 @@ export default function TeamsPage() {
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-border">
                   <div className="text-center">
-                    <p className="text-lg font-bold text-white">{tech.completed_orders || 0}</p>
+                    <p className="text-lg font-bold text-foreground">{tech.completed_orders || 0}</p>
                     <p className="text-xs text-slate-muted">Completed</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                      <span className="text-lg font-bold text-white">
+                      <span className="text-lg font-bold text-foreground">
                         {tech.avg_rating?.toFixed(1) || 'N/A'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-muted">Rating</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-bold text-white">
+                    <p className="text-lg font-bold text-foreground">
                       {tech.completion_rate ? `${tech.completion_rate}%` : 'N/A'}
                     </p>
                     <p className="text-xs text-slate-muted">Rate</p>

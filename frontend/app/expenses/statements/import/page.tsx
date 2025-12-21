@@ -328,7 +328,7 @@ export default function StatementImportPage() {
       <div className="flex items-center gap-4">
         <Link
           href="/expenses/statements"
-          className="p-2 text-slate-muted hover:text-white hover:bg-slate-elevated rounded-lg transition-colors"
+          className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </Link>
@@ -337,7 +337,7 @@ export default function StatementImportPage() {
             <Upload className="w-5 h-5 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Import Statement</h1>
+            <h1 className="text-2xl font-bold text-foreground">Import Statement</h1>
             <p className="text-slate-muted text-sm">Upload CSV bank statement</p>
           </div>
         </div>
@@ -351,7 +351,7 @@ export default function StatementImportPage() {
               className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
                 step === s
-                  ? 'bg-violet-500 text-white'
+                  ? 'bg-violet-500 text-foreground'
                   : ['upload', 'mapping', 'preview', 'importing'].indexOf(step) > idx
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : 'bg-slate-elevated text-slate-muted'
@@ -395,7 +395,7 @@ export default function StatementImportPage() {
           <div className="space-y-6">
             <div className="text-center">
               <FileSpreadsheet className="w-12 h-12 text-violet-400 mx-auto mb-3" />
-              <h2 className="text-lg font-semibold text-white">Upload Bank Statement</h2>
+              <h2 className="text-lg font-semibold text-foreground">Upload Bank Statement</h2>
               <p className="text-sm text-slate-muted mt-1">CSV format with transaction data</p>
             </div>
 
@@ -413,7 +413,7 @@ export default function StatementImportPage() {
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
               />
               <Upload className="w-10 h-10 text-slate-muted mx-auto mb-3" />
-              <p className="text-white font-medium">Drop CSV file here or click to browse</p>
+              <p className="text-foreground font-medium">Drop CSV file here or click to browse</p>
               <p className="text-xs text-slate-muted mt-2">Supports standard bank statement CSV exports</p>
             </div>
           </div>
@@ -424,7 +424,7 @@ export default function StatementImportPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-violet-400" />
                   Map Columns
                 </h2>
@@ -442,7 +442,7 @@ export default function StatementImportPage() {
                 <select
                   value={cardId || ''}
                   onChange={(e) => setCardId(e.target.value ? Number(e.target.value) : null)}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 >
                   <option value="">Select card...</option>
                   {cards?.map((c) => (
@@ -458,7 +458,7 @@ export default function StatementImportPage() {
                   type="date"
                   value={periodStart}
                   onChange={(e) => setPeriodStart(e.target.value)}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
               <div>
@@ -467,7 +467,7 @@ export default function StatementImportPage() {
                   type="date"
                   value={periodEnd}
                   onChange={(e) => setPeriodEnd(e.target.value)}
-                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
               </div>
             </div>
@@ -489,7 +489,7 @@ export default function StatementImportPage() {
                       }))
                     }
                     className={cn(
-                      'w-full bg-slate-elevated border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50',
+                      'w-full bg-slate-elevated border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50',
                       mapping[field as keyof ColumnMapping]
                         ? 'border-emerald-500/50'
                         : REQUIRED_FIELDS.includes(field as any)
@@ -526,7 +526,7 @@ export default function StatementImportPage() {
                     {csvData.rows.slice(0, 3).map((row, idx) => (
                       <tr key={idx} className="border-t border-slate-border">
                         {csvData.headers.map((h) => (
-                          <td key={h} className="px-2 py-1 text-white">
+                          <td key={h} className="px-2 py-1 text-foreground">
                             {row[h]}
                           </td>
                         ))}
@@ -544,14 +544,14 @@ export default function StatementImportPage() {
                   setCsvData({ headers: [], rows: [] });
                   setFile(null);
                 }}
-                className="px-4 py-2 text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handlePreview}
                 disabled={!validateMapping() || !cardId || !periodStart || !periodEnd}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Preview <ArrowRight className="w-4 h-4" />
               </button>
@@ -564,7 +564,7 @@ export default function StatementImportPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <Eye className="w-5 h-5 text-violet-400" />
                   Review Transactions
                 </h2>
@@ -595,23 +595,23 @@ export default function StatementImportPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-slate-elevated rounded-lg p-3">
                 <p className="text-xs text-slate-muted">Transactions</p>
-                <p className="text-xl font-bold text-white">{parsedTransactions.length}</p>
+                <p className="text-xl font-bold text-foreground">{parsedTransactions.length}</p>
               </div>
               <div className="bg-slate-elevated rounded-lg p-3">
                 <p className="text-xs text-slate-muted">Total Amount</p>
-                <p className="text-xl font-bold text-white">
+                <p className="text-xl font-bold text-foreground">
                   {parsedTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
                 </p>
               </div>
               <div className="bg-slate-elevated rounded-lg p-3">
                 <p className="text-xs text-slate-muted">Period</p>
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium text-foreground">
                   {periodStart} to {periodEnd}
                 </p>
               </div>
               <div className="bg-slate-elevated rounded-lg p-3">
                 <p className="text-xs text-slate-muted">Card</p>
-                <p className="text-sm font-medium text-white">
+                <p className="text-sm font-medium text-foreground">
                   {cards?.find((c) => c.id === cardId)?.card_name || `Card #${cardId}`}
                 </p>
               </div>
@@ -631,12 +631,12 @@ export default function StatementImportPage() {
                 <tbody className="divide-y divide-slate-border">
                   {parsedTransactions.slice(0, 50).map((txn, idx) => (
                     <tr key={idx} className="bg-slate-card hover:bg-slate-elevated/50">
-                      <td className="px-3 py-2 text-white">{txn.transaction_date}</td>
-                      <td className="px-3 py-2 text-white">{txn.merchant_name || '-'}</td>
+                      <td className="px-3 py-2 text-foreground">{txn.transaction_date}</td>
+                      <td className="px-3 py-2 text-foreground">{txn.merchant_name || '-'}</td>
                       <td className="px-3 py-2 text-slate-muted truncate max-w-xs">
                         {txn.description || '-'}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-white">
+                      <td className="px-3 py-2 text-right font-mono text-foreground">
                         {txn.amount.toLocaleString()}
                       </td>
                     </tr>
@@ -653,14 +653,14 @@ export default function StatementImportPage() {
             <div className="flex justify-between pt-4">
               <button
                 onClick={() => setStep('mapping')}
-                className="px-4 py-2 text-slate-muted hover:text-white transition-colors"
+                className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing || parsedTransactions.length === 0}
-                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 {importing ? (
                   <>

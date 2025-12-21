@@ -21,7 +21,7 @@ import {
   Search,
 } from 'lucide-react';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { useConsolidatedSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary } from '@/hooks/useApi';
+import { useConsolidatedSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
@@ -71,7 +71,7 @@ function StatCard({
     info: 'bg-blue-500/10 border-blue-500/30',
   };
   const textVariants = {
-    default: 'text-white',
+    default: 'text-foreground',
     warning: 'text-rose-400',
     success: 'text-emerald-400',
     info: 'text-blue-400',
@@ -102,7 +102,7 @@ function PriorityBadge({ priority }: { priority: string }) {
     urgent: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
     high: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
     medium: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    low: 'bg-slate-500/10 text-slate-300 border-slate-500/30',
+    low: 'bg-slate-500/10 text-foreground-secondary border-slate-500/30',
   };
   const color = colors[priority] || colors.medium;
 
@@ -142,6 +142,7 @@ export default function SupportTicketsPage() {
     status: string;
     ticketType: string;
     agent: string;
+    teamId: string;
     startDate: string;
     endDate: string;
     quickFilter: string;
@@ -152,11 +153,16 @@ export default function SupportTicketsPage() {
     status: '',
     ticketType: '',
     agent: '',
+    teamId: '',
     startDate: '',
     endDate: '',
     quickFilter: '',
   });
-  const { page, pageSize, priority, status, ticketType, agent, startDate, endDate, quickFilter } = filters;
+  const { page, pageSize, priority, status, ticketType, agent, teamId, startDate, endDate, quickFilter } = filters;
+
+  // Fetch teams for filter dropdown
+  const { data: teamsData } = useSupportTeams();
+  const teams = teamsData?.teams || [];
   const offset = (page - 1) * pageSize;
 
   const { data, isLoading, error, mutate } = useSupportTickets({
@@ -164,6 +170,7 @@ export default function SupportTicketsPage() {
     status: status || undefined,
     ticket_type: ticketType || undefined,
     agent: agent || undefined,
+    team_id: teamId ? Number(teamId) : undefined,
     start: startDate || undefined,
     end: endDate || undefined,
     limit: pageSize,
@@ -202,6 +209,7 @@ export default function SupportTicketsPage() {
       status: '',
       ticketType: '',
       agent: '',
+      teamId: '',
       startDate: '',
       endDate: '',
       quickFilter: '',
@@ -209,7 +217,7 @@ export default function SupportTicketsPage() {
     });
   };
 
-  const hasActiveFilters = priority || status || ticketType || agent || startDate || endDate;
+  const hasActiveFilters = priority || status || ticketType || agent || teamId || startDate || endDate;
 
   const columns = [
     {
@@ -218,7 +226,7 @@ export default function SupportTicketsPage() {
       render: (item: any) => (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-white font-semibold">{item.ticket_number || `#${item.id}`}</span>
+            <span className="font-mono text-foreground font-semibold">{item.ticket_number || `#${item.id}`}</span>
             {item.is_overdue && (
               <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 text-[10px] font-medium">
                 OVERDUE
@@ -304,7 +312,7 @@ export default function SupportTicketsPage() {
             <LifeBuoy className="w-5 h-5 text-teal-electric" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Support Tickets</h1>
+            <h1 className="text-2xl font-bold text-foreground">Support Tickets</h1>
             <p className="text-slate-muted text-sm">Browse, filter, and manage customer tickets</p>
           </div>
         </div>
@@ -365,12 +373,12 @@ export default function SupportTicketsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-teal-electric" />
-            <span className="text-white text-sm font-medium">Filters</span>
+            <span className="text-foreground text-sm font-medium">Filters</span>
           </div>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="text-slate-muted text-sm hover:text-white transition-colors flex items-center gap-1"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
             >
               <XCircle className="w-3 h-3" />
               Clear all
@@ -378,7 +386,7 @@ export default function SupportTicketsPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
             <input
@@ -387,23 +395,37 @@ export default function SupportTicketsPage() {
                 setFilters((prev) => ({ ...prev, agent: e.target.value, page: 1 }));
               }}
               placeholder="Search agent/email..."
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
+          <select
+            value={teamId}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, teamId: e.target.value, page: 1 }));
+            }}
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          >
+            <option value="">All Teams</option>
+            {teams.map((team: any) => (
+              <option key={team.id} value={team.id}>
+                {team.team_name}
+              </option>
+            ))}
+          </select>
           <input
           value={ticketType}
           onChange={(e) => {
             setFilters((prev) => ({ ...prev, ticketType: e.target.value, page: 1 }));
           }}
           placeholder="Ticket type..."
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <select
           value={priority}
           onChange={(e) => {
             setFilters((prev) => ({ ...prev, priority: e.target.value, quickFilter: '', page: 1 }));
           }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Priorities</option>
             <option value="low">Low</option>
@@ -416,7 +438,7 @@ export default function SupportTicketsPage() {
           onChange={(e) => {
             setFilters((prev) => ({ ...prev, status: e.target.value, quickFilter: '', page: 1 }));
           }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Statuses</option>
             <option value="open">Open</option>
@@ -438,7 +460,7 @@ export default function SupportTicketsPage() {
               onChange={(e) => {
                 setFilters((prev) => ({ ...prev, startDate: e.target.value, page: 1 }));
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
             <ChevronRight className="w-4 h-4 text-slate-muted" />
             <input
@@ -447,7 +469,7 @@ export default function SupportTicketsPage() {
               onChange={(e) => {
                 setFilters((prev) => ({ ...prev, endDate: e.target.value, page: 1 }));
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
             />
           </div>
         </div>
@@ -459,7 +481,7 @@ export default function SupportTicketsPage() {
           Showing {tickets.length} of {total} tickets
         </span>
         {hasActiveFilters && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {priority && (
               <span className="px-2 py-1 rounded-full bg-slate-elevated text-xs text-slate-muted">
                 Priority: {priority}
@@ -468,6 +490,11 @@ export default function SupportTicketsPage() {
             {status && (
               <span className="px-2 py-1 rounded-full bg-slate-elevated text-xs text-slate-muted">
                 Status: {status}
+              </span>
+            )}
+            {teamId && (
+              <span className="px-2 py-1 rounded-full bg-slate-elevated text-xs text-slate-muted">
+                Team: {teams.find((t: any) => t.id === Number(teamId))?.team_name || teamId}
               </span>
             )}
             {ticketType && (

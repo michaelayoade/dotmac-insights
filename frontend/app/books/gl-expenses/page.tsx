@@ -63,7 +63,7 @@ export default function GLExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Receipt className="w-4 h-4 text-teal-400" />
-          <span className="font-mono text-white font-medium">
+          <span className="font-mono text-foreground font-medium">
             {item.voucher_no || `#${item.id}`}
           </span>
         </div>
@@ -75,7 +75,7 @@ export default function GLExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1.5">
           <Tag className="w-3.5 h-3.5 text-slate-muted" />
-          <span className="text-slate-300 text-sm capitalize">
+          <span className="text-foreground-secondary text-sm capitalize">
             {item.voucher_type || '-'}
           </span>
         </div>
@@ -87,7 +87,7 @@ export default function GLExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[180px]">
+          <span className="text-foreground-secondary truncate max-w-[180px]">
             {item.account || '-'}
           </span>
         </div>
@@ -99,7 +99,7 @@ export default function GLExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           <Building2 className="w-4 h-4 text-slate-muted" />
-          <span className="text-slate-300 truncate max-w-[150px]">
+          <span className="text-foreground-secondary truncate max-w-[150px]">
             {item.party || '-'}
           </span>
         </div>
@@ -111,7 +111,7 @@ export default function GLExpensesPage() {
       render: (item: any) => (
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3 text-slate-muted" />
-          <span className="text-slate-300">
+          <span className="text-foreground-secondary">
             {formatDate(item.posting_date)}
           </span>
         </div>
@@ -134,7 +134,7 @@ export default function GLExpensesPage() {
       header: 'Amount',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-white font-medium">
+        <span className="font-mono text-foreground font-medium">
           {formatCurrency(item.amount)}
         </span>
       ),
@@ -156,7 +156,7 @@ export default function GLExpensesPage() {
       <div className="rounded-2xl border border-slate-border bg-slate-card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">GL Expense Entries</h1>
+            <h1 className="text-xl font-bold text-foreground">GL Expense Entries</h1>
             <p className="text-slate-muted text-sm mt-1">
               Read-only view of expense-type journal entries from the general ledger
             </p>
@@ -171,7 +171,7 @@ export default function GLExpensesPage() {
             <Receipt className="w-4 h-4 text-teal-400" />
             <p className="text-slate-muted text-sm">Total Entries</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatNumber(total)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatNumber(total)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -196,7 +196,7 @@ export default function GLExpensesPage() {
             <Calendar className="w-4 h-4 text-slate-muted" />
             <p className="text-slate-muted text-sm">Period</p>
           </div>
-          <p className="text-sm font-medium text-white">
+          <p className="text-sm font-medium text-foreground">
             {startDate && endDate ? `${formatDate(startDate)} - ${formatDate(endDate)}` : 'All time'}
           </p>
         </div>
@@ -206,7 +206,7 @@ export default function GLExpensesPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-teal-400" />
-          <span className="text-white text-sm font-medium">Filters</span>
+          <span className="text-foreground text-sm font-medium">Filters</span>
         </div>
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex-1 min-w-[200px] max-w-md relative">
@@ -219,7 +219,7 @@ export default function GLExpensesPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="flex-1 min-w-[200px] max-w-md">
@@ -231,7 +231,7 @@ export default function GLExpensesPage() {
                 setCostCenter(e.target.value);
                 setPage(1);
               }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-white placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ export default function GLExpensesPage() {
                 setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               placeholder="Start date"
             />
             <span className="text-slate-muted">to</span>
@@ -253,7 +253,7 @@ export default function GLExpensesPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               placeholder="End date"
             />
           </div>
@@ -266,7 +266,7 @@ export default function GLExpensesPage() {
                 setEndDate('');
                 setPage(1);
               }}
-              className="text-slate-muted text-sm hover:text-white transition-colors"
+              className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
             </button>

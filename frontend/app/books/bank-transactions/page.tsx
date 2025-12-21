@@ -35,7 +35,7 @@ export default function BankTransactionsPage() {
 
   const columns = [
     { key: 'id', header: 'ID', render: (item: any) => <span className="font-mono text-teal-electric">#{item.erpnext_id || item.id}</span> },
-    { key: 'account', header: 'Account', render: (item: any) => <span className="text-white">{item.account}</span> },
+    { key: 'account', header: 'Account', render: (item: any) => <span className="text-foreground">{item.account}</span> },
     { key: 'type', header: 'Type', render: (item: any) => <span className="text-slate-muted text-sm capitalize">{item.transaction_type || '-'}</span> },
     {
       key: 'amount',
@@ -43,7 +43,7 @@ export default function BankTransactionsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <span className="font-mono text-white">{formatCurrency(item.amount ?? item.deposit ?? item.withdrawal, item.currency)}</span>
+          <span className="font-mono text-foreground">{formatCurrency(item.amount ?? item.deposit ?? item.withdrawal, item.currency)}</span>
           <div className="text-xs text-slate-muted">
             {item.deposit ? `+${formatCurrency(item.deposit, item.currency)}` : null}
             {item.withdrawal ? `-${formatCurrency(item.withdrawal, item.currency)}` : null}
@@ -77,12 +77,12 @@ export default function BankTransactionsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Landmark className="w-5 h-5 text-teal-electric" />
-          <h1 className="text-xl font-semibold text-white">Bank Transactions</h1>
+          <h1 className="text-xl font-semibold text-foreground">Bank Transactions</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/books/bank-transactions/new"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-muted transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Transaction

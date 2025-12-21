@@ -52,13 +52,13 @@ export default function PAYEPage() {
     {
       key: 'employee_name',
       header: 'Employee',
-      render: (item: any) => <span className="text-white font-medium">{item.employee_name}</span>,
+      render: (item: any) => <span className="text-foreground font-medium">{item.employee_name}</span>,
     },
     {
       key: 'gross_income',
       header: 'Gross Income',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.gross_income, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_income, 'NGN')}</span>,
     },
     {
       key: 'tax_free_allowance',
@@ -70,7 +70,7 @@ export default function PAYEPage() {
       key: 'taxable_income',
       header: 'Taxable Income',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-white">{formatCurrency(item.taxable_income, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.taxable_income, 'NGN')}</span>,
     },
     {
       key: 'paye_amount',
@@ -115,14 +115,14 @@ export default function PAYEPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/books/tax"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-white hover:border-slate-border/70"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Tax
           </Link>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-400" />
-            <h1 className="text-xl font-semibold text-white">PAYE (Pay As You Earn)</h1>
+            <h1 className="text-xl font-semibold text-foreground">PAYE (Pay As You Earn)</h1>
           </div>
         </div>
         <button
@@ -144,11 +144,11 @@ export default function PAYEPage() {
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Employees</p>
-          <p className="text-2xl font-semibold text-white font-mono mt-1">{employeeCount}</p>
+          <p className="text-2xl font-semibold text-foreground font-mono mt-1">{employeeCount}</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Avg PAYE per Employee</p>
-          <p className="text-2xl font-semibold text-white font-mono mt-1">
+          <p className="text-2xl font-semibold text-foreground font-mono mt-1">
             {employeeCount > 0 ? formatCurrency(totalPAYE / employeeCount, 'NGN') : '-'}
           </p>
         </div>
@@ -196,7 +196,7 @@ export default function PAYEPage() {
 
       {/* PAYE Tax Bands Guide */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+        <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-teal-electric" />
           Nigerian PAYE Tax Bands (Annual)
         </h3>
@@ -280,11 +280,11 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
   return (
     <form onSubmit={handleSubmit} className="bg-slate-card border border-emerald-500/30 rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-foreground font-semibold flex items-center gap-2">
           <Calculator className="w-4 h-4 text-emerald-400" />
           Calculate Employee PAYE
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-white text-sm">Cancel</button>
+        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -324,7 +324,7 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
       <button
         type="button"
         onClick={() => setShowMore(!showMore)}
-        className="flex items-center gap-2 text-sm text-slate-muted hover:text-white"
+        className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         Deductions & allowances
@@ -380,11 +380,11 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
         <div className="text-sm space-y-1">
           <div>
             <span className="text-slate-muted">CRA (Tax-Free): </span>
-            <span className="text-white font-mono">{formatCurrency(cra, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatCurrency(cra, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Taxable Income: </span>
-            <span className="text-white font-mono">{formatCurrency(taxableIncome, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatCurrency(taxableIncome, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Annual PAYE: </span>

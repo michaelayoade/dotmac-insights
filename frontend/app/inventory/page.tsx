@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useInventoryStockSummary, useInventoryItems, useInventoryStockEntries } from "@/hooks/useApi";
+import { useInventoryStockSummary, useInventoryItems, useInventoryStockEntries, useInventoryReorderAlerts } from "@/hooks/useApi";
 import {
   Boxes,
   Package,
@@ -19,6 +19,7 @@ export default function InventoryDashboard() {
   const { data: summaryData, isLoading: summaryLoading } = useInventoryStockSummary();
   const { data: itemsData, isLoading: itemsLoading } = useInventoryItems({ has_stock: true, limit: 5 });
   const { data: entriesData, isLoading: entriesLoading } = useInventoryStockEntries({ limit: 5 });
+  const { data: alertsData, isLoading: alertsLoading } = useInventoryReorderAlerts({ limit: 10 });
 
   const totalValue = summaryData?.total_value ?? 0;
   const totalItems = summaryData?.total_items ?? 0;
@@ -35,7 +36,7 @@ export default function InventoryDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Inventory Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Inventory Dashboard</h1>
         <p className="text-slate-muted text-sm">Overview of stock, warehouses, and movements</p>
       </div>
 
@@ -48,7 +49,7 @@ export default function InventoryDashboard() {
               {summaryLoading ? (
                 <Loader2 className="w-4 h-4 text-amber-500 animate-spin mt-2" />
               ) : (
-                <p className="text-2xl font-bold text-white mt-1">
+                <p className="text-2xl font-bold text-foreground mt-1">
                   {totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               )}
@@ -66,7 +67,7 @@ export default function InventoryDashboard() {
               {summaryLoading ? (
                 <Loader2 className="w-4 h-4 text-blue-500 animate-spin mt-2" />
               ) : (
-                <p className="text-2xl font-bold text-white mt-1">{totalItems}</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{totalItems}</p>
               )}
             </div>
             <div className="p-3 rounded-xl bg-blue-500/10">
@@ -82,7 +83,7 @@ export default function InventoryDashboard() {
               {entriesLoading ? (
                 <Loader2 className="w-4 h-4 text-emerald-500 animate-spin mt-2" />
               ) : (
-                <p className="text-2xl font-bold text-white mt-1">{entriesData?.total ?? 0}</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{entriesData?.total ?? 0}</p>
               )}
             </div>
             <div className="p-3 rounded-xl bg-emerald-500/10">
@@ -91,23 +92,33 @@ export default function InventoryDashboard() {
           </div>
         </div>
 
-        <div className="bg-slate-card border border-slate-border rounded-xl p-4">
+        <Link href="/inventory/reorder" className="bg-slate-card border border-slate-border rounded-xl p-4 hover:border-red-500/50 transition-colors block">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wider text-slate-muted">Low Stock Alerts</p>
-              <p className="text-2xl font-bold text-white mt-1">-</p>
-              <p className="text-xs text-slate-muted">Coming soon</p>
+              {alertsLoading ? (
+                <Loader2 className="w-4 h-4 text-red-500 animate-spin mt-2" />
+              ) : (
+                <>
+                  <p className={cn("text-2xl font-bold mt-1", (alertsData?.total ?? 0) > 0 ? "text-red-400" : "text-foreground")}>
+                    {alertsData?.total ?? 0}
+                  </p>
+                  {(alertsData?.total ?? 0) > 0 && (
+                    <p className="text-xs text-red-400">Items need reorder</p>
+                  )}
+                </>
+              )}
             </div>
             <div className="p-3 rounded-xl bg-red-500/10">
-              <AlertTriangle className="w-6 h-6 text-red-400" />
+              <AlertTriangle className={cn("w-6 h-6", (alertsData?.total ?? 0) > 0 ? "text-red-400" : "text-slate-muted")} />
             </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Quick Actions */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <h2 className="text-lg font-semibold text-white mb-4">Quick Actions</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {quickActions.map((action) => {
             const Icon = action.icon;
@@ -121,7 +132,7 @@ export default function InventoryDashboard() {
                 )}
               >
                 <Icon className="w-6 h-6 mb-2" />
-                <span className="text-sm font-medium text-white">{action.label}</span>
+                <span className="text-sm font-medium text-foreground">{action.label}</span>
               </Link>
             );
           })}
@@ -133,7 +144,7 @@ export default function InventoryDashboard() {
         {/* Top Items by Stock */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Items with Stock</h2>
+            <h2 className="text-lg font-semibold text-foreground">Items with Stock</h2>
             <Link
               href="/inventory/items"
               className="inline-flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300"
@@ -153,7 +164,7 @@ export default function InventoryDashboard() {
                   className="flex items-center justify-between py-2 border-b border-slate-border/50 last:border-0"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{item.item_name}</p>
+                    <p className="text-sm font-medium text-foreground">{item.item_name}</p>
                     <p className="text-xs text-slate-muted font-mono">{item.item_code}</p>
                   </div>
                   <div className="text-right">
@@ -182,7 +193,7 @@ export default function InventoryDashboard() {
         {/* Recent Stock Entries */}
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Recent Entries</h2>
+            <h2 className="text-lg font-semibold text-foreground">Recent Entries</h2>
             <Link
               href="/inventory/stock-entries"
               className="inline-flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300"
@@ -202,7 +213,7 @@ export default function InventoryDashboard() {
                   className="flex items-center justify-between py-2 border-b border-slate-border/50 last:border-0"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{entry.stock_entry_type}</p>
+                    <p className="text-sm font-medium text-foreground">{entry.stock_entry_type}</p>
                     <p className="text-xs text-slate-muted">
                       {entry.posting_date
                         ? new Date(entry.posting_date).toLocaleDateString()
@@ -210,7 +221,7 @@ export default function InventoryDashboard() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-mono text-white">
+                    <p className="text-sm font-mono text-foreground">
                       {(entry.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className={cn(
