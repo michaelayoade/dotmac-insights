@@ -1,0 +1,16 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Invoice Written Off" %}
+{% set icon = "x-circle" %}
+{% set priority = "normal" %}
+
+{% block content %}
+An invoice has been written off as uncollectible.
+
+Invoice: {{ invoice_number | default('N/A') }}
+Customer: {{ customer_name | default('Customer') }}
+Original Amount: {{ amount | default('N/A') }}
+Write-off Reason: {{ reason | default('Uncollectible') }}
+Written Off By: {{ written_off_by | default('System') }}
+
+This invoice will no longer appear in receivables aging.
+{% endblock %}

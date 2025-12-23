@@ -5,13 +5,17 @@ import Link from 'next/link';
 import { FileSpreadsheet, Plus, MoreVertical, CheckCircle, Lock, Unlock, Trash2, Eye } from 'lucide-react';
 import { useCorporateCardStatements, useStatementMutations, useCorporateCards } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { CorporateCardStatement, StatementStatus } from '@/lib/expenses.types';
+import { LoadingState, Button, FilterCard, FilterSelect, StatusPill } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-const STATUS_CONFIG: Record<StatementStatus, { bg: string; text: string; label: string }> = {
-  open: { bg: 'bg-sky-500/15', text: 'text-sky-300', label: 'Open' },
-  reconciled: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Reconciled' },
-  closed: { bg: 'bg-slate-500/15', text: 'text-slate-400', label: 'Closed' },
+const STATUS_TONES: Record<StatementStatus, StatusTone> = {
+  open: 'info',
+  reconciled: 'success',
+  closed: 'default',
 };
 
 function StatementRow({
@@ -24,7 +28,7 @@ function StatementRow({
   onAction: (action: string, stmt: CorporateCardStatement) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const statusStyle = STATUS_CONFIG[statement.status] || STATUS_CONFIG.open;
+  const statusTone = STATUS_TONES[statement.status] || STATUS_TONES.open;
   const matchRate = statement.transaction_count > 0
     ? Math.round((statement.matched_count / statement.transaction_count) * 100)
     : 0;
@@ -40,9 +44,10 @@ function StatementRow({
             <p className="text-foreground font-semibold">
               {statement.period_start} to {statement.period_end}
             </p>
-            <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyle.bg, statusStyle.text)}>
-              {statusStyle.label}
-            </span>
+            <StatusPill
+              label={formatStatusLabel(statement.status)}
+              tone={statusTone}
+            />
           </div>
           <p className="text-slate-muted text-sm truncate">
             {cardName || `Card #${statement.card_id}`} &middot; {statement.transaction_count} transactions
@@ -65,12 +70,12 @@ function StatementRow({
           <p className="text-slate-muted text-xs">Unmatched</p>
         </div>
         <div className="relative">
-          <button
+          <Button
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
-          </button>
+          </Button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
@@ -84,40 +89,40 @@ function StatementRow({
                   View transactions
                 </Link>
                 {statement.status === 'open' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('reconcile', statement); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-400 hover:text-emerald-300 hover:bg-slate-elevated transition-colors"
                   >
                     <CheckCircle className="w-4 h-4" />
                     Mark reconciled
-                  </button>
+                  </Button>
                 )}
                 {statement.status === 'reconciled' && (
                   <>
-                    <button
+                    <Button
                       onClick={() => { onAction('close', statement); setMenuOpen(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                     >
                       <Lock className="w-4 h-4" />
                       Close statement
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => { onAction('reopen', statement); setMenuOpen(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:text-amber-300 hover:bg-slate-elevated transition-colors"
                     >
                       <Unlock className="w-4 h-4" />
                       Reopen
-                    </button>
+                    </Button>
                   </>
                 )}
                 {statement.status === 'open' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('delete', statement); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-slate-elevated transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -129,16 +134,19 @@ function StatementRow({
 }
 
 export default function StatementsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const { handleError, handleInfo } = useErrorHandler();
   const [cardFilter, setCardFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  const { data: cards } = useCorporateCards({ include_inactive: true });
+  const canFetch = !authLoading && !missingScope;
+  const { data: cards } = useCorporateCards({ include_inactive: true }, { isPaused: () => !canFetch });
   const { data: statements, isLoading } = useCorporateCardStatements({
     card_id: cardFilter ? Number(cardFilter) : undefined,
     status: statusFilter || undefined,
     limit: 50,
-  });
+  }, { isPaused: () => !canFetch });
   const { reconcileStatement, closeStatement, reopenStatement, deleteStatement } = useStatementMutations();
 
   const cardMap = new Map(cards?.map((c) => [c.id, `${c.card_name} (****${c.card_number_last4})`]));
@@ -161,6 +169,20 @@ export default function StatementsPage() {
     }
   };
 
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view card statements."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -181,11 +203,11 @@ export default function StatementsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-3" iconClassName="text-sky-300">
+        <FilterSelect
           value={cardFilter}
           onChange={(e) => setCardFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-sky-500"
+          className="focus:border-sky-500"
         >
           <option value="">All cards</option>
           {cards?.map((card) => (
@@ -193,18 +215,18 @@ export default function StatementsPage() {
               {card.card_name} (****{card.card_number_last4})
             </option>
           ))}
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-sky-500"
+          className="focus:border-sky-500"
         >
           <option value="">All statuses</option>
           <option value="open">Open</option>
           <option value="reconciled">Reconciled</option>
           <option value="closed">Closed</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Stats summary */}
       {statements && statements.length > 0 && (
@@ -240,13 +262,13 @@ export default function StatementsPage() {
             <FileSpreadsheet className="w-12 h-12 mx-auto text-slate-muted mb-3" />
             <p className="text-foreground font-semibold">No statements found</p>
             <p className="text-slate-muted text-sm mt-1">Import a statement to get started</p>
-            <button
+            <Button
               onClick={() => handleInfo('Statement import wizard coming soon')}
               className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-xl bg-sky-500 text-foreground font-semibold hover:bg-sky-400 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Import statement
-            </button>
+            </Button>
           </div>
         )}
         {statements?.map((stmt) => (

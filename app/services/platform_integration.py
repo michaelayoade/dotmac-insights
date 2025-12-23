@@ -1,30 +1,40 @@
 """
 Platform Integration Service
 
-Provides:
+Provides async functions for platform communication:
 - License validation with caching and grace period
 - Feature flag refresh from platform
-- Usage reporting
+- Usage reporting with batching
 - Heartbeat/health reporting
+
+Uses async PlatformClient with correct platform API endpoints:
+- POST /api/licensing/validate for license validation
+- GET /api/v1/tenants/current for tenant features
+- POST /api/v1/tenants/{tenant_id}/usage for usage reporting
+- POST /api/v1/deployment/instances/{id}/health-check for heartbeat
 """
 from __future__ import annotations
 
-import logging
 import time
-from datetime import datetime, timedelta
-from typing import Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional, Dict, List
+import logging
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.platform.client import platform_client
 from app.feature_flags import feature_flags
 from app.models.unified_contact import UnifiedContact
 from app.models.invoice import Invoice
 from app.middleware.metrics import CONTACTS_DUAL_WRITE_FAILURES
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# LICENSE CACHE (Sync-compatible wrapper)
+# =============================================================================
 
 
 class LicenseCache:
@@ -37,6 +47,7 @@ class LicenseCache:
         self.last_successful_validation: float = 0  # Track last known-good
         self.grace_started_at: Optional[float] = None  # When grace period began
         self.entitlements: Optional[dict] = None  # Raw entitlements from platform
+        self.license_info: Optional[dict] = None  # Full license data
 
     def is_valid(self) -> bool:
         now = time.time()
@@ -54,10 +65,11 @@ class LicenseCache:
             return False
         return (time.time() - self.grace_started_at) >= grace_seconds
 
-    def update(self, valid: bool, ttl_seconds: int) -> None:
+    def update(self, valid: bool, ttl_seconds: int, license_info: Optional[dict] = None) -> None:
         self.last_result = valid
         self.last_checked = time.time()
         self.valid_until = self.last_checked + ttl_seconds
+        self.license_info = license_info
         if valid:
             self.last_successful_validation = self.last_checked
             self.grace_started_at = None  # Clear grace period on success
@@ -80,7 +92,23 @@ class LicenseStatus:
     INVALID = "invalid"  # Platform explicitly rejected
 
 
-def validate_license() -> bool:
+# =============================================================================
+# ASYNC PLATFORM CLIENT
+# =============================================================================
+
+from app.services.platform_client import (
+    get_platform_client,
+    PlatformClientError,
+    PlatformConnectionError,
+)
+
+
+# =============================================================================
+# LICENSE VALIDATION
+# =============================================================================
+
+
+async def validate_license_async() -> bool:
     """Validate license via platform; respects fail-open and grace period.
 
     Behavior:
@@ -101,57 +129,83 @@ def validate_license() -> bool:
     ttl = settings.license_cache_ttl_seconds
     grace_seconds = settings.license_grace_period_hours * 3600
 
-    data = platform_client.get_json("/api/licenses/validate")
+    try:
+        client = get_platform_client()
+        license_info = await client.validate_license()
 
-    # Platform reachable and returned valid response
-    if data and isinstance(data, dict) and data.get("valid") is True:
-        entitlements = data.get("entitlements") or {}
-        license_cache.entitlements = entitlements
-        license_cache.update(True, ttl)
-        _apply_entitlements(entitlements, disable_missing=False)
-        return True
+        # Update cache with validation result
+        license_data = {
+            "id": license_info.license_id,
+            "license_key": license_info.license_key,
+            "status": license_info.status.value,
+            "type": license_info.license_type.value,
+            "features": license_info.features,
+            "limits": license_info.limits,
+            "max_users": license_info.max_users,
+            "expires_at": license_info.expires_at.isoformat() if license_info.expires_at else None,
+        }
+        if license_info.is_valid:
+            entitlements = license_info.features
+            license_cache.entitlements = entitlements
+            license_cache.update(True, ttl, license_data)
+            _apply_entitlements(entitlements, disable_missing=False)
 
-    # Platform reachable but explicitly invalid
-    if data and isinstance(data, dict) and data.get("valid") is False:
-        logger.error("license_explicitly_invalid data=%s status=%s", data, LicenseStatus.INVALID)
+            logger.info(
+                "license_validated_async status=%s license_id=%s",
+                license_info.status.value,
+                license_info.license_id,
+            )
+            return True
+
+        license_cache.entitlements = {}
+        license_cache.update(False, ttl, license_data)
+        _apply_entitlements({}, disable_missing=True)
+        logger.error(
+            "license_invalid_async status=%s license_id=%s",
+            license_info.status.value,
+            license_info.license_id,
+        )
+        return False
+
+    except PlatformConnectionError:
+        # Platform unreachable - apply fail-open with grace period
+        if settings.license_fail_open_on_startup:
+            license_cache.start_grace_period()
+
+            if license_cache.is_in_grace_period(grace_seconds):
+                remaining = grace_seconds - (time.time() - (license_cache.grace_started_at or 0))
+                logger.warning(
+                    "license_validation_fail_open_async reason=%s status=%s grace_remaining_hours=%s",
+                    "platform_unreachable",
+                    LicenseStatus.GRACE_PERIOD,
+                    round(remaining / 3600, 1),
+                )
+                license_cache.update(True, ttl)
+                return True
+            else:
+                logger.error(
+                    "license_grace_period_expired_async status=%s grace_started_at=%s",
+                    LicenseStatus.EXPIRED,
+                    license_cache.grace_started_at,
+                )
+                license_cache.update(False, ttl)
+                license_cache.entitlements = {}
+                _apply_entitlements({}, disable_missing=True)
+                return False
+
+        logger.error("license_validation_failed_async reason=connection_error status=%s", LicenseStatus.INVALID)
         license_cache.update(False, ttl)
         license_cache.entitlements = {}
         _apply_entitlements({}, disable_missing=True)
         return False
 
-    # Platform unreachable (data is None or malformed)
-    # Apply fail-open with grace period
-    if settings.license_fail_open_on_startup:
-        license_cache.start_grace_period()
-
-        if license_cache.is_in_grace_period(grace_seconds):
-            remaining = grace_seconds - (time.time() - (license_cache.grace_started_at or 0))
-            logger.warning(
-                "license_validation_fail_open reason=%s status=%s grace_remaining_hours=%s",
-                "platform_unreachable",
-                LicenseStatus.GRACE_PERIOD,
-                round(remaining / 3600, 1),
-            )
-            license_cache.update(True, ttl)  # Allow operation during grace
-            return True
-        else:
-            # Grace period exhausted
-            logger.error(
-                "license_grace_period_expired status=%s grace_started_at=%s",
-                LicenseStatus.EXPIRED,
-                license_cache.grace_started_at,
-            )
-            license_cache.update(False, ttl)
-            license_cache.entitlements = {}
-            _apply_entitlements({}, disable_missing=True)
-            return False
-
-    # No fail-open configured
-    logger.error("license_validation_failed data=%s status=%s", data, LicenseStatus.INVALID)
-    license_cache.update(False, ttl)
-    license_cache.entitlements = {}
-    _apply_entitlements({}, disable_missing=True)
-    return False
+    except PlatformClientError as e:
+        # Platform reachable but validation failed
+        logger.error("license_explicitly_invalid_async error=%s status=%s", str(e), LicenseStatus.INVALID)
+        license_cache.update(False, ttl)
+        license_cache.entitlements = {}
+        _apply_entitlements({}, disable_missing=True)
+        return False
 
 
 def get_license_status() -> dict:
@@ -167,6 +221,8 @@ def get_license_status() -> dict:
     elif not license_cache.last_result:
         status = LicenseStatus.INVALID
 
+    license_info = license_cache.license_info or {}
+
     return {
         "status": status,
         "last_checked": datetime.fromtimestamp(license_cache.last_checked).isoformat() if license_cache.last_checked else None,
@@ -174,7 +230,16 @@ def get_license_status() -> dict:
         "grace_started_at": datetime.fromtimestamp(license_cache.grace_started_at).isoformat() if license_cache.grace_started_at else None,
         "in_grace_period": license_cache.is_in_grace_period(grace_seconds),
         "entitlements": getattr(license_cache, "entitlements", None),
+        "license_id": license_info.get("id"),
+        "license_type": license_info.get("type"),
+        "expires_at": license_info.get("expires_at"),
+        "max_users": license_info.get("max_users"),
     }
+
+
+# =============================================================================
+# FEATURE FLAGS
+# =============================================================================
 
 
 class FeatureFlagsCache:
@@ -184,10 +249,20 @@ class FeatureFlagsCache:
         self.last_known_good: dict = {}
         self.last_refresh: float = 0
         self.last_error: Optional[str] = None
+        self.tenant_features: dict = {}
+        self.tenant_limits: dict = {}
 
     def update_from_platform(self, data: dict) -> None:
         """Update cache with platform data (last-known-good)."""
         self.last_known_good = data.copy()
+        self.last_refresh = time.time()
+        self.last_error = None
+
+    def update_from_tenant(self, features: dict, limits: dict) -> None:
+        """Update cache with tenant data."""
+        self.tenant_features = features.copy()
+        self.tenant_limits = limits.copy()
+        self.last_known_good = features.copy()  # Store as fallback
         self.last_refresh = time.time()
         self.last_error = None
 
@@ -199,35 +274,44 @@ class FeatureFlagsCache:
 _feature_flags_cache = FeatureFlagsCache()
 
 
-def refresh_feature_flags_from_platform() -> None:
+async def refresh_feature_flags_from_platform_async() -> None:
     """Fetch feature entitlements from platform and apply overrides.
 
-    Fallback chain (in order of precedence):
-    1. Platform entitlements (if reachable and platform_precedence=True)
-    2. Last-known-good cached values (if platform unreachable)
-    3. Environment variable defaults (FF_* prefix)
-    4. Code defaults in FeatureFlags class
+    Uses GET /api/v1/tenants/current for tenant-specific features.
+    Falls back to cached values if platform is unreachable.
     """
     if not settings.platform_api_url:
         return
 
-    data = platform_client.get_json("/api/features/entitlements")
+    try:
+        client = get_platform_client()
+        tenant_info = await client.get_current_tenant()
 
-    if data and isinstance(data, dict):
-        # Platform reachable - update cache and apply
-        _feature_flags_cache.update_from_platform(data)
+        features = tenant_info.features
+        limits = tenant_info.limits
+
+        # Update cache
+        _feature_flags_cache.update_from_tenant(features, limits)
+        _feature_flags_cache.update_from_platform(features)
 
         if settings.feature_flags_platform_precedence:
-            _apply_feature_flags(data, source="platform")
-    else:
+            _apply_feature_flags(features, source="tenant_async")
+            logger.info(
+                "feature_flags_from_tenant_async tenant_id=%s features=%s",
+                tenant_info.tenant_id,
+                list(features.keys()),
+            )
+
+    except PlatformClientError as e:
         # Platform unreachable - use last-known-good if available
-        _feature_flags_cache.last_error = "platform_unreachable"
+        _feature_flags_cache.last_error = f"platform_error: {str(e)}"
         cached = _feature_flags_cache.get_fallback()
         if cached and settings.feature_flags_platform_precedence:
             logger.warning(
-                "feature_flags_using_cached cached_count=%s last_refresh=%s",
+                "feature_flags_using_cached_async cached_count=%s last_refresh=%s error=%s",
                 len(cached),
                 _feature_flags_cache.last_refresh,
+                str(e),
             )
             _apply_feature_flags(cached, source="cached")
 
@@ -287,41 +371,106 @@ def get_feature_flags_status() -> dict:
     return {
         "last_refresh": datetime.fromtimestamp(_feature_flags_cache.last_refresh).isoformat() if _feature_flags_cache.last_refresh else None,
         "cached_count": len(_feature_flags_cache.last_known_good),
+        "tenant_features_count": len(_feature_flags_cache.tenant_features),
+        "tenant_limits": _feature_flags_cache.tenant_limits,
         "last_error": _feature_flags_cache.last_error,
         "platform_precedence": settings.feature_flags_platform_precedence,
     }
 
 
-def report_usage(db: Session) -> None:
-    """Send usage metrics to platform (best effort)."""
+def has_feature(feature: str) -> bool:
+    """Check if a feature is enabled (sync check from cache)."""
+    # Check tenant features first
+    if feature in _feature_flags_cache.tenant_features:
+        return bool(_feature_flags_cache.tenant_features[feature])
+    # Check license entitlements
+    if license_cache.entitlements and feature in license_cache.entitlements:
+        return bool(license_cache.entitlements[feature])
+    # Check local feature flags
+    if hasattr(feature_flags, feature):
+        return bool(getattr(feature_flags, feature))
+    return False
+
+
+def get_limit(limit_name: str, default: int = 0) -> int:
+    """Get a limit value from cached tenant data."""
+    value = _feature_flags_cache.tenant_limits.get(limit_name, default)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+# =============================================================================
+# USAGE REPORTING
+# =============================================================================
+
+
+async def report_usage_async(db: Session) -> None:
+    """Send usage metrics to platform.
+
+    Uses POST /api/v1/tenants/{tenant_id}/usage.
+    """
     if not settings.platform_api_url or not settings.platform_instance_id:
+        return
+
+    if not settings.platform_tenant_id:
+        logger.warning("usage_report_skipped_async reason=no_tenant_id")
         return
 
     active_contacts = db.execute(select(func.count(UnifiedContact.id))).scalar() or 0
     invoices_count = db.execute(select(func.count(Invoice.id))).scalar() or 0
     dual_write_failures = 0
-    # Use metric getter if available (stub returns 0 when prometheus is absent)
     try:
         dual_write_failures = int(CONTACTS_DUAL_WRITE_FAILURES.get())
     except Exception:
         dual_write_failures = 0
 
-    payload = {
-        "instance_id": settings.platform_instance_id,
-        "tenant_id": settings.platform_tenant_id,
-        "timestamp": datetime.utcnow().isoformat(),
-        "metrics": {
-            "active_contacts": active_contacts,
-            "invoices": invoices_count,
-            "dual_write_failures": dual_write_failures,
-        },
-    }
+    try:
+        client = get_platform_client()
 
-    platform_client.post_json("/api/usage/report", payload)
+        # Report each metric
+        await client.report_usage(
+            metric="active_contacts",
+            value=active_contacts,
+            metadata={"instance_id": settings.platform_instance_id},
+        )
+        await client.report_usage(
+            metric="invoices",
+            value=invoices_count,
+            metadata={"instance_id": settings.platform_instance_id},
+        )
+        await client.report_usage(
+            metric="dual_write_failures",
+            value=dual_write_failures,
+            metadata={"instance_id": settings.platform_instance_id},
+        )
+
+        # Flush the usage buffer
+        await client.flush_usage_if_needed()
+
+        logger.debug("usage_reported_async metrics_count=3")
+
+    except PlatformClientError as e:
+        logger.warning("usage_report_failed_async error=%s", str(e))
 
 
-def send_heartbeat(db: Session) -> None:
-    """Send heartbeat/health snapshot to platform."""
+# =============================================================================
+# HEARTBEAT
+# =============================================================================
+
+
+async def send_heartbeat_async(db: Session) -> None:
+    """Send heartbeat/health snapshot to platform.
+
+    Uses POST /api/v1/deployment/instances/{instance_id}/health-check.
+    """
     if not settings.platform_api_url or not settings.platform_instance_id:
         return
 
@@ -332,15 +481,17 @@ def send_heartbeat(db: Session) -> None:
     except Exception:
         db_ok = False
 
-    payload = {
-        "instance_id": settings.platform_instance_id,
-        "tenant_id": settings.platform_tenant_id,
-        "version": "1.0.0",
-        "status": "healthy" if db_ok else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
-        "components": {
-            "database": "ok" if db_ok else "error",
-        },
-    }
+    try:
+        client = get_platform_client()
+        result = await client.send_heartbeat(
+            status="healthy" if db_ok else "degraded",
+            components={"database": "ok" if db_ok else "error"},
+        )
 
-    platform_client.post_json("/api/instances/heartbeat", payload)
+        if result.get("status") != "error":
+            logger.debug("heartbeat_sent_async status=%s", "healthy" if db_ok else "degraded")
+        else:
+            logger.warning("heartbeat_failed_async error=%s", result.get("error"))
+
+    except PlatformClientError as e:
+        logger.warning("heartbeat_failed_async error=%s", str(e))

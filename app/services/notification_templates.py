@@ -1,31 +1,41 @@
-"""Notification template registry and rendering helpers."""
+"""Notification template registry and rendering helpers.
+
+All templates are loaded from Jinja2 files in app/templates/notifications/.
+"""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 import structlog
+from jinja2 import TemplateNotFound
 
-from app.config import settings
 from app.models.notification import NotificationEventType
+from app.templates.environment import get_template_env, render_string
 
 logger = structlog.get_logger()
 
 
-class _SafeFormatDict(dict):
-    def __missing__(self, key: str) -> str:
-        return ""
-
-
 def render_template(template: str, context: Dict[str, Any]) -> str:
-    """Render a template string with safe fallback values."""
-    return template.format_map(_SafeFormatDict(context))
+    """
+    Render a Jinja2 template string with the given context.
+
+    Args:
+        template: Jinja2 template string
+        context: Dictionary of template variables
+
+    Returns:
+        Rendered string
+
+    Raises:
+        jinja2.TemplateError: If template rendering fails
+    """
+    return render_string(template, context)
 
 
 @dataclass(frozen=True)
 class NotificationTemplate:
+    """Represents a notification template with all its attributes."""
     title: str
     message: str
     icon: str
@@ -37,51 +47,76 @@ class NotificationTemplate:
 
 
 class NotificationTemplateRegistry:
-    """Loads notification templates from disk with defaults."""
+    """
+    Loads notification templates from Jinja2 files.
 
-    def __init__(self, templates_path: Optional[str] = None):
-        self.templates_path = templates_path or settings.notification_templates_path
-        self._templates: Optional[Dict[str, Any]] = None
+    Template files are located at: app/templates/notifications/{event_type}.txt.j2
+    """
 
-    def _load_templates(self) -> Dict[str, Any]:
-        path = Path(self.templates_path)
-        try:
-            with path.open("r", encoding="utf-8") as handle:
-                data = cast(Dict[str, Any], json.load(handle))
-        except FileNotFoundError:
-            logger.warning("notification_templates_missing", path=str(path))
-            data = {}
-        except json.JSONDecodeError as exc:
-            logger.error("notification_templates_invalid", path=str(path), error=str(exc))
-            data = {}
+    def __init__(self):
+        self._template_env = get_template_env()
 
-        self._templates = data
-        return data
+    def get_template(
+        self,
+        event_type: NotificationEventType,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> NotificationTemplate:
+        """
+        Get a notification template for the given event type.
 
-    def _get_templates(self) -> Dict[str, Any]:
-        if self._templates is None:
-            return self._load_templates()
-        return self._templates
+        Args:
+            event_type: The notification event type
+            context: Optional context to use for rendering
 
-    def get_template(self, event_type: NotificationEventType) -> NotificationTemplate:
-        templates = self._get_templates()
-        defaults = templates.get("defaults", {})
-        event_templates = templates.get("events", {})
-        event_template = event_templates.get(event_type.value, {})
+        Returns:
+            NotificationTemplate with resolved values
 
-        merged = {**defaults, **event_template}
-        context = {
-            **defaults.get("context", {}),
-            **event_template.get("context", {}),
-        }
+        Raises:
+            TemplateNotFound: If no template exists for the event type
+        """
+        template_name = f"notifications/{event_type.value}.txt.j2"
+        merged_context = context or {}
+
+        template = self._template_env.get_template(template_name)
+
+        # Render the template to get the message
+        rendered = template.render(merged_context)
+
+        # Extract title, icon, priority from template module
+        # These are set as {% set title = "..." %} in the template
+        module = template.module
+        title = getattr(module, "title", event_type.value.replace("_", " ").title())
+        icon = getattr(module, "icon", "bell")
+        priority = getattr(module, "priority", "normal")
 
         return NotificationTemplate(
-            title=merged.get("title", "Notification"),
-            message=merged.get("message", "{message}"),
-            icon=merged.get("icon", "bell"),
-            priority=merged.get("priority", "normal"),
-            context=context,
-            email_subject=merged.get("email_subject"),
-            email_body_html=merged.get("email_body_html"),
-            email_body_text=merged.get("email_body_text"),
+            title=str(title),
+            message=rendered.strip(),
+            icon=str(icon),
+            priority=str(priority),
+            context=merged_context,
         )
+
+    def render(
+        self,
+        event_type: NotificationEventType,
+        context: Dict[str, Any],
+    ) -> Dict[str, str]:
+        """
+        Get and render a notification template.
+
+        Args:
+            event_type: The notification event type
+            context: Template context variables
+
+        Returns:
+            Dict with 'title', 'message', 'icon', and 'priority' keys
+        """
+        template = self.get_template(event_type, context)
+
+        return {
+            "title": template.title,
+            "message": template.message,
+            "icon": template.icon,
+            "priority": template.priority,
+        }

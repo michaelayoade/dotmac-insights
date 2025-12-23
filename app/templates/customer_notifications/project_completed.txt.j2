@@ -1,0 +1,15 @@
+{# Project completed notification #}
+{% set title = "Project Completed: " ~ (project_name | default('Your Project')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Congratulations! Your project has been successfully completed.
+
+Project: {{ project_name }}
+Completion Date: {{ end_date | format_date }}
+
+{% if summary %}{{ summary }}{% endif %}
+
+We hope you're pleased with the results. Please don't hesitate to contact us if you have any questions or need further assistance.
+
+Thank you for choosing us for your project!

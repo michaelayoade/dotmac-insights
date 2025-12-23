@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useAccountingBankAccounts, useBankTransactionMutations } from '@/hooks/useApi';
 import { ArrowLeft, Save, AlertTriangle, CreditCard, Calendar, FileText, User } from 'lucide-react';
+import { Button, LinkButton } from '@/components/ui';
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement> & { label: string; icon?: React.ReactNode }) {
   const { label, icon, className, ...rest } = props;
@@ -271,20 +272,12 @@ export default function NewBankTransactionPage() {
 
         {/* Actions */}
         <div className="flex justify-end gap-3">
-          <Link
-            href="/books/bank-transactions"
-            className="px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
-          >
+          <LinkButton href="/books/bank-transactions" variant="secondary">
             Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60 transition-colors"
-          >
-            <Save className="w-4 h-4" />
+          </LinkButton>
+          <Button type="submit" disabled={saving} loading={saving} module="books" icon={Save}>
             {saving ? 'Creating...' : 'Create Transaction'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -1,0 +1,53 @@
+{% extends "reports/_base.html.j2" %}
+{% from "reports/_macros.html.j2" import format_num %}
+
+{% block title %}General Ledger{% endblock %}
+
+{% block report_title %}General Ledger{% endblock %}
+
+{% block report_subtitle %}
+{% if data.account %}Account: {{ data.account }}{% endif %}
+{% if data.from_date and data.to_date %}
+<br>Period: {{ data.from_date }} to {{ data.to_date }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<table class="small-text">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Account</th>
+            <th>Party</th>
+            <th class="number">Debit</th>
+            <th class="number">Credit</th>
+            <th>Voucher</th>
+        </tr>
+    </thead>
+    <tbody>
+        {# Limit to 500 entries for PDF #}
+        {% for entry in data.entries[:500] | default([]) %}
+        <tr>
+            <td>{{ entry.posting_date | default('') }}</td>
+            <td>{{ entry.account[:30] | default('') }}</td>
+            <td>{{ entry.party | default('') }}</td>
+            <td class="number">{{ format_num(entry.debit) }}</td>
+            <td class="number">{{ format_num(entry.credit) }}</td>
+            <td>{{ entry.voucher_no | default('') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" style="text-align: center; color: #999;">No entries found</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+{% block footer %}
+<p>Total Records: {{ data.total | default(data.entries | length | default(0)) }}</p>
+{% if data.entries | length > 500 %}
+<p style="color: #999; font-size: 8pt;">Note: Showing first 500 entries. Export to CSV for full data.</p>
+{% endif %}
+<p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+{% endblock %}

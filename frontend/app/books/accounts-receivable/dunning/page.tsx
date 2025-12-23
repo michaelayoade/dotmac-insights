@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useAccountingDunningQueue, useCustomerCreditMutations } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { AlertTriangle, Bell, Mail, Loader2 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function DunningQueuePage() {
   const { data, isLoading, error, mutate } = useAccountingDunningQueue();
@@ -22,7 +24,7 @@ export default function DunningQueuePage() {
       key: 'balance',
       header: 'Balance',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.balance, item.currency || 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.balance, item.currency || 'NGN')}</span>,
     },
     { key: 'last_dunning_stage', header: 'Last Stage' },
   ];
@@ -41,14 +43,9 @@ export default function DunningQueuePage() {
           <h1 className="text-2xl font-bold text-foreground">Dunning Queue</h1>
           <p className="text-slate-muted text-sm">Invoices ready for follow-up notices.</p>
         </div>
-        <button
-          onClick={triggerSend}
-          disabled={sending}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
-        >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+        <Button onClick={triggerSend} disabled={sending} loading={sending} module="books" icon={Mail}>
           Send notices
-        </button>
+        </Button>
       </div>
 
       {error && (

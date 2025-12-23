@@ -22,6 +22,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useCorporateCards, useStatementMutations } from '@/hooks/useExpenses';
 import type { CorporateCardTransactionCreatePayload } from '@/lib/expenses.types';
+import { LoadingState, Button } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type Step = 'upload' | 'mapping' | 'preview' | 'importing';
 
@@ -139,6 +142,8 @@ function parseAmount(value: string): number | null {
 }
 
 export default function StatementImportPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:write');
   const router = useRouter();
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -151,7 +156,8 @@ export default function StatementImportPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
 
-  const { data: cards } = useCorporateCards();
+  const canFetch = !authLoading && !missingScope;
+  const { data: cards } = useCorporateCards({}, { isPaused: () => !canFetch });
   const { importStatement } = useStatementMutations();
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
@@ -322,6 +328,20 @@ export default function StatementImportPage() {
 
   const { transactions: parsedTransactions } = step === 'preview' ? parseTransactions() : { transactions: [] };
 
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:write permission to import statements."
+        backHref="/expenses/statements"
+        backLabel="Back to Statements"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -382,9 +402,9 @@ export default function StatementImportPage() {
         <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0" />
           <p className="text-sm text-rose-400">{importError}</p>
-          <button onClick={() => setImportError(null)} className="ml-auto text-rose-400 hover:text-rose-300">
+          <Button onClick={() => setImportError(null)} className="ml-auto text-rose-400 hover:text-rose-300">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -538,7 +558,7 @@ export default function StatementImportPage() {
             </div>
 
             <div className="flex justify-between pt-4">
-              <button
+              <Button
                 onClick={() => {
                   setStep('upload');
                   setCsvData({ headers: [], rows: [] });
@@ -547,14 +567,14 @@ export default function StatementImportPage() {
                 className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
               >
                 Back
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handlePreview}
                 disabled={!validateMapping() || !cardId || !periodStart || !periodEnd}
                 className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Preview <ArrowRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -651,13 +671,13 @@ export default function StatementImportPage() {
             </div>
 
             <div className="flex justify-between pt-4">
-              <button
+              <Button
                 onClick={() => setStep('mapping')}
                 className="px-4 py-2 text-slate-muted hover:text-foreground transition-colors"
               >
                 Back
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleImport}
                 disabled={importing || parsedTransactions.length === 0}
                 className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
@@ -673,7 +693,7 @@ export default function StatementImportPage() {
                     Import {parsedTransactions.length} Transactions
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         )}

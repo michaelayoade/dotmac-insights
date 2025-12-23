@@ -11,7 +11,11 @@ import {
   useHrAttendanceRequestMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { CalendarClock, Clock3, Layers, Users, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button, StatusPill } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -19,60 +23,36 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-teal-electric',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
-      </div>
-    </div>
-  );
-}
-
 function StatusBadge({ status, type = 'attendance' }: { status: string; type?: 'attendance' | 'request' | 'shift' }) {
   const statusLower = status?.toLowerCase() || '';
 
-  const getConfig = () => {
-    if (type === 'attendance') {
-      if (statusLower === 'present') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'absent') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
-      if (statusLower === 'late') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: AlertCircle };
-      if (statusLower === 'half day') return { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/40', icon: Clock3 };
-    }
-    if (type === 'request') {
-      if (statusLower === 'approved') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'rejected') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
-      if (statusLower === 'open' || statusLower === 'pending') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock3 };
-    }
-    if (type === 'shift') {
-      if (statusLower === 'active') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'inactive') return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: XCircle };
-    }
-    return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: Clock3 };
+  const configs: Record<string, Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }>> = {
+    attendance: {
+      present: { tone: 'success', icon: CheckCircle2 },
+      absent: { tone: 'danger', icon: XCircle },
+      late: { tone: 'warning', icon: AlertCircle },
+      'half day': { tone: 'info', icon: Clock3, label: 'Half day' },
+    },
+    request: {
+      approved: { tone: 'success', icon: CheckCircle2 },
+      rejected: { tone: 'danger', icon: XCircle },
+      open: { tone: 'warning', icon: Clock3 },
+      pending: { tone: 'warning', icon: Clock3 },
+    },
+    shift: {
+      active: { tone: 'success', icon: CheckCircle2 },
+      inactive: { tone: 'default', icon: XCircle },
+    },
   };
 
-  const config = getConfig();
-  const Icon = config.icon;
-
+  const config = configs[type]?.[statusLower] || { tone: 'default', icon: Clock3 };
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
-      <Icon className="w-3 h-3" />
-      <span className="capitalize">{status || 'Unknown'}</span>
-    </span>
+    <StatusPill
+      label={config.label || formatStatusLabel(status || 'unknown')}
+      tone={config.tone}
+      icon={config.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -265,10 +245,10 @@ export default function HrAttendancePage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Shift Types" value={shiftTypeList.total} icon={Layers} tone="text-blue-300" />
-        <StatCard label="Assignments" value={shiftAssignmentList.total} icon={CalendarClock} tone="text-teal-electric" />
-        <StatCard label="Attendance Records" value={attendanceList.total} icon={Clock3} tone="text-green-300" />
-        <StatCard label="Attendance Requests" value={attendanceRequestList.total} icon={Users} tone="text-amber-300" />
+        <StatCard title="Shift Types" value={shiftTypeList.total} icon={Layers} colorClass="text-blue-300" />
+        <StatCard title="Assignments" value={shiftAssignmentList.total} icon={CalendarClock} colorClass="text-teal-electric" />
+        <StatCard title="Attendance Records" value={attendanceList.total} icon={Clock3} colorClass="text-green-300" />
+        <StatCard title="Attendance Requests" value={attendanceRequestList.total} icon={Users} colorClass="text-amber-300" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-card border border-slate-border rounded-xl p-4">
@@ -339,12 +319,12 @@ export default function HrAttendancePage() {
               className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
           </div>
-          <button
+          <Button
             onClick={handleCreateAttendance}
             className="w-full bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
           >
             Save Attendance
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-3">
@@ -375,12 +355,12 @@ export default function HrAttendancePage() {
                 <option value="open">Open</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={handleBulkMark}
               className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
             >
               Apply Bulk Mark
-            </button>
+            </Button>
           </div>
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
             <p className="text-foreground font-semibold text-sm">Check-in/out defaults</p>
@@ -534,18 +514,18 @@ export default function HrAttendancePage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => { e.stopPropagation(); handleCheckIn(item.id || item.employee); }}
                     className="px-2 py-1 rounded border border-teal-electric text-teal-electric hover:bg-teal-electric/10"
                   >
                     Check-in
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); handleCheckOut(item.id || item.employee); }}
                     className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
                   >
                     Check-out
-                  </button>
+                  </Button>
                 </div>
               ),
             },
@@ -593,18 +573,18 @@ export default function HrAttendancePage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.approve(item.id); }}
                     className="px-2 py-1 rounded border border-emerald-500 text-emerald-300 hover:bg-emerald-500/10"
                   >
                     Approve
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); attendanceRequestMutations.reject(item.id); }}
                     className="px-2 py-1 rounded border border-rose-500 text-rose-300 hover:bg-rose-500/10"
                   >
                     Reject
-                  </button>
+                  </Button>
                 </div>
               ),
             },
@@ -645,12 +625,12 @@ export default function HrAttendancePage() {
               <option value="reject">Reject</option>
             </select>
           </div>
-          <button
+          <Button
             onClick={handleBulkRequestAction}
             className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
           >
             Run Bulk Action
-          </button>
+          </Button>
         </div>
       </div>
     </div>

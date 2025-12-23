@@ -13,7 +13,11 @@ import {
   useHrJobOpeningMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { Briefcase, FileSignature, UserSearch, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button, StatusPill } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -21,72 +25,47 @@ function extractList<T>(response: any) {
   return { items, total };
 }
 
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-teal-electric',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
-      </div>
-    </div>
-  );
-}
-
 function StatusBadge({ status, type = 'default' }: { status: string; type?: 'job' | 'applicant' | 'offer' | 'interview' | 'default' }) {
   const statusLower = status?.toLowerCase() || '';
 
-  const getConfig = () => {
-    // Job opening statuses
-    if (type === 'job') {
-      if (statusLower === 'open') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'closed') return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: XCircle };
-    }
-    // Applicant statuses
-    if (type === 'applicant') {
-      if (statusLower === 'open') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock };
-      if (statusLower === 'screened') return { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/40', icon: UserSearch };
-      if (statusLower === 'interviewed') return { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/40', icon: CheckCircle2 };
-      if (statusLower === 'hired') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'rejected' || statusLower === 'withdrawn') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
-    }
-    // Offer statuses
-    if (type === 'offer') {
-      if (statusLower === 'draft') return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: Clock };
-      if (statusLower === 'sent') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: AlertCircle };
-      if (statusLower === 'accepted') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'rejected') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
-    }
-    // Interview statuses
-    if (type === 'interview') {
-      if (statusLower === 'scheduled') return { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock };
-      if (statusLower === 'completed') return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 };
-      if (statusLower === 'cancelled' || statusLower === 'no-show') return { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle };
-    }
-    // Default
-    return { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: Clock };
+  const configs: Record<string, Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }>> = {
+    job: {
+      open: { tone: 'success', icon: CheckCircle2 },
+      closed: { tone: 'default', icon: XCircle },
+    },
+    applicant: {
+      open: { tone: 'warning', icon: Clock },
+      screened: { tone: 'info', icon: UserSearch },
+      interviewed: { tone: 'info', icon: CheckCircle2 },
+      hired: { tone: 'success', icon: CheckCircle2 },
+      rejected: { tone: 'danger', icon: XCircle },
+      withdrawn: { tone: 'danger', icon: XCircle },
+    },
+    offer: {
+      draft: { tone: 'default', icon: Clock },
+      sent: { tone: 'warning', icon: AlertCircle },
+      accepted: { tone: 'success', icon: CheckCircle2 },
+      rejected: { tone: 'danger', icon: XCircle },
+    },
+    interview: {
+      scheduled: { tone: 'warning', icon: Clock },
+      completed: { tone: 'success', icon: CheckCircle2 },
+      cancelled: { tone: 'danger', icon: XCircle },
+      'no-show': { tone: 'danger', icon: XCircle, label: 'No show' },
+    },
+    default: {
+      unknown: { tone: 'default', icon: Clock },
+    },
   };
 
-  const config = getConfig();
-  const Icon = config.icon;
-
+  const config = configs[type]?.[statusLower] || configs.default.unknown;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
-      <Icon className="w-3 h-3" />
-      <span className="capitalize">{status || 'Unknown'}</span>
-    </span>
+    <StatusPill
+      label={config.label || formatStatusLabel(status || 'unknown')}
+      tone={config.tone}
+      icon={config.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -318,9 +297,9 @@ export default function HrRecruitmentPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Openings" value={openingList.total} icon={Briefcase} tone="text-teal-electric" />
-        <StatCard label="Applicants" value={applicantList.total} icon={UserSearch} tone="text-purple-300" />
-        <StatCard label="Offers" value={offerList.total} icon={FileSignature} tone="text-green-300" />
+        <StatCard title="Openings" value={openingList.total} icon={Briefcase} colorClass="text-teal-electric" />
+        <StatCard title="Applicants" value={applicantList.total} icon={UserSearch} colorClass="text-purple-300" />
+        <StatCard title="Offers" value={offerList.total} icon={FileSignature} colorClass="text-green-300" />
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -399,12 +378,12 @@ export default function HrRecruitmentPage() {
             onChange={(e) => setNewOpening({ ...newOpening, vacancies: e.target.value })}
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
           />
-          <button
+          <Button
             onClick={handleCreateOpening}
             className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
           >
             Create Opening
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-3">
@@ -488,12 +467,12 @@ export default function HrRecruitmentPage() {
                 className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
-            <button
+            <Button
               onClick={handleScheduleInterview}
               className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
             >
               Schedule Interview
-            </button>
+            </Button>
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
@@ -530,12 +509,12 @@ export default function HrRecruitmentPage() {
                 </select>
               </div>
             </div>
-            <button
+            <Button
               onClick={handleMakeOffer}
               className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
             >
               Link Offer
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -603,12 +582,12 @@ export default function HrRecruitmentPage() {
                 <option value="phone">Phone</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={handleCreateInterview}
               className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
             >
               Create Interview
-            </button>
+            </Button>
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-3 space-y-2">
@@ -646,12 +625,12 @@ export default function HrRecruitmentPage() {
               className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
             />
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleCompleteInterview}
                 className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
               >
                 Complete Interview
-              </button>
+              </Button>
               <select
                 value={interviewAction}
                 onChange={(e) => setInterviewAction(e.target.value as 'cancel' | 'no-show')}
@@ -660,12 +639,12 @@ export default function HrRecruitmentPage() {
                 <option value="cancel">Cancel</option>
                 <option value="no-show">No-show</option>
               </select>
-              <button
+              <Button
                 onClick={handleInterviewAction}
                 className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-foreground"
               >
                 Apply
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -699,12 +678,12 @@ export default function HrRecruitmentPage() {
                 className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             )}
-            <button
+            <Button
               onClick={handleOfferAction}
               className="bg-teal-electric text-slate-deep px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-glow transition-colors"
             >
               Run Offer Action
-            </button>
+            </Button>
             <div className="pt-2 space-y-2 border-t border-slate-border">
               <p className="text-xs text-slate-muted">Bulk send offers</p>
               <input
@@ -723,12 +702,12 @@ export default function HrRecruitmentPage() {
                   <option value="email">Email</option>
                   <option value="manual">Manual</option>
                 </select>
-                <button
+                <Button
                   onClick={handleBulkOfferSend}
                   className="px-3 py-2 rounded-lg text-sm font-semibold border border-slate-border text-slate-muted hover:text-foreground"
                 >
                   Send
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -786,18 +765,18 @@ export default function HrRecruitmentPage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => { e.stopPropagation(); applicantMutations.screen(item.id).catch((err: any) => setActionError(err?.message || 'Screen failed')); }}
                     className="px-2 py-1 rounded border border-teal-electric text-teal-electric hover:bg-teal-electric/10"
                   >
                     Screen
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); applicantMutations.withdraw(item.id).catch((err: any) => setActionError(err?.message || 'Withdraw failed')); }}
                     className="px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10"
                   >
                     Withdraw
-                  </button>
+                  </Button>
                 </div>
               ),
             },
@@ -838,30 +817,30 @@ export default function HrRecruitmentPage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => { e.stopPropagation(); offerMutations.send(item.id).catch((err: any) => setActionError(err?.message || 'Send failed')); }}
                     className="px-2 py-1 rounded border border-teal-electric text-teal-electric hover:bg-teal-electric/10"
                   >
                     Send
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); offerMutations.accept(item.id).catch((err: any) => setActionError(err?.message || 'Accept failed')); }}
                     className="px-2 py-1 rounded border border-green-500 text-green-300 hover:bg-green-500/10"
                   >
                     Accept
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); offerMutations.reject(item.id).catch((err: any) => setActionError(err?.message || 'Reject failed')); }}
                     className="px-2 py-1 rounded border border-red-500 text-red-300 hover:bg-red-500/10"
                   >
                     Reject
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); offerMutations.void(item.id, { void_reason: 'Void from list' }).catch((err: any) => setActionError(err?.message || 'Void failed')); }}
                     className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
                   >
                     Void
-                  </button>
+                  </Button>
                 </div>
               ),
             },

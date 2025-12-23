@@ -1,0 +1,10 @@
+{% extends "emails/_base.html.j2" %}
+
+{% block title %}{{ title | default('Notification') }}{% endblock %}
+
+{% block content %}
+<h2>{{ title | default('Notification') }}</h2>
+<div style="color: #555; font-size: 16px;">
+    {{ message | nl2br }}
+</div>
+{% endblock %}

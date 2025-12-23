@@ -1,0 +1,16 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Payment Failed" %}
+{% set icon = "x-circle" %}
+{% set priority = "high" %}
+
+{% block content %}
+A payment attempt has failed.
+
+Customer: {{ customer_name | default('Customer') }}
+Invoice: {{ invoice_number | default('N/A') }}
+Amount: {{ amount | default('N/A') }}
+Payment Method: {{ payment_method | default('N/A') }}
+Failure Reason: {{ failure_reason | default('Payment could not be processed') }}
+
+Please follow up with the customer to resolve this issue.
+{% endblock %}

@@ -1,0 +1,9 @@
+{# Performance scorecard approved notification #}
+{% set title = "Scorecard Approved" %}
+{% set icon = "check-circle" %}
+{% set priority = "normal" %}
+
+Your performance scorecard for {{ period_name | default('this period') }} has been approved by {{ reviewer_name | default('your manager') }}.
+{% if score %}
+Final Score: {{ score }}
+{% endif %}

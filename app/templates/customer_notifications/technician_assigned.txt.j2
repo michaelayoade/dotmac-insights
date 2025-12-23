@@ -1,0 +1,14 @@
+{# Technician assigned notification #}
+{% set title = "Technician Assigned: " ~ (order_type | default('Service') | title_case) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+A technician has been assigned to your service order #{{ order_number }}.
+
+Technician: {{ technician_name | default('A technician') }}
+Scheduled Date: {{ scheduled_date | format_date }}
+Scheduled Time: {{ scheduled_time | default('TBD') }}
+
+Your technician will contact you if needed before the appointment.
+
+Thank you!

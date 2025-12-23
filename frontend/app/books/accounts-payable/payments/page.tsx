@@ -4,13 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { usePurchasingPayments } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
-import { Filter, Calendar, CreditCard, Landmark } from 'lucide-react';
 
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  return new Date(value).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+import { Calendar, CreditCard, Landmark } from 'lucide-react';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
+import { FilterCard, FilterInput } from '@/components/ui';
 
 export default function BooksApPaymentsPage() {
   const [page, setPage] = useState(1);
@@ -35,7 +32,7 @@ export default function BooksApPaymentsPage() {
       render: (item: any) => (
         <div className="flex flex-col">
           <span className="font-mono text-foreground">{item.receipt_number || `#${item.id}`}</span>
-          <span className="text-slate-muted text-sm">{formatDate(item.payment_date)}</span>
+          <span className="text-slate-muted text-sm">{formatAccountingDate(item.payment_date)}</span>
         </div>
       ),
     },
@@ -55,7 +52,7 @@ export default function BooksApPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-foreground font-mono">{formatCurrency(item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatAccountingCurrency(item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">{item.payment_method || '—'}</div>
         </div>
       ),
@@ -87,26 +84,18 @@ export default function BooksApPaymentsPage() {
         </Link>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search receipt/reference"
-            className="input-field"
-          />
-          <input
-            value={currency}
-            onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
-            placeholder="Currency"
-            className="input-field"
-          />
-        </div>
-      </div>
+      <FilterCard contentClassName="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <FilterInput
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search receipt/reference"
+        />
+        <FilterInput
+          value={currency}
+          onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
+          placeholder="Currency"
+        />
+      </FilterCard>
 
       <DataTable
         columns={columns}

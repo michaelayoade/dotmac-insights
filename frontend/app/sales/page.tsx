@@ -6,7 +6,6 @@ import type { SalesDashboardResponse } from '@/lib/api/domains/dashboards';
 import { cn } from '@/lib/utils';
 import {
   TrendingUp,
-  TrendingDown,
   FileText,
   CreditCard,
   Clock,
@@ -24,83 +23,8 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
-
-function formatCurrency(value: number, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  className?: string;
-  href?: string;
-}
-
-function StatCard({ title, value, subtitle, icon: Icon, trend, trendValue, className, href }: StatCardProps) {
-  const content = (
-    <div className={cn(
-      'bg-slate-card rounded-xl border border-slate-border p-6',
-      href && 'hover:border-teal-electric/50 hover:bg-slate-elevated/50 transition-all cursor-pointer',
-      className
-    )}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-slate-muted text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-          {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
-          {trend && trendValue && (
-            <div className={cn(
-              'flex items-center gap-1 mt-2 text-sm',
-              trend === 'up' && 'text-green-400',
-              trend === 'down' && 'text-red-400',
-              trend === 'neutral' && 'text-slate-muted'
-            )}>
-              {trend === 'up' && <TrendingUp className="w-4 h-4" />}
-              {trend === 'down' && <TrendingDown className="w-4 h-4" />}
-              <span>{trendValue}</span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 bg-slate-elevated rounded-lg">
-          <Icon className="w-6 h-6 text-teal-electric" />
-        </div>
-      </div>
-      {href && (
-        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
-          <span>View details</span>
-          <ArrowRight className="w-3 h-3 ml-1" />
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
-}
+import { StatCard } from '@/components/StatCard';
+import { formatCurrency, formatDate, formatNumber } from '@/lib/formatters';
 
 interface AgingBuckets {
   current: { count: number; total: number };
@@ -225,8 +149,7 @@ export default function SalesDashboardPage() {
           value={formatNumber(crm?.pipeline?.open_count || 0)}
           subtitle={`Win Rate: ${((crm?.pipeline?.win_rate || 0) * 100).toFixed(0)}%`}
           icon={TrendingUp}
-          trend={(crm?.pipeline?.win_rate || 0) >= 0.3 ? 'up' : 'down'}
-          trendValue={(crm?.pipeline?.win_rate || 0) >= 0.3 ? 'Above Target' : 'Below Target'}
+          trend={(crm?.pipeline?.win_rate || 0) >= 0.3 ? { value: 1, label: 'Above Target' } : { value: -1, label: 'Below Target' }}
           href="/sales/opportunities"
         />
         <StatCard
@@ -241,8 +164,7 @@ export default function SalesDashboardPage() {
           value={formatNumber(crm?.upcoming_activities?.length || 0)}
           subtitle={crm?.overdue_activities?.length ? `${crm.overdue_activities.length} overdue` : 'All on track'}
           icon={Calendar}
-          trend={crm?.overdue_activities?.length ? 'down' : 'up'}
-          trendValue={crm?.overdue_activities?.length ? 'Action needed' : 'Healthy'}
+          trend={crm?.overdue_activities?.length ? { value: -1, label: 'Action needed' } : { value: 1, label: 'Healthy' }}
           href="/sales/activities"
         />
       </div>
@@ -293,8 +215,7 @@ export default function SalesDashboardPage() {
           value={formatCurrency(collected30d, currency)}
           subtitle={`Collection Rate: ${(collectionRate * 100).toFixed(1)}%`}
           icon={CreditCard}
-          trend={collectionRate >= 0.8 ? 'up' : 'down'}
-          trendValue={collectionRate >= 0.8 ? 'Healthy' : 'Below Target'}
+          trend={collectionRate >= 0.8 ? { value: 1, label: 'Healthy' } : { value: -1, label: 'Below Target' }}
           href="/sales/payments"
         />
         <StatCard

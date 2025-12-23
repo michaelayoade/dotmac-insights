@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, Network, Users, Activity, Target, Filter } from 'lucide-react';
+import { BarChart3, Network, Users, Activity, Target } from 'lucide-react';
 import { useSupportRoutingQueueHealth, useSupportRoutingRules, useSupportRoutingWorkload, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { PageHeader, Select } from '@/components/ui';
+import { FilterCard, FilterSelect, PageHeader, Select } from '@/components/ui';
 
 function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -36,15 +36,11 @@ export default function SupportRoutingPage() {
       />
 
       {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filter by Team</span>
-        </div>
-        <select
+      <FilterCard title="Filter by Team" contentClassName="flex flex-wrap gap-3">
+        <FilterSelect
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
+          className="min-w-[200px]"
         >
           <option value="">All teams</option>
           {teams.map((team: any) => (
@@ -52,8 +48,8 @@ export default function SupportRoutingPage() {
               {team.team_name}
             </option>
           ))}
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Queue Health */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">

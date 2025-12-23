@@ -1,0 +1,12 @@
+{# Service cancelled notification #}
+{% set title = "Service Cancelled" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your service order #{{ order_number }} has been cancelled.
+
+{% if notes %}Reason: {{ notes }}{% endif %}
+
+If you did not request this cancellation or have any questions, please contact us immediately.
+
+We apologize for any inconvenience.

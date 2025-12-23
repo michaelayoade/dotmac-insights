@@ -55,7 +55,7 @@ import { formatCurrency, formatNumber, formatPercent, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-import { DashboardShell, PageHeader } from '@/components/ui';
+import { Button, DashboardShell, PageHeader } from '@/components/ui';
 import { RefreshCw, BarChart3 } from 'lucide-react';
 
 type TimeRange = 6 | 12 | 24;
@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
               {/* Time Range Selector */}
               <div className="flex items-center gap-2 bg-slate-elevated rounded-lg p-1">
                 {([6, 12, 24] as TimeRange[]).map((range) => (
-                  <button
+                  <Button
                     key={range}
                     onClick={() => setFilters((prev) => ({ ...prev, timeRange: range }))}
                     className={cn(
@@ -231,17 +231,17 @@ export default function AnalyticsPage() {
                     )}
                   >
                     {range}M
-                  </button>
+                  </Button>
                 ))}
               </div>
 
-              <button
+              <Button
                 onClick={retryAll}
                 className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Refresh data
-              </button>
+              </Button>
             </div>
           }
         />
@@ -293,7 +293,7 @@ export default function AnalyticsPage() {
       {/* Tab Navigation */}
       <div className="flex items-center gap-1 bg-slate-elevated rounded-lg p-1 w-fit">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             onClick={() => setFilters((prev) => ({ ...prev, activeTab: tab.id }))}
             className={cn(
@@ -305,7 +305,7 @@ export default function AnalyticsPage() {
           >
             <tab.icon className="w-4 h-4" />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 

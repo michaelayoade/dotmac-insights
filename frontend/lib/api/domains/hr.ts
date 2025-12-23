@@ -378,6 +378,91 @@ export interface HrPayrollPayoutRequest {
 }
 
 // =============================================================================
+// PAYROLL CONFIG (Regions, Deduction Rules, Tax Bands)
+// =============================================================================
+
+export type CalculationMethod = 'FLAT' | 'PERCENTAGE' | 'PROGRESSIVE';
+export type DeductionRuleType = 'TAX' | 'PENSION' | 'NHF' | 'NHIS' | 'NSITF' | 'ITF' | 'OTHER';
+
+export interface PayrollRegion {
+  id: number;
+  country_code: string;
+  currency: string;
+  deduction_rules?: DeductionRule[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PayrollRegionPayload {
+  country_code: string;
+  currency: string;
+  deduction_rule_ids?: number[];
+}
+
+export interface DeductionRule {
+  id: number;
+  name: string;
+  rule_type: DeductionRuleType;
+  calculation_method: CalculationMethod;
+  flat_amount?: number | null;
+  percentage?: number | null;
+  cap?: number | null;
+  floor?: number | null;
+  employer_contribution_percent?: number | null;
+  employee_contribution_percent?: number | null;
+  is_active: boolean;
+  tax_bands?: TaxBand[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DeductionRulePayload {
+  name: string;
+  rule_type: DeductionRuleType;
+  calculation_method: CalculationMethod;
+  flat_amount?: number | null;
+  percentage?: number | null;
+  cap?: number | null;
+  floor?: number | null;
+  employer_contribution_percent?: number | null;
+  employee_contribution_percent?: number | null;
+  is_active?: boolean;
+}
+
+export interface TaxBand {
+  id: number;
+  deduction_rule_id: number;
+  lower_bound: number;
+  upper_bound: number | null;
+  rate: number;
+  fixed_amount?: number | null;
+  idx: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TaxBandPayload {
+  deduction_rule_id: number;
+  lower_bound: number;
+  upper_bound?: number | null;
+  rate: number;
+  fixed_amount?: number | null;
+  idx?: number;
+}
+
+export interface HrSalarySlipListParams {
+  employee_id?: number;
+  payroll_entry?: string;
+  status?: string;
+  department?: string;
+  start_date?: string;
+  end_date?: string;
+  company?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// =============================================================================
 // HR SETTINGS
 // =============================================================================
 
@@ -1528,4 +1613,89 @@ export const hrApi = {
 
   seedHRDefaults: () =>
     fetchApi<{ status: string }>('/hr/settings/seed-defaults', { method: 'POST' }),
+
+  // Salary Slips (list and detail)
+  getSalarySlips: (params?: HrSalarySlipListParams) =>
+    fetchApi<HrListResponse<HrSalarySlip>>('/hr/salary-slips', { params: params as any }),
+
+  getSalarySlipDetail: (id: number | string) =>
+    fetchApi<HrSalarySlip>(`/hr/salary-slips/${id}`),
+
+  submitSalarySlip: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/submit`, { method: 'POST' }),
+
+  cancelSalarySlip: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/cancel`, { method: 'POST' }),
+
+  markSalarySlipPaid: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/mark-paid`, { method: 'POST' }),
+
+  voidSalarySlip: (id: number | string) =>
+    fetchApi<void>(`/hr/salary-slips/${id}/void`, { method: 'POST' }),
+
+  bulkSubmitSalarySlips: (body: { slip_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/salary-slips/bulk/submit', { method: 'POST', body: JSON.stringify(body) }),
+
+  bulkMarkSalarySlipsPaid: (body: { slip_ids: (number | string)[] }) =>
+    fetchApi<void>('/hr/salary-slips/bulk/mark-paid', { method: 'POST', body: JSON.stringify(body) }),
+
+  // -------------------------------------------------------------------------
+  // Payroll Config - Regions
+  // -------------------------------------------------------------------------
+
+  getPayrollRegions: (params?: { limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<PayrollRegion>>('/payroll-config/regions', { params }),
+
+  getPayrollRegion: (id: number | string) =>
+    fetchApi<PayrollRegion>(`/payroll-config/regions/${id}`),
+
+  createPayrollRegion: (body: PayrollRegionPayload) =>
+    fetchApi<PayrollRegion>('/payroll-config/regions', { method: 'POST', body: JSON.stringify(body) }),
+
+  updatePayrollRegion: (id: number | string, body: Partial<PayrollRegionPayload>) =>
+    fetchApi<PayrollRegion>(`/payroll-config/regions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deletePayrollRegion: (id: number | string) =>
+    fetchApi<void>(`/payroll-config/regions/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Payroll Config - Deduction Rules
+  // -------------------------------------------------------------------------
+
+  getDeductionRules: (params?: { rule_type?: DeductionRuleType; is_active?: boolean; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<DeductionRule>>('/payroll-config/deduction-rules', { params }),
+
+  getDeductionRule: (id: number | string) =>
+    fetchApi<DeductionRule>(`/payroll-config/deduction-rules/${id}`),
+
+  createDeductionRule: (body: DeductionRulePayload) =>
+    fetchApi<DeductionRule>('/payroll-config/deduction-rules', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateDeductionRule: (id: number | string, body: Partial<DeductionRulePayload>) =>
+    fetchApi<DeductionRule>(`/payroll-config/deduction-rules/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteDeductionRule: (id: number | string) =>
+    fetchApi<void>(`/payroll-config/deduction-rules/${id}`, { method: 'DELETE' }),
+
+  // -------------------------------------------------------------------------
+  // Payroll Config - Tax Bands
+  // -------------------------------------------------------------------------
+
+  getTaxBands: (params?: { deduction_rule_id?: number; limit?: number; offset?: number }) =>
+    fetchApi<HrListResponse<TaxBand>>('/payroll-config/tax-bands', { params }),
+
+  getTaxBand: (id: number | string) =>
+    fetchApi<TaxBand>(`/payroll-config/tax-bands/${id}`),
+
+  createTaxBand: (body: TaxBandPayload) =>
+    fetchApi<TaxBand>('/payroll-config/tax-bands', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateTaxBand: (id: number | string, body: Partial<TaxBandPayload>) =>
+    fetchApi<TaxBand>(`/payroll-config/tax-bands/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteTaxBand: (id: number | string) =>
+    fetchApi<void>(`/payroll-config/tax-bands/${id}`, { method: 'DELETE' }),
+
+  submitPayrollEntry: (id: number | string) =>
+    fetchApi<void>(`/hr/payroll-entries/${id}/submit`, { method: 'POST' }),
 };

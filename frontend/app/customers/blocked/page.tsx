@@ -11,6 +11,7 @@ import {
   EmptyState,
   SummaryCard,
 } from '@/components/insights/shared';
+import { FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 export default function BlockedCustomersPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
@@ -19,13 +20,17 @@ export default function BlockedCustomersPage() {
   const [sortBy, setSortBy] = useState<'mrr' | 'days_blocked' | 'tenure' | undefined>(undefined);
   const maxDays = useMemo(() => months * 30, [months]);
 
-  const { data, isLoading, error, mutate } = useBlockedCustomers({
-    min_days_blocked: 0,
-    max_days_blocked: maxDays,
-    min_mrr: minMrr,
-    sort_by: sortBy,
-    limit: 200,
-  });
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error, mutate } = useBlockedCustomers(
+    {
+      min_days_blocked: 0,
+      max_days_blocked: maxDays,
+      min_mrr: minMrr,
+      sort_by: sortBy,
+      limit: 200,
+    },
+    { isPaused: () => !canFetch }
+  );
 
   if (authLoading || isLoading) {
     return <LoadingState />;
@@ -67,44 +72,41 @@ export default function BlockedCustomersPage() {
       </div>
 
       {/* Filter */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
+      <FilterCard contentClassName="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
         <div className="flex flex-col gap-2">
           <label className="text-sm text-slate-muted">Time Period</label>
-          <select
+          <FilterSelect
             value={months}
             onChange={(e) => setMonths(Number(e.target.value))}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
           >
             <option value={1}>Last 1 month</option>
             <option value={3}>Last 3 months</option>
             <option value={6}>Last 6 months</option>
             <option value={12}>Last 12 months</option>
-          </select>
+          </FilterSelect>
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm text-slate-muted">Min MRR</label>
-          <input
+          <FilterInput
             type="number"
             placeholder="e.g. 50000"
             value={minMrr ?? ''}
             onChange={(e) => setMinMrr(e.target.value ? Number(e.target.value) : undefined)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric"
           />
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm text-slate-muted">Sort By</label>
-          <select
+          <FilterSelect
             value={sortBy || ''}
             onChange={(e) => setSortBy(e.target.value ? (e.target.value as 'mrr' | 'days_blocked' | 'tenure') : undefined)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
           >
             <option value="">None</option>
             <option value="mrr">MRR</option>
             <option value="days_blocked">Days Blocked</option>
             <option value="tenure">Tenure</option>
-          </select>
+          </FilterSelect>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Blocked Customers Table */}
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">

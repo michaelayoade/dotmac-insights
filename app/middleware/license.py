@@ -5,7 +5,7 @@ Gates API requests based on platform license status. Fail-open is honored for
 GRACE_PERIOD if configured; EXPIRED/INVALID returns 503.
 """
 from fastapi import HTTPException, Request
-from app.services.platform_integration import validate_license, get_license_status, LicenseStatus
+from app.services.platform_integration import validate_license_async, get_license_status, LicenseStatus
 from app.config import settings
 
 
@@ -20,8 +20,8 @@ async def enforce_license(request: Request):
     if not settings.platform_api_url or not settings.platform_instance_id:
         return
 
-    # Check cache + platform (best effort)
-    is_valid = validate_license()
+    # Check cache + platform (async, non-blocking)
+    is_valid = await validate_license_async()
     status = get_license_status()["status"]
 
     if is_valid:

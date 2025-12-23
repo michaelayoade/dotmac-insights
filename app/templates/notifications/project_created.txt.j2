@@ -1,0 +1,12 @@
+{# Project created notification #}
+{% set title = "New Project Created" %}
+{% set icon = "folder-plus" %}
+{% set priority = "normal" %}
+
+A new project has been created: {{ project_name }}.
+{% if created_by_name %}
+Created by: {{ created_by_name }}
+{% endif %}
+{% if expected_end_date %}
+Target completion: {{ expected_end_date }}
+{% endif %}

@@ -303,3 +303,133 @@ export function getCardColors(color: AccentColor) {
     icon: config.cardIcon,
   };
 }
+
+// =============================================================================
+// BUTTON COLORS
+// =============================================================================
+
+export interface ButtonColorConfig {
+  /** Primary filled button background */
+  primary: string;
+  /** Primary button hover state */
+  primaryHover: string;
+  /** Primary text/icon color */
+  primaryText: string;
+  /** Light background for badges/chips */
+  primaryBg: string;
+  /** Border color for outlined elements */
+  primaryBorder: string;
+}
+
+/**
+ * Button color mappings derived from AccentColor.
+ * This consolidates the MODULE_COLORS pattern from module-colors.ts.
+ */
+const BUTTON_COLORS: Record<AccentColor, ButtonColorConfig> = {
+  amber: {
+    primary: 'bg-amber-500',
+    primaryHover: 'hover:bg-amber-400',
+    primaryText: 'text-amber-500',
+    primaryBg: 'bg-amber-500/10',
+    primaryBorder: 'border-amber-500/30',
+  },
+  teal: {
+    primary: 'bg-teal-electric',
+    primaryHover: 'hover:bg-teal-electric/90',
+    primaryText: 'text-teal-electric',
+    primaryBg: 'bg-teal-electric/10',
+    primaryBorder: 'border-teal-electric/30',
+  },
+  sky: {
+    primary: 'bg-sky-500',
+    primaryHover: 'hover:bg-sky-400',
+    primaryText: 'text-sky-500',
+    primaryBg: 'bg-sky-500/10',
+    primaryBorder: 'border-sky-500/30',
+  },
+  violet: {
+    primary: 'bg-violet-500',
+    primaryHover: 'hover:bg-violet-400',
+    primaryText: 'text-violet-500',
+    primaryBg: 'bg-violet-500/10',
+    primaryBorder: 'border-violet-500/30',
+  },
+  emerald: {
+    primary: 'bg-emerald-500',
+    primaryHover: 'hover:bg-emerald-400',
+    primaryText: 'text-emerald-500',
+    primaryBg: 'bg-emerald-500/10',
+    primaryBorder: 'border-emerald-500/30',
+  },
+  rose: {
+    primary: 'bg-rose-500',
+    primaryHover: 'hover:bg-rose-400',
+    primaryText: 'text-rose-500',
+    primaryBg: 'bg-rose-500/10',
+    primaryBorder: 'border-rose-500/30',
+  },
+  cyan: {
+    primary: 'bg-cyan-500',
+    primaryHover: 'hover:bg-cyan-400',
+    primaryText: 'text-cyan-500',
+    primaryBg: 'bg-cyan-500/10',
+    primaryBorder: 'border-cyan-500/30',
+  },
+  indigo: {
+    primary: 'bg-indigo-500',
+    primaryHover: 'hover:bg-indigo-400',
+    primaryText: 'text-indigo-500',
+    primaryBg: 'bg-indigo-500/10',
+    primaryBorder: 'border-indigo-500/30',
+  },
+  orange: {
+    primary: 'bg-orange-500',
+    primaryHover: 'hover:bg-orange-400',
+    primaryText: 'text-orange-500',
+    primaryBg: 'bg-orange-500/10',
+    primaryBorder: 'border-orange-500/30',
+  },
+  blue: {
+    primary: 'bg-blue-500',
+    primaryHover: 'hover:bg-blue-400',
+    primaryText: 'text-blue-500',
+    primaryBg: 'bg-blue-500/10',
+    primaryBorder: 'border-blue-500/30',
+  },
+  purple: {
+    primary: 'bg-purple-500',
+    primaryHover: 'hover:bg-purple-400',
+    primaryText: 'text-purple-500',
+    primaryBg: 'bg-purple-500/10',
+    primaryBorder: 'border-purple-500/30',
+  },
+  lime: {
+    primary: 'bg-lime-500',
+    primaryHover: 'hover:bg-lime-400',
+    primaryText: 'text-lime-500',
+    primaryBg: 'bg-lime-500/10',
+    primaryBorder: 'border-lime-500/30',
+  },
+  stone: {
+    primary: 'bg-stone-500',
+    primaryHover: 'hover:bg-stone-400',
+    primaryText: 'text-stone-500',
+    primaryBg: 'bg-stone-500/10',
+    primaryBorder: 'border-stone-500/30',
+  },
+  slate: {
+    primary: 'bg-slate-500',
+    primaryHover: 'hover:bg-slate-400',
+    primaryText: 'text-slate-400',
+    primaryBg: 'bg-slate-500/10',
+    primaryBorder: 'border-slate-500/30',
+  },
+};
+
+/**
+ * Get button-specific colors for an accent color.
+ * Use this for primary action buttons, badges, and module-specific UI.
+ */
+export function getButtonColors(color: AccentColor): ButtonColorConfig {
+  return BUTTON_COLORS[color] ?? BUTTON_COLORS.teal;
+}

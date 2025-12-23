@@ -24,6 +24,7 @@ import {
 import { useLead, useLeadMutations, useLeadContacts, useActivityTimeline } from '@/hooks/useApi';
 import { formatDistanceToNow, formatDate } from '@/lib/date';
 import type { Activity, Contact } from '@/lib/api';
+import { Button } from '@/components/ui';
 
 const statusColors: Record<string, string> = {
   new: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -131,30 +132,30 @@ export default function LeadDetailPage() {
         <div className="flex items-center gap-2">
           {(lead.status === 'new' || lead.status === 'contacted') && (
             <>
-              <button
+              <Button
                 onClick={handleQualify}
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
                 Qualify
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setShowDisqualifyModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Disqualify
-              </button>
+              </Button>
             </>
           )}
           {lead.status === 'qualified' && (
-            <button
+            <Button
               onClick={() => setShowConvertModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-foreground rounded-lg transition-colors"
             >
               <ArrowRight className="w-4 h-4" />
               Convert to Customer
-            </button>
+            </Button>
           )}
           <Link
             href={`/sales/leads/${leadId}/edit`}
@@ -412,18 +413,18 @@ export default function LeadDetailPage() {
               />
             </div>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
                 onClick={() => setShowDisqualifyModal(false)}
                 className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleDisqualify}
                 className="px-4 py-2 bg-red-600 hover:bg-red-500 text-foreground rounded-lg transition-colors"
               >
                 Disqualify
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -477,18 +478,18 @@ export default function LeadDetailPage() {
               )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button
+              <Button
                 onClick={() => setShowConvertModal(false)}
                 className="px-4 py-2 text-slate-400 hover:text-foreground transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleConvert}
                 className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-foreground rounded-lg transition-colors"
               >
                 Convert
-              </button>
+              </Button>
             </div>
           </div>
         </div>

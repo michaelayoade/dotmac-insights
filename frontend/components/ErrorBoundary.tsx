@@ -2,7 +2,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import Link from 'next/link';
+import { Button, LinkButton } from '@/components/ui';
 
 interface Props {
   children: ReactNode;
@@ -95,20 +95,12 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
 
             <div className="flex gap-2 justify-center">
-              <button
-                onClick={this.handleReset}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-teal-electric text-foreground rounded-lg text-sm font-medium hover:bg-teal-glow transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
+              <Button size="sm" icon={RefreshCw} onClick={this.handleReset}>
                 Try again
-              </button>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors"
-              >
-                <Home className="w-3.5 h-3.5" />
+              </Button>
+              <LinkButton href="/" variant="secondary" size="sm" icon={Home} className="text-sm">
                 Home
-              </Link>
+              </LinkButton>
             </div>
           </div>
         </div>

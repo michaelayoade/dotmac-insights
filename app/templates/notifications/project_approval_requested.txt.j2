@@ -1,0 +1,12 @@
+{# Project approval request notification #}
+{% set title = "Project Approval Required" %}
+{% set icon = "clipboard-check" %}
+{% set priority = "high" %}
+
+Project "{{ project_name }}" requires your approval.
+{% if requester_name %}
+Submitted by: {{ requester_name }}
+{% endif %}
+{% if estimated_costing %}
+Estimated budget: {{ estimated_costing | currency }}
+{% endif %}

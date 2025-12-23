@@ -1,0 +1,12 @@
+{# Tax due reminder notification #}
+{% set title = "Tax Filing Due" %}
+{% set icon = "calendar" %}
+{% set priority = "high" %}
+
+{{ tax_type | default('Tax') }} filing due on {{ due_date | format_date }}.
+{% if amount %}
+Estimated Amount: {{ amount | currency }}
+{% endif %}
+{% if period %}
+Period: {{ period }}
+{% endif %}

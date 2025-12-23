@@ -1,0 +1,14 @@
+{# Service started notification #}
+{% set title = "Service Work Started" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your {{ order_type | default('service') | title_case }} service has started.
+
+Order: #{{ order_number }}
+Started: {{ start_time | default('Now') }}
+Technician: {{ technician_name | default('Our technician') }}
+
+{% if estimated_duration %}Estimated Duration: {{ estimated_duration }}{% endif %}
+
+We'll notify you when the work is complete.

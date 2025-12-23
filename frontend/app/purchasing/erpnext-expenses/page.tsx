@@ -7,6 +7,8 @@ import { useERPNextExpenses } from '@/hooks/useApi';
 import { purchasingApi, ERPNextExpenseClaimPayload } from '@/lib/api/domains/purchasing';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { formatCurrency, formatNumber, formatDate } from '@/lib/formatters';
+import { Button, FilterCard, FilterSelect } from '@/components/ui';
 import {
   AlertTriangle,
   Receipt,
@@ -15,7 +17,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  Filter,
   Search,
   User,
   Briefcase,
@@ -26,31 +27,6 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '\u20A60';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 const EXPENSE_STATUSES = ['draft', 'submitted', 'approved', 'rejected', 'paid'] as const;
 
@@ -278,7 +254,7 @@ export default function ERPNextExpensesPage() {
       key: 'actions',
       header: '',
       render: (item: any) => (
-        <button
+        <Button
           onClick={(e) => {
             e.stopPropagation();
             setDeleteId(item.id);
@@ -287,7 +263,7 @@ export default function ERPNextExpensesPage() {
           title="Delete"
         >
           <Trash2 className="w-4 h-4" />
-        </button>
+        </Button>
       ),
     },
   ];
@@ -308,13 +284,13 @@ export default function ERPNextExpensesPage() {
           <h1 className="text-2xl font-bold text-foreground">ERPNext Expense Claims</h1>
           <p className="text-slate-muted text-sm">Manage expense claims synced from ERPNext</p>
         </div>
-        <button
+        <Button
           onClick={() => setShowCreate(true)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
         >
           <Plus className="w-4 h-4" />
           New Expense Claim
-        </button>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -352,40 +328,36 @@ export default function ERPNextExpensesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+      <FilterCard
+        actions={status && (
+          <Button
+            onClick={() => {
+              setStatus('');
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
-            <option value="">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="paid">Paid</option>
-          </select>
-          {status && (
-            <button
-              onClick={() => {
-                setStatus('');
-                setPage(1);
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </div>
+            Clear filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-center"
+      >
+        <FilterSelect
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        >
+          <option value="">All Status</option>
+          <option value="draft">Draft</option>
+          <option value="submitted">Submitted</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="paid">Paid</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Create Modal */}
       {showCreate && (
@@ -393,12 +365,12 @@ export default function ERPNextExpensesPage() {
           <div className="bg-slate-card border border-slate-border rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-slate-border">
               <h2 className="text-lg font-semibold text-foreground">New Expense Claim</h2>
-              <button
+              <Button
                 onClick={() => setShowCreate(false)}
                 className="p-2 rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
             <form onSubmit={handleCreate} className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -502,7 +474,7 @@ export default function ERPNextExpensesPage() {
                 />
               </div>
               <div className="flex items-center gap-3 pt-2">
-                <button
+                <Button
                   type="submit"
                   disabled={saving}
                   className={cn(
@@ -512,14 +484,14 @@ export default function ERPNextExpensesPage() {
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   {saving ? 'Creating...' : 'Create Expense Claim'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => setShowCreate(false)}
                   className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -540,7 +512,7 @@ export default function ERPNextExpensesPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={handleDelete}
                 disabled={deleting}
                 className={cn(
@@ -550,13 +522,13 @@ export default function ERPNextExpensesPage() {
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteId(null)}
                 className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>

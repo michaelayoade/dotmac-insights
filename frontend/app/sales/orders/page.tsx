@@ -6,25 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFinanceOrders } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, ShoppingCart, FileText } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 export default function SalesOrdersPage() {
   const router = useRouter();

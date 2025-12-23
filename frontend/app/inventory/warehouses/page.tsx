@@ -3,19 +3,43 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useInventoryWarehouses } from "@/hooks/useApi";
-import { Warehouse, Plus, Search, Loader2, AlertCircle, Building2, FolderTree } from "lucide-react";
+import { Warehouse, Plus, Loader2, AlertCircle, Building2, FolderTree } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button, FilterCard, LoadingState } from '@/components/ui';
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function InventoryWarehousesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
   const [includeDisabled, setIncludeDisabled] = useState(false);
   const [isGroupFilter, setIsGroupFilter] = useState<boolean | undefined>(undefined);
-  const { data, isLoading, error } = useInventoryWarehouses({
-    include_disabled: includeDisabled,
-    is_group: isGroupFilter,
-    limit: 100,
-  });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error } = useInventoryWarehouses(
+    {
+      include_disabled: includeDisabled,
+      is_group: isGroupFilter,
+      limit: 100,
+    },
+    { isPaused: () => !canFetch }
+  );
 
   const warehouses = data?.warehouses || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view warehouses."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -33,10 +57,10 @@ export default function InventoryWarehousesPage() {
         </Link>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
+      <FilterCard contentClassName="space-y-4" iconClassName="text-amber-400">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setIsGroupFilter(isGroupFilter === true ? undefined : true)}
               className={cn(
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors",
@@ -47,8 +71,8 @@ export default function InventoryWarehousesPage() {
             >
               <FolderTree className="w-4 h-4" />
               Groups Only
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setIsGroupFilter(isGroupFilter === false ? undefined : false)}
               className={cn(
                 "inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors",
@@ -59,8 +83,8 @@ export default function InventoryWarehousesPage() {
             >
               <Warehouse className="w-4 h-4" />
               Leaf Only
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setIncludeDisabled(!includeDisabled)}
               className={cn(
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
@@ -70,7 +94,7 @@ export default function InventoryWarehousesPage() {
               )}
             >
               Include Disabled
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -163,7 +187,7 @@ export default function InventoryWarehousesPage() {
             Showing {warehouses.length} of {data.total} warehouses
           </div>
         )}
-      </div>
+      </FilterCard>
     </div>
   );
 }

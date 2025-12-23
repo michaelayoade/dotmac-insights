@@ -5,25 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, FileText, StickyNote } from 'lucide-react';
 import { useFinanceQuotationDetail } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN') {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 export default function SalesQuotationDetailPage() {
   const params = useParams();
@@ -49,13 +32,13 @@ export default function SalesQuotationDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load quotation</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }

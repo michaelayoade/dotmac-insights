@@ -1,0 +1,15 @@
+{# Project started notification #}
+{% set title = "Project Started: " ~ (project_name | default('Your Project')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your project has officially started!
+
+Project: {{ project_name }}
+Start Date: {{ start_date | format_date }}
+Expected Completion: {{ expected_end_date | format_date | default('TBD') }}
+Project Manager: {{ project_manager | default('Our team') }}
+
+We're excited to begin work on your project. You'll receive regular updates on our progress.
+
+Thank you for your trust in us!

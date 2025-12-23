@@ -5,33 +5,27 @@ import { useRouter } from 'next/navigation';
 import { useGatewayTransfers, useGatewayMutations, useBanks } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, Banknote, RefreshCw, Plus, Eye, Send } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+
 import { paymentsApi } from '@/lib/api';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, StatusPill } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getStatusBadge(status: string) {
-  const styles: Record<string, string> = {
-    success: 'bg-green-500/20 text-green-400 border-green-500/30',
-    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    processing: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    failed: 'bg-red-500/20 text-red-400 border-red-500/30',
-    reversed: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  const tones: Record<string, StatusTone> = {
+    success: 'success',
+    pending: 'warning',
+    processing: 'info',
+    failed: 'danger',
+    reversed: 'info',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.pending}`}>
-      {status}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -138,9 +132,9 @@ export default function GatewayTransfersPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <span className="font-mono text-foreground">{formatCurrency(item.amount, item.currency)}</span>
+          <span className="font-mono text-foreground">{formatAccountingCurrency(item.amount, item.currency)}</span>
           {item.fees > 0 && (
-            <div className="text-xs text-slate-muted">Fee: {formatCurrency(item.fees, item.currency)}</div>
+            <div className="text-xs text-slate-muted">Fee: {formatAccountingCurrency(item.fees, item.currency)}</div>
           )}
         </div>
       ),
@@ -158,7 +152,7 @@ export default function GatewayTransfersPage() {
     {
       key: 'created_at',
       header: 'Created',
-      render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.created_at)}</span>,
+      render: (item: any) => <span className="text-slate-muted text-sm">{formatAccountingDate(item.created_at)}</span>,
     },
     {
       key: 'actions',
@@ -166,21 +160,21 @@ export default function GatewayTransfersPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {(item.status === 'pending' || item.status === 'processing') && (
-            <button
+            <Button
               onClick={() => handleVerify(item.reference)}
               className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-teal-electric transition-colors"
               title="Verify transfer"
             >
               <RefreshCw className="w-4 h-4" />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => router.push(`/books/gateway/transfers/${item.reference}`)}
             className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-foreground transition-colors"
             title="View details"
           >
             <Eye className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -200,20 +194,12 @@ export default function GatewayTransfersPage() {
           <h1 className="text-xl font-semibold text-foreground">Bank Transfers</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => mutate()}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
+          <Button onClick={() => mutate()} variant="secondary" icon={RefreshCw}>
             Refresh
-          </button>
-          <button
-            onClick={() => setShowNewModal(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
+          </Button>
+          <Button onClick={() => setShowNewModal(true)} module="books" icon={Plus}>
             New Transfer
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -270,21 +256,17 @@ export default function GatewayTransfersPage() {
         {bulkStatus.state === 'running' && <span className="text-slate-muted">Paying payroll transfers...</span>}
       </div>
       <div className="flex gap-3">
-        <button
+        <Button
           onClick={handlePayPayroll}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-foreground hover:bg-emerald-500 transition-colors disabled:opacity-50"
+          variant="success"
+          icon={Send}
           disabled={bulkStatus.state === 'running'}
         >
-          <Send className="w-4 h-4" />
           Pay selected payroll transfers
-        </button>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700 text-foreground hover:bg-slate-600 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
+        </Button>
+        <Button onClick={() => setShowNewModal(true)} variant="secondary" icon={Plus}>
           New transfer
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -423,14 +405,14 @@ function NewTransferModal({ onClose, onSuccess, initiateTransfer }: NewTransferM
                 maxLength={10}
                 required
               />
-              <button
+              <Button
                 type="button"
                 onClick={handleResolve}
                 disabled={resolving || !form.bank_code || form.account_number.length !== 10}
                 className="px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground disabled:opacity-50 transition-colors"
               >
                 {resolving ? 'Checking...' : 'Verify'}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -460,20 +442,12 @@ function NewTransferModal({ onClose, onSuccess, initiateTransfer }: NewTransferM
           )}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
-            >
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !form.account_name}
-              className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-50 transition-colors"
-            >
+            </Button>
+            <Button type="submit" disabled={loading || !form.account_name} loading={loading} module="books">
               {loading ? 'Processing...' : 'Send Transfer'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

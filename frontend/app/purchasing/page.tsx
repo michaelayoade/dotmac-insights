@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import { useConsolidatedPurchasingDashboard } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { formatCurrency, formatNumber, formatPercent, formatDate } from '@/lib/formatters';
 import {
   DollarSign,
   Users,
   FileText,
   Calendar,
   AlertTriangle,
-  Loader2,
   Clock,
   CreditCard,
   Building2,
@@ -20,81 +20,9 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatPercent(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0%';
-  return `${value.toFixed(1)}%`;
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  loading?: boolean;
-  href?: string;
-}
-
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href }: MetricCardProps) {
-  const content = (
-    <div className={cn(
-      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
-      href && 'hover:border-teal-electric/50 cursor-pointer'
-    )}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-        </div>
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-      {href && (
-        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
-          <span>View details</span>
-          <ArrowRight className="w-3 h-3 ml-1" />
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
-}
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 interface StatusBadgeProps {
   status: string;
@@ -135,8 +63,29 @@ function StatusBadge({ status, count, total, href }: StatusBadgeProps) {
 }
 
 export default function PurchasingDashboardPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('purchasing:read');
   const currency = 'NGN';
-  const { data, isLoading, error, mutate } = useConsolidatedPurchasingDashboard(currency);
+  const canFetch = !authLoading && !missingScope;
+  const { data, isLoading, error, mutate } = useConsolidatedPurchasingDashboard(
+    currency,
+    undefined,
+    { isPaused: () => !canFetch }
+  );
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the purchasing:read permission to view the purchasing dashboard."
+        backHref="/"
+        backLabel="Back to Home"
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -181,31 +130,31 @@ export default function PurchasingDashboardPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
+        <StatCard
           title="Total Outstanding"
-          value={formatCurrency(summary?.total_outstanding)}
+          value={formatCurrency(summary?.total_outstanding ?? 0)}
           subtitle="All unpaid bills"
           icon={DollarSign}
           colorClass="text-blue-400"
           href="/purchasing/bills?status=unpaid"
         />
-        <MetricCard
+        <StatCard
           title="Total Overdue"
-          value={formatCurrency(summary?.total_overdue)}
+          value={formatCurrency(summary?.total_overdue ?? 0)}
           subtitle={formatPercent(summary?.overdue_percentage) + ' of outstanding'}
           icon={AlertTriangle}
           colorClass="text-red-400"
           href="/purchasing/bills?status=overdue"
         />
-        <MetricCard
+        <StatCard
           title="Due This Week"
-          value={formatCurrency(summary?.due_this_week?.total)}
+          value={formatCurrency(summary?.due_this_week?.total ?? 0)}
           subtitle={`${summary?.due_this_week?.count || 0} bills due`}
           icon={Calendar}
           colorClass="text-yellow-400"
           href="/purchasing/bills?due_this_week=true"
         />
-        <MetricCard
+        <StatCard
           title="Active Suppliers"
           value={formatNumber(summary?.supplier_count)}
           subtitle="With outstanding balance"

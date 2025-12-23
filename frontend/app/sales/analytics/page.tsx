@@ -3,15 +3,7 @@
 import { useMemo } from 'react';
 import { useFinanceAging, useFinanceCollections, useFinanceRevenueBySegment, useFinanceRevenueTrend } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number, currency = 'NGN') {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
+import { formatCurrency } from '@/lib/formatters';
 
 export default function SalesAnalyticsPage() {
   const currency = 'NGN';

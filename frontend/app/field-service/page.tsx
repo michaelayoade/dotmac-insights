@@ -363,21 +363,21 @@ export default function FieldServiceDashboard() {
             <QuickActionCard
               title="Dispatch Board"
               description="Assign orders to technicians"
-              href="/field-service/dispatch"
+              href="/field-service/orders"
               icon={Truck}
               colorClass="text-cyan-400"
             />
             <QuickActionCard
-              title="Calendar View"
+              title="Schedule View"
               description="Schedule overview"
-              href="/field-service/calendar"
+              href="/field-service/schedule"
               icon={Calendar}
               colorClass="text-blue-400"
             />
             <QuickActionCard
-              title="Technicians"
+              title="Teams"
               description="Manage field team"
-              href="/field-service/technicians"
+              href="/field-service/teams"
               icon={Users}
               colorClass="text-emerald-400"
             />

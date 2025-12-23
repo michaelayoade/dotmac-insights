@@ -10,6 +10,9 @@
 
 import type { Page } from '@playwright/test';
 import { test, expect, setupAuth, expectAccessDenied } from './fixtures/auth';
+import { deleteTestWebhook, getAuthHeaders } from './fixtures/api-helpers';
+
+const API_BASE = process.env.E2E_API_URL || 'http://localhost:8000';
 
 async function ensureInboundWebhooksPageReady(page: Page) {
   const heading = page.getByRole('heading', { name: /inbound webhooks/i });
@@ -48,6 +51,19 @@ async function ensureWebhookLogsPageReady(page: Page) {
   const emptyState = page.getByText(/no .*logs|no .*deliveries|no .*events/i);
   await expect(statusFilter.or(tableRow).or(emptyState).or(notFound)).toBeVisible({ timeout: 15000 });
   return { available: !(await notFound.isVisible()), statusFilter, emptyState };
+}
+
+async function findWebhookIdByName(
+  request: import('@playwright/test').APIRequestContext,
+  name: string
+): Promise<number | null> {
+  const response = await request.get(`${API_BASE}/api/notifications/webhooks?include_inactive=true&limit=200`, {
+    headers: getAuthHeaders(['books:admin']),
+  });
+  if (!response.ok()) return null;
+  const payload = await response.json();
+  const match = (payload.webhooks || []).find((wh: any) => wh.name === name);
+  return match?.id ?? null;
 }
 
 test.describe('Webhooks - Admin Authenticated', () => {
@@ -205,7 +221,7 @@ test.describe('Webhooks - Admin Authenticated', () => {
       await expect(page.getByText(/invalid|url|https/i).first()).toBeVisible({ timeout: 5000 });
     });
 
-    test('create webhook successfully', async ({ page }) => {
+    test('create webhook successfully', async ({ page, request }) => {
       await page.goto('/admin/webhooks/omni');
 
       if (!(await ensureOmniWebhooksPageReady(page))) {
@@ -219,7 +235,8 @@ test.describe('Webhooks - Admin Authenticated', () => {
       await expect(addButton).toBeVisible();
       await addButton.click();
 
-      await page.getByLabel(/name/i).fill(`Test Webhook ${Date.now()}`);
+      const webhookName = `Test Webhook ${Date.now()}`;
+      await page.getByLabel(/name/i).fill(webhookName);
       await page.getByLabel(/url|endpoint/i).fill('https://example.com/webhook');
 
       const eventCheckbox = page.locator('input[type="checkbox"]').first();
@@ -229,6 +246,18 @@ test.describe('Webhooks - Admin Authenticated', () => {
       await page.getByRole('button', { name: /save|create/i }).click();
 
       await expect(page.getByText(/created|success/i).first()).toBeVisible({ timeout: 5000 });
+
+      let webhookId: number | null = null;
+      await expect
+        .poll(async () => {
+          webhookId = await findWebhookIdByName(request, webhookName);
+          return webhookId;
+        }, { timeout: 10000 })
+        .toBeTruthy();
+
+      if (webhookId) {
+        await deleteTestWebhook(request, webhookId);
+      }
     });
 
     test('edit webhook configuration', async ({ page }) => {
@@ -318,7 +347,7 @@ test.describe('Webhooks - Admin Authenticated', () => {
       }
       await expect(statusFilter).toBeVisible();
       await statusFilter.selectOption({ label: /failed/i });
-      await page.waitForTimeout(500);
+      await expect(statusFilter).toHaveValue(/failed/i);
     });
 
     test('retry failed delivery', async ({ page }) => {

@@ -39,7 +39,7 @@ import type {
   ConversationPriority,
   ChannelType,
 } from '@/lib/inbox.types';
-import { ErrorState, SearchInput, StatGrid } from '@/components/ui';
+import { Button, ErrorState, FilterSelect, SearchInput, StatGrid } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { useRequireScope } from '@/lib/auth-context';
@@ -318,30 +318,30 @@ export default function InboxPage() {
               placeholder="Search conversations..."
             />
             <div className="flex gap-2">
-              <select
+              <FilterSelect
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ConversationStatus | 'all')}
                 aria-label="Filter by status"
-                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="flex-1 py-1.5 text-xs"
               >
                 <option value="all">All Status</option>
                 <option value="open">Open</option>
                 <option value="pending">Pending</option>
                 <option value="resolved">Resolved</option>
                 <option value="archived">Archived</option>
-              </select>
-              <select
+              </FilterSelect>
+              <FilterSelect
                 value={channelFilter}
                 onChange={(e) => setChannelFilter(e.target.value)}
                 aria-label="Filter by channel"
-                className="flex-1 bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="flex-1 py-1.5 text-xs"
               >
                 <option value="all">All Channels</option>
                 <option value="email">Email</option>
                 <option value="chat">Chat</option>
                 <option value="whatsapp">WhatsApp</option>
                 <option value="phone">Phone</option>
-              </select>
+              </FilterSelect>
             </div>
           </div>
 
@@ -366,7 +366,7 @@ export default function InboxPage() {
                 const isSelected = selectedId === conv.id;
 
                 return (
-                  <button
+                  <Button
                     key={conv.id}
                     onClick={() => handleSelectConversation(conv.id)}
                     role="option"
@@ -435,7 +435,7 @@ export default function InboxPage() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             )}
@@ -476,7 +476,7 @@ export default function InboxPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={handleToggleStar}
                       className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                       title={selectedConversation.is_starred ? 'Unstar' : 'Star'}
@@ -487,48 +487,48 @@ export default function InboxPage() {
                       ) : (
                         <StarOff className="w-5 h-5" />
                       )}
-                    </button>
+                    </Button>
                     <div className="relative">
-                      <button
+                      <Button
                         onClick={() => setShowActions(!showActions)}
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         aria-label="More actions"
                         aria-expanded={showActions}
                       >
                         <MoreVertical className="w-5 h-5" />
-                      </button>
+                      </Button>
                       {showActions && (
                         <div className="absolute right-0 top-full mt-1 w-48 bg-slate-card border border-slate-border rounded-lg shadow-xl z-10 py-1">
-                          <button
+                          <Button
                             onClick={handleCreateTicket}
                             className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <Ticket className="w-4 h-4" />
                             Create Support Ticket
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={handleCreateLead}
                             className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <UserPlus className="w-4 h-4" />
                             Create Sales Lead
-                          </button>
-                          <button className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2">
+                          </Button>
+                          <Button className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2">
                             <User className="w-4 h-4" />
                             Assign to Agent
-                          </button>
+                          </Button>
                           <hr className="my-1 border-slate-border" />
-                          <button
+                          <Button
                             onClick={handleArchive}
                             className="w-full px-4 py-2 text-sm text-left text-foreground hover:bg-slate-elevated flex items-center gap-2"
                           >
                             <Archive className="w-4 h-4" />
                             Archive
-                          </button>
-                          <button className="w-full px-4 py-2 text-sm text-left text-rose-400 hover:bg-slate-elevated flex items-center gap-2">
+                          </Button>
+                          <Button className="w-full px-4 py-2 text-sm text-left text-rose-400 hover:bg-slate-elevated flex items-center gap-2">
                             <Trash2 className="w-4 h-4" />
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -627,27 +627,27 @@ export default function InboxPage() {
                   />
                   <div className="flex items-center justify-between px-4 pb-3">
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Attach file"
                         aria-label="Attach file"
                       >
                         <Paperclip className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Insert emoji"
                         aria-label="Insert emoji"
                       >
                         <Smile className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/50 rounded-lg transition-colors"
                         title="Canned response"
                         aria-label="Use canned response"
                       >
                         <CornerUpLeft className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                     <div className="flex items-center gap-2">
                       <select
@@ -658,7 +658,7 @@ export default function InboxPage() {
                         <option>Send & Resolve</option>
                         <option>Send & Archive</option>
                       </select>
-                      <button
+                      <Button
                         onClick={handleSendReply}
                         disabled={!replyText.trim() || isSending}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -669,7 +669,7 @@ export default function InboxPage() {
                           <Send className="w-4 h-4" />
                         )}
                         Send
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>

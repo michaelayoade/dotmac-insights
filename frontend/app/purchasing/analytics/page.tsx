@@ -18,28 +18,10 @@ import {
   PieChart,
   ChevronRight,
 } from 'lucide-react';
+import { FilterSelect } from '@/components/ui';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatPercent(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0%';
-  return `${value.toFixed(1)}%`;
-}
+import { formatCurrency, formatNumber, formatPercent } from '@/lib/formatters';
 
 function getDateRange(range: string): { start_date: string; end_date: string } {
   const now = new Date();
@@ -165,17 +147,17 @@ export default function PurchasingAnalyticsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-muted" />
-          <select
+          <FilterSelect
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="px-3 py-1.5 focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="7d">Last 7 Days</option>
             <option value="30d">Last 30 Days</option>
             <option value="90d">Last 90 Days</option>
             <option value="ytd">Year to Date</option>
             <option value="1y">Last Year</option>
-          </select>
+          </FilterSelect>
         </div>
       </div>
 

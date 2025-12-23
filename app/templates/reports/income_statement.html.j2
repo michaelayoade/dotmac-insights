@@ -1,0 +1,69 @@
+{% extends "reports/_base.html.j2" %}
+{% from "reports/_macros.html.j2" import format_num, spacer %}
+
+{% block title %}Income Statement{% endblock %}
+
+{% block report_title %}Income Statement{% endblock %}
+
+{% block report_subtitle %}
+Period: {{ data.period.start_date | default('') }} to {{ data.period.end_date | default('') }}
+<br>Basis: {{ data.basis | default('accrual') | title_case }}
+{% endblock %}
+
+{% block content %}
+<table>
+    <tbody>
+        {# Income Section #}
+        <tr class="section-header">
+            <td colspan="2">Income</td>
+        </tr>
+        {% for acc in data.income.accounts | default([]) %}
+        <tr>
+            <td class="indent">{{ acc.account | default(acc.account_name) }}</td>
+            <td class="number">{{ format_num(acc.amount) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="subtotal">
+            <td>Total Income</td>
+            <td class="number">{{ format_num(data.income.total | default(0)) }}</td>
+        </tr>
+
+        {{ spacer() }}
+
+        {# Expenses Section #}
+        <tr class="section-header">
+            <td colspan="2">Expenses</td>
+        </tr>
+        {% for acc in data.expenses.accounts | default([]) %}
+        <tr>
+            <td class="indent">{{ acc.account | default(acc.account_name) }}</td>
+            <td class="number">{{ format_num(acc.amount) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="subtotal">
+            <td>Total Expenses</td>
+            <td class="number">{{ format_num(data.expenses.total | default(0)) }}</td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr class="total">
+            <td>Gross Profit</td>
+            <td class="number">{{ format_num(data.gross_profit) }}</td>
+        </tr>
+        <tr class="total highlight">
+            <td>Net Income</td>
+            <td class="number {% if data.net_income and data.net_income < 0 %}negative{% else %}positive{% endif %}">
+                {{ format_num(data.net_income) }}
+            </td>
+        </tr>
+        <tr>
+            <td>Profit Margin</td>
+            <td class="number">{{ "%.2f" | format(data.profit_margin | default(0)) }}%</td>
+        </tr>
+    </tfoot>
+</table>
+{% endblock %}
+
+{% block footer %}
+<p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+{% endblock %}

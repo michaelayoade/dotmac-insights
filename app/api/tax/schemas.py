@@ -7,7 +7,7 @@ Request/response schemas for all Nigerian tax endpoints.
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from app.models.tax_ng import (
     NigerianTaxType,
@@ -95,8 +95,7 @@ class TaxSettingsResponse(TaxBaseSchema):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============= VAT SCHEMAS =============
@@ -142,8 +141,7 @@ class VATTransactionResponse(TaxBaseSchema):
     is_zero_rated: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VATSummaryResponse(BaseModel):
@@ -210,8 +208,7 @@ class WHTTransactionResponse(TaxBaseSchema):
     certificate_id: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WHTSupplierSummaryResponse(BaseModel):
@@ -266,8 +263,7 @@ class WHTCertificateResponse(BaseModel):
     company_tin: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============= PAYE SCHEMAS =============
@@ -316,8 +312,7 @@ class PAYECalculationResponse(TaxBaseSchema):
     is_filed: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PAYESummaryResponse(BaseModel):
@@ -377,8 +372,7 @@ class CITAssessmentResponse(TaxBaseSchema):
     is_filed: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CITMinimumTaxComputation(BaseModel):
@@ -467,8 +461,7 @@ class TaxPaymentResponse(BaseModel):
     company: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============= DASHBOARD SCHEMAS =============
@@ -577,8 +570,7 @@ class EInvoiceResponse(TaxBaseSchema):
     validation_errors: Optional[List[Dict]]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EInvoiceValidationResult(BaseModel):

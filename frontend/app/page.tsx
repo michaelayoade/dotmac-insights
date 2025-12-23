@@ -21,6 +21,7 @@ import { applyColorScheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { AccentColor, getCardColors } from '@/lib/config/colors';
 import { MODULES, CATEGORY_META, ModuleDefinition, ModuleCategory } from '@/lib/config/modules';
+import { Button } from '@/components/ui';
 
 
 const DEFAULT_KEY = 'dotmac_default_module';
@@ -44,8 +45,11 @@ export default function HomePage() {
   };
 
   const modulesWithAccess: ModuleWithAccess[] = useMemo(
-    () => MODULES.map((module) => ({ ...module, hasAccess: true })),
-    [],
+    () => MODULES.map((module) => ({
+      ...module,
+      hasAccess: !module.requiredScopes?.length || hasAnyScope(module.requiredScopes),
+    })),
+    [hasAnyScope],
   );
 
   const accessibleModules = modulesWithAccess;
@@ -119,14 +123,14 @@ export default function HomePage() {
               <span className="text-[10px] text-slate-muted uppercase tracking-widest">Business Operating System</span>
             </div>
           </Link>
-          <button
+          <Button
             onClick={toggleTheme}
             className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -173,23 +177,39 @@ export default function HomePage() {
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-6 py-10">
         {/* Quick access tip */}
-        {defaultModuleKey && (
-          <div className="mb-8 flex items-center justify-between gap-3 px-4 py-3 bg-teal-500/10 border border-teal-500/30 rounded-xl">
+        {defaultModuleKey && defaultModule && (
+          <div className={cn(
+            "mb-8 flex items-center justify-between gap-3 px-4 py-3 rounded-xl",
+            defaultModule.hasAccess
+              ? "bg-teal-500/10 border border-teal-500/30"
+              : "bg-amber-500/10 border border-amber-500/30"
+          )}>
             <div className="flex items-center gap-3">
-              <Star className="w-5 h-5 text-teal-400 flex-shrink-0 fill-current" />
-              <p className="text-sm text-teal-300">
-                <span className="font-medium">{defaultModule?.name}</span> is your default workspace.
+              <Star className={cn(
+                "w-5 h-5 flex-shrink-0 fill-current",
+                defaultModule.hasAccess ? "text-teal-400" : "text-amber-400"
+              )} />
+              <p className={cn("text-sm", defaultModule.hasAccess ? "text-teal-300" : "text-amber-300")}>
+                <span className="font-medium">{defaultModule.name}</span>
+                {defaultModule.hasAccess
+                  ? " is your default workspace."
+                  : " is your default but you lack access."}
               </p>
             </div>
-            <button
+            <Button
               onClick={handleResetDefault}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-foreground hover:bg-teal-500/20 rounded-lg transition-colors"
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                defaultModule.hasAccess
+                  ? "text-teal-300 hover:text-foreground hover:bg-teal-500/20"
+                  : "text-amber-300 hover:text-foreground hover:bg-amber-500/20"
+              )}
               title="Reset default workspace"
             >
               <X className="w-4 h-4" />
               Reset
-            </button>
-            {defaultModule && (
+            </Button>
+            {defaultModule.hasAccess && (
               <Link
                 href={defaultModule.href}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-teal-300 hover:text-foreground hover:bg-teal-500/20 rounded-lg transition-colors"
@@ -281,7 +301,7 @@ export default function HomePage() {
                                 Open
                                 <ArrowRight className="w-4 h-4" />
                               </Link>
-                              <button
+                              <Button
                                 onClick={() => handleSetDefault(module.key)}
                                 className={cn(
                                   'p-2 rounded-xl border transition-colors',
@@ -293,7 +313,7 @@ export default function HomePage() {
                                 aria-label={isDefault ? 'Default workspace' : `Set ${module.name} as default`}
                               >
                                 <Star className={cn('w-4 h-4', isDefault && 'fill-current')} />
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>

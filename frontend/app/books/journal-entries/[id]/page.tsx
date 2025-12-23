@@ -4,25 +4,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, BookMarked, FileText } from 'lucide-react';
 import { useAccountingJournalEntryDetail } from '@/hooks/useApi';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN') {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 export default function JournalEntryDetailPage() {
   const params = useParams();
@@ -48,13 +31,13 @@ export default function JournalEntryDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load journal entry</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -82,12 +65,12 @@ export default function JournalEntryDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Posting Date</p>
-          <p className="text-foreground font-semibold">{formatDate(data.posting_date)}</p>
+          <p className="text-foreground font-semibold">{formatAccountingDate(data.posting_date)}</p>
         </div>
         <div>
           <p className="text-xs uppercase text-slate-muted tracking-[0.1em]">Total Debit / Credit</p>
           <p className="text-foreground font-semibold">
-            {formatCurrency(data.total_debit)} / {formatCurrency(data.total_credit)}
+            {formatAccountingCurrency(data.total_debit)} / {formatAccountingCurrency(data.total_credit)}
           </p>
         </div>
         <div>
@@ -118,8 +101,8 @@ export default function JournalEntryDetailPage() {
                   <tr key={idx} className="border-t border-slate-border/60">
                     <td className="px-2 py-2 text-foreground font-mono">{acc.account}</td>
                     <td className="px-2 py-2 text-slate-200">{acc.party || acc.party_type || '-'}</td>
-                    <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(acc.debit)}</td>
-                    <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(acc.credit)}</td>
+                    <td className="px-2 py-2 text-right text-slate-200">{formatAccountingCurrency(acc.debit)}</td>
+                    <td className="px-2 py-2 text-right text-slate-200">{formatAccountingCurrency(acc.credit)}</td>
                     <td className="px-2 py-2 text-slate-200">{acc.cost_center || '-'}</td>
                   </tr>
                 ))}

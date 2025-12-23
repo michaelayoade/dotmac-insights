@@ -33,25 +33,9 @@ import {
   useSupportTeams,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const dt = new Date(value);
-  return dt.toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function formatTimeAgo(dateStr: string | null | undefined) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) return `${diffDays}d ago`;
-  if (diffHours > 0) return `${diffHours}h ago`;
-  return 'Just now';
-}
+import { formatDateTime, formatRelativeTime } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, StatusPill } from '@/components/ui';
 
 function PriorityBadge({ priority }: { priority: string }) {
   const colors: Record<string, string> = {
@@ -71,21 +55,21 @@ function PriorityBadge({ priority }: { priority: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    open: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    in_progress: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    pending: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    resolved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    closed: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
-    replied: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-    on_hold: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+  const tones: Record<string, StatusTone> = {
+    open: 'info',
+    in_progress: 'warning',
+    pending: 'warning',
+    resolved: 'success',
+    closed: 'default',
+    replied: 'info',
+    on_hold: 'warning',
   };
-  const color = colors[status] || colors.open;
 
   return (
-    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border capitalize', color)}>
-      {status?.replace(/_/g, ' ')}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+    />
   );
 }
 
@@ -138,13 +122,13 @@ export default function SupportTicketDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load ticket</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -349,16 +333,16 @@ export default function SupportTicketDetailPage() {
             </h3>
             <div className="space-y-1">
               <p className="text-slate-muted text-sm">
-                Created: {formatDate(ticket.created_at || ticket.creation)}
+                Created: {formatDateTime(ticket.created_at || ticket.creation)}
               </p>
               {ticket.response_by && (
                 <p className="text-slate-muted text-sm">
-                  Response by: {formatDate(ticket.response_by)}
+                  Response by: {formatDateTime(ticket.response_by)}
                 </p>
               )}
               {ticket.resolution_by && (
                 <p className={cn('text-sm', isOverdue ? 'text-rose-400' : 'text-slate-muted')}>
-                  Resolution by: {formatDate(ticket.resolution_by)}
+                  Resolution by: {formatDateTime(ticket.resolution_by)}
                 </p>
               )}
             </div>
@@ -413,8 +397,8 @@ export default function SupportTicketDetailPage() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-foreground font-medium">{c.commented_by_name || c.commented_by || 'Unknown'}</span>
               <div className="flex items-center gap-2">
-                <span className="text-slate-muted text-xs">{formatTimeAgo(c.comment_date || c.created_at)}</span>
-                <span className="text-slate-muted text-xs">{formatDate(c.comment_date || c.created_at)}</span>
+                <span className="text-slate-muted text-xs">{formatRelativeTime(c.comment_date || c.created_at)}</span>
+                <span className="text-slate-muted text-xs">{formatDateTime(c.comment_date || c.created_at)}</span>
               </div>
             </div>
             <p className="text-slate-200 text-sm whitespace-pre-line">{c.comment}</p>
@@ -447,14 +431,14 @@ export default function SupportTicketDetailPage() {
             placeholder="Write a public comment..."
           />
           <div className="flex justify-end">
-            <button
+            <Button
               type="submit"
               disabled={adding}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
             >
               <Send className="w-4 h-4" />
               {adding ? 'Posting...' : 'Post comment'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -509,13 +493,13 @@ export default function SupportTicketDetailPage() {
               />
             </div>
             <div className="flex justify-end">
-              <button
+              <Button
                 type="submit"
                 disabled={assigning}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
               >
                 {assigning ? 'Saving...' : 'Assign'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -559,13 +543,13 @@ export default function SupportTicketDetailPage() {
               />
             </div>
             <div className="flex justify-end">
-              <button
+              <Button
                 type="submit"
                 disabled={savingSla}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
               >
                 {savingSla ? 'Saving...' : 'Save SLA'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -594,12 +578,12 @@ export default function SupportTicketDetailPage() {
             className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <div className="md:col-span-3 flex justify-end">
-            <button
+            <Button
               type="submit"
               className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
             >
               Add activity
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -633,12 +617,12 @@ export default function SupportTicketDetailPage() {
             className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-h-[100px]"
           />
           <div className="md:col-span-2 flex justify-end">
-            <button
+            <Button
               type="submit"
               className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
             >
               Add communication
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -663,12 +647,12 @@ export default function SupportTicketDetailPage() {
             className="md:col-span-2 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           />
           <div className="md:col-span-3 flex justify-end">
-            <button
+            <Button
               type="submit"
               className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
             >
               Add dependency
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -691,7 +675,7 @@ export default function SupportTicketDetailPage() {
               </div>
               <p className="text-slate-200 text-sm whitespace-pre-line">{a.activity}</p>
             </div>
-            <span className="text-slate-muted text-xs">{formatDate(a.activity_date || a.created_at)}</span>
+            <span className="text-slate-muted text-xs">{formatDateTime(a.activity_date || a.created_at)}</span>
           </div>
         )}
       />
@@ -705,7 +689,7 @@ export default function SupportTicketDetailPage() {
           <div className="flex flex-col gap-1 border-b border-slate-border/60 pb-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-foreground font-semibold">{c.subject || c.communication_type || 'Communication'}</span>
-              <span className="text-slate-muted text-xs">{formatDate(c.communication_date)}</span>
+              <span className="text-slate-muted text-xs">{formatDateTime(c.communication_date)}</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="px-2 py-0.5 rounded bg-slate-elevated text-slate-muted">
@@ -758,7 +742,7 @@ export default function SupportTicketDetailPage() {
                 <span className="px-2 py-0.5 rounded bg-slate-elevated">{e.status || '-'}</span>
               </div>
             </div>
-            <span className="text-slate-muted text-xs">{formatDate(e.expense_date)}</span>
+            <span className="text-slate-muted text-xs">{formatDateTime(e.expense_date)}</span>
           </div>
         )}
       />

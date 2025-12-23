@@ -1,0 +1,6 @@
+{# Performance rating finalized notification #}
+{% set title = "Performance Rating Finalized" %}
+{% set icon = "award" %}
+{% set priority = "high" %}
+
+Your final performance rating for {{ period_name | default('this period') }} is: {{ rating | default('N/A') }} ({{ score | default('N/A') }} points).

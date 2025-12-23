@@ -5,13 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, ShoppingCart } from 'lucide-react';
 import { useFinanceCustomers, useFinanceOrderMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function OrderCreatePage() {
   const router = useRouter();
   const currency = 'NGN';
   const { createOrder } = useFinanceOrderMutations();
   const { data: customersData } = useFinanceCustomers({ limit: 100, offset: 0 });
+  const { errors: fieldErrors, setErrors, clearAll } = useFormErrors();
 
   const [customerId, setCustomerId] = useState<string>('');
   const [orderNumber, setOrderNumber] = useState<string>('');
@@ -22,7 +25,6 @@ export default function OrderCreatePage() {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const customers = (customersData as any)?.items || (customersData as any)?.customers || [];
 
   const validate = () => {
@@ -30,7 +32,7 @@ export default function OrderCreatePage() {
     if (!customerId) errs.customerId = 'Customer is required';
     if (!orderDate) errs.orderDate = 'Order date is required';
     if (!totalAmount || totalAmount <= 0) errs.totalAmount = 'Total must be greater than zero';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -204,21 +206,21 @@ export default function OrderCreatePage() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Save Order'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

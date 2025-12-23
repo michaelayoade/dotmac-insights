@@ -1,0 +1,255 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "Back to app home" [ref=e7]:
+          - /url: /
+          - img [ref=e8]
+        - link "Dotmac Contact Hub" [ref=e11]:
+          - /url: /contacts
+          - img [ref=e13]
+          - generic [ref=e18]:
+            - generic [ref=e19]: Dotmac
+            - generic [ref=e20]: Contact Hub
+      - generic [ref=e21]:
+        - button "Search" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+        - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+        - button "Toggle menu" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - link "New Contact" [ref=e34]:
+          - /url: /contacts/new
+          - img [ref=e35]
+          - generic [ref=e38]: New Contact
+        - link "New Lead" [ref=e39]:
+          - /url: /contacts/new?type=lead
+          - img [ref=e40]
+          - generic [ref=e44]: New Lead
+        - link "Import" [ref=e45]:
+          - /url: /contacts/import
+          - img [ref=e46]
+          - generic [ref=e50]: Import
+        - link "Find Duplicates" [ref=e51]:
+          - /url: /contacts/duplicates
+          - img [ref=e52]
+          - generic [ref=e56]: Find Duplicates
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - button "Dashboard Contact hub overview" [ref=e59] [cursor=pointer]:
+            - generic [ref=e60]:
+              - img [ref=e61]
+              - generic [ref=e66]:
+                - generic [ref=e67]: Dashboard
+                - text: Contact hub overview
+            - img [ref=e68]
+          - generic [ref=e70]:
+            - link "Dashboard Overview & KPIs" [ref=e71]:
+              - /url: /contacts
+              - generic [ref=e72]: Dashboard
+              - generic [ref=e73]: Overview & KPIs
+            - link "Analytics Contact insights" [ref=e74]:
+              - /url: /contacts/analytics
+              - generic [ref=e75]: Analytics
+              - generic [ref=e76]: Contact insights
+        - button "Directory Browse all contacts" [ref=e78] [cursor=pointer]:
+          - generic [ref=e79]:
+            - img [ref=e80]
+            - generic [ref=e85]:
+              - generic [ref=e86]: Directory
+              - text: Browse all contacts
+          - img [ref=e87]
+        - button "Lifecycle Lead to customer journey" [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]:
+            - img [ref=e92]
+            - generic [ref=e96]:
+              - generic [ref=e97]: Lifecycle
+              - text: Lead to customer journey
+          - img [ref=e98]
+        - button "Segments Contact segments & lists" [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]:
+            - img [ref=e103]
+            - generic [ref=e105]:
+              - generic [ref=e106]: Segments
+              - text: Contact segments & lists
+          - img [ref=e107]
+        - button "Tools Bulk operations & import" [ref=e110] [cursor=pointer]:
+          - generic [ref=e111]:
+            - img [ref=e112]
+            - generic [ref=e115]:
+              - generic [ref=e116]: Tools
+              - text: Bulk operations & import
+          - img [ref=e117]
+      - generic [ref=e119]:
+        - button "Dark mode" [ref=e120] [cursor=pointer]:
+          - generic [ref=e121]: Dark mode
+          - img [ref=e122]
+        - button "Sign out" [ref=e124] [cursor=pointer]:
+          - generic [ref=e125]: Sign out
+          - img [ref=e126]
+    - generic [ref=e131]:
+      - generic [ref=e132]:
+        - link [ref=e133]:
+          - /url: /contacts
+          - img [ref=e134]
+        - generic [ref=e136]:
+          - heading "New Contact" [level=1] [ref=e137]
+          - paragraph [ref=e138]: Add a new contact to your directory
+      - generic [ref=e139]:
+        - generic [ref=e140]:
+          - heading "Classification" [level=2] [ref=e141]:
+            - img [ref=e142]
+            - text: Classification
+          - generic [ref=e146]:
+            - generic [ref=e147]:
+              - generic [ref=e148]: Contact Type
+              - combobox [ref=e149]:
+                - option "Lead" [selected]
+                - option "Prospect"
+                - option "Customer"
+                - option "Person"
+                - option "Churned"
+            - generic [ref=e150]:
+              - generic [ref=e151]: Category
+              - combobox [ref=e152]:
+                - option "Residential" [selected]
+                - option "Business"
+                - option "Enterprise"
+                - option "Government"
+                - option "Non-Profit"
+            - generic [ref=e153]:
+              - generic [ref=e154]: Status
+              - combobox [ref=e155]:
+                - option "Active" [selected]
+                - option "Inactive"
+                - option "Suspended"
+                - option "Do Not Contact"
+          - generic [ref=e157] [cursor=pointer]:
+            - checkbox "This is an organization/company" [ref=e158]
+            - generic [ref=e159]: This is an organization/company
+        - generic [ref=e160]:
+          - heading "Basic Information" [level=2] [ref=e161]:
+            - img [ref=e162]
+            - text: Basic Information
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: First Name
+              - textbox "First name" [ref=e168]
+            - generic [ref=e169]:
+              - generic [ref=e170]: Last Name
+              - textbox "Last name" [ref=e171]
+            - generic [ref=e172]:
+              - generic [ref=e173]: Display Name *
+              - textbox "Full name or display name" [ref=e174]
+              - paragraph [ref=e175]: Leave blank to use first + last name
+            - generic [ref=e176]:
+              - generic [ref=e177]: Company
+              - textbox "Company name" [ref=e178]
+            - generic [ref=e179]:
+              - generic [ref=e180]: Job Title
+              - textbox "Job title" [ref=e181]
+            - generic [ref=e182]:
+              - generic [ref=e183]: Department
+              - textbox "Department" [ref=e184]
+        - generic [ref=e185]:
+          - heading "Contact Information" [level=2] [ref=e186]:
+            - img [ref=e187]
+            - text: Contact Information
+          - generic [ref=e190]:
+            - generic [ref=e191]:
+              - generic [ref=e192]: Email
+              - textbox "email@example.com" [ref=e193]
+            - generic [ref=e194]:
+              - generic [ref=e195]: Billing Email
+              - textbox "billing@example.com" [ref=e196]
+            - generic [ref=e197]:
+              - generic [ref=e198]: Phone
+              - textbox "+234 xxx xxx xxxx" [ref=e199]
+            - generic [ref=e200]:
+              - generic [ref=e201]: Mobile
+              - textbox "+234 xxx xxx xxxx" [ref=e202]
+            - generic [ref=e203]:
+              - generic [ref=e204]: Secondary Phone
+              - textbox "+234 xxx xxx xxxx" [ref=e205]
+            - generic [ref=e206]:
+              - generic [ref=e207]: Website
+              - textbox "https://example.com" [ref=e208]
+        - generic [ref=e209]:
+          - heading "Address" [level=2] [ref=e210]:
+            - img [ref=e211]
+            - text: Address
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]: Address Line 1
+              - textbox "Street address" [ref=e217]
+            - generic [ref=e218]:
+              - generic [ref=e219]: Address Line 2
+              - textbox "Suite, unit, building, etc." [ref=e220]
+            - generic [ref=e221]:
+              - generic [ref=e222]: City
+              - textbox "City" [ref=e223]
+            - generic [ref=e224]:
+              - generic [ref=e225]: State
+              - textbox "State" [ref=e226]
+            - generic [ref=e227]:
+              - generic [ref=e228]: Postal Code
+              - textbox "Postal code" [ref=e229]
+            - generic [ref=e230]:
+              - generic [ref=e231]: Country
+              - textbox "Country" [ref=e232]: Nigeria
+        - generic [ref=e233]:
+          - heading "Business Information" [level=2] [ref=e234]:
+            - img [ref=e235]
+            - text: Business Information
+          - generic [ref=e238]:
+            - generic [ref=e239]:
+              - generic [ref=e240]: Industry
+              - textbox "Industry" [ref=e241]
+            - generic [ref=e242]:
+              - generic [ref=e243]: Territory
+              - textbox "Territory / Region" [ref=e244]
+            - generic [ref=e245]:
+              - generic [ref=e246]: Lead Source
+              - textbox "e.g., Website, Referral, Event" [ref=e247]
+            - generic [ref=e248]:
+              - generic [ref=e249]: Campaign
+              - textbox "Campaign name" [ref=e250]
+        - generic [ref=e251]:
+          - heading "Social Profiles" [level=2] [ref=e252]:
+            - img [ref=e253]
+            - text: Social Profiles
+          - generic [ref=e256]:
+            - generic [ref=e257]:
+              - generic [ref=e258]: LinkedIn
+              - textbox "https://linkedin.com/in/..." [ref=e259]
+            - generic [ref=e260]:
+              - generic [ref=e261]: Twitter
+              - textbox "@username" [ref=e262]
+            - generic [ref=e263]:
+              - generic [ref=e264]: Facebook
+              - textbox "https://facebook.com/..." [ref=e265]
+        - generic [ref=e266]:
+          - heading "Tags" [level=2] [ref=e267]:
+            - img [ref=e268]
+            - text: Tags
+          - generic [ref=e270]:
+            - textbox "Add a tag..." [ref=e271]
+            - button "Add" [ref=e272] [cursor=pointer]
+        - generic [ref=e273]:
+          - heading "Notes" [level=2] [ref=e274]
+          - textbox "Additional notes about this contact..." [ref=e275]
+        - generic [ref=e276]:
+          - link "Cancel" [ref=e277]:
+            - /url: /contacts
+          - button "Create Contact" [ref=e278] [cursor=pointer]:
+            - img [ref=e279]
+            - text: Create Contact
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e283]
+```

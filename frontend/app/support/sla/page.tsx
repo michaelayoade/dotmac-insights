@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Calendar, Clock, ShieldCheck, Target, Filter } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, ShieldCheck, Target } from 'lucide-react';
 import { useSupportSlaBreachesSummary, useSupportSlaCalendars, useSupportSlaPolicies, useSupportAnalyticsSlaPerformance } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { PageHeader, Select } from '@/components/ui';
+import { FilterCard, FilterSelect, PageHeader, Select } from '@/components/ui';
 
 function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -72,37 +72,30 @@ export default function SupportSlaPage() {
       />
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
+      <FilterCard contentClassName="flex flex-wrap items-center gap-4">
+        <label className="inline-flex items-center gap-2 text-slate-muted text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={activeOnly}
+            onChange={(e) => setActiveOnly(e.target.checked)}
+            className="rounded"
+          />
+          Active only
+        </label>
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Breach window</label>
+          <FilterSelect
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </FilterSelect>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="inline-flex items-center gap-2 text-slate-muted text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={activeOnly}
-              onChange={(e) => setActiveOnly(e.target.checked)}
-              className="rounded"
-            />
-            Active only
-          </label>
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Breach window</label>
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      </FilterCard>
 
       {/* SLA Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

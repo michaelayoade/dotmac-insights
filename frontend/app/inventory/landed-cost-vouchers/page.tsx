@@ -5,14 +5,38 @@ import Link from 'next/link';
 import { useLandedCostVouchers, useLandedCostVoucherMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, Boxes, CheckCircle2, Loader2 } from 'lucide-react';
+import { Button, LoadingState } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function LandedCostVouchersPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('inventory:read');
   const [limit, setLimit] = useState(20);
   const [offset, setOffset] = useState(0);
-  const { data, isLoading, error, mutate } = useLandedCostVouchers({ limit, offset });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error, mutate } = useLandedCostVouchers(
+    { limit, offset },
+    { isPaused: () => !canFetch }
+  );
   const { submit } = useLandedCostVoucherMutations();
 
   const rows = data?.data || data || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view landed cost vouchers."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   const columns = [
     {
@@ -38,12 +62,12 @@ export default function LandedCostVouchersPage() {
       header: '',
       render: (item: any) => (
         item.status === 'draft' ? (
-          <button
+          <Button
             onClick={async () => { await submit(item.id); await mutate(); }}
             className="text-xs px-2 py-1 rounded-md bg-teal-electric text-slate-950 hover:bg-teal-electric/90"
           >
             Submit
-          </button>
+          </Button>
         ) : (
           <span className="text-xs inline-flex items-center gap-1 text-green-400">
             <CheckCircle2 className="w-4 h-4" /> {item.status}

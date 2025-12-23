@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision: str = "20251221_enforce_journal_entry_item_account_fk"
@@ -19,6 +20,13 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Make journal_entry_items.account_id required once fully backfilled."""
     bind = op.get_bind()
+    inspector = inspect(bind)
+    if not inspector.has_table("journal_entry_items"):
+        return
+    columns = {col["name"] for col in inspector.get_columns("journal_entry_items")}
+    if "account_id" not in columns:
+        return
+
     null_count = bind.execute(
         sa.text("SELECT COUNT(*) FROM journal_entry_items WHERE account_id IS NULL")
     ).scalar()

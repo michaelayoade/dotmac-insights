@@ -1,0 +1,16 @@
+{# Cash Advances CSV Report Template #}
+Cash Advances Report
+Generated: {{ generated_at }}
+Period: {{ period.start }} to {{ period.end }}
+
+Summary
+Total Advances,{{ summary.total_advances | csv_escape }}
+Total Requested,{{ summary.total_requested | format_number | csv_escape }}
+Total Disbursed,{{ summary.total_disbursed | format_number | csv_escape }}
+Total Settled,{{ summary.total_settled | format_number | csv_escape }}
+Total Outstanding,{{ summary.total_outstanding | format_number | csv_escape }}
+
+Advance #,Employee ID,Purpose,Request Date,Status,Currency,Requested,Disbursed,Settled,Outstanding
+{% for adv in advances -%}
+{{ adv.advance_number | csv_escape }},{{ adv.employee_id | csv_escape }},{{ adv.purpose | csv_escape }},{{ adv.request_date | csv_escape }},{{ adv.status | csv_escape }},{{ adv.currency | csv_escape }},{{ adv.requested_amount | format_number | csv_escape }},{{ adv.disbursed_amount | format_number | csv_escape }},{{ adv.settled_amount | format_number | csv_escape }},{{ adv.outstanding_balance | format_number | csv_escape }}
+{% endfor -%}

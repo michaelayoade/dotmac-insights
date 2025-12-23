@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useBanks } from '@/hooks/useApi';
 import { AlertTriangle, Landmark, Search, CheckCircle, XCircle, Building2 } from 'lucide-react';
 import { paymentsApi } from '@/lib/api';
+import { Button } from '@/components/ui';
 
 export default function GatewayBanksPage() {
   const [search, setSearch] = useState('');
@@ -103,13 +104,15 @@ export default function GatewayBanksPage() {
               <p className="text-xs text-slate-muted mt-1">10-digit NUBAN account number</p>
             </div>
 
-            <button
+            <Button
               onClick={handleResolve}
               disabled={resolving || !selectedBank || accountNumber.length !== 10}
-              className="w-full px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-50 transition-colors"
+              loading={resolving}
+              module="books"
+              className="w-full"
             >
               {resolving ? 'Verifying...' : 'Verify Account'}
-            </button>
+            </Button>
 
             {resolveResult && (
               <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
@@ -172,7 +175,7 @@ export default function GatewayBanksPage() {
                 <p className="text-slate-muted text-center py-4">No banks found</p>
               ) : (
                 filteredBanks.map((bank: any) => (
-                  <button
+                  <Button
                     key={bank.code}
                     onClick={() => { setSelectedBank(bank.code); setResolveResult(null); setResolveError(''); }}
                     className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${
@@ -192,7 +195,7 @@ export default function GatewayBanksPage() {
                     <span className="font-mono text-xs text-slate-muted bg-slate-800 px-2 py-1 rounded">
                       {bank.code}
                     </span>
-                  </button>
+                  </Button>
                 ))
               )}
             </div>

@@ -7,25 +7,8 @@ import { buildApiUrl } from '@/lib/api';
 import { Users, Calendar, Download } from 'lucide-react';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getAgingBadge(daysOverdue: number | undefined | null) {
   if (daysOverdue === undefined || daysOverdue === null || daysOverdue <= 0) {
@@ -118,7 +101,7 @@ export default function AccountsReceivablePage() {
       header: 'Total Receivable',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-foreground">{formatCurrency(item.total_receivable)}</span>
+        <span className="font-mono text-foreground">{formatAccountingCurrency(item.total_receivable)}</span>
       ),
     },
     {
@@ -126,32 +109,32 @@ export default function AccountsReceivablePage() {
       header: 'Current',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-green-400">{formatCurrency(item.current)}</span>
+        <span className="font-mono text-green-400">{formatAccountingCurrency(item.current)}</span>
       ),
     },
     {
       key: 'overdue_1_30',
       header: '1-30',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-yellow-400">{formatCurrency(item.overdue_1_30)}</span>,
+      render: (item: any) => <span className="font-mono text-yellow-400">{formatAccountingCurrency(item.overdue_1_30)}</span>,
     },
     {
       key: 'overdue_31_60',
       header: '31-60',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-orange-400">{formatCurrency(item.overdue_31_60)}</span>,
+      render: (item: any) => <span className="font-mono text-orange-400">{formatAccountingCurrency(item.overdue_31_60)}</span>,
     },
     {
       key: 'overdue_61_90',
       header: '61-90',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-orange-400">{formatCurrency(item.overdue_61_90)}</span>,
+      render: (item: any) => <span className="font-mono text-orange-400">{formatAccountingCurrency(item.overdue_61_90)}</span>,
     },
     {
       key: 'overdue_over_90',
       header: '90+',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-red-400">{formatCurrency(item.overdue_over_90)}</span>,
+      render: (item: any) => <span className="font-mono text-red-400">{formatAccountingCurrency(item.overdue_over_90)}</span>,
     },
     {
       key: 'invoice_count',
@@ -162,7 +145,7 @@ export default function AccountsReceivablePage() {
     {
       key: 'oldest_invoice_date',
       header: 'Oldest Invoice',
-      render: (item: any) => <span className="text-slate-muted">{formatDate(item.oldest_invoice_date)}</span>,
+      render: (item: any) => <span className="text-slate-muted">{formatAccountingDate(item.oldest_invoice_date)}</span>,
     },
   ];
 
@@ -188,23 +171,23 @@ export default function AccountsReceivablePage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total AR</p>
-          <p className="text-2xl font-bold text-foreground">{formatCurrency(data?.total_receivable)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatAccountingCurrency(data?.total_receivable)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Current</p>
-          <p className="text-xl font-bold text-green-400">{formatCurrency(summary.current)}</p>
+          <p className="text-xl font-bold text-green-400">{formatAccountingCurrency(summary.current)}</p>
         </div>
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
           <p className="text-yellow-400 text-sm">1-30 Days</p>
-          <p className="text-xl font-bold text-yellow-400">{formatCurrency(summary['1_30'])}</p>
+          <p className="text-xl font-bold text-yellow-400">{formatAccountingCurrency(summary['1_30'])}</p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
           <p className="text-orange-400 text-sm">31-60 Days</p>
-          <p className="text-xl font-bold text-orange-400">{formatCurrency(summary['31_60'])}</p>
+          <p className="text-xl font-bold text-orange-400">{formatAccountingCurrency(summary['31_60'])}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <p className="text-red-400 text-sm">60+ Days</p>
-          <p className="text-xl font-bold text-red-400">{formatCurrency(summary.over_90)}</p>
+          <p className="text-xl font-bold text-red-400">{formatAccountingCurrency(summary.over_90)}</p>
         </div>
       </div>
 
@@ -233,20 +216,20 @@ export default function AccountsReceivablePage() {
           Enhanced aging
         </label>
         {(customerSearch || minAmount) && (
-          <button
+          <Button
             onClick={() => { setFilters((prev) => ({ ...prev, customerSearch: '', minAmount: '', offset: 0 })); }}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           onClick={exportAging}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70 ml-auto"
         >
           <Download className="w-4 h-4" />
           Export aging
-        </button>
+        </Button>
       </div>
 
       {/* Table */}

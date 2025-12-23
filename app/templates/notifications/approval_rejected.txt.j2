@@ -1,0 +1,14 @@
+{# Approval rejected notification #}
+{% set title = "Document Rejected" %}
+{% set icon = "x-circle" %}
+{% set priority = "high" %}
+
+Your {{ doctype | default('document') }} was rejected.
+{% if reason %}
+Reason: {{ reason }}
+{% else %}
+Please contact the approver for more details.
+{% endif %}
+{% if document_number %}
+Document: #{{ document_number }}
+{% endif %}

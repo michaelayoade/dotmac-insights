@@ -1,0 +1,16 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Tax Payment Overdue" %}
+{% set icon = "alert-octagon" %}
+{% set priority = "urgent" %}
+
+{% block content %}
+URGENT: A tax payment is overdue and requires immediate attention.
+
+Tax Type: {{ tax_type | default('Tax') }}
+Period: {{ period | default('Current period') }}
+Amount Due: {{ amount | default('N/A') }}
+Original Due Date: {{ due_date | default('N/A') }}
+Days Overdue: {{ days_overdue | default('N/A') }}
+
+Late payment may result in penalties and interest charges.
+{% endblock %}

@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { AccentStatCard } from "@/components/StatCard";
 import {
   useAssetsSummary,
   usePendingDepreciation,
@@ -22,6 +23,7 @@ import {
   useWarrantyExpiring,
   useInsuranceExpiring,
 } from "@/hooks/useApi";
+import { Button } from "@/components/ui";
 import type {
   AssetSummaryResponse,
   PendingDepreciationEntry,
@@ -30,46 +32,6 @@ import type {
   InsuranceExpiringAsset,
 } from "@/lib/api";
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  color,
-  href,
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: "indigo" | "emerald" | "amber" | "coral" | "purple";
-  href?: string;
-}) {
-  const colorClasses = {
-    indigo: "from-indigo-500 to-purple-400 text-indigo-300",
-    emerald: "from-emerald-500 to-teal-400 text-emerald-300",
-    amber: "from-amber-500 to-orange-400 text-amber-300",
-    coral: "from-coral-alert to-red-400 text-coral-alert",
-    purple: "from-purple-500 to-pink-400 text-purple-300",
-  };
-
-  const content = (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm text-slate-muted">{title}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
-          {subtitle && <p className="text-xs text-slate-muted">{subtitle}</p>}
-        </div>
-        <div className={cn("p-3 rounded-xl bg-gradient-to-br", colorClasses[color].split(" ").slice(0, 2).join(" "))}>
-          <Icon className="w-5 h-5 text-foreground" />
-        </div>
-      </div>
-    </div>
-  );
-
-  return href ? <Link href={href}>{content}</Link> : content;
-}
 
 function AlertCard<T>({
   title,
@@ -139,46 +101,50 @@ export default function AssetsDashboard() {
           <h1 className="text-2xl font-bold text-foreground">Asset Dashboard</h1>
           <p className="text-sm text-slate-muted mt-1">Overview of fixed assets, depreciation, and maintenance</p>
         </div>
-        <button
+        <Button
           onClick={handleRefresh}
           disabled={isLoading}
           className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors disabled:opacity-50"
         >
           <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+        <AccentStatCard
           title="Total Assets"
           value={summaryData?.totals?.count ?? 0}
           subtitle={`${summaryData?.by_status?.find((s) => s.status === 'submitted')?.count ?? 0} active`}
           icon={Building2}
-          color="indigo"
+          accent="indigo"
+          gradient
           href="/assets/list"
         />
-        <StatCard
+        <AccentStatCard
           title="Total Value"
           value={formatCurrency(summaryData?.totals?.purchase_value ?? 0)}
           subtitle="Gross purchase amount"
           icon={Package}
-          color="emerald"
+          accent="emerald"
+          gradient
         />
-        <StatCard
+        <AccentStatCard
           title="Book Value"
           value={formatCurrency(summaryData?.totals?.book_value ?? 0)}
           subtitle="After depreciation"
           icon={TrendingDown}
-          color="purple"
+          accent="purple"
+          gradient
         />
-        <StatCard
+        <AccentStatCard
           title="Accumulated Depreciation"
           value={formatCurrency(summaryData?.totals?.accumulated_depreciation ?? 0)}
           subtitle="Total depreciated"
           icon={Calendar}
-          color="amber"
+          accent="amber"
+          gradient
         />
       </div>
 

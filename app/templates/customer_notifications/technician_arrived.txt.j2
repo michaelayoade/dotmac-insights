@@ -1,0 +1,11 @@
+{# Technician arrived notification #}
+{% set title = "Technician Has Arrived" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your technician {{ technician_name | default('') }} has arrived at your location.
+
+Order: #{{ order_number }}
+Arrival Time: {{ arrival_time | default('Now') }}
+
+The service work will begin shortly.

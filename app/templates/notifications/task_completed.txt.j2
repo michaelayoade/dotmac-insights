@@ -1,0 +1,12 @@
+{# Task completed notification #}
+{% set title = "Task Completed" %}
+{% set icon = "check-square" %}
+{% set priority = "normal" %}
+
+Task "{{ task_subject }}" has been completed.
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if completed_by_name %}
+Completed by: {{ completed_by_name }}
+{% endif %}

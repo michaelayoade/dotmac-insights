@@ -2,21 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAccountingSuppliers } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { cn } from '@/lib/utils';
-import { AlertTriangle, Building, Phone, Mail, MapPin, CheckCircle2, XCircle, Plus } from 'lucide-react';
 
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { AlertTriangle, Plus } from 'lucide-react';
+import { Button, LinkButton } from '@/components/ui';
+import { getSuppliersColumns } from '@/lib/config/accounting-tables';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -36,88 +28,7 @@ export default function SuppliersPage() {
   const totalPurchases = supplierStats.total_purchases ?? supplierStats.total_invoices ?? 0;
   const supplierRows = supplierStats.suppliers ?? supplierStats.data ?? [];
 
-  const columns = [
-    {
-      key: 'name',
-      header: 'Supplier Name',
-      sortable: true,
-      render: (item: any) => (
-        <div className="flex items-center gap-2">
-          <Building className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground font-medium">{item.name || item.supplier_name}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'code',
-      header: 'Code',
-      render: (item: any) => (
-        <span className="font-mono text-slate-muted">{item.code || item.supplier_code || '-'}</span>
-      ),
-    },
-    {
-      key: 'contact',
-      header: 'Contact',
-      render: (item: any) => (
-        <div className="space-y-1">
-          {item.email && (
-            <div className="flex items-center gap-1 text-sm">
-              <Mail className="w-3 h-3 text-slate-muted" />
-              <span className="text-foreground-secondary">{item.email}</span>
-            </div>
-          )}
-          {item.phone && (
-            <div className="flex items-center gap-1 text-sm">
-              <Phone className="w-3 h-3 text-slate-muted" />
-              <span className="text-foreground-secondary">{item.phone}</span>
-            </div>
-          )}
-          {!item.email && !item.phone && <span className="text-slate-muted">-</span>}
-        </div>
-      ),
-    },
-    {
-      key: 'balance',
-      header: 'Outstanding',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn(
-          'font-mono',
-          (item.balance || item.outstanding_balance || 0) > 0 ? 'text-orange-400' : 'text-green-400'
-        )}>
-          {formatCurrency(item.balance || item.outstanding_balance)}
-        </span>
-      ),
-    },
-    {
-      key: 'total_purchases',
-      header: 'Total Purchases',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className="font-mono text-foreground">
-          {formatCurrency(item.total_purchases || item.total_invoices)}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (item: any) => {
-        const isActive = item.status === 'active' || item.is_active !== false;
-        return (
-          <span className={cn(
-            'px-2 py-1 rounded-full text-xs font-medium border flex items-center gap-1 w-fit',
-            isActive
-              ? 'bg-green-500/20 text-green-400 border-green-500/30'
-              : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-          )}>
-            {isActive ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-            {isActive ? 'Active' : 'Inactive'}
-          </span>
-        );
-      },
-    },
-  ];
+  const columns = getSuppliersColumns();
 
   return (
     <div className="space-y-6">
@@ -139,11 +50,11 @@ export default function SuppliersPage() {
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
           <p className="text-orange-400 text-sm">Total Outstanding</p>
-          <p className="text-xl font-bold text-orange-400">{formatCurrency(totalOutstanding)}</p>
+          <p className="text-xl font-bold text-orange-400">{formatAccountingCurrency(totalOutstanding)}</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Purchases</p>
-          <p className="text-xl font-bold text-blue-400">{formatCurrency(totalPurchases)}</p>
+          <p className="text-xl font-bold text-blue-400">{formatAccountingCurrency(totalPurchases)}</p>
         </div>
       </div>
 
@@ -169,21 +80,17 @@ export default function SuppliersPage() {
             <option value="inactive">Inactive</option>
           </select>
           {(search || status) && (
-            <button
+            <Button
               onClick={() => { setSearch(''); setStatus(''); setOffset(0); }}
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear filters
-            </button>
+            </Button>
           )}
         </div>
-        <Link
-          href="/books/suppliers/new"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
-        >
-          <Plus className="w-4 h-4" />
+        <LinkButton href="/books/suppliers/new" module="books" icon={Plus}>
           Add Supplier
-        </Link>
+        </LinkButton>
       </div>
 
       {/* Table */}

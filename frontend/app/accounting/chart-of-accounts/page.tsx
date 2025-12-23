@@ -3,30 +3,8 @@
 import { useState } from 'react';
 import { useAccountingChartOfAccounts } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
-import { cn } from '@/lib/utils';
-import { AlertTriangle, BookOpen, ChevronRight, Folder, FolderOpen } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function getAccountTypeColor(type: string) {
-  const colors: Record<string, string> = {
-    asset: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    liability: 'bg-red-500/20 text-red-400 border-red-500/30',
-    equity: 'bg-green-500/20 text-green-400 border-green-500/30',
-    income: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-    revenue: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-    expense: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  };
-  return colors[type?.toLowerCase()] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-}
+import { AlertTriangle } from 'lucide-react';
+import { getChartOfAccountsColumns } from '@/lib/config/accounting-tables';
 
 export default function ChartOfAccountsPage() {
   const [accountType, setAccountType] = useState<string>('');
@@ -48,83 +26,7 @@ export default function ChartOfAccountsPage() {
     );
   });
 
-  const columns = [
-    {
-      key: 'account_number',
-      header: 'Account #',
-      sortable: true,
-      render: (item: any) => (
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-teal-electric" />
-          <span className="font-mono text-teal-electric">{item.account_number || '-'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'account_name',
-      header: 'Account Name',
-      sortable: true,
-      render: (item: any) => (
-        <div className="flex items-center gap-2">
-          {item.is_group ? (
-            <FolderOpen className="w-4 h-4 text-yellow-400" />
-          ) : item.parent_account ? (
-            <ChevronRight className="w-4 h-4 text-slate-muted ml-4" />
-          ) : (
-            <Folder className="w-4 h-4 text-slate-muted" />
-          )}
-          <span className={cn('text-foreground', item.is_group && 'font-semibold')}>
-            {item.name || item.account_name}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: 'account_type',
-      header: 'Type',
-      render: (item: any) => (
-        <span className={cn('px-2 py-1 rounded-full text-xs font-medium border capitalize', getAccountTypeColor(item.root_type || item.account_type))}>
-          {item.root_type || item.account_type || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'balance',
-      header: 'Balance',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn(
-          'font-mono',
-          (item.balance || 0) >= 0 ? 'text-green-400' : 'text-red-400'
-        )}>
-          {formatCurrency(item.balance)}
-        </span>
-      ),
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      render: (item: any) => (
-        <span className="text-slate-muted text-sm truncate max-w-[200px] block">
-          {item.description || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'is_active',
-      header: 'Status',
-      render: (item: any) => (
-        <span className={cn(
-          'px-2 py-1 rounded-full text-xs font-medium border',
-          !item.disabled
-            ? 'bg-green-500/20 text-green-400 border-green-500/30'
-            : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-        )}>
-          {!item.disabled ? 'Active' : 'Inactive'}
-        </span>
-      ),
-    },
-  ];
+  const columns = getChartOfAccountsColumns();
 
   return (
     <div className="space-y-6">

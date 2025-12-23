@@ -1,0 +1,163 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - link "BOS" [ref=e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=e16]
+          - generic [ref=e18]: BOS
+        - link "Dotmac Support" [ref=e20] [cursor=pointer]:
+          - /url: /support
+          - img [ref=e22]
+          - generic [ref=e24]:
+            - generic [ref=e25]: Dotmac
+            - generic [ref=e26]: Support
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - img [ref=e30]
+            - generic [ref=e33]: "0"
+            - generic [ref=e34]: open
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - generic [ref=e39]: "0"
+            - generic [ref=e40]: overdue
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - generic [ref=e47]: 0%
+            - generic [ref=e48]: SLA
+        - button "Search ⌘K" [ref=e49] [cursor=pointer]:
+          - img [ref=e50]
+          - generic [ref=e53]: Search
+          - generic [ref=e54]: ⌘K
+        - button "Switch to dark mode" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+        - generic [ref=e58]:
+          - img [ref=e60]
+          - button "Sign out" [ref=e63] [cursor=pointer]:
+            - img [ref=e64]
+    - generic [ref=e67]:
+      - complementary [ref=e68]:
+        - generic [ref=e69]:
+          - heading "Support Desk" [level=1] [ref=e70]
+          - paragraph [ref=e71]: Omnichannel helpdesk & SLA management
+        - generic [ref=e72]:
+          - paragraph [ref=e73]: Workflow Phase
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - link "Intake" [ref=e76] [cursor=pointer]:
+                - /url: /support
+              - img [ref=e77]
+            - generic [ref=e79]:
+              - link "Resolve" [ref=e80] [cursor=pointer]:
+                - /url: /support
+              - img [ref=e81]
+            - link "Analyze" [ref=e84] [cursor=pointer]:
+              - /url: /support/analytics
+        - generic [ref=e85]:
+          - generic [ref=e86]:
+            - button "Omnichannel Desk Tickets, conversations, and assignments" [ref=e87] [cursor=pointer]:
+              - generic [ref=e88]:
+                - img [ref=e89]
+                - generic [ref=e92]:
+                  - generic [ref=e93]: Omnichannel Desk
+                  - text: Tickets, conversations, and assignments
+              - img [ref=e94]
+            - generic [ref=e96]:
+              - link "Dashboard Overview & metrics" [ref=e97] [cursor=pointer]:
+                - /url: /support
+                - generic [ref=e98]: Dashboard
+                - generic [ref=e99]: Overview & metrics
+              - link "Tickets Inbox, SLA, assignments" [ref=e100] [cursor=pointer]:
+                - /url: /support/tickets
+                - generic [ref=e101]: Tickets
+                - generic [ref=e102]: Inbox, SLA, assignments
+              - link "Agents People, capacity, skills" [ref=e103] [cursor=pointer]:
+                - /url: /support/agents
+                - generic [ref=e104]: Agents
+                - generic [ref=e105]: People, capacity, skills
+              - link "Teams Queues, members, routing" [ref=e106] [cursor=pointer]:
+                - /url: /support/teams
+                - generic [ref=e107]: Teams
+                - generic [ref=e108]: Queues, members, routing
+          - button "Analytics Performance, SLA, backlog" [ref=e110] [cursor=pointer]:
+            - generic [ref=e111]:
+              - img [ref=e112]
+              - generic [ref=e114]:
+                - generic [ref=e115]: Analytics
+                - text: Performance, SLA, backlog
+            - img [ref=e116]
+          - button "Automation & SLA Rules, calendars, routing" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - img [ref=e121]
+              - generic [ref=e124]:
+                - generic [ref=e125]: Automation & SLA
+                - text: Rules, calendars, routing
+            - img [ref=e126]
+          - button "Knowledge & Canned Knowledge base & snippets" [ref=e129] [cursor=pointer]:
+            - generic [ref=e130]:
+              - img [ref=e131]
+              - generic [ref=e133]:
+                - generic [ref=e134]: Knowledge & Canned
+                - text: Knowledge base & snippets
+            - img [ref=e135]
+          - button "Configuration Support settings" [ref=e138] [cursor=pointer]:
+            - generic [ref=e139]:
+              - img [ref=e140]
+              - generic [ref=e143]:
+                - generic [ref=e144]: Configuration
+                - text: Support settings
+            - img [ref=e145]
+        - generic [ref=e147]:
+          - paragraph [ref=e148]: Quick Links
+          - generic [ref=e149]:
+            - link "New Ticket" [ref=e150] [cursor=pointer]:
+              - /url: /support/tickets/new
+              - img [ref=e151]
+              - generic [ref=e154]: New Ticket
+            - link "Inbox" [ref=e155] [cursor=pointer]:
+              - /url: /support/tickets
+              - img [ref=e156]
+              - generic [ref=e158]: Inbox
+            - link "Analytics" [ref=e159] [cursor=pointer]:
+              - /url: /support/analytics
+              - img [ref=e160]
+              - generic [ref=e162]: Analytics
+            - link "SLA Watch" [ref=e163] [cursor=pointer]:
+              - /url: /support/sla
+              - img [ref=e164]
+              - generic [ref=e166]: SLA Watch
+        - generic [ref=e167]:
+          - paragraph [ref=e168]: Workflow
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: "1"
+              - generic [ref=e172]: Capture (email/voice/chat)
+            - generic [ref=e173]:
+              - generic [ref=e174]: "2"
+              - generic [ref=e175]: Triage & assign
+            - generic [ref=e176]:
+              - generic [ref=e177]: "3"
+              - generic [ref=e178]: Respond & resolve
+            - generic [ref=e179]:
+              - generic [ref=e180]: "4"
+              - generic [ref=e181]: Analyze & improve
+      - generic [ref=e183]:
+        - img [ref=e184]
+        - paragraph [ref=e186]: Failed to load ticket
+        - button "Back" [ref=e187] [cursor=pointer]:
+          - img [ref=e188]
+          - text: Back
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e190]
+```

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 // Simple bar chart component
 function BarChart({ data, height = 200 }: { data: { label: string; value: number; color?: string }[]; height?: number }) {
@@ -152,7 +153,7 @@ export default function FieldServiceAnalyticsPage() {
         </div>
         <div className="flex items-center bg-slate-elevated border border-slate-border rounded-lg p-1">
           {(['week', 'month', 'quarter', 'year'] as const).map((p) => (
-            <button
+            <Button
               key={p}
               onClick={() => setPeriod(p)}
               className={cn(
@@ -163,7 +164,7 @@ export default function FieldServiceAnalyticsPage() {
               )}
             >
               {p}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

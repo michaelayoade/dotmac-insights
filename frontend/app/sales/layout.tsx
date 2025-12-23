@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 // CRM & Sales Flow:
 // 1. LEAD: Capture and qualify leads

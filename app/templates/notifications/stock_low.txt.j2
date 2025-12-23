@@ -1,0 +1,17 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Low Stock Alert" %}
+{% set icon = "package" %}
+{% set priority = "normal" %}
+
+{% block content %}
+An item has fallen below its minimum stock level.
+
+Item: {{ item_name | default('Item') }}
+Item Code: {{ item_code | default('N/A') }}
+Warehouse: {{ warehouse | default('Main Warehouse') }}
+Current Stock: {{ current_qty | default(0) }}
+Minimum Level: {{ min_qty | default('N/A') }}
+Reorder Level: {{ reorder_qty | default('N/A') }}
+
+Consider creating a purchase order to replenish stock.
+{% endblock %}

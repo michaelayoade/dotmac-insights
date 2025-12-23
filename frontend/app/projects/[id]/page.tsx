@@ -25,29 +25,25 @@ import {
   Briefcase,
   BarChart3,
   RefreshCw,
+  GanttChartSquare,
+  Flag,
+  Activity,
+  MessageSquare,
+  History,
 } from 'lucide-react';
-import { useProjectDetail, useProjectTasks } from '@/hooks/useApi';
+import type { LucideIcon } from 'lucide-react';
+import { useProjectDetail, useProjectTasks, useProjectMilestones } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function formatCurrency(value: number | null | undefined) {
-  if (value === null || value === undefined) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | null | undefined) {
-  if (value === null || value === undefined) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
+import { formatDate, formatCurrency, formatNumber } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, StatusPill } from '@/components/ui';
+import { GanttChart } from '@/components/projects/gantt';
+import { MilestoneList } from '@/components/projects/milestones';
+import { CommentList } from '@/components/projects/comments';
+import { ActivityFeed } from '@/components/projects/activity';
+import { AttachmentList } from '@/components/projects/attachments';
+import { ApprovalBanner, ApprovalHistory } from '@/components/projects/approval';
+import { ChangeHistory } from '@/components/projects/history';
 
 // Progress ring component
 function ProgressRing({ percent, size = 80, strokeWidth = 8 }: { percent: number; size?: number; strokeWidth?: number }) {
@@ -89,18 +85,31 @@ function ProgressRing({ percent, size = 80, strokeWidth = 8 }: { percent: number
 
 // Status badge component
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-    open: { icon: ClipboardList, color: 'text-blue-400 bg-blue-500/10 border-blue-500/30', label: 'Open' },
-    completed: { icon: CheckCircle2, color: 'text-green-400 bg-green-500/10 border-green-500/30', label: 'Completed' },
-    on_hold: { icon: Clock, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', label: 'On Hold' },
-    cancelled: { icon: AlertTriangle, color: 'text-red-400 bg-red-500/10 border-red-500/30', label: 'Cancelled' },
+  const icons: Record<string, LucideIcon> = {
+    open: ClipboardList,
+    completed: CheckCircle2,
+    on_hold: Clock,
+    cancelled: AlertTriangle,
   };
-  const { icon: Icon, color, label } = config[status] || config.open;
+  const tones: Record<string, StatusTone> = {
+    open: 'info',
+    completed: 'success',
+    on_hold: 'warning',
+    cancelled: 'danger',
+  };
+  const labels: Record<string, string> = {
+    on_hold: 'On Hold',
+  };
+  const Icon = icons[status] || icons.open;
+
   return (
-    <span className={cn('px-3 py-1.5 rounded-full text-sm font-medium border inline-flex items-center gap-2', color)}>
-      <Icon className="w-4 h-4" />
-      {label}
-    </span>
+    <StatusPill
+      label={labels[status] || formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+      size="md"
+      icon={Icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -124,7 +133,7 @@ function KPICard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-e
   title: string;
   value: string;
   subtitle?: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   colorClass?: string;
 }) {
   return (
@@ -199,21 +208,22 @@ export default function ProjectDetailPage() {
 
   const { data, isLoading, error, mutate } = useProjectDetail(isValidId ? id : null);
   const { data: tasksData, isLoading: tasksLoading } = useProjectTasks(isValidId ? id : null);
+  const { data: milestonesData } = useProjectMilestones(isValidId ? id : null);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'team' | 'financials'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'milestones' | 'activity' | 'timeline' | 'team' | 'financials' | 'history'>('overview');
 
   if (!isValidId) {
     return (
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Invalid project ID.</p>
-        <button
+        <Button
           onClick={() => router.push('/projects')}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to projects
-        </button>
+        </Button>
       </div>
     );
   }
@@ -237,13 +247,13 @@ export default function ProjectDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load project</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -298,12 +308,12 @@ export default function ProjectDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
+          </Button>
           <Link
             href={`/projects/${id}/edit`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground hover:border-teal-electric/50 transition-colors"
@@ -344,6 +354,9 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {/* Approval Banner */}
+      <ApprovalBanner projectId={id} onApprovalChange={() => mutate()} />
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard
@@ -380,10 +393,14 @@ export default function ProjectDetailPage() {
           {[
             { key: 'overview', label: 'Overview', icon: ClipboardList },
             { key: 'tasks', label: `Tasks (${taskStats.total})`, icon: ListTodo },
+            { key: 'milestones', label: `Milestones (${milestonesData?.total || 0})`, icon: Flag },
+            { key: 'activity', label: 'Activity', icon: Activity },
+            { key: 'timeline', label: 'Timeline', icon: GanttChartSquare },
             { key: 'team', label: `Team (${data.users?.length || 0})`, icon: Users },
             { key: 'financials', label: 'Financials', icon: DollarSign },
+            { key: 'history', label: 'History', icon: History },
           ].map((tab) => (
-            <button
+            <Button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
               className={cn(
@@ -395,16 +412,16 @@ export default function ProjectDetailPage() {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Details */}
-          <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+          <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4 lg:col-span-2">
             <h3 className="text-foreground font-semibold flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-teal-electric" />
               Project Details
@@ -443,44 +460,68 @@ export default function ProjectDetailPage() {
             )}
           </div>
 
-          {/* Recent Tasks */}
-          <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-foreground font-semibold flex items-center gap-2">
-                <ListTodo className="w-4 h-4 text-teal-electric" />
-                Recent Tasks
-              </h3>
-              <button
-                onClick={() => setActiveTab('tasks')}
-                className="text-teal-electric text-sm flex items-center gap-1 hover:underline"
-              >
-                View all <ChevronRight className="w-3 h-3" />
-              </button>
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Recent Tasks */}
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-foreground font-semibold flex items-center gap-2">
+                  <ListTodo className="w-4 h-4 text-teal-electric" />
+                  Recent Tasks
+                </h3>
+                <Button
+                  onClick={() => setActiveTab('tasks')}
+                  className="text-teal-electric text-sm flex items-center gap-1 hover:underline"
+                >
+                  View all <ChevronRight className="w-3 h-3" />
+                </Button>
+              </div>
+              {tasksLoading ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-16 bg-slate-elevated rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : tasks.length > 0 ? (
+                <div className="space-y-2">
+                  {tasks.slice(0, 3).map((task: any) => (
+                    <TaskRow key={task.id} task={task} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-muted">
+                  <ListTodo className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No tasks yet</p>
+                </div>
+              )}
+              {taskStats.overdue > 0 && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center gap-2 text-red-400 text-sm">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{taskStats.overdue} overdue</span>
+                </div>
+              )}
             </div>
-            {tasksLoading ? (
-              <div className="space-y-2">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-16 bg-slate-elevated rounded-lg animate-pulse" />
-                ))}
+
+            {/* Quick Comments */}
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-foreground font-semibold flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-teal-electric" />
+                  Discussion
+                </h3>
+                <Button
+                  onClick={() => setActiveTab('activity')}
+                  className="text-teal-electric text-sm flex items-center gap-1 hover:underline"
+                >
+                  View all <ChevronRight className="w-3 h-3" />
+                </Button>
               </div>
-            ) : tasks.length > 0 ? (
-              <div className="space-y-2">
-                {tasks.slice(0, 5).map((task: any) => (
-                  <TaskRow key={task.id} task={task} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-muted">
-                <ListTodo className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No tasks yet</p>
-              </div>
-            )}
-            {taskStats.overdue > 0 && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center gap-2 text-red-400 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                <span>{taskStats.overdue} overdue task{taskStats.overdue > 1 ? 's' : ''}</span>
-              </div>
-            )}
+              <CommentList
+                entityType="project"
+                entityId={id}
+                title=""
+              />
+            </div>
           </div>
         </div>
       )}
@@ -541,6 +582,76 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {activeTab === 'milestones' && (
+        <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+          <MilestoneList
+            projectId={id}
+            onTaskClick={(taskId) => router.push(`/projects/tasks/${taskId}`)}
+          />
+        </div>
+      )}
+
+      {activeTab === 'activity' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Activity Feed */}
+          <div className="lg:col-span-2 bg-slate-card border border-slate-border rounded-xl p-5">
+            <ActivityFeed
+              entityType="project"
+              entityId={id}
+              title="Project Activity"
+              showTimeline={true}
+              limit={50}
+            />
+          </div>
+
+          {/* Sidebar: Comments + Attachments */}
+          <div className="space-y-4">
+            {/* Comments */}
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+              <CommentList
+                entityType="project"
+                entityId={id}
+                title="Discussion"
+              />
+            </div>
+
+            {/* Attachments */}
+            <div className="bg-slate-card border border-slate-border rounded-xl p-5">
+              <AttachmentList
+                entityType="project"
+                entityId={id}
+                title="Files"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'timeline' && (
+        <div className="space-y-4">
+          <GanttChart
+            projectId={id}
+            height={500}
+            showDependencies={true}
+            showTodayMarker={true}
+            showProgress={true}
+            onTaskClick={(task) => {
+              // Navigate to task detail or open modal
+              router.push(`/projects/tasks/${task.id}`);
+            }}
+          />
+          <div className="flex justify-end">
+            <Link
+              href={`/projects/${id}/gantt`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-sm text-foreground hover:border-teal-electric/50 transition-colors"
+            >
+              <GanttChartSquare className="w-4 h-4" />
+              Full Screen
+            </Link>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'team' && (
         <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -548,10 +659,10 @@ export default function ProjectDetailPage() {
               <Users className="w-4 h-4 text-teal-electric" />
               Project Team ({data.users?.length || 0})
             </h3>
-            <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70">
+            <Button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70">
               <Plus className="w-4 h-4" />
               Add Member
-            </button>
+            </Button>
           </div>
           {data.users?.length ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -664,6 +775,10 @@ export default function ProjectDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'history' && (
+        <ChangeHistory entityType="project" entityId={id} />
       )}
     </div>
   );

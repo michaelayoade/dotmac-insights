@@ -5,26 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAccountingJournalEntries } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, ClipboardList, Calendar, FileText, CreditCard, Receipt, ShoppingCart } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { AlertTriangle, ClipboardList, FileText, CreditCard, Receipt, ShoppingCart } from 'lucide-react';
+import { Button, FilterCard, FilterInput, FilterSelect, LoadingState } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 function FormLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs text-slate-muted mb-1">{children}</label>;
@@ -47,6 +32,8 @@ function VoucherTypeBadge({ type }: { type: string }) {
 }
 
 export default function JournalEntriesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope, hasAccess } = useRequireScope('books:read');
   const router = useRouter();
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(20);
@@ -54,15 +41,33 @@ export default function JournalEntriesPage() {
   const [endDate, setEndDate] = useState<string>('');
   const [voucherType, setVoucherType] = useState<string>('');
 
-  const { data, isLoading, error } = useAccountingJournalEntries({
-    voucher_type: voucherType || undefined,
-    start_date: startDate || undefined,
-    end_date: endDate || undefined,
-    limit,
-    offset,
-  });
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error } = useAccountingJournalEntries(
+    {
+      voucher_type: voucherType || undefined,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+      limit,
+      offset,
+    },
+    { isPaused: () => !canFetch }
+  );
   const summary = (data as any)?.summary || {};
   const entries = (data as any)?.entries || (data as any)?.data || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the books:read permission to view journal entries."
+        backHref="/books"
+        backLabel="Back to Books"
+      />
+    );
+  }
 
   const columns = [
     {
@@ -81,7 +86,7 @@ export default function JournalEntriesPage() {
       header: 'Posting Date',
       sortable: true,
       render: (item: any) => (
-        <span className="text-slate-muted">{formatDate(item.posting_date)}</span>
+        <span className="text-slate-muted">{formatAccountingDate(item.posting_date)}</span>
       ),
     },
     {
@@ -95,7 +100,7 @@ export default function JournalEntriesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className="font-mono text-cyan-400">
-          {formatCurrency(item.debit_total || item.total_debit)}
+          {formatAccountingCurrency(item.debit_total || item.total_debit)}
         </span>
       ),
     },
@@ -105,7 +110,7 @@ export default function JournalEntriesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className="font-mono text-emerald-400">
-          {formatCurrency(item.credit_total || item.total_credit)}
+          {formatAccountingCurrency(item.credit_total || item.total_credit)}
         </span>
       ),
     },
@@ -136,66 +141,57 @@ export default function JournalEntriesPage() {
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Debit</p>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(summary.total_debit)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(summary.total_debit)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Total Credit</p>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(summary.total_credit)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(summary.total_credit)}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <p className="text-xs text-slate-muted mb-3">Filter Journal Entries</p>
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="min-w-[200px]">
-            <FormLabel>Voucher Type</FormLabel>
-            <select
-              value={voucherType}
-              onChange={(e) => { setVoucherType(e.target.value); setOffset(0); }}
-              className="input-field"
-            >
-              <option value="">All Types</option>
-              <option value="Journal Entry">Journal Entry</option>
-              <option value="Payment Entry">Payment Entry</option>
-              <option value="Sales Invoice">Sales Invoice</option>
-              <option value="Purchase Invoice">Purchase Invoice</option>
-            </select>
-          </div>
-          <div>
-            <FormLabel>Start Date</FormLabel>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-slate-muted" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setOffset(0); }}
-                className="input-field"
-              />
-            </div>
-          </div>
-          <div>
-            <FormLabel>End Date</FormLabel>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-slate-muted" />
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setOffset(0); }}
-                className="input-field"
-              />
-            </div>
-          </div>
-          {(startDate || endDate || voucherType) && (
-            <button
-              onClick={() => { setStartDate(''); setEndDate(''); setVoucherType(''); setOffset(0); }}
-              className="px-3 py-2 text-slate-muted text-sm hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
-            >
-              Clear Filters
-            </button>
-          )}
+      <FilterCard
+        title="Filter Journal Entries"
+        actions={(startDate || endDate || voucherType) && (
+          <Button
+            onClick={() => { setStartDate(''); setEndDate(''); setVoucherType(''); setOffset(0); }}
+            className="px-3 py-2 text-slate-muted text-sm hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+          >
+            Clear Filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-end"
+      >
+        <div className="min-w-[200px]">
+          <FormLabel>Voucher Type</FormLabel>
+          <FilterSelect
+            value={voucherType}
+            onChange={(e) => { setVoucherType(e.target.value); setOffset(0); }}
+          >
+            <option value="">All Types</option>
+            <option value="Journal Entry">Journal Entry</option>
+            <option value="Payment Entry">Payment Entry</option>
+            <option value="Sales Invoice">Sales Invoice</option>
+            <option value="Purchase Invoice">Purchase Invoice</option>
+          </FilterSelect>
         </div>
-      </div>
+        <div>
+          <FormLabel>Start Date</FormLabel>
+          <FilterInput
+            type="date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setOffset(0); }}
+          />
+        </div>
+        <div>
+          <FormLabel>End Date</FormLabel>
+          <FilterInput
+            type="date"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setOffset(0); }}
+          />
+        </div>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

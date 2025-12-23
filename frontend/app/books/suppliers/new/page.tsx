@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { accountingApi, AccountingSupplierPayload } from '@/lib/api/domains/accounting';
-import { cn } from '@/lib/utils';
+import { Button, LinkButton } from '@/components/ui';
 
 const SUPPLIER_TYPES = ['Company', 'Individual', 'Proprietorship', 'Partnership'] as const;
 
@@ -202,23 +202,12 @@ export default function NewSupplierPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90',
-              saving && 'opacity-60 cursor-not-allowed'
-            )}
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <Button type="submit" disabled={saving} loading={saving} module="books" icon={Save}>
             {saving ? 'Creating...' : 'Create Supplier'}
-          </button>
-          <Link
-            href="/books/suppliers"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
-          >
+          </Button>
+          <LinkButton href="/books/suppliers" variant="secondary">
             Cancel
-          </Link>
+          </LinkButton>
         </div>
       </form>
     </div>

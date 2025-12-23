@@ -8,6 +8,7 @@ import { webhooksApi, OmniChannel, OmniChannelWebhookEvent } from '@/lib/api';
 import { useToast } from '@dotmac/core';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function OmniChannelDetailPage() {
   const params = useParams();
@@ -56,7 +57,7 @@ export default function OmniChannelDetailPage() {
           <h1 className="text-2xl font-bold text-foreground">{channel?.name || 'Channel'}</h1>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => {
               mutate();
               mutateEvents();
@@ -65,14 +66,14 @@ export default function OmniChannelDetailPage() {
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleRotate}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 font-medium hover:bg-teal-electric/90"
           >
             <RotateCcw className="w-4 h-4" />
             Rotate Secret
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -90,13 +91,13 @@ export default function OmniChannelDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-border flex items-center justify-between">
           <p className="text-sm text-slate-muted">Webhook Events</p>
-          <button
+          <Button
             onClick={() => mutateEvents()}
             className="text-xs text-slate-muted hover:text-foreground inline-flex items-center gap-1"
           >
             <RefreshCw className="w-3 h-3" />
             Refresh
-          </button>
+          </Button>
         </div>
         <table className="w-full">
           <thead>
@@ -129,13 +130,13 @@ export default function OmniChannelDetailPage() {
                   {event.created_at ? new Date(event.created_at).toLocaleString() : '--'}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
+                  <Button
                     onClick={() => loadEvent(event.id)}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground text-xs hover:bg-slate-border"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     Payload
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -154,9 +155,9 @@ export default function OmniChannelDetailPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl">
           <div className="px-4 py-3 border-b border-slate-border flex items-center justify-between">
             <p className="text-sm text-slate-muted">Event Payload</p>
-            <button onClick={() => setPayload(null)} className="text-xs text-slate-muted hover:text-foreground">
+            <Button onClick={() => setPayload(null)} className="text-xs text-slate-muted hover:text-foreground">
               Close
-            </button>
+            </Button>
           </div>
           <pre className="p-4 text-sm text-slate-100 overflow-auto bg-slate-elevated">
 {JSON.stringify(payload, null, 2)}

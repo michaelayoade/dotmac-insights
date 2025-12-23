@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List, Iterable, cast
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from app.database import get_db
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.payment import Payment, PaymentStatus, PaymentMethod, PaymentSource
@@ -215,11 +215,11 @@ class InvoiceBaseRequest(BaseModel):
     paid_date: Optional[datetime] = None
     category: Optional[str] = None
 
-    @validator("amount", "tax_amount", "amount_paid", pre=True)
+    @field_validator("amount", "tax_amount", "amount_paid", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
@@ -244,11 +244,11 @@ class InvoiceUpdateRequest(BaseModel):
     paid_date: Optional[datetime] = None
     category: Optional[str] = None
 
-    @validator("amount", "tax_amount", "amount_paid", "total_amount", pre=True)
+    @field_validator("amount", "tax_amount", "amount_paid", "total_amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
 
@@ -266,11 +266,11 @@ class PaymentRequest(BaseModel):
     gateway_reference: Optional[str] = None
     notes: Optional[str] = None
 
-    @validator("amount", pre=True)
+    @field_validator("amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value))
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
@@ -288,11 +288,11 @@ class PaymentUpdateRequest(BaseModel):
     gateway_reference: Optional[str] = None
     notes: Optional[str] = None
 
-    @validator("amount", pre=True)
+    @field_validator("amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
 
@@ -321,7 +321,7 @@ class SalesOrderRequest(BaseModel):
     source: Optional[str] = None
     campaign: Optional[str] = None
 
-    @validator(
+    @field_validator(
         "total_qty",
         "total",
         "net_total",
@@ -330,12 +330,12 @@ class SalesOrderRequest(BaseModel):
         "total_taxes_and_charges",
         "per_delivered",
         "per_billed",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
@@ -364,7 +364,7 @@ class SalesOrderUpdateRequest(BaseModel):
     source: Optional[str] = None
     campaign: Optional[str] = None
 
-    @validator(
+    @field_validator(
         "total_qty",
         "total",
         "net_total",
@@ -373,12 +373,12 @@ class SalesOrderUpdateRequest(BaseModel):
         "total_taxes_and_charges",
         "per_delivered",
         "per_billed",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
 
@@ -405,19 +405,19 @@ class QuotationRequest(BaseModel):
     campaign: Optional[str] = None
     order_lost_reason: Optional[str] = None
 
-    @validator(
+    @field_validator(
         "total_qty",
         "total",
         "net_total",
         "grand_total",
         "rounded_total",
         "total_taxes_and_charges",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
@@ -444,19 +444,19 @@ class QuotationUpdateRequest(BaseModel):
     campaign: Optional[str] = None
     order_lost_reason: Optional[str] = None
 
-    @validator(
+    @field_validator(
         "total_qty",
         "total",
         "net_total",
         "grand_total",
         "rounded_total",
         "total_taxes_and_charges",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
 
@@ -511,7 +511,7 @@ class SalesPersonRequest(BaseModel):
     lft: Optional[int] = None
     rgt: Optional[int] = None
 
-    @validator("commission_rate", pre=True)
+    @field_validator("commission_rate", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
 
@@ -528,7 +528,7 @@ class SalesPersonUpdateRequest(BaseModel):
     lft: Optional[int] = None
     rgt: Optional[int] = None
 
-    @validator("commission_rate", pre=True)
+    @field_validator("commission_rate", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
@@ -544,11 +544,11 @@ class CreditNoteRequest(BaseModel):
     issue_date: Optional[datetime] = None
     applied_date: Optional[datetime] = None
 
-    @validator("amount", pre=True)
+    @field_validator("amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value))
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
@@ -564,11 +564,11 @@ class CreditNoteUpdateRequest(BaseModel):
     issue_date: Optional[datetime] = None
     applied_date: Optional[datetime] = None
 
-    @validator("amount", pre=True)
+    @field_validator("amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
-    @validator("currency")
+    @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
 

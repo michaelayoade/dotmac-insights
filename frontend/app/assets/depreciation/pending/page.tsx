@@ -13,6 +13,7 @@ import {
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { usePendingDepreciation } from "@/hooks/useApi";
 import type { PendingDepreciationEntry } from "@/lib/api";
+import { Button } from '@/components/ui';
 
 export default function PendingDepreciationPage() {
   const today = new Date().toISOString().split("T")[0];
@@ -45,13 +46,13 @@ export default function PendingDepreciationPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -119,13 +120,13 @@ export default function PendingDepreciationPage() {
                       <span className="text-sm font-medium text-amber-300">
                         {formatCurrency(entry.depreciation_amount)}
                       </span>
-                      <button
+                      <Button
                         className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
                         title="Book depreciation"
                       >
                         <CheckCircle className="w-3 h-3" />
                         Book
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -140,10 +141,10 @@ export default function PendingDepreciationPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-5">
           <h3 className="font-semibold text-foreground mb-3">Bulk Actions</h3>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors">
+            <Button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors">
               <CheckCircle className="w-4 h-4" />
               Book All Pending
-            </button>
+            </Button>
             <p className="text-sm text-slate-muted">
               This will create journal entries for all {pendingEntries.length} pending depreciation entries.
             </p>

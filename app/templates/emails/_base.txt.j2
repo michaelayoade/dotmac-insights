@@ -1,0 +1,16 @@
+{# Base plain text email template #}
+{% block content %}
+{{ title | default('Notification') }}
+
+{{ message | default('') }}
+{% endblock %}
+
+{% block action %}
+{% if action_url %}
+View Details: {{ action_url }}
+{% endif %}
+{% endblock %}
+
+---
+This is an automated notification from {{ product_name | default('DotMac Insights') }}.
+Contact us: {{ support_email | default('support@dotmac.com') }}

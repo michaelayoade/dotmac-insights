@@ -18,7 +18,6 @@ import {
   Moon,
   User,
   LogOut,
-  Key,
   Calculator,
   ShoppingCart,
   FileText,
@@ -39,17 +38,31 @@ import {
   GraduationCap,
   Target,
   GitMerge,
+  Car,
   Bell,
   Settings,
   ChevronDown,
   Zap,
   Database,
+  Contact2,
+  Building2,
+  Landmark,
+  Package,
+  TrendingDown,
+  Truck,
+  Calendar,
+  MessageSquare,
+  Globe,
+  Award,
+  ClipboardCheck,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/hooks/useApi';
 import { useAuth, Scope } from '@/lib/auth-context';
 import { useTheme } from '@dotmac/design-tokens';
 import { applyColorScheme } from '@/lib/theme';
+import { isBooksShell as checkBooksShell, isHrShell as checkHrShell } from '@/lib/config/modules';
 
 interface NavItem {
   name: string;
@@ -78,7 +91,7 @@ const booksSections: BooksSection[] = [
       { name: 'Journal Entries', href: '/books/journal-entries', icon: BookOpen, requiredScopes: ['analytics:read'] },
       { name: 'Chart of Accounts', href: '/books/chart-of-accounts', icon: FileText, requiredScopes: ['analytics:read'] },
       { name: 'Controls', href: '/books/controls', icon: Settings, requiredScopes: ['analytics:read'] },
-      { name: 'Taxes', href: '/books/taxes', icon: Calculator, requiredScopes: ['analytics:read'] },
+      { name: 'Taxes', href: '/books/tax', icon: Calculator, requiredScopes: ['analytics:read'] },
     ],
   },
   {
@@ -173,6 +186,12 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: 'Fleet',
+    items: [
+      { name: 'Dashboard', href: '/fleet', icon: Car, requiredScopes: ['fleet:read'] },
+    ],
+  },
+  {
     label: 'Purchasing (AP)',
     items: [
       { name: 'Dashboard', href: '/purchasing', icon: ShoppingCart, requiredScopes: ['analytics:read'] },
@@ -194,7 +213,7 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
       { name: 'Dunning', href: '/books/accounts-receivable/dunning', icon: Bell, requiredScopes: ['analytics:read'] },
       { name: 'Accounts Payable', href: '/books/accounts-payable', icon: ArrowLeftRight, requiredScopes: ['analytics:read'] },
       { name: 'Banking', href: '/books/bank-transactions', icon: CreditCard, requiredScopes: ['analytics:read'] },
-      { name: 'Taxes', href: '/books/taxes', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'Taxes', href: '/books/tax', icon: FileText, requiredScopes: ['analytics:read'] },
       { name: 'Controls', href: '/books/controls', icon: ClipboardList, requiredScopes: ['analytics:read'] },
       { name: 'Docs', href: '/books/docs', icon: BookOpen, requiredScopes: ['analytics:read'] },
     ],
@@ -232,13 +251,13 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Projects',
     items: [
-      { name: 'Projects', href: '/projects', icon: ClipboardList, requiredScopes: ['explore:read'] },
+      { name: 'Projects', href: '/projects', icon: ClipboardList, requiredScopes: ['explorer:read'] },
     ],
   },
   {
     label: 'Customers',
     items: [
-      { name: 'Customer 360', href: '/customers', icon: Users, requiredScopes: ['customers:read', 'explore:read'] },
+      { name: 'Customer 360', href: '/customers', icon: Users, requiredScopes: ['customers:read', 'explorer:read'] },
       { name: 'Analytics', href: '/customers/analytics', icon: TrendingUp, requiredScopes: ['analytics:read'] },
       { name: 'Insights', href: '/customers/insights', icon: Lightbulb, requiredScopes: ['analytics:read'] },
     ],
@@ -246,7 +265,60 @@ const navigationGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Data',
     items: [
-      { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explore:read'] },
+      { name: 'Data Explorer', href: '/explorer', icon: Database, requiredScopes: ['explorer:read'] },
+    ],
+  },
+  {
+    label: 'Contacts',
+    items: [
+      { name: 'All Contacts', href: '/contacts', icon: Contact2, requiredScopes: ['contacts:read'] },
+      { name: 'Organizations', href: '/contacts/organizations', icon: Building2, requiredScopes: ['contacts:read'] },
+      { name: 'People', href: '/contacts/people', icon: Users, requiredScopes: ['contacts:read'] },
+      { name: 'Leads', href: '/contacts/leads', icon: Target, requiredScopes: ['contacts:read'] },
+    ],
+  },
+  {
+    label: 'Assets',
+    items: [
+      { name: 'Dashboard', href: '/assets', icon: Landmark, requiredScopes: ['assets:read'] },
+      { name: 'Asset Register', href: '/assets/list', icon: Package, requiredScopes: ['assets:read'] },
+      { name: 'Depreciation', href: '/assets/depreciation', icon: TrendingDown, requiredScopes: ['assets:read'] },
+      { name: 'Maintenance', href: '/assets/maintenance', icon: Settings, requiredScopes: ['assets:read'] },
+    ],
+  },
+  {
+    label: 'Field Service',
+    items: [
+      { name: 'Dashboard', href: '/field-service', icon: Truck, requiredScopes: ['field-service:read'] },
+      { name: 'Orders', href: '/field-service/orders', icon: ClipboardList, requiredScopes: ['field-service:read'] },
+      { name: 'Schedule', href: '/field-service/schedule', icon: Calendar, requiredScopes: ['field-service:read'] },
+      { name: 'Teams', href: '/field-service/teams', icon: Users, requiredScopes: ['field-service:read'] },
+    ],
+  },
+  {
+    label: 'Inbox',
+    items: [
+      { name: 'Conversations', href: '/inbox', icon: MessageSquare, requiredScopes: ['inbox:read'] },
+      { name: 'Channels', href: '/inbox/channels', icon: Globe, requiredScopes: ['inbox:read'] },
+      { name: 'Analytics', href: '/inbox/analytics', icon: Activity, requiredScopes: ['inbox:read'] },
+    ],
+  },
+  {
+    label: 'Performance',
+    items: [
+      { name: 'Scorecards', href: '/performance/scorecards', icon: ClipboardCheck, requiredScopes: ['analytics:read'] },
+      { name: 'Reviews', href: '/performance/reviews', icon: FileText, requiredScopes: ['analytics:read'] },
+      { name: 'KPIs', href: '/performance/kpis', icon: Target, requiredScopes: ['analytics:read'] },
+      { name: 'Analytics', href: '/performance/analytics', icon: Award, requiredScopes: ['analytics:read'] },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { name: 'Settings', href: '/admin', icon: Settings, requiredScopes: ['admin:read'] },
+      { name: 'Roles', href: '/admin/roles', icon: Shield, requiredScopes: ['admin:read'] },
+      { name: 'Security', href: '/admin/security', icon: Lock, requiredScopes: ['admin:read'] },
+      { name: 'Webhooks', href: '/admin/webhooks', icon: Zap, requiredScopes: ['admin:read'] },
     ],
   },
 ];
@@ -334,17 +406,8 @@ function SyncStatusIndicator() {
 }
 
 function AuthStatusIndicator({ collapsed }: { collapsed?: boolean }) {
-  const { isAuthenticated, isLoading, scopes, login, logout } = useAuth();
-  const [showTokenInput, setShowTokenInput] = useState(false);
-  const [tokenValue, setTokenValue] = useState('');
-
-  const handleSetToken = () => {
-    if (tokenValue.trim()) {
-      login(tokenValue.trim());
-      setTokenValue('');
-      setShowTokenInput(false);
-    }
-  };
+  const { isAuthenticated, isLoading, scopes, logout } = useAuth();
+  const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || '/auth/login';
 
   if (isLoading) {
     return (
@@ -361,46 +424,19 @@ function AuthStatusIndicator({ collapsed }: { collapsed?: boolean }) {
   if (!isAuthenticated) {
     return (
       <div className={cn('text-xs', collapsed && 'flex justify-center')}>
-        {showTokenInput ? (
-          <div className="px-3 space-y-2">
-            <input
-              type="password"
-              value={tokenValue}
-              onChange={(e) => setTokenValue(e.target.value)}
-              placeholder="Paste JWT token..."
-              className="w-full px-2 py-1.5 bg-slate-elevated border border-slate-border rounded text-foreground text-xs placeholder:text-slate-muted focus:outline-none focus:border-teal-electric"
-              onKeyDown={(e) => e.key === 'Enter' && handleSetToken()}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleSetToken}
-                className="flex-1 px-2 py-1 bg-teal-electric text-slate-deep rounded text-xs font-medium hover:bg-teal-glow transition-colors"
-              >
-                Set Token
-              </button>
-              <button
-                onClick={() => { setShowTokenInput(false); setTokenValue(''); }}
-                className="px-2 py-1 text-slate-muted hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowTokenInput(true)}
-            className={cn(
-              'flex items-center rounded-lg text-amber-warn hover:text-amber-warn/80 hover:bg-slate-elevated transition-colors',
-              collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2 w-full'
-            )}
-            title="Set authentication token"
-            data-auth-token-cta
-          >
-            <Key className="w-4 h-4" />
-            {!collapsed && <span>Set Token</span>}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => { window.location.href = authUrl; }}
+          className={cn(
+            'flex items-center rounded-lg text-amber-warn hover:text-amber-warn/80 hover:bg-slate-elevated transition-colors',
+            collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2 w-full'
+          )}
+          title="Sign in"
+          data-auth-login-cta
+        >
+          <Lock className="w-4 h-4" />
+          {!collapsed && <span>Sign in</span>}
+        </button>
       </div>
     );
   }
@@ -450,13 +486,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const { hasAnyScope, isAuthenticated } = useAuth();
   const { isDarkMode } = useTheme();
-  const rootSegment = pathname.split('/')[1] || '';
-  const isBooksShell =
-    rootSegment === 'books' ||
-    rootSegment === 'inventory' ||
-    rootSegment === 'reports' ||
-    (rootSegment === 'sales' && pathname.startsWith('/sales/customers'));
-  const isHrShell = rootSegment === 'hr';
+  // Use centralized module registry for shell detection
+  const isBooksShell = checkBooksShell(pathname);
+  const isHrShell = checkHrShell(pathname);
   const sidebarBg = isDarkMode ? 'bg-slate-950 border-slate-900' : 'bg-white border-slate-200';
   const sectionCard = isDarkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200';
   const sectionHover = isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100';

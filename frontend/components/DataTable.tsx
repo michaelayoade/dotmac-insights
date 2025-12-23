@@ -24,6 +24,10 @@ interface DataTableProps<T = any> {
   selectable?: boolean;
   selectedRowIds?: Record<string, boolean> | Set<string>;
   onSelectChange?: (selected: Record<string, boolean>) => void;
+  sortKey?: string;
+  sortDir?: 'asc' | 'desc';
+  onSortChange?: (key: string, dir: 'asc' | 'desc') => void;
+  manualSort?: boolean;
 }
 
 export function DataTable<T = any>({
@@ -37,33 +41,42 @@ export function DataTable<T = any>({
   selectable = false,
   selectedRowIds,
   onSelectChange,
+  sortKey,
+  sortDir,
+  onSortChange,
+  manualSort = false,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [internalSortKey, setInternalSortKey] = useState<string | null>(null);
+  const [internalSortDir, setInternalSortDir] = useState<'asc' | 'desc'>('asc');
   const selectAllRef = useRef<HTMLInputElement>(null);
   const selection =
     selectedRowIds instanceof Set
       ? Object.fromEntries(Array.from(selectedRowIds).map((id) => [id, true]))
       : selectedRowIds || {};
 
+  const activeSortKey = sortKey ?? internalSortKey;
+  const activeSortDir = sortDir ?? internalSortDir;
+
   const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
+    const nextDir =
+      activeSortKey === key ? (activeSortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+    if (onSortChange) {
+      onSortChange(key, nextDir);
+      return;
     }
+    setInternalSortKey(key);
+    setInternalSortDir(nextDir);
   };
 
-  const sortedData = sortKey
+  const sortedData = !manualSort && activeSortKey
     ? [...data].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortKey];
-      const bVal = (b as Record<string, unknown>)[sortKey];
+      const aVal = (a as Record<string, unknown>)[activeSortKey];
+      const bVal = (b as Record<string, unknown>)[activeSortKey];
       if (aVal === bVal) return 0;
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
       const comparison = aVal < bVal ? -1 : 1;
-      return sortDir === 'asc' ? comparison : -comparison;
+      return activeSortDir === 'asc' ? comparison : -comparison;
     })
     : data;
 
@@ -199,8 +212,8 @@ export function DataTable<T = any>({
                     {col.header}
                     {col.sortable && (
                       <span className="text-slate-muted">
-                        {sortKey === col.key ? (
-                          sortDir === 'asc' ? (
+                        {activeSortKey === col.key ? (
+                          activeSortDir === 'asc' ? (
                             <ChevronUp className="w-4 h-4" />
                           ) : (
                             <ChevronDown className="w-4 h-4" />

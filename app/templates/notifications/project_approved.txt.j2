@@ -1,0 +1,12 @@
+{# Project approved notification #}
+{% set title = "Project Approved" %}
+{% set icon = "check-circle" %}
+{% set priority = "normal" %}
+
+Project "{{ project_name }}" has been approved.
+{% if approver_name %}
+Approved by: {{ approver_name }}
+{% endif %}
+{% if remarks %}
+Comments: {{ remarks }}
+{% endif %}

@@ -14,7 +14,10 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSection } from '@/components/ModuleLayout/types';
 
 // Field Service Information Flow:
 // 1. ORDERS: Create and manage service orders (Core)
@@ -93,6 +96,24 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function FieldServiceLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('field-service:read');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
+
   return (
     <ModuleLayout
       moduleName="Dotmac Field Service"

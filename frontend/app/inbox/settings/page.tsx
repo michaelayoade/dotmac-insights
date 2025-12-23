@@ -14,6 +14,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 interface SettingToggle {
   id: string;
@@ -59,10 +60,10 @@ export default function InboxSettingsPage() {
             <p className="text-slate-muted text-sm">Configure your inbox preferences</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <Button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Save className="w-4 h-4" />
           Save Changes
-        </button>
+        </Button>
       </div>
 
       {/* Notification Settings */}
@@ -78,12 +79,12 @@ export default function InboxSettingsPage() {
                 <p className="text-foreground font-medium">{setting.label}</p>
                 <p className="text-sm text-slate-muted">{setting.description}</p>
               </div>
-              <button
+              <Button
                 onClick={() => toggleSetting(setting.id)}
                 className={cn('transition-colors', setting.enabled ? 'text-emerald-400' : 'text-slate-muted')}
               >
                 {setting.enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -102,12 +103,12 @@ export default function InboxSettingsPage() {
                 <p className="text-foreground font-medium">{setting.label}</p>
                 <p className="text-sm text-slate-muted">{setting.description}</p>
               </div>
-              <button
+              <Button
                 onClick={() => toggleSetting(setting.id)}
                 className={cn('transition-colors', setting.enabled ? 'text-emerald-400' : 'text-slate-muted')}
               >
                 {setting.enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -120,12 +121,12 @@ export default function InboxSettingsPage() {
             <Clock className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-semibold text-foreground">Working Hours</h2>
           </div>
-          <button
+          <Button
             onClick={() => setWorkingHours((prev) => ({ ...prev, enabled: !prev.enabled }))}
             className={cn('transition-colors', workingHours.enabled ? 'text-emerald-400' : 'text-slate-muted')}
           >
             {workingHours.enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
-          </button>
+          </Button>
         </div>
 
         {workingHours.enabled && (
@@ -167,7 +168,7 @@ export default function InboxSettingsPage() {
               <label className="block text-sm text-slate-muted mb-2">Days Off</label>
               <div className="flex flex-wrap gap-2">
                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <button
+                  <Button
                     key={day}
                     onClick={() => {
                       setWorkingHours((prev) => ({
@@ -185,7 +186,7 @@ export default function InboxSettingsPage() {
                     )}
                   >
                     {day.slice(0, 3)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>

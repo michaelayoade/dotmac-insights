@@ -1,0 +1,12 @@
+{# Credit hold notification #}
+{% set title = "Credit Hold Applied" %}
+{% set icon = "ban" %}
+{% set priority = "urgent" %}
+
+Customer {{ customer_name | default('') }} has been placed on credit hold.
+{% if reason %}
+Reason: {{ reason }}
+{% endif %}
+{% if outstanding %}
+Outstanding Balance: {{ outstanding | currency }}
+{% endif %}

@@ -2,6 +2,7 @@
 
 import { MessageCircle, Phone, CheckCircle, AlertCircle, Settings, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function WhatsAppChannelPage() {
   return (
@@ -40,9 +41,9 @@ export default function WhatsAppChannelPage() {
               <p className="text-foreground font-medium">Meta Business Account</p>
               <p className="text-sm text-slate-muted">Required for WhatsApp Business API access</p>
             </div>
-            <button className="px-4 py-2 bg-slate-border text-foreground rounded-lg text-sm font-medium hover:bg-slate-muted transition-colors">
+            <Button className="px-4 py-2 bg-slate-border text-foreground rounded-lg text-sm font-medium hover:bg-slate-muted transition-colors">
               Verify
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-elevated">
@@ -53,9 +54,9 @@ export default function WhatsAppChannelPage() {
               <p className="text-foreground font-medium">Phone Number Verification</p>
               <p className="text-sm text-slate-muted">Verify your business phone number</p>
             </div>
-            <button className="px-4 py-2 bg-green-500 text-foreground rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
+            <Button className="px-4 py-2 bg-green-500 text-foreground rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
               Connect
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-elevated opacity-50">

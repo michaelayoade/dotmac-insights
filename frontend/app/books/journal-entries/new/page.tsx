@@ -1,12 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, Calendar as CalendarIcon, Hash, Plus, Trash2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useJournalEntryAdminMutations, useAccountingChartOfAccounts } from '@/hooks/useApi';
 import { AccountSearch } from '@/components/EntitySearch';
+import { Button, LinkButton } from '@/components/ui';
 
 type Line = { account: string; description: string; debit: number; credit: number; cost_center: string };
 type SelectedAccount = { name: string; account_number?: string } | null;
@@ -162,14 +163,14 @@ export default function NewJournalEntryPage() {
               <p className="text-sm text-foreground font-semibold">Lines</p>
               <p className="text-xs text-slate-muted">Accounts must balance (debits = credits)</p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={addLine}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-foreground hover:bg-slate-elevated"
             >
               <Plus className="w-4 h-4" />
               Add line
-            </button>
+            </Button>
           </div>
           <div className="space-y-3">
             {lines.map((line, idx) => (
@@ -215,14 +216,14 @@ export default function NewJournalEntryPage() {
                   placeholder="Optional"
                 />
                 <div className="flex justify-end pt-6">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeLine(idx)}
                     className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-card rounded-lg"
                     aria-label="Remove line"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -255,20 +256,12 @@ export default function NewJournalEntryPage() {
         )}
 
         <div className="flex justify-end gap-3">
-          <Link
-            href="/books/journal-entries"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
-          >
+          <LinkButton href="/books/journal-entries" variant="secondary">
             Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
-          >
-            <Save className="w-4 h-4" />
+          </LinkButton>
+          <Button type="submit" disabled={saving} loading={saving} module="books" icon={Save}>
             {saving ? 'Posting...' : 'Post Journal Entry'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

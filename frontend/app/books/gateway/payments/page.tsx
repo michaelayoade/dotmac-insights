@@ -5,32 +5,26 @@ import { useRouter } from 'next/navigation';
 import { useGatewayPayments, useGatewayMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, CreditCard, RefreshCw, Eye, RotateCcw } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
 
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, StatusPill } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getStatusBadge(status: string) {
-  const styles: Record<string, string> = {
-    success: 'bg-green-500/20 text-green-400 border-green-500/30',
-    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    failed: 'bg-red-500/20 text-red-400 border-red-500/30',
-    abandoned: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-    refunded: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  const tones: Record<string, StatusTone> = {
+    success: 'success',
+    pending: 'warning',
+    failed: 'danger',
+    abandoned: 'default',
+    refunded: 'info',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles.pending}`}>
-      {status}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -114,9 +108,9 @@ export default function GatewayPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <span className="font-mono text-foreground">{formatCurrency(item.amount, item.currency)}</span>
+          <span className="font-mono text-foreground">{formatAccountingCurrency(item.amount, item.currency)}</span>
           {item.fees > 0 && (
-            <div className="text-xs text-slate-muted">Fee: {formatCurrency(item.fees, item.currency)}</div>
+            <div className="text-xs text-slate-muted">Fee: {formatAccountingCurrency(item.fees, item.currency)}</div>
           )}
         </div>
       ),
@@ -134,12 +128,12 @@ export default function GatewayPaymentsPage() {
     {
       key: 'paid_at',
       header: 'Paid At',
-      render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.paid_at)}</span>,
+      render: (item: any) => <span className="text-slate-muted text-sm">{formatAccountingDate(item.paid_at)}</span>,
     },
     {
       key: 'created_at',
       header: 'Created',
-      render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.created_at)}</span>,
+      render: (item: any) => <span className="text-slate-muted text-sm">{formatAccountingDate(item.created_at)}</span>,
     },
     {
       key: 'actions',
@@ -147,30 +141,30 @@ export default function GatewayPaymentsPage() {
       render: (item: any) => (
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {item.status === 'pending' && (
-            <button
+            <Button
               onClick={() => { setSelectedPayment(item); setShowVerifyModal(true); }}
               className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-teal-electric transition-colors"
               title="Verify payment"
             >
               <RefreshCw className="w-4 h-4" />
-            </button>
+            </Button>
           )}
           {item.status === 'success' && (
-            <button
+            <Button
               onClick={() => { setSelectedPayment(item); setShowRefundModal(true); }}
               className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-purple-400 transition-colors"
               title="Refund payment"
             >
               <RotateCcw className="w-4 h-4" />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={() => router.push(`/books/gateway/payments/${item.reference}`)}
             className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-foreground transition-colors"
             title="View details"
           >
             <Eye className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -189,13 +183,13 @@ export default function GatewayPaymentsPage() {
           <CreditCard className="w-5 h-5 text-teal-electric" />
           <h1 className="text-xl font-semibold text-foreground">Online Payments</h1>
         </div>
-        <button
+        <Button
           onClick={() => mutate()}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-4 items-center">
@@ -252,18 +246,12 @@ export default function GatewayPaymentsPage() {
               Verify payment status with the provider for reference: <span className="text-teal-electric font-mono">{selectedPayment.reference}</span>
             </p>
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowVerifyModal(false)}
-                className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
-              >
+              <Button onClick={() => setShowVerifyModal(false)} variant="secondary">
                 Cancel
-              </button>
-              <button
-                onClick={() => handleVerify(selectedPayment.reference)}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 transition-colors"
-              >
+              </Button>
+              <Button onClick={() => handleVerify(selectedPayment.reference)} module="books">
                 Verify
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -279,21 +267,21 @@ export default function GatewayPaymentsPage() {
             </p>
             <div className="mb-4 p-3 bg-slate-900 rounded-lg">
               <div className="text-sm text-slate-muted">Amount</div>
-              <div className="text-lg font-mono text-foreground">{formatCurrency(selectedPayment.amount, selectedPayment.currency)}</div>
+              <div className="text-lg font-mono text-foreground">{formatAccountingCurrency(selectedPayment.amount, selectedPayment.currency)}</div>
             </div>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
                 onClick={() => setShowRefundModal(false)}
                 className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleRefund(selectedPayment.reference)}
                 className="px-4 py-2 rounded-lg bg-purple-500 text-foreground font-semibold hover:bg-purple-600 transition-colors"
               >
                 Full Refund
-              </button>
+              </Button>
             </div>
           </div>
         </div>

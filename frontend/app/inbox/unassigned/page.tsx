@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Inbox, Clock, MessageSquare, ArrowRight, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 const UNASSIGNED_CONVERSATIONS = [
   { id: '2', contact: 'Michael Chen', subject: 'Product demo request', channel: 'chat', priority: 'medium', lastActivity: '15 min ago', unread: 1 },
@@ -66,9 +67,9 @@ export default function UnassignedPage() {
                   {conv.lastActivity}
                 </p>
               </div>
-              <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Assign to me">
+              <Button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Assign to me">
                 <UserPlus className="w-4 h-4" />
-              </button>
+              </Button>
               <Link href={`/inbox?id=${conv.id}`} className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors">
                 <ArrowRight className="w-4 h-4" />
               </Link>

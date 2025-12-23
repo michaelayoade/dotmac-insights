@@ -5,16 +5,8 @@ import { useAccountingIncomeStatement } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, TrendingUp, TrendingDown, Calendar, DollarSign, Minus, Equal } from 'lucide-react';
 import PageSkeleton from '@/components/PageSkeleton';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface LineItemProps {
   name: string;
@@ -32,7 +24,7 @@ function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-foregroun
     )} style={{ paddingLeft: `${indent * 1.5}rem` }}>
       <span className={bold ? colorClass : 'text-foreground-secondary'}>{name}</span>
       <span className={cn('font-mono', colorClass)}>
-        {formatCurrency(amount)}
+        {formatAccountingCurrency(amount)}
       </span>
     </div>
   );
@@ -105,12 +97,12 @@ export default function IncomeStatementPage() {
             />
           </div>
           {(startDate || endDate) && (
-            <button
+            <Button
               onClick={() => { setStartDate(''); setEndDate(''); }}
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -122,14 +114,14 @@ export default function IncomeStatementPage() {
             <TrendingUp className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Revenue</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(revenue.total)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(revenue.total)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <TrendingDown className="w-5 h-5 text-red-400" />
             <p className="text-red-400 text-sm">Total Expenses</p>
           </div>
-          <p className="text-2xl font-bold text-red-400">{formatCurrency(expensesTotal)}</p>
+          <p className="text-2xl font-bold text-red-400">{formatAccountingCurrency(expensesTotal)}</p>
         </div>
         <div className={cn(
           'border rounded-xl p-5',
@@ -142,7 +134,7 @@ export default function IncomeStatementPage() {
             <p className={cn('text-sm', netIncome >= 0 ? 'text-teal-400' : 'text-orange-400')}>Net Income</p>
           </div>
           <p className={cn('text-2xl font-bold', netIncome >= 0 ? 'text-teal-400' : 'text-orange-400')}>
-            {formatCurrency(netIncome)}
+            {formatAccountingCurrency(netIncome)}
           </p>
         </div>
       </div>
@@ -212,12 +204,12 @@ export default function IncomeStatementPage() {
         <div className="flex items-center justify-center gap-6 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Revenue</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(revenue.total)}</p>
+            <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(revenue.total)}</p>
           </div>
           <Minus className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Expenses</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(expensesTotal)}</p>
+            <p className="font-mono font-bold text-red-400">{formatAccountingCurrency(expensesTotal)}</p>
           </div>
           <Equal className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
@@ -226,7 +218,7 @@ export default function IncomeStatementPage() {
               'font-mono font-bold text-xl',
               netIncome >= 0 ? 'text-teal-400' : 'text-orange-400'
             )}>
-              {formatCurrency(netIncome)}
+              {formatAccountingCurrency(netIncome)}
             </p>
           </div>
         </div>
@@ -238,13 +230,13 @@ export default function IncomeStatementPage() {
               {grossProfit !== 0 && (
                 <div>
                   <p className="text-slate-muted text-sm">Gross Profit</p>
-                  <p className="font-mono font-semibold text-foreground">{formatCurrency(grossProfit)}</p>
+                  <p className="font-mono font-semibold text-foreground">{formatAccountingCurrency(grossProfit)}</p>
                 </div>
               )}
               {operatingIncome !== 0 && (
                 <div>
                   <p className="text-slate-muted text-sm">Operating Income</p>
-                  <p className="font-mono font-semibold text-foreground">{formatCurrency(operatingIncome)}</p>
+                  <p className="font-mono font-semibold text-foreground">{formatAccountingCurrency(operatingIncome)}</p>
                 </div>
               )}
               {revenue.total > 0 && (

@@ -1,0 +1,9 @@
+{# Performance score overridden notification #}
+{% set title = "Score Adjusted" %}
+{% set icon = "edit" %}
+{% set priority = "normal" %}
+
+A score on your {{ period_name | default('') }} scorecard was adjusted from {{ old_score | default('N/A') }} to {{ new_score | default('N/A') }}.
+{% if reason %}
+Reason: {{ reason }}
+{% endif %}

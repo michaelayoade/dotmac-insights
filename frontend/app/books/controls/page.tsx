@@ -15,7 +15,7 @@ import {
   ClipboardList,
   Plus,
 } from 'lucide-react';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   useFiscalPeriods,
   useFiscalPeriodMutations,
@@ -32,6 +32,7 @@ import {
   useFxRevaluationMutations,
 } from '@/hooks/useApi';
 import { DashboardShell, PageHeader, Button, SectionHeader } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function BooksControlsPage() {
   const { data: periods, error: periodsError, isLoading: periodsLoading, mutate: refetchPeriods } = useFiscalPeriods();
@@ -171,7 +172,7 @@ export default function BooksControlsPage() {
                     <div>
                       <p className="text-foreground font-medium">{row.document_number || row.document_id || row.id}</p>
                       <p className="text-slate-muted text-sm">
-                        {row.doctype} · {formatCurrency(row.amount ?? 0, row.currency || 'NGN')}
+                        {row.doctype} · {formatAccountingCurrency(row.amount ?? 0, row.currency || 'NGN')}
                       </p>
                       <p className="text-slate-muted text-xs">By {row.requested_by || row.created_by}</p>
                     </div>

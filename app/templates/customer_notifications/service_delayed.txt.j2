@@ -1,0 +1,13 @@
+{# Service delayed notification #}
+{% set title = "Service Delay Notice" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+We regret to inform you that your service order #{{ order_number }} is experiencing a delay.
+
+{% if notes %}Reason: {{ notes }}{% endif %}
+New Estimated Time: {{ eta | default('To be confirmed') }}
+
+We sincerely apologize for the inconvenience. Our team is working to complete your service as soon as possible.
+
+Thank you for your patience and understanding.

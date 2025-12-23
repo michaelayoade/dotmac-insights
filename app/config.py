@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 import os
 
@@ -67,8 +67,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: Optional[str] = None
 
-    # Notifications
-    notification_templates_path: str = "data/notification_templates.json"
+    # Branding (used in templates and emails)
+    company_name: str = "dotMac Limited"
+    product_name: str = "DotMac Insights"
+    support_email: str = "support@dotmac.com"
 
     # OpenBao (secrets management)
     openbao_url: Optional[str] = None  # e.g., http://localhost:8200
@@ -151,10 +153,11 @@ class Settings(BaseSettings):
             return []
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # Allow extra env vars
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()

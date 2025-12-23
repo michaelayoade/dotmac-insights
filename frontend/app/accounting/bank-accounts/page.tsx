@@ -3,16 +3,7 @@
 import { useAccountingBankAccounts } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Landmark, Building2, CreditCard, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface BankAccountCardProps {
   account: any;
@@ -70,7 +61,7 @@ function BankAccountCard({ account }: BankAccountCardProps) {
               'font-mono font-bold text-lg',
               (account.balance || account.current_balance || 0) >= 0 ? 'text-green-400' : 'text-red-400'
             )}>
-              {formatCurrency(account.balance || account.current_balance, account.currency)}
+              {formatAccountingCurrency(account.balance || account.current_balance, account.currency)}
             </span>
           </div>
         </div>
@@ -117,7 +108,7 @@ export default function BankAccountsPage() {
             <CreditCard className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Balance</p>
           </div>
-          <p className="text-3xl font-bold text-green-400">{formatCurrency(totalBalance)}</p>
+          <p className="text-3xl font-bold text-green-400">{formatAccountingCurrency(totalBalance)}</p>
           <p className="text-green-400/70 text-sm mt-1">Across all accounts</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">

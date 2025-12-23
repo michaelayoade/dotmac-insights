@@ -1,7 +1,7 @@
 'use client';
 
 import { FileQuestion, Home, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { Button, LinkButton } from '@/components/ui';
 
 export default function NotFound() {
   return (
@@ -18,20 +18,16 @@ export default function NotFound() {
         </p>
 
         <div className="flex gap-3 justify-center">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg font-medium hover:bg-teal-glow transition-colors"
-          >
-            <Home className="w-4 h-4" />
+          <LinkButton href="/" icon={Home}>
             Dashboard
-          </Link>
-          <button
+          </LinkButton>
+          <Button
+            variant="secondary"
+            icon={ArrowLeft}
             onClick={() => typeof window !== 'undefined' && window.history.back()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg font-medium hover:bg-slate-border transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
             Go back
-          </button>
+          </Button>
         </div>
       </div>
     </div>

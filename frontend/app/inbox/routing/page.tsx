@@ -202,13 +202,13 @@ export default function RoutingPage() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <button
+                    <Button
                       onClick={() => handleToggleRule(rule)}
                       className={cn('transition-colors', rule.is_active ? 'text-emerald-400' : 'text-slate-muted')}
                       aria-label={rule.is_active ? 'Disable rule' : 'Enable rule'}
                     >
                       {rule.is_active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
-                    </button>
+                    </Button>
                     <div>
                       <h3 className="text-foreground font-semibold">{rule.name}</h3>
                       {rule.description && <p className="text-sm text-slate-muted">{rule.description}</p>}
@@ -216,19 +216,19 @@ export default function RoutingPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-muted">{rule.match_count || 0} matches</span>
-                    <button
+                    <Button
                       className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                       aria-label="Edit rule"
                     >
                       <Edit className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDeleteRule(rule)}
                       className="p-2 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors"
                       aria-label="Delete rule"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 

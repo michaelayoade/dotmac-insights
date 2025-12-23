@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { RefreshCw, ArrowLeft, Activity, RotateCcw } from 'lucide-react';
 import { webhooksApi, WebhookEventListResponse, WebhookProviderStats } from '@/lib/api';
+import { AccentStatCard } from '@/components/StatCard';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
+import { Button } from '@/components/ui';
 
 export default function ProviderDetailPage() {
   const params = useParams();
@@ -43,7 +45,7 @@ export default function ProviderDetailPage() {
           </Link>
           <h1 className="text-2xl font-bold text-foreground capitalize">{provider}</h1>
         </div>
-        <button
+        <Button
           onClick={() => {
             mutate();
             mutateEvents();
@@ -52,13 +54,13 @@ export default function ProviderDetailPage() {
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Total Events" value={stats?.total_events} />
-        <StatCard label="Processed" value={stats?.processed_count ?? stats?.processed_events} />
-        <StatCard label="Errors" value={stats?.error_count ?? stats?.failed_events} accent="rose" />
+        <AccentStatCard title="Total Events" value={stats?.total_events ?? 0} accent="teal" />
+        <AccentStatCard title="Processed" value={stats?.processed_count ?? stats?.processed_events ?? 0} accent="teal" />
+        <AccentStatCard title="Errors" value={stats?.error_count ?? stats?.failed_events ?? 0} accent="rose" />
       </div>
 
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -110,13 +112,13 @@ export default function ProviderDetailPage() {
                       <Activity className="w-3.5 h-3.5" />
                       Details
                     </Link>
-                    <button
+                    <Button
                       onClick={() => handleReplay(event.id)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-xs text-teal-electric hover:text-teal-glow"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Replay
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -135,15 +137,3 @@ export default function ProviderDetailPage() {
   );
 }
 
-function StatCard({ label, value, accent = 'teal' }: { label: string; value?: number; accent?: 'teal' | 'rose' }) {
-  const styles =
-    accent === 'rose'
-      ? { bg: 'bg-rose-500/10', text: 'text-rose-300' }
-      : { bg: 'bg-teal-500/10', text: 'text-teal-300' };
-  return (
-    <div className={cn('border border-slate-border rounded-xl p-4', styles.bg)}>
-      <p className="text-sm text-slate-muted">{label}</p>
-      <p className={cn('text-2xl font-bold', styles.text)}>{value ?? 0}</p>
-    </div>
-  );
-}

@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAssetCategories, useAssetCategoryMutations } from "@/hooks/useApi";
 import type { AssetCategory } from "@/lib/api";
+import { Button } from '@/components/ui';
 
 export default function AssetCategoriesPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -65,20 +66,20 @@ export default function AssetCategoriesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setShowCreateForm(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-foreground transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Category
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -113,19 +114,19 @@ export default function AssetCategoriesPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 justify-end">
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
                 className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 Create Category
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -158,13 +159,13 @@ export default function AssetCategoriesPage() {
                   >
                     <div className="flex items-center gap-3">
                       {hasFinanceBooks ? (
-                        <button className="p-1 text-slate-muted hover:text-foreground">
+                        <Button className="p-1 text-slate-muted hover:text-foreground">
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
                           ) : (
                             <ChevronRight className="w-4 h-4" />
                           )}
-                        </button>
+                        </Button>
                       ) : (
                         <div className="w-6" />
                       )}
@@ -188,20 +189,20 @@ export default function AssetCategoriesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         onClick={(e) => { e.stopPropagation(); }}
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={(e) => { e.stopPropagation(); }}
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Settings"
                       >
                         <Settings className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
 

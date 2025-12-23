@@ -1,0 +1,19 @@
+{# Service scheduled notification #}
+{% set title = "Service Scheduled: " ~ (order_type | default('Service') | title_case) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your {{ order_type | default('service') | title_case }} service has been scheduled.
+
+Order: #{{ order_number }}
+Date: {{ scheduled_date | format_date }}
+Time: {{ scheduled_time | default('TBD') }}
+Address: {{ service_address }}
+
+{% if title %}Description: {{ title }}{% endif %}
+
+Our team will arrive at the scheduled time. Please ensure someone is available to provide access.
+
+If you need to reschedule, please contact us as soon as possible.
+
+Thank you for choosing us!

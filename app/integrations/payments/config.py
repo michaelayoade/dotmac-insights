@@ -5,7 +5,7 @@ All settings are loaded from environment variables.
 """
 
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class PaymentSettings(BaseSettings):
@@ -56,10 +56,11 @@ class PaymentSettings(BaseSettings):
     api_timeout: int = 30
     webhook_timeout: int = 10
 
-    class Config:
-        env_file = ".env"
-        env_prefix = ""
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="",
+        extra="ignore",
+    )
 
 
 # Singleton instance

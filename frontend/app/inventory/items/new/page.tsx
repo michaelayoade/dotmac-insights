@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Save } from 'lucide-react';
 import { useInventoryItemMutations } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function InventoryItemCreatePage() {
   const router = useRouter();
@@ -164,7 +165,7 @@ export default function InventoryItemCreatePage() {
           ))}
         </div>
 
-        <button
+        <Button
           type="submit"
           disabled={submitting}
           className={cn(
@@ -174,7 +175,7 @@ export default function InventoryItemCreatePage() {
         >
           <Save className="w-4 h-4" />
           {submitting ? 'Saving...' : 'Create Item'}
-        </button>
+        </Button>
       </form>
     </div>
   );

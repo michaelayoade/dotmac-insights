@@ -541,31 +541,23 @@ def generate_period_report(period_id: int, email_recipients: Optional[List[str]]
             period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
             period_name = period.name if period else f"Period {period_id}"
 
+            # Render email body using Jinja2 template
+            from app.templates.environment import get_template_env
+            env = get_template_env()
+            email_template = env.get_template("emails/performance/period_report.html.j2")
+            body_html = email_template.render(
+                period_name=period_name,
+                summary=report_data["summary"],
+                scores=report_data["scores"],
+                distribution=report_data["distribution"],
+                generated_at=report_data["generated_at"],
+            )
+
             for email in email_recipients:
                 email_item = EmailQueue(
                     to_email=email,
                     subject=f"Performance Report: {period_name}",
-                    body_html=f"""
-                    <h2>Performance Report: {period_name}</h2>
-                    <h3>Summary</h3>
-                    <ul>
-                        <li>Total Scorecards: {report_data['summary']['total_scorecards']}</li>
-                        <li>Computed: {report_data['summary']['computed']}</li>
-                        <li>Finalized: {report_data['summary']['finalized']}</li>
-                        <li>Completion Rate: {report_data['summary']['completion_rate']}%</li>
-                    </ul>
-                    <h3>Score Statistics</h3>
-                    <ul>
-                        <li>Average Score: {report_data['scores']['average']}</li>
-                        <li>Min Score: {report_data['scores']['minimum']}</li>
-                        <li>Max Score: {report_data['scores']['maximum']}</li>
-                    </ul>
-                    <h3>Rating Distribution</h3>
-                    <ul>
-                        {"".join(f"<li>{rating}: {count}</li>" for rating, count in report_data['distribution'].items())}
-                    </ul>
-                    <p><small>Generated: {report_data['generated_at']}</small></p>
-                    """,
+                    body_html=body_html,
                     event_type="performance_report",
                     entity_type="evaluation_period",
                     entity_id=period_id,

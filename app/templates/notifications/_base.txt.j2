@@ -1,0 +1,6 @@
+{# Base template for internal notifications #}
+{# Override blocks in child templates #}
+
+{% block title %}Notification{% endblock %}
+
+{% block message %}{{ message | default('You have a new notification') }}{% endblock %}

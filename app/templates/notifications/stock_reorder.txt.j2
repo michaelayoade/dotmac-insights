@@ -1,0 +1,18 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Stock Reorder Required" %}
+{% set icon = "shopping-cart" %}
+{% set priority = "high" %}
+
+{% block content %}
+An item has reached its reorder point and needs to be replenished.
+
+Item: {{ item_name | default('Item') }}
+Item Code: {{ item_code | default('N/A') }}
+Warehouse: {{ warehouse | default('Main Warehouse') }}
+Current Stock: {{ current_qty | default(0) }}
+Reorder Point: {{ reorder_point | default('N/A') }}
+Suggested Order Qty: {{ suggested_qty | default('N/A') }}
+Preferred Supplier: {{ supplier_name | default('N/A') }}
+
+A purchase order should be created to maintain adequate stock levels.
+{% endblock %}

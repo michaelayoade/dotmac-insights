@@ -1,0 +1,12 @@
+{# Project rejected notification #}
+{% set title = "Project Rejected" %}
+{% set icon = "x-circle" %}
+{% set priority = "high" %}
+
+Project "{{ project_name }}" has been rejected.
+{% if rejector_name %}
+Rejected by: {{ rejector_name }}
+{% endif %}
+{% if reason %}
+Reason: {{ reason }}
+{% endif %}

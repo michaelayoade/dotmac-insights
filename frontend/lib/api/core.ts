@@ -546,15 +546,23 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     const startTime = Date.now();
 
     try {
+      // Only set Content-Type for requests with a body to avoid CORS preflight on simple GETs.
+      const hasBody = fetchOptions.body !== undefined;
+      const isFormData =
+        typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData;
+      const headers = new Headers(fetchOptions.headers || {});
+      if (hasBody && !isFormData && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      if (accessToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${accessToken}`);
+      }
+
       const response = await fetchWithTimeout(url, {
         ...fetchOptions,
         timeout,
         credentials: typeof window !== 'undefined' ? 'include' : 'omit',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          ...fetchOptions.headers,
-        },
+        headers,
       });
 
       const durationMs = Date.now() - startTime;

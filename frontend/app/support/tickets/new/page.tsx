@@ -7,14 +7,18 @@ import { AlertTriangle, ArrowLeft, LifeBuoy, User, Users, Tag, Clock } from 'luc
 import { useSupportTicketMutations, useSupportAgents, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
+import { useFormErrors } from '@/hooks';
 import { AccessDenied } from '@/components/AccessDenied';
+import { Button } from '@/components/ui';
 
 export default function SupportTicketCreatePage() {
   const router = useRouter();
   const { createTicket } = useSupportTicketMutations();
-  const { data: agentsData } = useSupportAgents();
-  const { data: teamsData } = useSupportTeams();
   const { hasAccess: canWrite, isLoading: authLoading } = useRequireScope('support:write');
+  const canFetch = canWrite && !authLoading;
+  const { data: agentsData } = useSupportAgents(undefined, undefined, { isPaused: () => !canFetch });
+  const { data: teamsData } = useSupportTeams({ isPaused: () => !canFetch });
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const agents = agentsData?.agents?.filter((a: any) => a.is_active) || [];
   const teams = teamsData?.teams || [];
@@ -36,7 +40,6 @@ export default function SupportTicketCreatePage() {
   const [baseStation, setBaseStation] = useState('');
 
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   if (authLoading) {
@@ -58,7 +61,7 @@ export default function SupportTicketCreatePage() {
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!subject.trim()) errs.subject = 'Subject is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -342,20 +345,20 @@ export default function SupportTicketCreatePage() {
 
         {/* Form Actions */}
         <div className="lg:col-span-2 flex justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-6 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
           >
             {submitting ? 'Creating...' : 'Create Ticket'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

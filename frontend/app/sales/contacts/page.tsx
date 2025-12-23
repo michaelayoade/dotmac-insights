@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
-  Search,
   MoreHorizontal,
   Phone,
   Mail,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useContacts, useContactMutations } from '@/hooks/useApi';
 import type { Contact } from '@/lib/api';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 export default function ContactsPage() {
   const [search, setSearch] = useState('');
@@ -61,35 +61,30 @@ export default function ContactsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search contacts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-          />
-        </div>
-        <select
+      <FilterCard contentClassName="flex items-center gap-4 flex-wrap" iconClassName="text-emerald-400">
+        <FilterInput
+          type="text"
+          placeholder="Search contacts..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 max-w-md"
+        />
+        <FilterSelect
           value={isPrimary}
           onChange={(e) => setIsPrimary(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Contacts</option>
           <option value="true">Primary Only</option>
           <option value="false">Non-Primary</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={isDecisionMaker}
           onChange={(e) => setIsDecisionMaker(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Roles</option>
           <option value="true">Decision Makers</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Contacts Grid */}
       <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
@@ -135,9 +130,9 @@ export default function ContactsPage() {
                       )}
                     </div>
                   </div>
-                  <button className="p-1.5 text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors">
+                  <Button className="p-1.5 text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors">
                     <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="mt-4 space-y-2">
@@ -217,12 +212,12 @@ export default function ContactsPage() {
                 </div>
 
                 {!contact.is_primary && (
-                  <button
+                  <Button
                     onClick={() => handleSetPrimary(contact.id)}
                     className="mt-3 w-full px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-400 hover:text-foreground rounded-lg transition-colors"
                   >
                     Set as Primary
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -236,20 +231,20 @@ export default function ContactsPage() {
               Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, contacts.total)} of {contacts.total}
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setPage(p => p + 1)}
                 disabled={page * 20 >= contacts.total}
                 className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         )}

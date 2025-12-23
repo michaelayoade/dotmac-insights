@@ -17,55 +17,25 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
-import {
-  useHrLeaveTypes,
-  useHrHolidayLists,
-  useHrLeaveApplications,
-  useHrShiftAssignments,
-  useHrJobOpenings,
-  useHrPayrollEntries,
-  useHrTrainingEvents,
-  useHrEmployeeOnboardings,
-  useHrAnalyticsOverview,
-  useHrAnalyticsLeaveTrend,
-  useHrAnalyticsAttendanceTrend,
-} from '@/hooks/useApi';
+import { useConsolidatedHRDashboard } from '@/hooks/useApi';
+import type { HRDashboardResponse } from '@/lib/api/domains/dashboards';
 import { DashboardShell } from '@/components/ui/DashboardShell';
-import { ErrorDisplay } from '@/components/insights/shared';
-import { useSWRStatusFromArray } from '@/hooks/useSWRStatus';
+import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 import {
   CalendarClock,
   Briefcase,
-  ClipboardList,
   GraduationCap,
-  Users,
-  TrendingUp,
   Wallet2,
   UserPlus,
   Clock3,
   Target,
   ArrowRight,
   CheckCircle2,
-  AlertCircle,
-  Timer,
 } from 'lucide-react';
-
-function extractList<T>(response: any) {
-  const items = response?.data || [];
-  const total = response?.total ?? items.length;
-  return { items, total };
-}
-
-// HR color palette using CSS variables for theme switching
-const HR_COLORS = {
-  primary: 'var(--color-amber-warn)',
-  secondary: 'var(--color-purple-accent)',
-  accent: 'var(--color-coral-alert)',
-  success: 'var(--color-teal-electric)',
-  warning: 'var(--color-amber-warn)',
-  info: 'var(--color-cyan-accent)',
-};
 
 // Chart colors from centralized design tokens
 const CHART_COLORS = [
@@ -77,44 +47,6 @@ const CHART_COLORS = [
   'var(--color-blue-info)',
 ];
 
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  trend,
-  trendLabel,
-  className,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  trend?: 'up' | 'down' | 'neutral';
-  trendLabel?: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
-          {trendLabel && (
-            <div className="flex items-center gap-1 mt-2">
-              {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
-              {trend === 'down' && <TrendingUp className="w-3 h-3 text-rose-400 rotate-180" />}
-              <span className={cn('text-xs', trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-muted')}>
-                {trendLabel}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 bg-amber-500/10 rounded-xl">
-          <Icon className="w-6 h-6 text-amber-400" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -230,49 +162,31 @@ function ActionItem({
 }
 
 export default function HrOverviewPage() {
-  const { data: leaveTypes, error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes } = useHrLeaveTypes({ limit: 50 });
-  const { data: holidayLists, error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday } = useHrHolidayLists({ limit: 1 });
-  const { data: leaveApplications, error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps } = useHrLeaveApplications({ status: 'open', limit: 10 });
-  const { data: shiftAssignments, error: shiftError, isLoading: shiftLoading, mutate: refetchShift } = useHrShiftAssignments({ limit: 10 });
-  const { data: jobOpenings, error: jobsError, isLoading: jobsLoading, mutate: refetchJobs } = useHrJobOpenings({ status: 'open', limit: 10 });
-  const { data: payrollEntries, error: payrollError, isLoading: payrollLoading, mutate: refetchPayroll } = useHrPayrollEntries({ limit: 10 });
-  const { data: trainingEvents, error: trainingError, isLoading: trainingLoading, mutate: refetchTraining } = useHrTrainingEvents({ status: 'scheduled', limit: 10 });
-  const { data: onboardings, error: onboardingError, isLoading: onboardingLoading, mutate: refetchOnboarding } = useHrEmployeeOnboardings({ limit: 10 });
-  const { data: analyticsOverview, error: analyticsError, isLoading: analyticsLoading, mutate: refetchAnalytics } = useHrAnalyticsOverview();
-  const { data: leaveTrend, error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
-  const { data: attendanceTrend, error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance } = useHrAnalyticsAttendanceTrend({ days: 14 });
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('hr:read');
+  const canFetch = !authLoading && !missingScope;
 
-  const swrStates = [
-    { error: leaveTypesError, isLoading: leaveTypesLoading, mutate: refetchLeaveTypes },
-    { error: holidayError, isLoading: holidayLoading, mutate: refetchHoliday },
-    { error: leaveAppsError, isLoading: leaveAppsLoading, mutate: refetchLeaveApps },
-    { error: shiftError, isLoading: shiftLoading, mutate: refetchShift },
-    { error: jobsError, isLoading: jobsLoading, mutate: refetchJobs },
-    { error: payrollError, isLoading: payrollLoading, mutate: refetchPayroll },
-    { error: trainingError, isLoading: trainingLoading, mutate: refetchTraining },
-    { error: onboardingError, isLoading: onboardingLoading, mutate: refetchOnboarding },
-    { error: analyticsError, isLoading: analyticsLoading, mutate: refetchAnalytics },
-    { error: leaveTrendError, isLoading: leaveTrendLoading, mutate: refetchLeaveTrend },
-    { error: attendanceError, isLoading: attendanceLoading, mutate: refetchAttendance },
-  ];
-
-  const { isLoading, error } = useSWRStatusFromArray(swrStates);
-  const retryAll = () => swrStates.forEach((state) => state.mutate && state.mutate());
+  const { data: dashboard, error, isLoading, mutate: refetchDashboard } = useConsolidatedHRDashboard(
+    { isPaused: () => !canFetch }
+  );
+  const safeDashboard = dashboard as HRDashboardResponse | undefined;
 
   // Memoized chart data - must be called unconditionally before early returns
-  const payroll30d = useMemo(() => analyticsOverview?.payroll_30d || {}, [analyticsOverview]);
+  const payroll30d = useMemo<HRDashboardResponse['payroll_30d']>(() => (
+    safeDashboard?.payroll_30d || { slip_count: 0, gross_total: 0, deduction_total: 0, net_total: 0 }
+  ), [safeDashboard]);
 
   // Transform leave trend data for chart
   const leaveTrendData = useMemo(() => {
-    return (leaveTrend || []).map((item: any) => ({
+    return (safeDashboard?.leave?.trend || []).map((item: any) => ({
       month: item.month,
       applications: item.count,
     }));
-  }, [leaveTrend]);
+  }, [safeDashboard]);
 
   // Transform attendance trend data for chart
   const attendanceTrendData = useMemo(() => {
-    return (attendanceTrend || []).slice(-7).map((item: any) => {
+    return (safeDashboard?.attendance?.trend || []).slice(-7).map((item: any) => {
       const counts = item.status_counts || {};
       return {
         date: formatDate(item.date).split(',')[0],
@@ -281,49 +195,67 @@ export default function HrOverviewPage() {
         late: counts.late || counts.Late || 0,
       };
     });
-  }, [attendanceTrend]);
+  }, [safeDashboard]);
+
+  const attendanceStatusData = useMemo(() => {
+    const statusCounts = safeDashboard?.attendance?.status_30d || {};
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      label: status,
+      value: count as number,
+    }));
+  }, [safeDashboard]);
 
   // Leave status distribution for pie chart
   const leaveStatusData = useMemo(() => {
-    const leaveByStatus = analyticsOverview?.leave_by_status || {};
+    const leaveByStatus = safeDashboard?.leave?.by_status || {};
     return Object.entries(leaveByStatus).map(([status, count], idx) => ({
       name: status.charAt(0).toUpperCase() + status.slice(1),
       value: count as number,
       color: CHART_COLORS[idx % CHART_COLORS.length],
     }));
-  }, [analyticsOverview]);
+  }, [safeDashboard]);
 
   // Recruitment funnel data
   const funnelData = useMemo(() => {
-    const recruitmentFunnel = analyticsOverview?.recruitment_funnel || {};
+    const recruitmentFunnel: HRDashboardResponse['recruitment']['funnel'] = safeDashboard?.recruitment?.funnel ?? {
+      applications: 0,
+      screened: 0,
+      interviewed: 0,
+      offered: 0,
+      hired: 0,
+    };
     const stages = [
       { name: 'Applications', key: 'applications', color: '#8b5cf6' },
       { name: 'Screened', key: 'screened', color: '#06b6d4' },
       { name: 'Interviewed', key: 'interviewed', color: '#f59e0b' },
       { name: 'Offered', key: 'offered', color: '#10b981' },
       { name: 'Hired', key: 'hired', color: '#ec4899' },
-    ];
+    ] satisfies Array<{ name: string; key: keyof HRDashboardResponse['recruitment']['funnel']; color: string }>;
     return stages.map((stage) => ({
       ...stage,
-      value: recruitmentFunnel[stage.key] || 0,
+      value: recruitmentFunnel[stage.key] ?? 0,
     }));
-  }, [analyticsOverview]);
+  }, [safeDashboard]);
 
-  const leaveAppList = extractList(leaveApplications);
-  const leaveTypeList = extractList(leaveTypes);
-  const jobOpeningList = extractList(jobOpenings);
-  const payrollEntryList = extractList(payrollEntries);
-  const trainingEventList = extractList(trainingEvents);
-  const onboardingList = extractList(onboardings);
-  const shiftAssignmentList = extractList(shiftAssignments);
-
-  const attendanceStatus = analyticsOverview?.attendance_status_30d || {};
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the hr:read permission to view the HR dashboard."
+        backHref="/"
+        backLabel="Back to Home"
+      />
+    );
+  }
 
   return (
     <DashboardShell
       isLoading={isLoading}
       error={error}
-      onRetry={retryAll}
+      onRetry={refetchDashboard}
       softError
     >
       <div className="space-y-6">
@@ -331,7 +263,7 @@ export default function HrOverviewPage() {
           <ErrorDisplay
             message="Failed to load HR overview data."
             error={error as Error}
-            onRetry={retryAll}
+            onRetry={refetchDashboard}
           />
         )}
         {/* Hero Section */}
@@ -340,6 +272,9 @@ export default function HrOverviewPage() {
             <div>
               <h2 className="text-xl font-bold text-foreground">Overview</h2>
               <p className="text-slate-muted text-sm mt-1">People operations at a glance</p>
+              {safeDashboard?.generated_at && (
+                <p className="text-slate-muted text-xs mt-2">Updated {formatDate(safeDashboard.generated_at)}</p>
+              )}
             </div>
             <div className="flex flex-wrap gap-3">
               <Link
@@ -362,33 +297,33 @@ export default function HrOverviewPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Open Leave Requests"
-          value={leaveAppList.total}
+        <StatCard
+          title="Open Leave Requests"
+          value={safeDashboard?.leave?.pending_approvals || 0}
           icon={CalendarClock}
-          trend={leaveAppList.total > 5 ? 'up' : 'neutral'}
-          trendLabel={leaveAppList.total > 5 ? 'Needs attention' : 'Under control'}
+          colorClass="text-amber-400"
+          trend={(safeDashboard?.leave?.pending_approvals || 0) > 5 ? { value: 1, label: 'Needs attention' } : { value: 0, label: 'Under control' }}
         />
-        <MetricCard
-          label="Open Positions"
-          value={jobOpeningList.total}
+        <StatCard
+          title="Open Positions"
+          value={safeDashboard?.recruitment?.open_positions || 0}
           icon={Briefcase}
-          trend="neutral"
-          trendLabel="Active recruiting"
+          colorClass="text-amber-400"
+          trend={{ value: 0, label: 'Active recruiting' }}
         />
-        <MetricCard
-          label="Upcoming Trainings"
-          value={trainingEventList.total}
+        <StatCard
+          title="Upcoming Trainings"
+          value={safeDashboard?.training?.scheduled_events || 0}
           icon={GraduationCap}
-          trend="neutral"
-          trendLabel="Scheduled"
+          colorClass="text-amber-400"
+          trend={{ value: 0, label: 'Scheduled' }}
         />
-        <MetricCard
-          label="Active Onboardings"
-          value={onboardingList.total}
+        <StatCard
+          title="Active Onboardings"
+          value={safeDashboard?.onboarding?.active_count || 0}
           icon={UserPlus}
-          trend={onboardingList.total > 0 ? 'up' : 'neutral'}
-          trendLabel={onboardingList.total > 0 ? 'New hires' : 'No pending'}
+          colorClass="text-amber-400"
+          trend={(safeDashboard?.onboarding?.active_count || 0) > 0 ? { value: 1, label: 'New hires' } : { value: 0, label: 'No pending' }}
         />
       </div>
 
@@ -415,7 +350,7 @@ export default function HrOverviewPage() {
             description="Welcome new employees"
             icon={UserPlus}
             href="/hr/lifecycle"
-            status={onboardingList.total > 0 ? 'active' : 'pending'}
+            status={(safeDashboard?.onboarding?.active_count || 0) > 0 ? 'active' : 'pending'}
           />
           <WorkflowStep
             step={3}
@@ -452,28 +387,28 @@ export default function HrOverviewPage() {
             <ActionItem
               icon={CalendarClock}
               title="Leave requests awaiting approval"
-              count={leaveAppList.total}
+              count={safeDashboard?.leave?.pending_approvals || 0}
               href="/hr/leave"
-              urgency={leaveAppList.total > 5 ? 'high' : leaveAppList.total > 0 ? 'medium' : 'low'}
+              urgency={(safeDashboard?.leave?.pending_approvals || 0) > 5 ? 'high' : (safeDashboard?.leave?.pending_approvals || 0) > 0 ? 'medium' : 'low'}
             />
             <ActionItem
               icon={Briefcase}
               title="Job openings to review"
-              count={jobOpeningList.total}
+              count={safeDashboard?.recruitment?.open_positions || 0}
               href="/hr/recruitment"
               urgency="medium"
             />
             <ActionItem
               icon={UserPlus}
               title="Employees in onboarding"
-              count={onboardingList.total}
+              count={safeDashboard?.onboarding?.active_count || 0}
               href="/hr/lifecycle"
-              urgency={onboardingList.total > 0 ? 'medium' : 'low'}
+              urgency={(safeDashboard?.onboarding?.active_count || 0) > 0 ? 'medium' : 'low'}
             />
             <ActionItem
               icon={GraduationCap}
               title="Upcoming training sessions"
-              count={trainingEventList.total}
+              count={safeDashboard?.training?.scheduled_events || 0}
               href="/hr/training"
               urgency="low"
             />
@@ -584,6 +519,15 @@ export default function HrOverviewPage() {
 
         {/* Attendance Trend */}
         <ChartCard title="Attendance" subtitle="Last 7 days">
+          {attendanceStatusData.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3 text-xs text-slate-muted">
+              {attendanceStatusData.map((item) => (
+                <span key={item.label} className="px-2 py-0.5 rounded-full bg-slate-elevated">
+                  {item.label}: {item.value}
+                </span>
+              ))}
+            </div>
+          )}
           {attendanceTrendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={attendanceTrendData}>
@@ -642,22 +586,77 @@ export default function HrOverviewPage() {
         </Link>
       </ChartCard>
 
+      {/* Upcoming Training & Recent Onboarding */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartCard title="Upcoming Training" subtitle="Next scheduled sessions">
+          {(safeDashboard?.training?.upcoming || []).length > 0 ? (
+            <div className="space-y-3">
+              {(safeDashboard?.training?.upcoming || []).map((event) => (
+                <div key={event.id} className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
+                  <div>
+                    <p className="text-foreground text-sm font-medium">{event.event_name}</p>
+                    <p className="text-slate-muted text-xs">{event.type || 'General'}</p>
+                  </div>
+                  <span className="text-slate-muted text-xs">
+                    {event.start_time ? formatDate(event.start_time) : 'TBD'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No upcoming training</div>
+          )}
+          <Link
+            href="/hr/training"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            View Training Calendar <ArrowRight className="w-4 h-4" />
+          </Link>
+        </ChartCard>
+
+        <ChartCard title="Recent Onboardings" subtitle="Active onboarding records">
+          {(safeDashboard?.onboarding?.recent || []).length > 0 ? (
+            <div className="space-y-3">
+              {(safeDashboard?.onboarding?.recent || []).map((record) => (
+                <div key={record.id} className="flex items-center justify-between p-3 bg-slate-elevated rounded-lg">
+                  <div>
+                    <p className="text-foreground text-sm font-medium">{record.employee_name || 'Unnamed employee'}</p>
+                    <p className="text-slate-muted text-xs">{record.status || 'Pending'}</p>
+                  </div>
+                  <span className="text-slate-muted text-xs">
+                    {record.date_of_joining ? formatDate(record.date_of_joining) : 'TBD'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-[180px] flex items-center justify-center text-slate-muted text-sm">No active onboardings</div>
+          )}
+          <Link
+            href="/hr/lifecycle"
+            className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            View Lifecycle <ArrowRight className="w-4 h-4" />
+          </Link>
+        </ChartCard>
+      </div>
+
       {/* Quick Stats Footer */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-foreground">{leaveTypeList.total}</p>
-          <p className="text-slate-muted text-sm">Leave Types</p>
+          <p className="text-3xl font-bold text-foreground">{safeDashboard?.summary?.total_employees || 0}</p>
+          <p className="text-slate-muted text-sm">Total Employees</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-foreground">{shiftAssignmentList.total}</p>
-          <p className="text-slate-muted text-sm">Shift Assignments</p>
+          <p className="text-3xl font-bold text-foreground">{safeDashboard?.summary?.active_employees || 0}</p>
+          <p className="text-slate-muted text-sm">Active Employees</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-foreground">{payrollEntryList.total}</p>
-          <p className="text-slate-muted text-sm">Payroll Runs</p>
+          <p className="text-3xl font-bold text-foreground">{safeDashboard?.summary?.on_leave_today || 0}</p>
+          <p className="text-slate-muted text-sm">On Leave Today</p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-foreground">{attendanceStatus.present || attendanceStatus.Present || 0}</p>
+          <p className="text-3xl font-bold text-foreground">{safeDashboard?.summary?.present_today || 0}</p>
           <p className="text-slate-muted text-sm">Present Today</p>
         </div>
       </div>

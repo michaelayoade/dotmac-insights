@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <!-- FIRS BIS 3.0 E-Invoice -->
+    <cbc:UBLVersionID>{{ ubl_version | default('2.1') }}</cbc:UBLVersionID>
+    <cbc:CustomizationID>{{ customization_id | default('urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0') }}</cbc:CustomizationID>
+    <cbc:ProfileID>{{ profile_id | default('urn:fdc:peppol.eu:2017:poacc:billing:01:1.0') }}</cbc:ProfileID>
+    <cbc:ID>{{ invoice_number }}</cbc:ID>
+    <cbc:IssueDate>{{ issue_date }}</cbc:IssueDate>
+    {% if due_date %}
+    <cbc:DueDate>{{ due_date }}</cbc:DueDate>
+    {% endif %}
+    <cbc:InvoiceTypeCode>{{ invoice_type_code | default('380') }}</cbc:InvoiceTypeCode>
+    {% if note %}
+    <cbc:Note>{{ note }}</cbc:Note>
+    {% endif %}
+    <cbc:DocumentCurrencyCode>{{ currency_code | default('NGN') }}</cbc:DocumentCurrencyCode>
+
+    <!-- Supplier (Seller) -->
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="0088">{{ supplier.tin | default('') }}</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>{{ supplier.name }}</cbc:Name>
+            </cac:PartyName>
+            <cac:PostalAddress>
+                <cbc:StreetName>{{ supplier.address | default('') }}</cbc:StreetName>
+                <cbc:CityName>{{ supplier.city | default('') }}</cbc:CityName>
+                <cbc:PostalZone>{{ supplier.postal_code | default('') }}</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>{{ supplier.country_code | default('NG') }}</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+            {% if supplier.tax_scheme %}
+            <cac:PartyTaxScheme>
+                <cbc:CompanyID>{{ supplier.tin }}</cbc:CompanyID>
+                <cac:TaxScheme>
+                    <cbc:ID>{{ supplier.tax_scheme }}</cbc:ID>
+                </cac:TaxScheme>
+            </cac:PartyTaxScheme>
+            {% endif %}
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+
+    <!-- Customer (Buyer) -->
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="0088">{{ customer.tin | default('') }}</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name>{{ customer.name }}</cbc:Name>
+            </cac:PartyName>
+            <cac:PostalAddress>
+                <cbc:StreetName>{{ customer.address | default('') }}</cbc:StreetName>
+                <cbc:CityName>{{ customer.city | default('') }}</cbc:CityName>
+                <cbc:PostalZone>{{ customer.postal_code | default('') }}</cbc:PostalZone>
+                <cac:Country>
+                    <cbc:IdentificationCode>{{ customer.country_code | default('NG') }}</cbc:IdentificationCode>
+                </cac:Country>
+            </cac:PostalAddress>
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+
+    <!-- Tax Total -->
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="{{ currency_code | default('NGN') }}">{{ tax_amount }}</cbc:TaxAmount>
+        {% for tax in tax_subtotals %}
+        <cac:TaxSubtotal>
+            <cbc:TaxableAmount currencyID="{{ currency_code | default('NGN') }}">{{ tax.taxable_amount }}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="{{ currency_code | default('NGN') }}">{{ tax.tax_amount }}</cbc:TaxAmount>
+            <cac:TaxCategory>
+                <cbc:ID>{{ tax.category_id | default('S') }}</cbc:ID>
+                <cbc:Percent>{{ tax.percent | default('7.5') }}</cbc:Percent>
+                <cac:TaxScheme>
+                    <cbc:ID>{{ tax.scheme_id | default('VAT') }}</cbc:ID>
+                </cac:TaxScheme>
+            </cac:TaxCategory>
+        </cac:TaxSubtotal>
+        {% endfor %}
+    </cac:TaxTotal>
+
+    <!-- Legal Monetary Total -->
+    <cac:LegalMonetaryTotal>
+        <cbc:LineExtensionAmount currencyID="{{ currency_code | default('NGN') }}">{{ line_extension_amount }}</cbc:LineExtensionAmount>
+        <cbc:TaxExclusiveAmount currencyID="{{ currency_code | default('NGN') }}">{{ tax_exclusive_amount }}</cbc:TaxExclusiveAmount>
+        <cbc:TaxInclusiveAmount currencyID="{{ currency_code | default('NGN') }}">{{ tax_inclusive_amount }}</cbc:TaxInclusiveAmount>
+        <cbc:PayableAmount currencyID="{{ currency_code | default('NGN') }}">{{ payable_amount }}</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+
+    <!-- Invoice Lines -->
+    {% for line in lines %}
+    <cac:InvoiceLine>
+        <cbc:ID>{{ line.id }}</cbc:ID>
+        <cbc:InvoicedQuantity unitCode="{{ line.unit_code | default('EA') }}">{{ line.quantity }}</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="{{ currency_code | default('NGN') }}">{{ line.line_extension_amount }}</cbc:LineExtensionAmount>
+        <cac:Item>
+            <cbc:Name>{{ line.item_name }}</cbc:Name>
+            {% if line.item_description %}
+            <cbc:Description>{{ line.item_description }}</cbc:Description>
+            {% endif %}
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="{{ currency_code | default('NGN') }}">{{ line.unit_price }}</cbc:PriceAmount>
+        </cac:Price>
+    </cac:InvoiceLine>
+    {% endfor %}
+</Invoice>

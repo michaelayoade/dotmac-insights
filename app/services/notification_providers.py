@@ -98,6 +98,8 @@ class SMTPEmailProvider(NotificationProvider):
         from_email = self.from_email
 
         try:
+            from app.templates.environment import get_template_env
+
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = f"{self.from_name} <{from_email}>"
@@ -107,17 +109,13 @@ class SMTPEmailProvider(NotificationProvider):
             text_part = MIMEText(message, "plain")
             msg.attach(text_part)
 
-            # HTML version (simple conversion)
-            html_message = message.replace("\n", "<br>\n")
-            html_content = f"""
-            <html>
-              <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                  {html_message}
-                </div>
-              </body>
-            </html>
-            """
+            # HTML version using Jinja2 template
+            env = get_template_env()
+            html_template = env.get_template("emails/notification.html.j2")
+            html_content = html_template.render(
+                title=subject,
+                message=message,
+            )
             html_part = MIMEText(html_content, "html")
             msg.attach(html_part)
 

@@ -12,6 +12,9 @@ interface AccessDeniedProps {
 }
 
 export function AccessDenied({ message, backHref, backLabel, className }: AccessDeniedProps) {
+  const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || '/auth/login';
+  const isExternalAuthUrl = authUrl.startsWith('http');
+
   return (
     <div
       className={cn(
@@ -43,18 +46,23 @@ export function AccessDenied({ message, backHref, backLabel, className }: Access
         >
           Go home
         </Link>
-        <button
-          type="button"
-          onClick={() => {
-            // Hint to set token via sidebar CTA
-            const el = document.querySelector('[data-auth-token-cta]') as HTMLButtonElement | null;
-            el?.click();
-          }}
-          className="rounded-lg border border-slate-border px-4 py-2 text-sm text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
-          data-testid="set-token-cta"
-        >
-          Set token
-        </button>
+        {isExternalAuthUrl ? (
+          <a
+            href={authUrl}
+            className="rounded-lg border border-slate-border px-4 py-2 text-sm text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
+            data-testid="auth-login-cta"
+          >
+            Sign in
+          </a>
+        ) : (
+          <Link
+            href={authUrl}
+            className="rounded-lg border border-slate-border px-4 py-2 text-sm text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
+            data-testid="auth-login-cta"
+          >
+            Sign in
+          </Link>
+        )}
       </div>
     </div>
   );

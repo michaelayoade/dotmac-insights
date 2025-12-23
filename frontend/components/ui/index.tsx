@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { LucideIcon, AlertTriangle, RefreshCw, Inbox } from 'lucide-react';
+import { STATUS_PILL_TONES, type StatusTone } from '@/lib/status-pill';
+import { LucideIcon, AlertTriangle, RefreshCw, Inbox, Filter } from 'lucide-react';
 import Link from 'next/link';
 
 // =============================================================================
@@ -327,7 +328,7 @@ export function StatGrid({ children, columns = 4, className }: StatGridProps) {
 // BUTTON
 // =============================================================================
 
-import { MODULE_COLORS, type AppModule } from '@/lib/module-colors';
+import { getModuleButtonColors, type ModuleKey } from '@/lib/config/modules';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
@@ -339,7 +340,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
    * Module context for brand-colored primary buttons.
    * When set, primary variant uses the module's brand color.
    */
-  module?: AppModule;
+  module?: ModuleKey;
 }
 
 export function Button({
@@ -350,6 +351,7 @@ export function Button({
   iconPosition = 'left',
   loading,
   disabled,
+  type = 'button',
   className,
   module,
   ...props
@@ -369,7 +371,7 @@ export function Button({
   // Module-specific primary colors
   const getVariantClasses = () => {
     if (variant === 'primary' && module) {
-      const colors = MODULE_COLORS[module];
+      const colors = getModuleButtonColors(module);
       return `${colors.primary} ${colors.primaryHover} text-foreground`;
     }
     return baseVariants[variant];
@@ -391,6 +393,7 @@ export function Button({
         className
       )}
       disabled={disabled || loading}
+      type={type}
       {...props}
     >
       {loading ? (
@@ -403,6 +406,217 @@ export function Button({
         <Icon className="w-4 h-4" />
       )}
     </button>
+  );
+}
+
+// =============================================================================
+// LINK BUTTON
+// =============================================================================
+
+export interface LinkButtonProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof Link>, 'href'> {
+  href: string;
+  variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
+  icon?: ButtonProps['icon'];
+  iconPosition?: ButtonProps['iconPosition'];
+  loading?: boolean;
+  disabled?: boolean;
+  module?: ButtonProps['module'];
+}
+
+/**
+ * A Link styled as a Button. Use this for navigation that should look like a button.
+ * Supports all Button variants, sizes, and module theming.
+ *
+ * @example
+ * <LinkButton href="/new" variant="primary" module="books" icon={Plus}>
+ *   Add Item
+ * </LinkButton>
+ */
+export function LinkButton({
+  href,
+  children,
+  variant = 'primary',
+  size = 'md',
+  icon: Icon,
+  iconPosition = 'left',
+  loading,
+  disabled,
+  className,
+  module,
+  ...props
+}: LinkButtonProps) {
+  // Base variants (non-module specific)
+  const baseVariants = {
+    primary:
+      'bg-gradient-to-r from-teal-electric to-teal-glow text-foreground hover:shadow-lg hover:shadow-teal-electric/25',
+    secondary:
+      'bg-slate-elevated border border-slate-border text-foreground hover:bg-slate-border',
+    danger:
+      'bg-coral-alert/15 border border-coral-alert/30 text-coral-alert hover:bg-coral-alert/25',
+    ghost: 'text-slate-muted hover:text-foreground hover:bg-slate-elevated',
+    success: 'bg-emerald-500 text-foreground hover:bg-emerald-400',
+  };
+
+  // Module-specific primary colors
+  const getVariantClasses = () => {
+    if (variant === 'primary' && module) {
+      const colors = getModuleButtonColors(module);
+      return `${colors.primary} ${colors.primaryHover} text-foreground`;
+    }
+    return baseVariants[variant];
+  };
+
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base',
+  };
+
+  if (disabled || loading) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center justify-center gap-2 font-medium rounded-lg',
+          getVariantClasses(),
+          sizes[size],
+          'opacity-60 cursor-not-allowed',
+          className
+        )}
+        aria-disabled="true"
+      >
+        {loading ? (
+          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          Icon && iconPosition === 'left' && <Icon className="w-4 h-4" />
+        )}
+        {children}
+        {!loading && Icon && iconPosition === 'right' && <Icon className="w-4 h-4" />}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-electric focus-visible:ring-offset-2 focus-visible:ring-offset-slate-deep',
+        getVariantClasses(),
+        sizes[size],
+        className
+      )}
+      aria-disabled={disabled}
+      {...props}
+    >
+      {Icon && iconPosition === 'left' && <Icon className="w-4 h-4" />}
+      {children}
+      {Icon && iconPosition === 'right' && <Icon className="w-4 h-4" />}
+    </Link>
+  );
+}
+
+// =============================================================================
+// STATUS PILL
+// =============================================================================
+
+export interface StatusPillProps {
+  label: string;
+  tone?: StatusTone;
+  size?: 'sm' | 'md';
+  icon?: React.ElementType<{ className?: string }>;
+  className?: string;
+}
+
+export function StatusPill({
+  label,
+  tone = 'default',
+  size = 'sm',
+  icon: Icon,
+  className,
+}: StatusPillProps) {
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-0.5',
+    md: 'text-sm px-3 py-1',
+  };
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full font-medium',
+        sizeClasses[size],
+        STATUS_PILL_TONES[tone],
+        className
+      )}
+    >
+      {Icon && <Icon className="w-3 h-3" />}
+      {label}
+    </span>
+  );
+}
+
+// =============================================================================
+// FILTER CONTROLS
+// =============================================================================
+
+export interface FilterCardProps {
+  title?: string;
+  icon?: LucideIcon;
+  iconClassName?: string;
+  actions?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  children: React.ReactNode;
+}
+
+export function FilterCard({
+  title = 'Filters',
+  icon: Icon = Filter,
+  iconClassName,
+  actions,
+  className,
+  contentClassName,
+  children,
+}: FilterCardProps) {
+  return (
+    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-4 space-y-3', className)}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Icon className={cn('w-4 h-4 text-teal-electric', iconClassName)} />
+          <span className="text-foreground text-sm font-medium">{title}</span>
+        </div>
+        {actions}
+      </div>
+      <div className={cn(contentClassName)}>{children}</div>
+    </div>
+  );
+}
+
+export type FilterInputProps = React.InputHTMLAttributes<HTMLInputElement>;
+
+export function FilterInput({ className, ...props }: FilterInputProps) {
+  return (
+    <input
+      className={cn(
+        'px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none',
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+export type FilterSelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
+
+export function FilterSelect({ className, ...props }: FilterSelectProps) {
+  return (
+    <select
+      className={cn(
+        'px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none',
+        className
+      )}
+      {...props}
+    />
   );
 }
 
@@ -576,4 +790,4 @@ export {
 export { BackButton, type BackButtonProps } from './BackButton';
 
 // Re-export module types for convenience
-export type { AppModule } from '@/lib/module-colors';
+export type { ModuleKey } from '@/lib/config/modules';

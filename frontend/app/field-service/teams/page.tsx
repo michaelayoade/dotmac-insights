@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 type ViewMode = 'teams' | 'technicians';
 
@@ -50,18 +51,18 @@ export default function TeamsPage() {
             Manage teams and technicians
           </p>
         </div>
-        <button
+        <Button
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Team
-        </button>
+        </Button>
       </div>
 
       {/* View Toggle */}
       <div className="flex items-center gap-4">
         <div className="flex items-center bg-slate-elevated border border-slate-border rounded-lg p-1">
-          <button
+          <Button
             onClick={() => setViewMode('teams')}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded text-sm transition-colors',
@@ -72,8 +73,8 @@ export default function TeamsPage() {
           >
             <Users className="w-4 h-4" />
             Teams
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setViewMode('technicians')}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded text-sm transition-colors',
@@ -84,7 +85,7 @@ export default function TeamsPage() {
           >
             <User className="w-4 h-4" />
             Technicians
-          </button>
+          </Button>
         </div>
 
         {viewMode === 'technicians' && (
@@ -115,7 +116,7 @@ export default function TeamsPage() {
                   <div className="p-4 text-center text-slate-muted">Loading...</div>
                 ) : teams.length > 0 ? (
                   teams.map((team: any) => (
-                    <button
+                    <Button
                       key={team.id}
                       onClick={() => setSelectedTeam(team)}
                       className={cn(
@@ -130,7 +131,7 @@ export default function TeamsPage() {
                         </p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-muted" />
-                    </button>
+                    </Button>
                   ))
                 ) : (
                   <div className="p-4 text-center text-slate-muted">
@@ -152,9 +153,9 @@ export default function TeamsPage() {
                       <h3 className="text-xl font-semibold text-foreground">{selectedTeam.name}</h3>
                       <p className="text-slate-muted">{selectedTeam.description || 'No description'}</p>
                     </div>
-                    <button className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors">
+                    <Button className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors">
                       <Edit2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
@@ -215,10 +216,10 @@ export default function TeamsPage() {
                       <Users className="w-4 h-4 text-teal-electric" />
                       Team Members
                     </h4>
-                    <button className="inline-flex items-center gap-1 text-sm text-teal-electric hover:underline">
+                    <Button className="inline-flex items-center gap-1 text-sm text-teal-electric hover:underline">
                       <Plus className="w-4 h-4" />
                       Add Member
-                    </button>
+                    </Button>
                   </div>
 
                   {selectedTeam.members?.length > 0 ? (

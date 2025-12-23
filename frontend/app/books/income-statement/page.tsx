@@ -22,16 +22,9 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay } from '@/components/insights/shared';
 import PageSkeleton from '@/components/PageSkeleton';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { PercentStatCard } from '@/components/StatCard';
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 function formatPercent(value: number | undefined | null): string {
   if (value === undefined || value === null) return '0.0%';
@@ -61,7 +54,7 @@ function LineItem({ name, amount, indent = 0, bold, colorClass = 'text-foregroun
         {pct !== undefined && (
           <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
         )}
-        <span className={cn('font-mono w-32 text-right', colorClass)}>{formatCurrency(amount)}</span>
+        <span className={cn('font-mono w-32 text-right', colorClass)}>{formatAccountingCurrency(amount)}</span>
       </div>
     </div>
   );
@@ -90,7 +83,7 @@ function CollapsibleSection({
 
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
       >
@@ -100,14 +93,14 @@ function CollapsibleSection({
           <span className="text-slate-muted text-sm">({items.length} items)</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(total)}</span>
+          <span className={cn('font-mono font-bold', colorClass)}>{formatAccountingCurrency(total)}</span>
           {isOpen ? (
             <ChevronDown className="w-5 h-5 text-slate-muted" />
           ) : (
             <ChevronRight className="w-5 h-5 text-slate-muted" />
           )}
         </div>
-      </button>
+      </Button>
       {isOpen && items.length > 0 && (
         <div className="px-4 pb-4 space-y-1">
           {items.map((item, index) => (
@@ -125,28 +118,6 @@ function CollapsibleSection({
   );
 }
 
-interface MetricCardProps {
-  label: string;
-  value: number;
-  pct?: number;
-  colorClass: string;
-  icon?: React.ElementType;
-}
-
-function MetricCard({ label, value, pct, colorClass, icon: Icon }: MetricCardProps) {
-  return (
-    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-4')}>
-      <div className="flex items-center gap-2 mb-2">
-        {Icon && <Icon className={cn('w-4 h-4', colorClass)} />}
-        <span className="text-slate-muted text-sm">{label}</span>
-      </div>
-      <p className={cn('text-xl font-bold font-mono', colorClass)}>{formatCurrency(value)}</p>
-      {pct !== undefined && (
-        <p className="text-slate-muted text-sm mt-1">{formatPercent(pct)} of revenue</p>
-      )}
-    </div>
-  );
-}
 
 export default function IncomeStatementPage() {
   const [startDate, setStartDate] = useState<string>('');
@@ -258,7 +229,7 @@ export default function IncomeStatementPage() {
             <option value="cash">Cash</option>
           </select>
           {(startDate || endDate || commonSize || basis) && (
-            <button
+            <Button
               onClick={() => {
                 setStartDate('');
                 setEndDate('');
@@ -271,23 +242,23 @@ export default function IncomeStatementPage() {
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={() => exportStatement('csv')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => exportStatement('pdf')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -299,14 +270,14 @@ export default function IncomeStatementPage() {
             <TrendingUp className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Revenue</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(revenue.total, currency)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(revenue.total, currency)}</p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Calculator className="w-5 h-5 text-orange-400" />
             <p className="text-orange-400 text-sm">Gross Profit</p>
           </div>
-          <p className="text-2xl font-bold text-orange-400">{formatCurrency(grossProfit, currency)}</p>
+          <p className="text-2xl font-bold text-orange-400">{formatAccountingCurrency(grossProfit, currency)}</p>
           <p className="text-orange-300 text-sm mt-1">{formatPercent(grossMargin)} margin</p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
@@ -314,7 +285,7 @@ export default function IncomeStatementPage() {
             <BarChart2 className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">EBITDA</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(ebitda, currency)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(ebitda, currency)}</p>
           <p className="text-blue-300 text-sm mt-1">{formatPercent(ebitdaMargin)} margin</p>
         </div>
         <div
@@ -328,7 +299,7 @@ export default function IncomeStatementPage() {
             <p className={cn('text-sm', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>Net Income</p>
           </div>
           <p className={cn('text-2xl font-bold', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
-            {formatCurrency(netIncome, currency)}
+            {formatAccountingCurrency(netIncome, currency)}
           </p>
           <p className={cn('text-sm mt-1', netIncome >= 0 ? 'text-teal-300' : 'text-red-300')}>
             {formatPercent(netMargin)} margin
@@ -369,7 +340,7 @@ export default function IncomeStatementPage() {
             </div>
             <div className="flex items-center gap-4">
               <span className="text-slate-muted text-sm">{formatPercent(grossMargin)}</span>
-              <span className="font-mono font-bold text-orange-400">{formatCurrency(grossProfit, currency)}</span>
+              <span className="font-mono font-bold text-orange-400">{formatAccountingCurrency(grossProfit, currency)}</span>
             </div>
           </div>
         </div>
@@ -393,13 +364,13 @@ export default function IncomeStatementPage() {
             </div>
             <div className="flex items-center gap-4">
               <span className="text-slate-muted text-sm">{formatPercent(operatingMargin)}</span>
-              <span className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</span>
+              <span className="font-mono font-bold text-blue-400">{formatAccountingCurrency(operatingIncome, currency)}</span>
             </div>
           </div>
           {data?.depreciation_amortization !== undefined && data.depreciation_amortization > 0 && (
             <div className="mt-2 pt-2 border-t border-slate-border flex justify-between items-center text-sm">
-              <span className="text-slate-muted">EBITDA (add back D&A: {formatCurrency(data.depreciation_amortization)})</span>
-              <span className="font-mono text-blue-300">{formatCurrency(ebitda, currency)}</span>
+              <span className="text-slate-muted">EBITDA (add back D&A: {formatAccountingCurrency(data.depreciation_amortization)})</span>
+              <span className="font-mono text-blue-300">{formatAccountingCurrency(ebitda, currency)}</span>
             </div>
           )}
         </div>
@@ -437,7 +408,7 @@ export default function IncomeStatementPage() {
               <Calculator className="w-5 h-5 text-purple-400" />
               <span className="text-foreground font-semibold">Profit Before Tax (EBT)</span>
             </div>
-            <span className="font-mono font-bold text-purple-400">{formatCurrency(profitBeforeTax, currency)}</span>
+            <span className="font-mono font-bold text-purple-400">{formatAccountingCurrency(profitBeforeTax, currency)}</span>
           </div>
         </div>
 
@@ -473,7 +444,7 @@ export default function IncomeStatementPage() {
                 {formatPercent(netMargin)}
               </span>
               <span className={cn('font-mono font-bold text-xl', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
-                {formatCurrency(netIncome, currency)}
+                {formatAccountingCurrency(netIncome, currency)}
               </span>
             </div>
           </div>
@@ -487,17 +458,11 @@ export default function IncomeStatementPage() {
           Profitability Metrics (IAS 1)
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <MetricCard label="Gross Margin" value={grossProfit} pct={grossMargin} colorClass="text-orange-400" />
-          <MetricCard label="Operating Margin" value={operatingIncome} pct={operatingMargin} colorClass="text-blue-400" />
-          <MetricCard label="EBITDA Margin" value={ebitda} pct={ebitdaMargin} colorClass="text-blue-300" />
-          <MetricCard label="Net Margin" value={netIncome} pct={netMargin} colorClass="text-teal-400" />
-          <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Receipt className="w-4 h-4 text-amber-400" />
-              <span className="text-slate-muted text-sm">Effective Tax Rate</span>
-            </div>
-            <p className="text-xl font-bold font-mono text-amber-400">{formatPercent(effectiveTaxRate)}</p>
-          </div>
+          <PercentStatCard title="Gross Margin" value={formatAccountingCurrency(grossProfit)} pct={grossMargin} colorClass="text-orange-400" />
+          <PercentStatCard title="Operating Margin" value={formatAccountingCurrency(operatingIncome)} pct={operatingMargin} colorClass="text-blue-400" />
+          <PercentStatCard title="EBITDA Margin" value={formatAccountingCurrency(ebitda)} pct={ebitdaMargin} colorClass="text-blue-300" />
+          <PercentStatCard title="Net Margin" value={formatAccountingCurrency(netIncome)} pct={netMargin} colorClass="text-teal-400" />
+          <PercentStatCard title="Effective Tax Rate" value={formatPercent(effectiveTaxRate)} icon={Receipt} colorClass="text-amber-400" />
         </div>
       </div>
 
@@ -507,51 +472,51 @@ export default function IncomeStatementPage() {
         <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Revenue</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(revenue.total, currency)}</p>
+            <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(revenue.total, currency)}</p>
           </div>
           <Minus className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">COGS</p>
-            <p className="font-mono font-bold text-orange-400">{formatCurrency(cogs.total, currency)}</p>
+            <p className="font-mono font-bold text-orange-400">{formatAccountingCurrency(cogs.total, currency)}</p>
           </div>
           <Equal className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Gross Profit</p>
-            <p className="font-mono font-bold text-orange-300">{formatCurrency(grossProfit, currency)}</p>
+            <p className="font-mono font-bold text-orange-300">{formatAccountingCurrency(grossProfit, currency)}</p>
           </div>
           <Minus className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">OpEx</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(operatingExpenses.total, currency)}</p>
+            <p className="font-mono font-bold text-red-400">{formatAccountingCurrency(operatingExpenses.total, currency)}</p>
           </div>
           <Equal className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Operating</p>
-            <p className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</p>
+            <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(operatingIncome, currency)}</p>
           </div>
         </div>
         <div className="flex items-center justify-center gap-4 text-lg flex-wrap mt-4 pt-4 border-t border-slate-border">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Operating</p>
-            <p className="font-mono font-bold text-blue-400">{formatCurrency(operatingIncome, currency)}</p>
+            <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(operatingIncome, currency)}</p>
           </div>
           <span className="text-slate-muted">±</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Net Finance</p>
             <p className={cn('font-mono font-bold', netFinance >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(netFinance, currency)}
+              {formatAccountingCurrency(netFinance, currency)}
             </p>
           </div>
           <Minus className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Tax</p>
-            <p className="font-mono font-bold text-amber-400">{formatCurrency(taxExpense.total, currency)}</p>
+            <p className="font-mono font-bold text-amber-400">{formatAccountingCurrency(taxExpense.total, currency)}</p>
           </div>
           <Equal className="w-5 h-5 text-slate-muted" />
           <div className="text-center">
             <p className="text-slate-muted text-sm">Net Income</p>
             <p className={cn('font-mono font-bold text-xl', netIncome >= 0 ? 'text-teal-400' : 'text-red-400')}>
-              {formatCurrency(netIncome, currency)}
+              {formatAccountingCurrency(netIncome, currency)}
             </p>
           </div>
         </div>

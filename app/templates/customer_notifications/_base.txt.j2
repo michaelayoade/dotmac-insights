@@ -1,0 +1,10 @@
+{# Base template for customer notifications #}
+{# All customer-facing messages should extend this template #}
+
+{% block greeting %}Dear {{ customer_name | default('Valued Customer') }},{% endblock %}
+
+{% block content %}{% endblock %}
+
+{% block signature %}
+Thank you for choosing us!
+{% endblock %}

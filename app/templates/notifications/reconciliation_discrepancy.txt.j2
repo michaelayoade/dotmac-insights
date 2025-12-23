@@ -1,0 +1,12 @@
+{# Reconciliation discrepancy notification #}
+{% set title = "Reconciliation Issue" %}
+{% set icon = "alert-triangle" %}
+{% set priority = "high" %}
+
+Discrepancy of {{ discrepancy_amount | currency }} found in bank reconciliation.
+{% if bank_account %}
+Account: {{ bank_account }}
+{% endif %}
+{% if statement_date %}
+Statement Date: {{ statement_date | format_date }}
+{% endif %}

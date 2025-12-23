@@ -1,35 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { AlertTriangle, BookOpen, Filter, Layers, Search, FileText, Eye, EyeOff, CheckCircle2, Clock, FolderOpen } from 'lucide-react';
+import { AlertTriangle, BookOpen, Layers, FileText, Eye, EyeOff, CheckCircle2, Clock, FolderOpen } from 'lucide-react';
 import { useSupportKbArticles, useSupportKbCategories } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className={cn('text-2xl font-bold mt-1', colorClass)}>{value}</p>
-        </div>
-        <div className="p-2 rounded-lg bg-slate-elevated">
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 export default function SupportKnowledgeBasePage() {
   const [categoryId, setCategoryId] = useState('');
@@ -90,67 +66,50 @@ export default function SupportKnowledgeBasePage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <MetricCard label="Total Articles" value={metrics.total} icon={FileText} colorClass="text-blue-400" />
-        <MetricCard label="Published" value={metrics.published} icon={CheckCircle2} colorClass="text-emerald-400" />
-        <MetricCard label="Drafts" value={metrics.draft} icon={Clock} colorClass="text-amber-400" />
-        <MetricCard label="Public" value={metrics.publicVisible} icon={Eye} colorClass="text-violet-400" />
-        <MetricCard label="Internal" value={metrics.internalVisible} icon={EyeOff} colorClass="text-slate-muted" />
-        <MetricCard label="Categories" value={metrics.categories} icon={FolderOpen} colorClass="text-cyan-400" />
+        <StatCard title="Total Articles" value={metrics.total} icon={FileText} colorClass="text-blue-400" />
+        <StatCard title="Published" value={metrics.published} icon={CheckCircle2} colorClass="text-emerald-400" />
+        <StatCard title="Drafts" value={metrics.draft} icon={Clock} colorClass="text-amber-400" />
+        <StatCard title="Public" value={metrics.publicVisible} icon={Eye} colorClass="text-violet-400" />
+        <StatCard title="Internal" value={metrics.internalVisible} icon={EyeOff} colorClass="text-slate-muted" />
+        <StatCard title="Categories" value={metrics.categories} icon={FolderOpen} colorClass="text-cyan-400" />
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-            <input
-              type="text"
-              placeholder="Search articles..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          {/* Category */}
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="">All categories</option>
-            {(cats ?? []).map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          {/* Status */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="">All statuses</option>
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-          </select>
-          {/* Visibility */}
-          <select
-            value={visibilityFilter}
-            onChange={(e) => setVisibilityFilter(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="">All visibility</option>
-            <option value="public">Public</option>
-            <option value="internal">Internal</option>
-            <option value="private">Private</option>
-          </select>
-        </div>
-      </div>
+      <FilterCard contentClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <FilterInput
+          type="text"
+          placeholder="Search articles..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <FilterSelect
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+        >
+          <option value="">All categories</option>
+          {(cats ?? []).map((c: any) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">All statuses</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+          <option value="archived">Archived</option>
+        </FilterSelect>
+        <FilterSelect
+          value={visibilityFilter}
+          onChange={(e) => setVisibilityFilter(e.target.value)}
+        >
+          <option value="">All visibility</option>
+          <option value="public">Public</option>
+          <option value="internal">Internal</option>
+          <option value="private">Private</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
@@ -168,7 +127,7 @@ export default function SupportKnowledgeBasePage() {
           ) : (
             <div className="space-y-2">
               {(cats ?? []).map((cat: any) => (
-                <button
+                <Button
                   key={cat.id}
                   onClick={() => setCategoryId(categoryId === String(cat.id) ? '' : String(cat.id))}
                   className={cn(
@@ -182,7 +141,7 @@ export default function SupportKnowledgeBasePage() {
                     {cat.name}
                   </p>
                   <p className="text-slate-muted text-xs line-clamp-1">{cat.description || 'No description'}</p>
-                </button>
+                </Button>
               ))}
             </div>
           )}

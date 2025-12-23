@@ -2,235 +2,247 @@
 
 ```yaml
 - generic [active] [ref=e1]:
-  - generic [ref=e3]:
-    - generic [ref=e5]:
-      - generic [ref=e6]:
-        - link "Back to Home" [ref=e7]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Unknown error
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Back to app home" [ref=e15]:
           - /url: /
-          - img [ref=e8]
-        - img [ref=e12]
-        - generic [ref=e17]:
-          - generic [ref=e18]: Dotmac People
-          - generic [ref=e19]: People
-      - generic [ref=e20]:
-        - button "Search" [ref=e21] [cursor=pointer]:
-          - img [ref=e22]
-        - button "Switch to dark mode" [ref=e25] [cursor=pointer]:
-          - img [ref=e26]
-        - button "Toggle menu" [ref=e28] [cursor=pointer]:
-          - img [ref=e29]
-    - generic [ref=e31]:
-      - generic [ref=e32]:
-        - link "Leave" [ref=e33]:
+          - img [ref=e16]
+        - link "Dotmac People People" [ref=e19]:
+          - /url: /hr
+          - img [ref=e21]
+          - generic [ref=e26]:
+            - generic [ref=e27]: Dotmac People
+            - generic [ref=e28]: People
+      - generic [ref=e29]:
+        - button "Search" [ref=e30] [cursor=pointer]:
+          - img [ref=e31]
+        - button "Switch to dark mode" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - button "Toggle menu" [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - link "Leave" [ref=e42]:
           - /url: /hr/leave
-          - img [ref=e34]
-          - generic [ref=e38]: Leave
-        - link "Payroll" [ref=e39]:
+          - img [ref=e43]
+          - generic [ref=e47]: Leave
+        - link "Payroll" [ref=e48]:
           - /url: /hr/payroll
-          - img [ref=e40]
-          - generic [ref=e42]: Payroll
-        - link "Recruit" [ref=e43]:
-          - /url: /hr/recruitment
-          - img [ref=e44]
-          - generic [ref=e47]: Recruit
-        - link "Reports" [ref=e48]:
-          - /url: /hr/analytics
           - img [ref=e49]
-          - generic [ref=e51]: Reports
-      - generic [ref=e52]:
-        - generic [ref=e53]:
-          - button "Dashboard HR overview and pending actions" [ref=e54] [cursor=pointer]:
-            - generic [ref=e55]:
-              - img [ref=e56]
-              - generic [ref=e61]:
-                - generic [ref=e62]: Dashboard
+          - generic [ref=e51]: Payroll
+        - link "Recruit" [ref=e52]:
+          - /url: /hr/recruitment
+          - img [ref=e53]
+          - generic [ref=e56]: Recruit
+      - generic [ref=e57]:
+        - generic [ref=e58]:
+          - button "Dashboard HR overview and pending actions" [ref=e59] [cursor=pointer]:
+            - generic [ref=e60]:
+              - img [ref=e61]
+              - generic [ref=e66]:
+                - generic [ref=e67]: Dashboard
                 - text: HR overview and pending actions
-            - img [ref=e63]
-          - generic [ref=e65]:
-            - link "Overview Dashboard & metrics" [ref=e66]:
+            - img [ref=e68]
+          - generic [ref=e70]:
+            - link "Overview Dashboard & metrics" [ref=e71]:
               - /url: /hr
-              - generic [ref=e67]: Overview
-              - generic [ref=e68]: Dashboard & metrics
-            - link "Analytics Reports & insights" [ref=e69]:
+              - generic [ref=e72]: Overview
+              - generic [ref=e73]: Dashboard & metrics
+            - link "Analytics Reports & insights" [ref=e74]:
               - /url: /hr/analytics
-              - generic [ref=e70]: Analytics
-              - generic [ref=e71]: Reports & insights
-        - button "People Management Recruitment to offboarding" [ref=e73] [cursor=pointer]:
-          - generic [ref=e74]:
-            - img [ref=e75]
-            - generic [ref=e80]:
-              - generic [ref=e81]: People Management
+              - generic [ref=e75]: Analytics
+              - generic [ref=e76]: Reports & insights
+        - button "People Management Recruitment to offboarding" [ref=e78] [cursor=pointer]:
+          - generic [ref=e79]:
+            - img [ref=e80]
+            - generic [ref=e85]:
+              - generic [ref=e86]: People Management
               - text: Recruitment to offboarding
-          - img [ref=e82]
-        - button "Time & Leave Attendance and leave management" [ref=e85] [cursor=pointer]:
-          - generic [ref=e86]:
-            - img [ref=e87]
-            - generic [ref=e90]:
-              - generic [ref=e91]: Time & Leave
+          - img [ref=e87]
+        - button "Time & Leave Attendance and leave management" [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]:
+            - img [ref=e92]
+            - generic [ref=e95]:
+              - generic [ref=e96]: Time & Leave
               - text: Attendance and leave management
-          - img [ref=e92]
-        - generic [ref=e94]:
-          - button "Compensation Payroll and salary structures" [ref=e95] [cursor=pointer]:
-            - generic [ref=e96]:
-              - img [ref=e97]
-              - generic [ref=e99]:
-                - generic [ref=e100]: Compensation
+          - img [ref=e97]
+        - generic [ref=e99]:
+          - button "Compensation Payroll and salary structures" [ref=e100] [cursor=pointer]:
+            - generic [ref=e101]:
+              - img [ref=e102]
+              - generic [ref=e104]:
+                - generic [ref=e105]: Compensation
                 - text: Payroll and salary structures
-            - img [ref=e101]
-          - link "Payroll Salary slips & processing" [ref=e104]:
+            - img [ref=e106]
+          - link "Payroll Salary slips & processing" [ref=e109]:
             - /url: /hr/payroll
-            - generic [ref=e105]: Payroll
-            - generic [ref=e106]: Salary slips & processing
-        - button "Development Training and performance" [ref=e108] [cursor=pointer]:
-          - generic [ref=e109]:
-            - img [ref=e110]
-            - generic [ref=e113]:
-              - generic [ref=e114]: Development
+            - generic [ref=e110]: Payroll
+            - generic [ref=e111]: Salary slips & processing
+        - button "Development Training and performance" [ref=e113] [cursor=pointer]:
+          - generic [ref=e114]:
+            - img [ref=e115]
+            - generic [ref=e118]:
+              - generic [ref=e119]: Development
               - text: Training and performance
-          - img [ref=e115]
-        - button "Configuration HR policies and settings" [ref=e118] [cursor=pointer]:
-          - generic [ref=e119]:
-            - img [ref=e120]
-            - generic [ref=e123]:
-              - generic [ref=e124]: Configuration
+          - img [ref=e120]
+        - button "Configuration HR policies and settings" [ref=e123] [cursor=pointer]:
+          - generic [ref=e124]:
+            - img [ref=e125]
+            - generic [ref=e128]:
+              - generic [ref=e129]: Configuration
               - text: HR policies and settings
-          - img [ref=e125]
-      - generic [ref=e127]:
-        - button "Dark mode" [ref=e128] [cursor=pointer]:
-          - generic [ref=e129]: Dark mode
           - img [ref=e130]
-        - button "Sign out" [ref=e132] [cursor=pointer]:
-          - generic [ref=e133]: Sign out
-          - img [ref=e134]
-    - generic [ref=e139]:
-      - generic [ref=e140]:
-        - generic [ref=e141]:
-          - generic [ref=e142]:
-            - heading "Payroll Management" [level=2] [ref=e143]
-            - paragraph [ref=e144]: Salary structures, entries, and slips
-          - button "Export Register" [ref=e146] [cursor=pointer]:
-            - img [ref=e147]
+      - generic [ref=e132]:
+        - button "Dark mode" [ref=e133] [cursor=pointer]:
+          - generic [ref=e134]: Dark mode
+          - img [ref=e135]
+        - button "Sign out" [ref=e137] [cursor=pointer]:
+          - generic [ref=e138]: Sign out
+          - img [ref=e139]
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - heading "Payroll Management" [level=2] [ref=e148]
+            - paragraph [ref=e149]: Salary structures, entries, and slips
+          - button "Export Register" [ref=e151] [cursor=pointer]:
+            - img [ref=e152]
             - text: Export Register
-        - generic [ref=e150]:
-          - generic [ref=e152]:
-            - generic [ref=e153]:
-              - paragraph [ref=e154]: Gross Pay (30d)
-              - paragraph [ref=e155]: ₦0
-              - generic [ref=e157]: 0 slips
-            - img [ref=e159]
-          - generic [ref=e162]:
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - generic [ref=e158]: Gross Pay (30d)
+              - img [ref=e161]
             - generic [ref=e163]:
-              - paragraph [ref=e164]: Net Pay (30d)
-              - paragraph [ref=e165]: ₦0
-              - generic [ref=e166]:
-                - img [ref=e167]
-                - generic [ref=e170]: After deductions
-            - img [ref=e172]
-          - generic [ref=e175]:
-            - generic [ref=e176]:
-              - paragraph [ref=e177]: Salary Structures
-              - paragraph [ref=e178]: "0"
-            - img [ref=e180]
-          - generic [ref=e184]:
-            - generic [ref=e185]:
-              - paragraph [ref=e186]: Active Assignments
-              - paragraph [ref=e187]: "0"
-            - img [ref=e189]
-      - generic [ref=e194]:
-        - generic [ref=e195]:
-          - generic [ref=e196]:
-            - heading "Pay Breakdown" [level=3] [ref=e197]
-            - paragraph [ref=e198]: Net vs Deductions
-          - generic [ref=e199]: No payroll data
-        - generic [ref=e200]:
-          - generic [ref=e201]:
-            - heading "Salary Components" [level=3] [ref=e202]
-            - paragraph [ref=e203]: Earnings vs Deductions
-          - generic [ref=e204]:
-            - generic [ref=e205]:
-              - generic [ref=e208]: Earnings
-              - generic [ref=e209]: "0"
-            - generic [ref=e210]:
-              - generic [ref=e213]: Deductions
-              - generic [ref=e214]: "0"
-            - generic [ref=e216]:
-              - generic [ref=e217]: Total Components
-              - generic [ref=e218]: "0"
-        - generic [ref=e219]:
+              - generic [ref=e164]:
+                - generic [ref=e165]: ₦0
+                - generic [ref=e166]:
+                  - img [ref=e167]
+                  - generic [ref=e168]: 0%
+              - paragraph [ref=e169]: 0 slips
+          - generic [ref=e170]:
+            - generic [ref=e171]:
+              - generic [ref=e172]: Net Pay (30d)
+              - img [ref=e175]
+            - generic [ref=e177]:
+              - generic [ref=e178]:
+                - generic [ref=e179]: ₦0
+                - generic [ref=e180]:
+                  - img [ref=e181]
+                  - generic [ref=e184]: 1%
+              - paragraph [ref=e185]: After deductions
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - generic [ref=e188]: Salary Structures
+              - img [ref=e191]
+            - generic [ref=e196]: "0"
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e199]: Active Assignments
+              - img [ref=e202]
+            - generic [ref=e209]: "0"
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - heading "Pay Breakdown" [level=3] [ref=e213]
+            - paragraph [ref=e214]: Net vs Deductions
+          - generic [ref=e215]: No payroll data
+        - generic [ref=e216]:
+          - generic [ref=e217]:
+            - heading "Salary Components" [level=3] [ref=e218]
+            - paragraph [ref=e219]: Earnings vs Deductions
           - generic [ref=e220]:
-            - heading "Salary Slips" [level=3] [ref=e221]
-            - paragraph [ref=e222]: Status breakdown
-          - generic [ref=e223]: No slips yet
-      - button "Payroll Actions" [ref=e225] [cursor=pointer]:
-        - generic [ref=e226]:
-          - img [ref=e227]
-          - generic [ref=e230]: Payroll Actions
-        - img [ref=e231]
-      - generic [ref=e233]:
-        - generic [ref=e234]:
-          - generic [ref=e235]:
-            - img [ref=e236]
-            - heading "Salary Components" [level=3] [ref=e239]
-          - paragraph [ref=e241]: No salary components
+            - generic [ref=e221]:
+              - generic [ref=e224]: Earnings
+              - generic [ref=e225]: "0"
+            - generic [ref=e226]:
+              - generic [ref=e229]: Deductions
+              - generic [ref=e230]: "0"
+            - generic [ref=e232]:
+              - generic [ref=e233]: Total Components
+              - generic [ref=e234]: "0"
+        - generic [ref=e235]:
+          - generic [ref=e236]:
+            - heading "Salary Slips" [level=3] [ref=e237]
+            - paragraph [ref=e238]: Status breakdown
+          - generic [ref=e239]: No slips yet
+      - button "Payroll Actions" [ref=e241] [cursor=pointer]:
         - generic [ref=e242]:
-          - generic [ref=e243]:
-            - img [ref=e244]
-            - heading "Salary Structures" [level=3] [ref=e247]
-          - paragraph [ref=e249]: No salary structures
-      - generic [ref=e250]:
-        - generic [ref=e251]:
-          - img [ref=e252]
-          - heading "Salary Structure Assignments" [level=3] [ref=e255]
-        - paragraph [ref=e257]: No salary assignments
-      - generic [ref=e258]:
-        - generic [ref=e259]:
-          - img [ref=e260]
-          - heading "Payroll Entries" [level=3] [ref=e263]
-        - paragraph [ref=e265]: No payroll entries
+          - img [ref=e243]
+          - generic [ref=e246]: Payroll Actions
+        - img [ref=e247]
+      - generic [ref=e249]:
+        - generic [ref=e250]:
+          - generic [ref=e251]:
+            - img [ref=e252]
+            - heading "Salary Components" [level=3] [ref=e255]
+          - paragraph [ref=e257]: No salary components
+        - generic [ref=e258]:
+          - generic [ref=e259]:
+            - img [ref=e260]
+            - heading "Salary Structures" [level=3] [ref=e263]
+          - paragraph [ref=e265]: No salary structures
       - generic [ref=e266]:
         - generic [ref=e267]:
-          - generic [ref=e268]:
-            - img [ref=e269]
-            - heading "Send Payroll to Books for Payment" [level=3] [ref=e272]
-          - paragraph [ref=e273]: Select a payroll entry, review bank details, and hand off salary slips to the Books payment queue. Accounting will pay via Paystack/Flutterwave.
-        - generic [ref=e274]:
-          - generic [ref=e275]:
+          - img [ref=e268]
+          - heading "Salary Structure Assignments" [level=3] [ref=e271]
+        - paragraph [ref=e273]: No salary assignments
+      - generic [ref=e274]:
+        - generic [ref=e275]:
+          - img [ref=e276]
+          - heading "Payroll Entries" [level=3] [ref=e279]
+        - paragraph [ref=e281]: No payroll entries
+      - generic [ref=e282]:
+        - generic [ref=e283]:
+          - generic [ref=e284]:
+            - img [ref=e285]
+            - heading "Send Payroll to Books for Payment" [level=3] [ref=e288]
+          - paragraph [ref=e289]: Select a payroll entry, review bank details, and hand off salary slips to the Books payment queue. Accounting will pay via Paystack/Flutterwave.
+        - generic [ref=e290]:
+          - generic [ref=e291]:
             - text: Payroll entry
-            - combobox "Payroll entry" [ref=e276]:
+            - combobox "Payroll entry" [ref=e292]:
               - option "Select entry" [selected]
-          - generic [ref=e277]:
+          - generic [ref=e293]:
             - text: Provider
-            - combobox "Provider" [ref=e278]:
+            - combobox "Provider" [ref=e294]:
               - option "Default" [selected]
               - option "Paystack"
               - option "Flutterwave"
-          - generic [ref=e279]:
+          - generic [ref=e295]:
             - text: Currency
-            - textbox "Currency" [ref=e280]: NGN
-        - table [ref=e282]:
-          - rowgroup [ref=e283]:
-            - row "Employee Net Pay Account Number Bank Code Account Name" [ref=e284]:
-              - columnheader "Employee" [ref=e285]
-              - columnheader "Net Pay" [ref=e286]
-              - columnheader "Account Number" [ref=e287]
-              - columnheader "Bank Code" [ref=e288]
-              - columnheader "Account Name" [ref=e289]
-          - rowgroup [ref=e290]:
-            - row "Select a payroll entry to load slips." [ref=e291]:
-              - cell "Select a payroll entry to load slips." [ref=e292]
-        - button "Send to Books" [ref=e294] [cursor=pointer]:
-          - img [ref=e295]
+            - textbox "Currency" [ref=e296]: NGN
+        - table [ref=e298]:
+          - rowgroup [ref=e299]:
+            - row "Employee Net Pay Account Number Bank Code Account Name" [ref=e300]:
+              - columnheader "Employee" [ref=e301]
+              - columnheader "Net Pay" [ref=e302]
+              - columnheader "Account Number" [ref=e303]
+              - columnheader "Bank Code" [ref=e304]
+              - columnheader "Account Name" [ref=e305]
+          - rowgroup [ref=e306]:
+            - row "Select a payroll entry to load slips." [ref=e307]:
+              - cell "Select a payroll entry to load slips." [ref=e308]
+        - button "Send to Books" [ref=e310] [cursor=pointer]:
+          - img [ref=e311]
           - text: Send to Books
-      - generic [ref=e297]:
-        - generic [ref=e298]:
-          - generic [ref=e299]:
-            - img [ref=e300]
-            - heading "Salary Slips" [level=3] [ref=e302]
-          - generic [ref=e303]:
-            - generic [ref=e304]: "Paid: 0"
-            - generic [ref=e305]: "Draft: 0"
-        - paragraph [ref=e307]: No salary slips
+      - generic [ref=e313]:
+        - generic [ref=e314]:
+          - generic [ref=e315]:
+            - img [ref=e316]
+            - heading "Salary Slips" [level=3] [ref=e318]
+          - generic [ref=e319]:
+            - generic [ref=e320]: "Paid: 0"
+            - generic [ref=e321]: "Draft: 0"
+        - paragraph [ref=e323]: No salary slips
   - region "Notifications (F8)":
     - list
-  - alert [ref=e308]
+  - alert [ref=e324]
 ```

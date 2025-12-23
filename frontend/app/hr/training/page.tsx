@@ -11,7 +11,11 @@ import {
   useEmployees,
 } from '@/hooks/useApi';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { GraduationCap, MapPin, Users, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button, FilterCard, FilterSelect, StatusPill } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -32,56 +36,36 @@ function StatusBadge({ status, type = 'event' }: { status: string; type?: 'event
   const normalizedStatus = (status || '').toLowerCase();
 
   if (type === 'result') {
-    const resultConfig: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-      passed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-      failed: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
-      'in-progress': { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
+    const resultConfig: Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }> = {
+      passed: { tone: 'success', icon: CheckCircle2 },
+      failed: { tone: 'danger', icon: XCircle },
+      'in-progress': { tone: 'warning', icon: Clock, label: 'In progress' },
     };
-    const config = resultConfig[normalizedStatus] || { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <AlertCircle className="w-3 h-3" /> };
+    const config = resultConfig[normalizedStatus] || { tone: 'default', icon: AlertCircle };
     return (
-      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', config.bg, config.border, config.text)}>
-        {config.icon}
-        <span className="capitalize">{status || 'Unknown'}</span>
-      </span>
+      <StatusPill
+        label={config.label || formatStatusLabel(status || 'unknown')}
+        tone={config.tone}
+        icon={config.icon}
+        className="border border-current/30"
+      />
     );
   }
 
   // Event status
-  const eventConfig: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    scheduled: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
-    completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-    cancelled: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
+  const eventConfig: Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }> = {
+    scheduled: { tone: 'warning', icon: Clock },
+    completed: { tone: 'success', icon: CheckCircle2 },
+    cancelled: { tone: 'danger', icon: XCircle },
   };
   const config = eventConfig[normalizedStatus] || eventConfig.scheduled;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', config.bg, config.border, config.text)}>
-      {config.icon}
-      <span className="capitalize">{status || 'Scheduled'}</span>
-    </span>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-amber-400',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
-      </div>
-    </div>
+    <StatusPill
+      label={config.label || formatStatusLabel(status || 'scheduled')}
+      tone={config.tone}
+      icon={config.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -192,33 +176,29 @@ export default function HrTrainingPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Training Programs" value={programList.total} icon={GraduationCap} tone="text-amber-400" />
-        <StatCard label="Events" value={eventList.total} icon={MapPin} tone="text-violet-400" />
-        <StatCard label="Results" value={resultList.total} icon={Users} tone="text-emerald-400" />
+        <StatCard title="Training Programs" value={programList.total} icon={GraduationCap} colorClass="text-amber-400" />
+        <StatCard title="Events" value={eventList.total} icon={MapPin} colorClass="text-violet-400" />
+        <StatCard title="Results" value={resultList.total} icon={Users} colorClass="text-emerald-400" />
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <p className="text-xs text-slate-muted mb-3">Filter Events</p>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Status</FormLabel>
-            <select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setEventOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            >
-              <option value="">All statuses</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
+      <FilterCard title="Filter Events" contentClassName="flex flex-wrap gap-3 items-end" iconClassName="text-amber-400">
+        <div>
+          <FormLabel>Status</FormLabel>
+          <FilterSelect
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setEventOffset(0);
+            }}
+          >
+            <option value="">All statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </FilterSelect>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Action Forms */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -272,13 +252,13 @@ export default function HrTrainingPage() {
               <p className="text-xs text-amber-400 mt-1">{enrollEmployeeIds.length} participant(s) selected</p>
             )}
           </div>
-          <button
+          <Button
             onClick={handleEnroll}
             disabled={!enrollEventId || !enrollEmployeeIds.length}
             className="bg-amber-500 text-slate-deep px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Enroll Selected
-          </button>
+          </Button>
 
           {/* Mark Complete Section */}
           <div className="pt-3 border-t border-slate-border space-y-3">
@@ -299,13 +279,13 @@ export default function HrTrainingPage() {
                   ))}
                 </select>
               </div>
-              <button
+              <Button
                 onClick={handleComplete}
                 disabled={!completeEventId}
                 className="px-4 py-2 rounded-lg text-sm font-semibold border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Complete
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -371,13 +351,13 @@ export default function HrTrainingPage() {
               />
             </div>
           </div>
-          <button
+          <Button
             onClick={handleCreateResult}
             disabled={!resultForm.employeeId || !resultForm.trainingEventId}
             className="bg-amber-500 text-slate-deep px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save Result
-          </button>
+          </Button>
         </div>
       </div>
       {actionError && (

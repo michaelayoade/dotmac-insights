@@ -11,7 +11,6 @@ import {
   TrendingDown,
   Users,
   MessageSquare,
-  Filter,
   Loader2,
   CheckCircle,
   XCircle,
@@ -24,45 +23,12 @@ import {
   useSupportCsatTrends,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { FilterCard, FilterSelect } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 // =============================================================================
 // UTILITY COMPONENTS
 // =============================================================================
-
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-  loading,
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  loading?: boolean;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-        </div>
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function RatingStars({ rating, size = 'md' }: { rating: number; size?: 'sm' | 'md' | 'lg' }) {
   const sizes = { sm: 'w-3 h-3', md: 'w-4 h-4', lg: 'w-5 h-5' };
@@ -206,32 +172,25 @@ export default function SupportCsatPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Time Range</span>
+      <FilterCard title="Time Range" contentClassName="flex items-center gap-4">
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Period (days)</label>
+          <FilterSelect
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </FilterSelect>
         </div>
-        <div className="flex items-center gap-4">
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Period (days)</label>
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      </FilterCard>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
+        <StatCard
           title="Average Rating"
           value={avgRating.toFixed(2)}
           subtitle="out of 5.0"
@@ -239,7 +198,7 @@ export default function SupportCsatPage() {
           colorClass={avgRating >= 4 ? 'text-emerald-400' : avgRating >= 3 ? 'text-amber-400' : 'text-rose-400'}
           loading={summaryLoading}
         />
-        <MetricCard
+        <StatCard
           title="Total Responses"
           value={totalResponses}
           subtitle={`last ${days} days`}
@@ -247,7 +206,7 @@ export default function SupportCsatPage() {
           colorClass="text-blue-400"
           loading={summaryLoading}
         />
-        <MetricCard
+        <StatCard
           title="Response Rate"
           value={`${responseRate.toFixed(1)}%`}
           subtitle="of sent surveys"

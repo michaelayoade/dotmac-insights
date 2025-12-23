@@ -7,7 +7,7 @@ from sqlalchemy import func, or_
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 from app.database import get_db
@@ -60,8 +60,7 @@ class OverrideResponse(BaseModel):
     overridden_by_id: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReviewNoteCreate(BaseModel):
@@ -83,8 +82,7 @@ class ReviewNoteResponse(BaseModel):
     created_by_id: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReviewQueueItem(BaseModel):
@@ -98,8 +96,7 @@ class ReviewQueueItem(BaseModel):
     total_score: Optional[float]
     submitted_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReviewQueueResponse(BaseModel):

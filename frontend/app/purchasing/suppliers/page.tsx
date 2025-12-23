@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePurchasingSuppliers, usePurchasingSupplierGroups } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput, FilterSelect, LoadingState } from '@/components/ui';
 import {
   AlertTriangle,
   Building2,
@@ -15,43 +16,50 @@ import {
   FileText,
   Users,
   DollarSign,
-  Filter,
 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
+import { formatCurrency, formatNumber } from '@/lib/formatters';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function PurchasingSuppliersPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('purchasing:read');
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [groupId, setGroupId] = useState<string>('');
+  const canFetch = !authLoading && !missingScope;
 
-  const { data, isLoading, error } = usePurchasingSuppliers({
-    search: search || undefined,
-    supplier_group: groupId || undefined,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
+  const { data, isLoading, error } = usePurchasingSuppliers(
+    {
+      search: search || undefined,
+      supplier_group: groupId || undefined,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    },
+    { isPaused: () => !canFetch }
+  );
 
-  const { data: groupsData } = usePurchasingSupplierGroups();
+  const { data: groupsData } = usePurchasingSupplierGroups({ isPaused: () => !canFetch });
 
   const suppliers = data?.suppliers || [];
   const total = data?.total || 0;
   const groups = groupsData?.groups || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the purchasing:read permission to view suppliers."
+        backHref="/purchasing"
+        backLabel="Back to Purchasing"
+      />
+    );
+  }
 
   const columns = [
     {
@@ -158,55 +166,51 @@ export default function PurchasingSuppliersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
+      <FilterCard
+        actions={(search || groupId) && (
+          <Button
+            onClick={() => {
+              setSearch('');
+              setGroupId('');
+              setPage(1);
+            }}
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
+          >
+            Clear filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-center"
+      >
+        <div className="flex-1 min-w-[200px] max-w-md">
+          <FilterInput
+            type="text"
+            placeholder="Search suppliers..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="w-full placeholder:text-slate-muted focus:ring-2 focus:ring-teal-electric/50"
+          />
         </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-[200px] max-w-md">
-            <input
-              type="text"
-              placeholder="Search suppliers..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          {groups.length > 0 && (
-            <select
-              value={groupId}
-              onChange={(e) => {
-                setGroupId(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            >
-              <option value="">All Groups</option>
-              {groups.map((group: any) => (
-                <option key={group.name} value={group.name}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {(search || groupId) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setGroupId('');
-                setPage(1);
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </div>
+        {groups.length > 0 && (
+          <FilterSelect
+            value={groupId}
+            onChange={(e) => {
+              setGroupId(e.target.value);
+              setPage(1);
+            }}
+            className="focus:ring-2 focus:ring-teal-electric/50"
+          >
+            <option value="">All Groups</option>
+            {groups.map((group: any) => (
+              <option key={group.name} value={group.name}>
+                {group.name}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
+      </FilterCard>
 
       {/* Table */}
       <DataTable

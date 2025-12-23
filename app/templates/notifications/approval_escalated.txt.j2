@@ -1,0 +1,15 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Approval Escalated" %}
+{% set icon = "arrow-up-circle" %}
+{% set priority = "high" %}
+
+{% block content %}
+An approval request has been escalated and requires your attention.
+
+Document: {{ document_type | default('Document') }} {{ document_number | default('') }}
+Amount: {{ amount | default('N/A') }}
+Original Approver: {{ original_approver | default('Previous approver') }}
+Reason: {{ reason | default('Timeout or manual escalation') }}
+
+Please review and take action promptly.
+{% endblock %}

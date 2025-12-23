@@ -1,0 +1,173 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Back to app home" [ref=e15]:
+          - /url: /
+          - img [ref=e16]
+        - link "Dotmac Support" [ref=e19]:
+          - /url: /support
+          - img [ref=e21]
+          - generic [ref=e23]:
+            - generic [ref=e24]: Dotmac
+            - generic [ref=e25]: Support
+      - generic [ref=e26]:
+        - button "Search" [ref=e27] [cursor=pointer]:
+          - img [ref=e28]
+        - button "Switch to dark mode" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Toggle menu" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - link "New Ticket" [ref=e39]:
+          - /url: /support/tickets/new
+          - img [ref=e40]
+          - generic [ref=e43]: New Ticket
+        - link "Inbox" [ref=e44]:
+          - /url: /support/tickets
+          - img [ref=e45]
+          - generic [ref=e47]: Inbox
+        - link "Analytics" [ref=e48]:
+          - /url: /support/analytics
+          - img [ref=e49]
+          - generic [ref=e51]: Analytics
+        - link "SLA Watch" [ref=e52]:
+          - /url: /support/sla
+          - img [ref=e53]
+          - generic [ref=e55]: SLA Watch
+      - generic [ref=e56]:
+        - button "Omnichannel Desk Tickets, conversations, and assignments" [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]:
+            - img [ref=e60]
+            - generic [ref=e63]:
+              - generic [ref=e64]: Omnichannel Desk
+              - text: Tickets, conversations, and assignments
+          - img [ref=e65]
+        - button "Analytics Performance, SLA, backlog" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]:
+            - img [ref=e70]
+            - generic [ref=e72]:
+              - generic [ref=e73]: Analytics
+              - text: Performance, SLA, backlog
+          - img [ref=e74]
+        - button "Automation & SLA Rules, calendars, routing" [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]:
+            - img [ref=e79]
+            - generic [ref=e82]:
+              - generic [ref=e83]: Automation & SLA
+              - text: Rules, calendars, routing
+          - img [ref=e84]
+        - button "Knowledge & Canned Knowledge base & snippets" [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]:
+            - img [ref=e89]
+            - generic [ref=e91]:
+              - generic [ref=e92]: Knowledge & Canned
+              - text: Knowledge base & snippets
+          - img [ref=e93]
+        - generic [ref=e95]:
+          - button "Configuration Support settings" [ref=e96] [cursor=pointer]:
+            - generic [ref=e97]:
+              - img [ref=e98]
+              - generic [ref=e101]:
+                - generic [ref=e102]: Configuration
+                - text: Support settings
+            - img [ref=e103]
+          - link "Settings Helpdesk configuration" [ref=e106]:
+            - /url: /support/settings
+            - generic [ref=e107]: Settings
+            - generic [ref=e108]: Helpdesk configuration
+      - generic [ref=e109]:
+        - button "Dark mode" [ref=e110] [cursor=pointer]:
+          - generic [ref=e111]: Dark mode
+          - img [ref=e112]
+        - button "Sign out" [ref=e114] [cursor=pointer]:
+          - generic [ref=e115]: Sign out
+          - img [ref=e116]
+    - generic [ref=e121]:
+      - paragraph [ref=e123]: Failed to load support settings. The settings may not be initialized yet.
+      - banner [ref=e124]:
+        - heading "Support Settings" [level=1] [ref=e125]
+        - paragraph [ref=e126]: Configure helpdesk, SLA, routing, CSAT, and support operations.
+      - navigation [ref=e128]:
+        - button "Business Hours & SLA" [ref=e129] [cursor=pointer]:
+          - img [ref=e130]
+          - text: Business Hours & SLA
+        - button "Ticket Routing" [ref=e133] [cursor=pointer]:
+          - img [ref=e134]
+          - text: Ticket Routing
+        - button "Auto-Close & Escalation" [ref=e139] [cursor=pointer]:
+          - img [ref=e140]
+          - text: Auto-Close & Escalation
+        - button "CSAT & Portal" [ref=e142] [cursor=pointer]:
+          - img [ref=e143]
+          - text: CSAT & Portal
+        - button "Knowledge Base" [ref=e145] [cursor=pointer]:
+          - img [ref=e146]
+          - text: Knowledge Base
+        - button "Display & Notifications" [ref=e149] [cursor=pointer]:
+          - img [ref=e150]
+          - text: Display & Notifications
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - img [ref=e157]
+            - heading "Business Hours" [level=2] [ref=e160]
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: Working Hours Type
+              - combobox [ref=e164]:
+                - option "Standard - 9 AM - 5 PM, Mon-Fri" [selected]
+                - option "Extended - 8 AM - 8 PM, Mon-Sat"
+                - option "24/7 - Always available"
+                - option "Custom - Set custom schedule"
+            - generic [ref=e165]:
+              - generic [ref=e166]: Timezone
+              - combobox [ref=e167]:
+                - option "Africa/Lagos" [selected]
+                - option "Africa/Nairobi"
+                - option "Africa/Johannesburg"
+                - option "Africa/Cairo"
+                - option "Europe/London"
+                - option "Europe/Paris"
+                - option "America/New_York"
+                - option "America/Los_Angeles"
+                - option "Asia/Dubai"
+                - option "Asia/Singapore"
+                - option "UTC"
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - img [ref=e170]
+            - heading "SLA Settings" [level=2] [ref=e174]
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - generic [ref=e178]: First Response (Hrs)
+                - spinbutton [ref=e179]: "4"
+              - generic [ref=e180]:
+                - generic [ref=e181]: Resolution (Hrs)
+                - spinbutton [ref=e182]: "24"
+            - generic [ref=e183]:
+              - generic [ref=e184]: Warning Threshold (%)
+              - spinbutton [ref=e185]: "75"
+            - generic [ref=e186]:
+              - generic [ref=e187] [cursor=pointer]:
+                - checkbox "Include holidays in SLA calculation" [ref=e188]
+                - generic [ref=e189]: Include holidays in SLA calculation
+              - generic [ref=e190] [cursor=pointer]:
+                - checkbox "Include weekends in SLA calculation" [ref=e191]
+                - generic [ref=e192]: Include weekends in SLA calculation
+      - button "Save Settings" [ref=e194] [cursor=pointer]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e195]
+```

@@ -5,16 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, CreditCard } from 'lucide-react';
 import { useFinanceCustomers, useFinancePaymentDetail, useFinancePaymentMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
+import { formatCurrency } from '@/lib/formatters';
+import { Button } from '@/components/ui';
 
 export default function PaymentEditPage() {
   const params = useParams();
@@ -24,6 +18,7 @@ export default function PaymentEditPage() {
   const { data, isLoading, error } = useFinancePaymentDetail(Number.isFinite(id) ? id : null, currency);
   const { updatePayment } = useFinancePaymentMutations();
   const { data: customersData } = useFinanceCustomers({ limit: 100, offset: 0 });
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [customerId, setCustomerId] = useState<string>('');
   const [invoiceId, setInvoiceId] = useState<string>('');
@@ -36,7 +31,6 @@ export default function PaymentEditPage() {
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const customers = (customersData as any)?.items || (customersData as any)?.customers || [];
 
   useEffect(() => {
@@ -58,7 +52,7 @@ export default function PaymentEditPage() {
     if (!customerId) errs.customerId = 'Customer is required';
     if (!amount || amount <= 0) errs.amount = 'Amount must be greater than zero';
     if (!paymentDate) errs.paymentDate = 'Payment date is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -109,13 +103,13 @@ export default function PaymentEditPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load payment</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -275,21 +269,21 @@ export default function PaymentEditPage() {
             Total: <span className="text-foreground font-mono">{formatCurrency(amount, currency)}</span>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
               onClick={() => router.back()}
               className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
               className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
             >
               {submitting ? 'Saving...' : 'Update Payment'}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

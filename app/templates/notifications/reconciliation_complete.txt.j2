@@ -1,0 +1,18 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Reconciliation Complete" %}
+{% set icon = "check-circle" %}
+{% set priority = "normal" %}
+
+{% block content %}
+A bank reconciliation has been completed successfully.
+
+Bank Account: {{ account_name | default('Account') }}
+Period: {{ period | default('Current period') }}
+Statement Date: {{ statement_date | default('N/A') }}
+Opening Balance: {{ opening_balance | default('N/A') }}
+Closing Balance: {{ closing_balance | default('N/A') }}
+Transactions Matched: {{ matched_count | default(0) }}
+Reconciled By: {{ reconciled_by | default('System') }}
+
+The account balances have been verified and matched.
+{% endblock %}

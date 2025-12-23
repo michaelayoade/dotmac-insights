@@ -5,7 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, StickyNote } from 'lucide-react';
 import { useFinanceCustomers, useFinanceQuotationDetail, useFinanceQuotationMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function QuotationEditPage() {
   const params = useParams();
@@ -15,6 +17,7 @@ export default function QuotationEditPage() {
   const { data, isLoading, error } = useFinanceQuotationDetail(Number.isFinite(id) ? id : null, currency);
   const { updateQuotation } = useFinanceQuotationMutations();
   const { data: customersData } = useFinanceCustomers({ limit: 100, offset: 0 });
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [customerId, setCustomerId] = useState<string>('');
   const [quotationNumber, setQuotationNumber] = useState<string>('');
@@ -25,7 +28,6 @@ export default function QuotationEditPage() {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const customers = (customersData as any)?.items || (customersData as any)?.customers || [];
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function QuotationEditPage() {
     if (!customerId) errs.customerId = 'Customer is required';
     if (!quotationDate) errs.quotationDate = 'Quotation date is required';
     if (!totalAmount || totalAmount <= 0) errs.totalAmount = 'Total must be greater than zero';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -112,13 +114,13 @@ export default function QuotationEditPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load quotation</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -251,21 +253,21 @@ export default function QuotationEditPage() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Update Quotation'}
-          </button>
+          </Button>
         </div>
       </form>
 

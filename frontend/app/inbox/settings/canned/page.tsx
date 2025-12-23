@@ -3,14 +3,12 @@
 import { useState, useMemo } from 'react';
 import {
   MessageCircle,
-  Search,
   Loader2,
   AlertTriangle,
   RefreshCw,
   ChevronLeft,
   Copy,
   Check,
-  Filter,
   Globe,
   Users,
   User,
@@ -18,7 +16,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useSupportCannedResponses, useSupportCannedCategories } from '@/hooks/useApi';
-import { PageHeader, Select } from '@/components/ui';
+import { Button, FilterCard, FilterInput, PageHeader, Select } from '@/components/ui';
 
 type ScopeFilter = 'all' | 'global' | 'team' | 'personal';
 
@@ -92,13 +90,13 @@ export default function InboxCannedResponsesPage() {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-muted">
         <AlertTriangle className="w-12 h-12 mb-4 text-rose-400" />
         <p className="text-lg text-rose-400 mb-4">Failed to load canned responses</p>
-        <button
+        <Button
           onClick={() => refresh()}
           className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -122,28 +120,20 @@ export default function InboxCannedResponsesPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-          <input
-            type="text"
-            placeholder="Search responses..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-elevated border border-slate-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-muted" />
-          <Select
-            value={scopeFilter}
-            onChange={(value) => setScopeFilter(value as ScopeFilter)}
-            className="w-32"
-            options={scopeOptions}
-          />
-        </div>
-
+      <FilterCard contentClassName="flex flex-wrap items-center gap-4">
+        <FilterInput
+          type="text"
+          placeholder="Search responses..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <Select
+          value={scopeFilter}
+          onChange={(value) => setScopeFilter(value as ScopeFilter)}
+          className="w-32"
+          options={scopeOptions}
+        />
         {categories.length > 0 && (
           <Select
             value={categoryFilter}
@@ -152,7 +142,7 @@ export default function InboxCannedResponsesPage() {
             options={categoryOptions}
           />
         )}
-      </div>
+      </FilterCard>
 
       {/* Responses Grid */}
       {isLoading ? (
@@ -185,7 +175,7 @@ export default function InboxCannedResponsesPage() {
                     </div>
                     <h3 className="font-medium text-foreground">{response.title}</h3>
                   </div>
-                  <button
+                  <Button
                     onClick={() => copyToClipboard(response.content || '', response.id)}
                     className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                     title="Copy to clipboard"
@@ -195,7 +185,7 @@ export default function InboxCannedResponsesPage() {
                     ) : (
                       <Copy className="w-4 h-4" />
                     )}
-                  </button>
+                  </Button>
                 </div>
 
                 {response.category && (

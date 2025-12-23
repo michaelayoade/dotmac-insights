@@ -43,7 +43,9 @@ import {
   Activity,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { StatCard } from '@/components/StatCard';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { formatCurrency, formatNumber, formatPercent } from '@/lib/formatters';
 
 const CHART_PALETTE = CHART_COLORS.palette;
 const STATUS_COLORS: Record<string, string> = {
@@ -66,63 +68,6 @@ const TOOLTIP_STYLE = {
   },
   labelStyle: { color: CHART_COLORS.tooltip.text },
 };
-
-function formatCurrency(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatPercent(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0%';
-  return `${value.toFixed(1)}%`;
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  trend?: { value: number; label: string };
-  loading?: boolean;
-}
-
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', trend, loading }: MetricCardProps) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-          {trend && (
-            <div className={cn('flex items-center gap-1 text-xs', trend.value >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {trend.value >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              <span>{trend.value >= 0 ? '+' : ''}{trend.value}% {trend.label}</span>
-            </div>
-          )}
-        </div>
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ChartCard({ title, subtitle, icon: Icon, children, className }: {
   title: string;
@@ -303,28 +248,28 @@ export default function ProjectsAnalyticsPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
+        <StatCard
           title="Total Projects"
           value={formatNumber(totalProjects)}
           subtitle={`${activeProjects} active`}
           icon={Building2}
           colorClass="text-blue-400"
         />
-        <MetricCard
+        <StatCard
           title="Total Tasks"
           value={formatNumber(totalTasks)}
           subtitle={`${openTasks} open, ${overdueTasks} overdue`}
           icon={ListTodo}
           colorClass="text-purple-400"
         />
-        <MetricCard
+        <StatCard
           title="Avg Completion"
           value={formatPercent(avgCompletion)}
           subtitle="Active projects"
           icon={Target}
           colorClass="text-teal-electric"
         />
-        <MetricCard
+        <StatCard
           title="Due This Week"
           value={formatNumber(dueThisWeek)}
           subtitle="Projects ending soon"

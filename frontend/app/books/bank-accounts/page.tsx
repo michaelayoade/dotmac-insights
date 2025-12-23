@@ -1,23 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import useSWR from 'swr';
 import { Landmark, Plus, Pencil, Trash2, X, Check, AlertTriangle, Building2, CreditCard, CheckCircle2, XCircle } from 'lucide-react';
 import { accountingApi, AccountingBankAccount, AccountingBankAccountPayload } from '@/lib/api/domains/accounting';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { useSWRStatus } from '@/hooks/useSWRStatus';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function BankAccountsPage() {
   const [isCreating, setIsCreating] = useState(false);
@@ -110,7 +101,7 @@ export default function BankAccountsPage() {
               <CreditCard className="w-5 h-5 text-green-400" />
               <p className="text-green-400 text-sm">Total Balance</p>
             </div>
-            <p className="text-3xl font-bold text-green-400">{formatCurrency(totalBalance)}</p>
+            <p className="text-3xl font-bold text-green-400">{formatAccountingCurrency(totalBalance)}</p>
             <p className="text-green-400/70 text-sm mt-1">Across all accounts</p>
           </div>
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
@@ -132,13 +123,13 @@ export default function BankAccountsPage() {
             <h1 className="text-xl font-semibold text-foreground">Bank Accounts</h1>
           </div>
           {!isCreating && (
-            <button
+            <Button
               onClick={() => { setIsCreating(true); setEditingId(null); setFormData({ account_name: '' }); }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
+              module="books"
+              icon={Plus}
             >
-              <Plus className="w-4 h-4" />
               Add Bank Account
-            </button>
+            </Button>
           )}
         </div>
 
@@ -230,19 +221,12 @@ export default function BankAccountsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <button
-                onClick={handleCreate}
-                disabled={!formData.account_name.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button onClick={handleCreate} disabled={!formData.account_name.trim()} module="books">
                 Create
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
-              >
+              </Button>
+              <Button onClick={cancelEdit} variant="secondary">
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -303,36 +287,26 @@ export default function BankAccountsPage() {
                         </label>
                       </div>
                       <div className="flex items-center gap-2 pt-2">
-                        <button
-                          onClick={() => handleUpdate(account.id)}
-                          className="p-1.5 rounded bg-teal-electric/20 text-teal-electric hover:bg-teal-electric/30"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <Button onClick={() => handleUpdate(account.id)} variant="success" size="sm" icon={Check} />
+                        <Button onClick={cancelEdit} variant="secondary" size="sm" icon={X} />
                       </div>
                     </div>
                   ) : isDeleting ? (
                     <div className="text-center py-4">
                       <p className="text-coral-alert text-sm mb-3">Delete this account?</p>
                       <div className="flex items-center justify-center gap-2">
-                        <button
+                        <Button
                           onClick={() => handleDelete(account.id)}
                           className="p-1.5 rounded bg-coral-alert/20 text-coral-alert hover:bg-coral-alert/30"
                         >
                           <Check className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => setDeleteConfirm(null)}
                           className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
                         >
                           <X className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -348,20 +322,20 @@ export default function BankAccountsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
                             onClick={() => startEdit(account)}
                             className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                             title="Edit"
                           >
                             <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => setDeleteConfirm(account.id)}
                             className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-coral-alert/20 hover:text-coral-alert"
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
@@ -400,7 +374,7 @@ export default function BankAccountsPage() {
                               'font-mono font-bold text-lg',
                               (account.balance || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                             )}>
-                              {formatCurrency(account.balance, account.currency || 'NGN')}
+                              {formatAccountingCurrency(account.balance, account.currency || 'NGN')}
                             </span>
                           </div>
                         </div>

@@ -1,0 +1,15 @@
+{# Task assigned notification #}
+{% set title = "Task Assigned" %}
+{% set icon = "clipboard-list" %}
+{% set priority = "normal" %}
+
+You have been assigned a task: "{{ task_subject }}".
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if assigned_by_name %}
+Assigned by: {{ assigned_by_name }}
+{% endif %}
+{% if exp_end_date %}
+Due date: {{ exp_end_date }}
+{% endif %}

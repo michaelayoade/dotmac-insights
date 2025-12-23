@@ -1,25 +1,47 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFinanceCustomers } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { AlertTriangle, Users, FileText } from 'lucide-react';
+import { FilterCard, FilterInput, LinkButton, LoadingState } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function SalesCustomersPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('sales:read');
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
-  const { data, isLoading, error } = useFinanceCustomers({
-    search: search || undefined,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
+  const canFetch = !authLoading && !missingScope;
+  const { data, isLoading, error } = useFinanceCustomers(
+    {
+      search: search || undefined,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    },
+    { isPaused: () => !canFetch }
+  );
 
   const customers = (data as any)?.items || (data as any)?.customers || [];
   const total = data?.total || 0;
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the sales:read permission to view customers."
+        backHref="/sales"
+        backLabel="Back to Sales"
+      />
+    );
+  }
 
   const columns = [
     {
@@ -57,24 +79,25 @@ export default function SalesCustomersPage() {
           <Users className="w-5 h-5 text-teal-electric" />
           <h1 className="text-xl font-semibold text-foreground">Sales Customers</h1>
         </div>
-        <Link
+        <LinkButton
           href="/sales/customers/new"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-teal-electric/50 text-sm text-teal-electric hover:text-teal-glow hover:border-teal-electric/70"
+          variant="ghost"
+          icon={FileText}
+          className="bg-transparent border border-teal-electric/50 text-teal-electric hover:text-teal-glow hover:border-teal-electric/70 hover:bg-transparent"
         >
-          <FileText className="w-4 h-4" />
           New Customer
-        </Link>
+        </LinkButton>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <input
+      <FilterCard contentClassName="flex flex-wrap items-center gap-3">
+        <FilterInput
           type="text"
           placeholder="Search customers..."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full sm:w-64 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          className="w-full sm:w-64"
         />
-      </div>
+      </FilterCard>
 
       <DataTable
         columns={columns}

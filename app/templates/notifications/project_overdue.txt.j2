@@ -1,0 +1,15 @@
+{# Project overdue notification #}
+{% set title = "Project Overdue" %}
+{% set icon = "alert-triangle" %}
+{% set priority = "high" %}
+
+Project "{{ project_name }}" is past its expected end date.
+{% if expected_end_date %}
+Expected completion: {{ expected_end_date }}
+{% endif %}
+{% if days_overdue %}
+Days overdue: {{ days_overdue }}
+{% endif %}
+{% if percent_complete %}
+Current progress: {{ percent_complete }}%
+{% endif %}

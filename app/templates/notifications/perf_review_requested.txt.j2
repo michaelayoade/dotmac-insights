@@ -1,0 +1,9 @@
+{# Performance review requested notification #}
+{% set title = "Performance Review Pending" %}
+{% set icon = "user-check" %}
+{% set priority = "high" %}
+
+{{ employee_name | default("An employee") }}'s scorecard is awaiting your review for {{ period_name | default('this period') }}.
+{% if deadline %}
+Review Deadline: {{ deadline | format_date }}
+{% endif %}

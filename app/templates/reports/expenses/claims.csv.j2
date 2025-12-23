@@ -1,0 +1,32 @@
+{# Expense Claims CSV Report Template #}
+Expense Claims Report
+Generated: {{ generated_at }}
+Period: {{ period.start }} to {{ period.end }}
+
+Summary
+Total Claims,{{ summary.total_claims | csv_escape }}
+Total Claimed,{{ summary.total_claimed | format_number | csv_escape }}
+Total Approved,{{ summary.total_approved | format_number | csv_escape }}
+
+{% if include_lines -%}
+Claim #,Title,Employee ID,Date,Status,Line Category,Line Description,Line Date,Line Amount,Currency
+{% for claim in claims -%}
+{% set lines = claim.lines | default([]) -%}
+{% if lines -%}
+{% for line in lines -%}
+{% if loop.first -%}
+{{ claim.claim_number | csv_escape }},{{ claim.title | csv_escape }},{{ claim.employee_id | csv_escape }},{{ claim.claim_date | csv_escape }},{{ claim.status | csv_escape }},{{ line.category | csv_escape }},{{ line.description | csv_escape }},{{ line.expense_date | csv_escape }},{{ line.amount | format_number | csv_escape }},{{ line.currency | csv_escape }}
+{% else -%}
+,,,,,{{ line.category | csv_escape }},{{ line.description | csv_escape }},{{ line.expense_date | csv_escape }},{{ line.amount | format_number | csv_escape }},{{ line.currency | csv_escape }}
+{% endif -%}
+{% endfor -%}
+{% else -%}
+{{ claim.claim_number | csv_escape }},{{ claim.title | csv_escape }},{{ claim.employee_id | csv_escape }},{{ claim.claim_date | csv_escape }},{{ claim.status | csv_escape }},,,{{ claim.total_claimed | format_number | csv_escape }},{{ claim.currency | csv_escape }}
+{% endif -%}
+{% endfor -%}
+{% else -%}
+Claim #,Title,Employee ID,Date,Status,Lines,Total Claimed,Approved,Currency
+{% for claim in claims -%}
+{{ claim.claim_number | csv_escape }},{{ claim.title | csv_escape }},{{ claim.employee_id | csv_escape }},{{ claim.claim_date | csv_escape }},{{ claim.status | csv_escape }},{{ claim.line_count }},{{ claim.total_claimed | format_number | csv_escape }},{{ claim.approved_amount | format_number | csv_escape }},{{ claim.currency | csv_escape }}
+{% endfor -%}
+{% endif -%}

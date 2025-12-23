@@ -23,6 +23,7 @@ import {
   useCurrencyMutations,
 } from '@/hooks/useApi';
 import type { DocumentNumberFormatResponse, DocumentType, ResetFrequency } from '@/lib/api';
+import { Button } from '@/components/ui';
 
 type TabKey = 'general' | 'formats' | 'currencies';
 
@@ -197,7 +198,7 @@ export default function BooksSettingsPage() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
-              <button
+              <Button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
@@ -209,7 +210,7 @@ export default function BooksSettingsPage() {
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -577,13 +578,9 @@ function GeneralSettingsTab() {
             {saveMessage}
           </span>
         )}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50"
-        >
+        <Button onClick={handleSave} disabled={saving} loading={saving} module="books">
           {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -716,7 +713,7 @@ function NumberFormatsTab() {
 
       {/* Add New Format */}
       {!showAdd ? (
-        <button
+        <Button
           onClick={() => {
             setShowAdd(true);
             generatePreview(newForm.format_pattern, newForm.prefix, newForm.min_digits);
@@ -725,7 +722,7 @@ function NumberFormatsTab() {
         >
           <Plus className="w-4 h-4" />
           Add Number Format
-        </button>
+        </Button>
       ) : (
         <Card title="New Number Format" icon={Plus}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -839,24 +836,20 @@ function NumberFormatsTab() {
           </div>
 
           <div className="mt-4 flex items-center gap-2">
-            <button
-              onClick={handleCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
-            >
-              <Check className="w-4 h-4" />
+            <Button onClick={handleCreate} module="books" icon={Check}>
               Create Format
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setShowAdd(false);
                 setNewForm(getInitialForm('invoice'));
                 setPreview(null);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
+              variant="secondary"
+              icon={X}
             >
-              <X className="w-4 h-4" />
               Cancel
-            </button>
+            </Button>
           </div>
         </Card>
       )}
@@ -910,12 +903,12 @@ function NumberFormatsTab() {
                     </FormField>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={handleUpdate} className="px-3 py-1.5 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold">
+                    <Button onClick={handleUpdate} module="books" size="sm">
                       Save
-                    </button>
-                    <button onClick={() => { setEditingId(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-foreground text-sm">
+                    </Button>
+                    <Button onClick={() => { setEditingId(null); setEditForm({}); }} variant="secondary" size="sm">
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -941,20 +934,20 @@ function NumberFormatsTab() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => { setEditingId(fmt.id); setEditForm({}); }}
                       className="p-2 rounded-lg text-slate-muted hover:text-foreground hover:bg-slate-elevated"
                       title="Edit"
                     >
                       <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDelete(fmt.id)}
                       className="p-2 rounded-lg text-slate-muted hover:text-rose-400 hover:bg-slate-elevated"
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1089,13 +1082,13 @@ function CurrenciesTab() {
       )}
       {/* Add New Currency */}
       {!showAdd ? (
-        <button
+        <Button
           onClick={() => setShowAdd(true)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-slate-border text-slate-muted hover:text-foreground hover:border-teal-electric transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Currency
-        </button>
+        </Button>
       ) : (
         <Card title="New Currency" icon={Plus}>
           {/* Currency Preset Selector */}
@@ -1216,21 +1209,17 @@ function CurrenciesTab() {
               </div>
 
               <div className="mt-4 flex items-center gap-2">
-                <button
+                <Button
                   onClick={handleCreate}
                   disabled={!newForm.currency_code || !newForm.currency_name || !newForm.symbol}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50"
+                  module="books"
+                  icon={Check}
                 >
-                  <Check className="w-4 h-4" />
                   Add Currency
-                </button>
-                <button
-                  onClick={resetAddForm}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
-                >
-                  <X className="w-4 h-4" />
+                </Button>
+                <Button onClick={resetAddForm} variant="secondary" icon={X}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -1238,13 +1227,9 @@ function CurrenciesTab() {
           {/* Cancel button when no selection */}
           {!selectedPreset && !newForm.currency_code && (
             <div className="mt-4">
-              <button
-                onClick={resetAddForm}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
-              >
-                <X className="w-4 h-4" />
+              <Button onClick={resetAddForm} variant="secondary" icon={X}>
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
         </Card>
@@ -1295,12 +1280,12 @@ function CurrenciesTab() {
                     onChange={(v) => setEditForm((p: any) => ({ ...p, is_enabled: v }))}
                   />
                   <div className="flex items-center gap-2">
-                    <button onClick={handleUpdate} className="px-3 py-1.5 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold">
+                    <Button onClick={handleUpdate} module="books" size="sm">
                       Save
-                    </button>
-                    <button onClick={() => { setEditingCode(null); setEditForm({}); }} className="px-3 py-1.5 rounded-lg border border-slate-border text-foreground text-sm">
+                    </Button>
+                    <Button onClick={() => { setEditingCode(null); setEditForm({}); }} variant="secondary" size="sm">
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -1338,13 +1323,13 @@ function CurrenciesTab() {
                     <span className="text-slate-muted text-xs">Format: </span>
                     <span className="text-foreground font-mono">{formatPreview(curr)}</span>
                   </div>
-                  <button
+                  <Button
                     onClick={() => { setEditingCode(curr.currency_code); setEditForm({}); }}
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:bg-slate-elevated text-sm"
                   >
                     <Pencil className="w-4 h-4" />
                     Edit
-                  </button>
+                  </Button>
                 </>
               )}
             </div>

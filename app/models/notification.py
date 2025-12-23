@@ -77,6 +77,27 @@ class NotificationEventType(enum.Enum):
     PERF_WEEKLY_SUMMARY = "perf_weekly_summary"  # Weekly manager summary
     PERF_RATING_PUBLISHED = "perf_rating_published"  # Rating visible to employee
 
+    # Project management events
+    PROJECT_CREATED = "project_created"  # New project created
+    PROJECT_STATUS_CHANGED = "project_status_changed"  # Status updated
+    PROJECT_ASSIGNED = "project_assigned"  # User assigned to project
+    PROJECT_OVERDUE = "project_overdue"  # Project past expected end date
+    PROJECT_COMPLETED = "project_completed"  # Project marked complete
+    PROJECT_APPROVAL_REQUESTED = "project_approval_requested"  # Submitted for approval
+    PROJECT_APPROVED = "project_approved"  # Project approved
+    PROJECT_REJECTED = "project_rejected"  # Project rejected
+
+    # Task events
+    TASK_ASSIGNED = "task_assigned"  # Task assigned to user
+    TASK_COMPLETED = "task_completed"  # Task marked complete
+    TASK_OVERDUE = "task_overdue"  # Task past expected end date
+    TASK_COMMENT_ADDED = "task_comment_added"  # New comment on task
+
+    # Milestone events
+    MILESTONE_APPROACHING = "milestone_approaching"  # Milestone due soon
+    MILESTONE_COMPLETED = "milestone_completed"  # Milestone completed
+    MILESTONE_OVERDUE = "milestone_overdue"  # Milestone past due date
+
     # Generic
     CUSTOM = "custom"
 

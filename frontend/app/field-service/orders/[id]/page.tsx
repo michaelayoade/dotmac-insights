@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 const statusConfig: Record<string, { color: string; bg: string; label: string; icon: any }> = {
   draft: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Draft', icon: FileText },
@@ -277,7 +278,7 @@ export default function ServiceOrderDetailPage() {
 
         <div className="flex items-center gap-2">
           {availableActions.map((action) => (
-            <button
+            <Button
               key={action.action}
               onClick={() => {
                 if (action.action === 'dispatch') {
@@ -296,7 +297,7 @@ export default function ServiceOrderDetailPage() {
               {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
               {!isUpdating && <action.icon className="w-4 h-4" />}
               {action.label}
-            </button>
+            </Button>
           ))}
           <Link
             href={`/field-service/orders/${order.id}/edit`}
@@ -315,9 +316,9 @@ export default function ServiceOrderDetailPage() {
             <AlertTriangle className="w-5 h-5" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-300">
+          <Button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-300">
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -330,7 +331,7 @@ export default function ServiceOrderDetailPage() {
             <div className="border-b border-slate-border px-4">
               <nav className="flex gap-1 -mb-px">
                 {tabs.map((tab) => (
-                  <button
+                  <Button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
                     className={cn(
@@ -342,7 +343,7 @@ export default function ServiceOrderDetailPage() {
                   >
                     <tab.icon className="w-4 h-4" />
                     {tab.label}
-                  </button>
+                  </Button>
                 ))}
               </nav>
             </div>
@@ -523,12 +524,12 @@ export default function ServiceOrderDetailPage() {
                             unoptimized
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
+                            <Button
                               onClick={() => handleDeletePhoto(photo.id)}
                               className="p-2 bg-red-500 rounded-full text-foreground hover:bg-red-600 transition-colors"
                             >
                               <X className="w-4 h-4" />
-                            </button>
+                            </Button>
                           </div>
                           <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1">
                             <p className="text-xs text-slate-muted capitalize">{photo.photo_type}</p>
@@ -728,7 +729,7 @@ export default function ServiceOrderDetailPage() {
                 Related Vehicle
               </h3>
               <Link
-                href={`/hr/fleet/${order.vehicle_id}`}
+                href={`/fleet/${order.vehicle_id}`}
                 className="text-foreground hover:text-teal-electric transition-colors"
               >
                 <p className="font-medium">{order.vehicle_name || order.license_plate || `Vehicle #${order.vehicle_id}`}</p>
@@ -808,12 +809,12 @@ export default function ServiceOrderDetailPage() {
                 <Truck className="w-5 h-5 text-teal-electric" />
                 Dispatch Order
               </h3>
-              <button
+              <Button
                 onClick={() => setShowDispatchModal(false)}
                 className="p-1 text-slate-muted hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-4">
@@ -870,20 +871,20 @@ export default function ServiceOrderDetailPage() {
 
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-border">
-                <button
+                <Button
                   onClick={() => setShowDispatchModal(false)}
                   className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleDispatch}
                   disabled={isUpdating || !selectedTechnician}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-foreground font-medium hover:bg-purple-600 transition-colors disabled:opacity-50"
                 >
                   {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Dispatch
-                </button>
+                </Button>
               </div>
             </div>
           </div>

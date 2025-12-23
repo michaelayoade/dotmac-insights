@@ -1,0 +1,13 @@
+{# Ticket updated notification #}
+{% set title = "Ticket Update: #" ~ (ticket_id | default('')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your support ticket has been updated.
+
+Ticket: #{{ ticket_id }}
+Status: {{ status | default('Updated') }}
+
+{% if notes %}{{ notes }}{% endif %}
+
+Thank you for your patience.

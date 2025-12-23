@@ -28,6 +28,9 @@ import {
   useExpensePolicies,
   useExpensePolicyMutations,
 } from '@/hooks/useExpenses';
+import { LoadingState, Button } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 import type {
   ExpenseCategory,
   ExpenseCategoryCreatePayload,
@@ -43,7 +46,7 @@ type TabType = 'categories' | 'policies';
 
 function TabButton({ active, onClick, icon: Icon, label, count }: { active: boolean; onClick: () => void; icon: React.ElementType; label: string; count?: number }) {
   return (
-    <button
+    <Button
       onClick={onClick}
       className={cn(
         'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
@@ -59,13 +62,13 @@ function TabButton({ active, onClick, icon: Icon, label, count }: { active: bool
           {count}
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 
 function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={() => !disabled && onChange(!checked)}
       className={cn('p-1 rounded transition-colors', disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')}
@@ -75,7 +78,7 @@ function ToggleSwitch({ checked, onChange, disabled }: { checked: boolean; onCha
       ) : (
         <ToggleLeft className="w-6 h-6 text-slate-muted" />
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -128,9 +131,9 @@ function CategoryFormModal({
       <div className="bg-slate-card border border-slate-border rounded-xl w-full max-w-lg mx-4 shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-border">
           <h3 className="text-lg font-semibold text-foreground">{category ? 'Edit Category' : 'New Category'}</h3>
-          <button onClick={onClose} className="text-slate-muted hover:text-foreground">
+          <Button onClick={onClose} className="text-slate-muted hover:text-foreground">
             <XCircle className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -199,17 +202,17 @@ function CategoryFormModal({
             </label>
           </div>
           <div className="flex justify-end gap-3 pt-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
+            <Button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {category ? 'Update' : 'Create'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -275,9 +278,9 @@ function PolicyFormModal({
       <div className="bg-slate-card border border-slate-border rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-border">
           <h3 className="text-lg font-semibold text-foreground">{policy ? 'Edit Policy' : 'New Policy'}</h3>
-          <button onClick={onClose} className="text-slate-muted hover:text-foreground">
+          <Button onClick={onClose} className="text-slate-muted hover:text-foreground">
             <XCircle className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Basic Info */}
@@ -507,17 +510,17 @@ function PolicyFormModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-border">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
+            <Button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving}
               className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               {policy ? 'Update' : 'Create'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -571,13 +574,13 @@ function CategoriesTab() {
             Show Inactive
           </label>
         </div>
-        <button
+        <Button
           onClick={() => setShowNewForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Category
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -620,22 +623,22 @@ function CategoriesTab() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button
+                      <Button
                         onClick={() => setEditingCategory(cat)}
                         className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
-                      </button>
+                      </Button>
                       {!cat.is_system && (
-                        <button
+                        <Button
                           onClick={() => handleDelete(cat.id)}
                           disabled={deletingId === cat.id}
                           className="p-1.5 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded transition-colors disabled:opacity-50"
                           title="Delete"
                         >
                           {deletingId === cat.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </td>
@@ -711,13 +714,13 @@ function PoliciesTab() {
             Show Inactive
           </label>
         </div>
-        <button
+        <Button
           onClick={() => setShowNewForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-foreground text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Policy
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -753,21 +756,21 @@ function PoliciesTab() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
+                  <Button
                     onClick={() => setEditingPolicy(policy)}
                     className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleDelete(policy.id)}
                     disabled={deletingId === policy.id}
                     className="p-1.5 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded transition-colors disabled:opacity-50"
                     title="Delete"
                   >
                     {deletingId === policy.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -844,9 +847,26 @@ function PoliciesTab() {
 // =============================================================================
 
 export default function ExpensesSettingsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:write');
   const [activeTab, setActiveTab] = useState<TabType>('categories');
-  const { data: categories } = useExpenseCategories();
-  const { data: policies } = useExpensePolicies();
+  const canFetch = !authLoading && !missingScope;
+  const { data: categories } = useExpenseCategories({}, { isPaused: () => !canFetch });
+  const { data: policies } = useExpensePolicies({}, { isPaused: () => !canFetch });
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:write permission to manage expense settings."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

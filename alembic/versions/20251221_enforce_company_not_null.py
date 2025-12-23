@@ -62,13 +62,16 @@ def upgrade() -> None:
     for table in ENFORCE_NOT_NULL_TABLES:
         # Check if table exists
         result = conn.execute(
-            f"""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_name = '{table}'
-            )
-            """
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                    AND table_name = :table_name
+                )
+                """
+            ),
+            {"table_name": table},
         )
         if not result.scalar():
             print(f"  Skipping {table} (table does not exist)")
@@ -76,21 +79,26 @@ def upgrade() -> None:
 
         # Check if column exists
         result = conn.execute(
-            f"""
-            SELECT EXISTS (
-                SELECT FROM information_schema.columns
-                WHERE table_schema = 'public'
-                AND table_name = '{table}'
-                AND column_name = 'company'
-            )
-            """
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = :table_name
+                    AND column_name = 'company'
+                )
+                """
+            ),
+            {"table_name": table},
         )
         if not result.scalar():
             print(f"  Skipping {table} (no company column)")
             continue
 
         # Check for remaining NULL values
-        result = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE company IS NULL")
+        result = conn.execute(
+            sa.text(f"SELECT COUNT(*) FROM {table} WHERE company IS NULL")
+        )
         null_count = result.scalar()
 
         if null_count > 0:

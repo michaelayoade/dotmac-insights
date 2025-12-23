@@ -32,6 +32,7 @@ export const VARIANT_COLORS = {
     text: 'text-slate-muted',
     border: 'border-slate-border',
     icon: 'text-slate-muted',
+    pulse: 'bg-slate-muted',
   },
   success: {
     bg: 'bg-teal-electric/15',
@@ -39,6 +40,7 @@ export const VARIANT_COLORS = {
     text: 'text-teal-electric',
     border: 'border-teal-electric/30',
     icon: 'text-teal-electric',
+    pulse: 'bg-teal-electric',
   },
   warning: {
     bg: 'bg-amber-warn/15',
@@ -46,6 +48,7 @@ export const VARIANT_COLORS = {
     text: 'text-amber-warn',
     border: 'border-amber-warn/30',
     icon: 'text-amber-warn',
+    pulse: 'bg-amber-warn',
   },
   danger: {
     bg: 'bg-coral-alert/15',
@@ -53,6 +56,7 @@ export const VARIANT_COLORS = {
     text: 'text-coral-alert',
     border: 'border-coral-alert/30',
     icon: 'text-coral-alert',
+    pulse: 'bg-coral-alert',
   },
   info: {
     bg: 'bg-blue-info/15',
@@ -60,8 +64,16 @@ export const VARIANT_COLORS = {
     text: 'text-blue-info',
     border: 'border-blue-info/30',
     icon: 'text-blue-info',
+    pulse: 'bg-blue-info',
   },
 } as const;
+
+/**
+ * Get colors for a specific variant
+ */
+export function getVariantColors(variant: Variant) {
+  return VARIANT_COLORS[variant];
+}
 
 // =============================================================================
 // SPACING SCALE (8px Grid)
@@ -182,6 +194,15 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
   connected: 'success',
   healthy: 'success',
   resolved: 'success',
+  closed: 'success',
+  qualified: 'success',
+  converted: 'success',
+  verified: 'success',
+  submitted: 'success',
+  delivered: 'success',
+  received: 'success',
+  reconciled: 'success',
+  valid: 'success',
 
   // Warning states
   pending: 'warning',
@@ -194,6 +215,14 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
   suspended: 'warning',
   open: 'warning',
   inactive: 'warning',
+  contacted: 'warning',
+  in_progress: 'warning',
+  inprogress: 'warning',
+  on_hold: 'warning',
+  onhold: 'warning',
+  awaiting: 'warning',
+  replied: 'warning',
+  disputed: 'warning',
 
   // Danger states
   failed: 'danger',
@@ -205,16 +234,56 @@ export const STATUS_VARIANT_MAP: Record<string, Variant> = {
   rejected: 'danger',
   blocked: 'danger',
   unpaid: 'danger',
+  unqualified: 'danger',
+  expired: 'danger',
+  lost: 'danger',
+  churned: 'danger',
+  breached: 'danger',
 
   // Info states
   draft: 'info',
   new: 'info',
   scheduled: 'info',
   started: 'info',
+  quotation: 'info',
+  inquiry: 'info',
+  planned: 'info',
 
   // Default fallback
   unknown: 'default',
 };
+
+/**
+ * Custom display labels for status strings.
+ * Falls back to title-cased version if not defined.
+ */
+export const STATUS_LABELS: Record<string, string> = {
+  // Shorten common labels
+  partially_paid: 'Partial',
+  in_progress: 'In Progress',
+  on_hold: 'On Hold',
+  // Clarify ambiguous statuses
+  open: 'Open',
+  closed: 'Closed',
+  // Domain-specific
+  quotation: 'Quote',
+  po: 'PO',
+  grn: 'GRN',
+};
+
+/**
+ * Format a status string for display.
+ * Uses custom labels if defined, otherwise title-cases the status.
+ */
+export function formatStatusLabel(status: string | null | undefined): string {
+  if (!status) return 'Unknown';
+  const key = status.toLowerCase();
+  if (STATUS_LABELS[key]) return STATUS_LABELS[key];
+  // Title case: replace underscores/hyphens, capitalize words
+  return status
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 /**
  * Get variant for a status string
@@ -252,3 +321,17 @@ export const TAILWIND_COLORS = {
   'purple-accent': 'var(--color-purple-accent)',
   'cyan-accent': 'var(--color-cyan-accent)',
 } as const;
+
+// =============================================================================
+// ACCENT COLOR SYSTEM (Re-exported from colors.ts)
+// =============================================================================
+
+/**
+ * Re-export accent color types and utilities from the colors module.
+ * This provides a unified entry point for all color-related imports.
+ *
+ * For full accent color configurations, import from '@/lib/config/colors'.
+ * This re-export provides the most commonly used types and helpers.
+ */
+export type { AccentColor, AccentColorConfig, ButtonColorConfig } from '@/lib/config/colors';
+export { ACCENT_COLORS, getAccentColors, getSidebarColors, getCardColors, getButtonColors } from '@/lib/config/colors';

@@ -6,42 +6,9 @@ import { ArrowRight, ClipboardList, Wallet2, CheckCircle2, AlertCircle, Sparkles
 import { useExpenseClaims, useCashAdvances } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-
-const ACCENT = {
-  primary: '#0ea5e9', // sky
-  secondary: '#22c55e', // emerald
-  accent: '#f59e0b', // amber
-  surface: 'bg-slate-card',
-};
-
-function StatCard({
-  label,
-  value,
-  helper,
-  tone = 'default',
-}: {
-  label: string;
-  value: string | number;
-  helper?: string;
-  tone?: 'default' | 'warn' | 'success';
-}) {
-  return (
-    <div className={cn('rounded-2xl border p-4', 'border-slate-border', 'bg-slate-card')}>
-      <p className="text-slate-muted text-sm">{label}</p>
-      <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
-      {helper && (
-        <p
-          className={cn(
-            'text-xs mt-1',
-            tone === 'warn' ? 'text-amber-400' : tone === 'success' ? 'text-emerald-400' : 'text-slate-muted'
-          )}
-        >
-          {helper}
-        </p>
-      )}
-    </div>
-  );
-}
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 function ActionTile({
   href,
@@ -87,8 +54,12 @@ function ActionTile({
 }
 
 export default function ExpensesDashboard() {
-  const { data: claims, error: claimsError, isLoading: claimsLoading, mutate: refetchClaims } = useExpenseClaims({ limit: 50 });
-  const { data: advances, error: advancesError, isLoading: advancesLoading, mutate: refetchAdvances } = useCashAdvances({ limit: 50 });
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
+  const canFetch = !authLoading && !missingScope;
+
+  const { data: claims, error: claimsError, isLoading: claimsLoading, mutate: refetchClaims } = useExpenseClaims({ limit: 50 }, { isPaused: () => !canFetch });
+  const { data: advances, error: advancesError, isLoading: advancesLoading, mutate: refetchAdvances } = useCashAdvances({ limit: 50 }, { isPaused: () => !canFetch });
   const isLoading = claimsLoading || advancesLoading;
   const firstError = (claimsError || advancesError) as Error | undefined;
   const retryAll = () => {
@@ -117,6 +88,20 @@ export default function ExpensesDashboard() {
 
   const recentClaims = (claims || []).slice(0, 4);
   const recentAdvances = (advances || []).slice(0, 4);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view expenses."
+        backHref="/"
+        backLabel="Back to Home"
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -164,11 +149,11 @@ export default function ExpensesDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
-        <StatCard label="Open claims" value={metrics.openClaims} helper="Awaiting submission/approval" />
-        <StatCard label="Approved claims" value={metrics.approvedClaims} helper="Ready for posting" tone="success" />
-        <StatCard label="Total claimed" value={metrics.totalClaimed.toLocaleString()} helper="All time" />
-        <StatCard label="Outstanding advances" value={metrics.outstandingAdvances.toLocaleString()} tone="warn" helper="Needs settlement" />
-        <StatCard label="Pending advances" value={metrics.pendingAdvances} helper="Awaiting disbursement/settlement" />
+        <StatCard title="Open claims" value={metrics.openClaims} subtitle="Awaiting submission/approval" />
+        <StatCard title="Approved claims" value={metrics.approvedClaims} subtitle="Ready for posting" variant="success" />
+        <StatCard title="Total claimed" value={metrics.totalClaimed.toLocaleString()} subtitle="All time" />
+        <StatCard title="Outstanding advances" value={metrics.outstandingAdvances.toLocaleString()} variant="warning" subtitle="Needs settlement" />
+        <StatCard title="Pending advances" value={metrics.pendingAdvances} subtitle="Awaiting disbursement/settlement" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

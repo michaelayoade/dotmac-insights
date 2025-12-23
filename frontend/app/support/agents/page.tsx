@@ -1,40 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { AlertTriangle, Plus, User, Users, CheckCircle2, XCircle, Activity, Briefcase, Search, Filter } from 'lucide-react';
+import { AlertTriangle, Plus, User, Users, CheckCircle2, XCircle, Activity, Briefcase } from 'lucide-react';
 import { useSupportAgents, useSupportAgentMutations, useSupportRoutingQueueHealth } from '@/hooks/useApi';
 import type { SupportAgent } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-  subtitle,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className={cn('text-2xl font-bold mt-1', colorClass)}>{value}</p>
-          {subtitle && <p className="text-xs text-slate-muted mt-1">{subtitle}</p>}
-        </div>
-        <div className="p-2 rounded-lg bg-slate-elevated">
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -46,10 +19,11 @@ function ProgressBar({ value, max, color = 'bg-teal-electric' }: { value: number
 }
 
 export default function SupportAgentsPage() {
-  const { data, error, isLoading } = useSupportAgents();
-  const { data: queueHealth } = useSupportRoutingQueueHealth();
+  const { hasAccess: canWrite, isLoading: authLoading } = useRequireScope('support:write');
+  const canFetch = !authLoading;
+  const { data, error, isLoading } = useSupportAgents(undefined, undefined, { isPaused: () => !canFetch });
+  const { data: queueHealth } = useSupportRoutingQueueHealth({ isPaused: () => !canFetch });
   const { createAgent, updateAgent, deleteAgent } = useSupportAgentMutations();
-  const { hasAccess: canWrite } = useRequireScope('support:write');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -136,14 +110,14 @@ export default function SupportAgentsPage() {
             <p className="text-slate-muted text-sm">Manage support agents, capacity, and status</p>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setShowForm(!showForm)}
           disabled={!canWrite}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Add Agent
-        </button>
+        </Button>
       </div>
 
       {/* Error State */}
@@ -156,13 +130,13 @@ export default function SupportAgentsPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MetricCard label="Total Agents" value={metrics.total} icon={Users} colorClass="text-blue-400" />
-        <MetricCard label="Active" value={metrics.active} icon={CheckCircle2} colorClass="text-emerald-400" />
-        <MetricCard label="Inactive" value={metrics.inactive} icon={XCircle} colorClass="text-slate-muted" />
-        <MetricCard label="Total Capacity" value={metrics.totalCapacity} icon={Briefcase} colorClass="text-violet-400" />
-        <MetricCard label="Current Load" value={metrics.currentLoad} icon={Activity} colorClass="text-amber-400" />
-        <MetricCard
-          label="Utilization"
+        <StatCard title="Total Agents" value={metrics.total} icon={Users} colorClass="text-blue-400" />
+        <StatCard title="Active" value={metrics.active} icon={CheckCircle2} colorClass="text-emerald-400" />
+        <StatCard title="Inactive" value={metrics.inactive} icon={XCircle} colorClass="text-slate-muted" />
+        <StatCard title="Total Capacity" value={metrics.totalCapacity} icon={Briefcase} colorClass="text-violet-400" />
+        <StatCard title="Current Load" value={metrics.currentLoad} icon={Activity} colorClass="text-amber-400" />
+        <StatCard
+          title="Utilization"
           value={`${metrics.utilization.toFixed(0)}%`}
           icon={Activity}
           colorClass={metrics.utilization > 80 ? 'text-rose-400' : metrics.utilization > 60 ? 'text-amber-400' : 'text-emerald-400'}
@@ -227,53 +201,43 @@ export default function SupportAgentsPage() {
               <span>Active</span>
             </label>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground text-sm"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={saving || !canWrite}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
               >
                 {saving ? 'Creating…' : 'Create Agent'}
-              </button>
+              </Button>
             </div>
           </div>
         </form>
       )}
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-          </select>
-        </div>
-      </div>
+      <FilterCard contentClassName="flex flex-wrap gap-3">
+        <FilterInput
+          type="text"
+          placeholder="Search by name or email..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[200px]"
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as any)}
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active Only</option>
+          <option value="inactive">Inactive Only</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Agents List */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -345,20 +309,20 @@ export default function SupportAgentsPage() {
 
                   {/* Actions */}
                   <div className="mt-4 pt-3 border-t border-slate-border/50 flex items-center justify-end gap-2">
-                    <button
+                    <Button
                       onClick={() => updateAgent(agent.id, { is_active: !agent.is_active })}
                       disabled={!canWrite}
                       className="px-3 py-1.5 rounded-lg border border-slate-border text-xs text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {agent.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => deleteAgent(agent.id)}
                       disabled={!canWrite}
                       className="px-3 py-1.5 rounded-lg border border-rose-500/40 text-xs text-rose-400 hover:bg-rose-500/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               );

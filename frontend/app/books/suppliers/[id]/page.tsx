@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Building, Phone, Mail, MapPin, Receipt, CreditCard, Pencil, Save, X, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building, Phone, Mail, MapPin, Receipt, CreditCard, Pencil, Save, X, Trash2, CheckCircle2 } from 'lucide-react';
 import { usePurchasingSupplierDetail } from '@/hooks/useApi';
 import { accountingApi, AccountingSupplierPayload } from '@/lib/api/domains/accounting';
-import { formatCurrency, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { Button, LinkButton } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 function formatValue(value: string | number | null | undefined, fallback = '—') {
   if (value === null || value === undefined) return fallback;
@@ -122,13 +124,13 @@ export default function SupplierDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Supplier not found</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -137,8 +139,8 @@ export default function SupplierDetailPage() {
   const outstanding = supplier.outstanding ?? supplier.total_outstanding ?? 0;
   const totalPurchases = supplier.total_purchases ?? 0;
   const cards = [
-    { label: 'Outstanding', value: formatCurrency(outstanding, currency), tone: 'text-orange-400' },
-    { label: 'Total Purchases', value: formatCurrency(totalPurchases, currency), tone: 'text-blue-400' },
+    { label: 'Outstanding', value: formatAccountingCurrency(outstanding, currency), tone: 'text-orange-400' },
+    { label: 'Total Purchases', value: formatAccountingCurrency(totalPurchases, currency), tone: 'text-blue-400' },
     { label: 'Status', value: (supplier as any).disabled ? 'Disabled' : 'Active', tone: (supplier as any).disabled ? 'text-slate-400' : 'text-emerald-success' },
     { label: 'Bills', value: (supplier.bill_count ?? 0).toString(), tone: 'text-slate-200' },
   ];
@@ -163,38 +165,21 @@ export default function SupplierDetailPage() {
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
-              >
-                <Pencil className="w-4 h-4" />
+              <Button onClick={() => setIsEditing(true)} variant="secondary" icon={Pencil}>
                 Edit
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-coral-alert/10 border border-coral-alert/30 text-coral-alert text-sm hover:bg-coral-alert/20"
-              >
-                <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button onClick={() => setDeleteConfirm(true)} variant="danger" icon={Trash2}>
                 Delete
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <Button onClick={handleSave} disabled={saving} loading={saving} module="books" icon={Save}>
                 Save
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
-              >
-                <X className="w-4 h-4" />
+              </Button>
+              <Button onClick={cancelEdit} variant="secondary" icon={X}>
                 Cancel
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -211,18 +196,18 @@ export default function SupplierDetailPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={handleDelete}
                 className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
               >
                 Yes, Delete
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(false)}
                 className="px-3 py-1.5 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -403,9 +388,9 @@ export default function SupplierDetailPage() {
               <h3 className="text-foreground font-semibold">Financials</h3>
             </div>
             <p className="text-sm text-slate-200">Currency: {currency}</p>
-            <p className="text-sm text-slate-200">Outstanding: {formatCurrency(outstanding, currency)}</p>
-            <p className="text-sm text-slate-200">Total Purchases: {formatCurrency(totalPurchases, currency)}</p>
-            <p className="text-sm text-slate-200">Credit Limit: {formatCurrency(supplier.credit_limit ?? 0, currency)}</p>
+            <p className="text-sm text-slate-200">Outstanding: {formatAccountingCurrency(outstanding, currency)}</p>
+            <p className="text-sm text-slate-200">Total Purchases: {formatAccountingCurrency(totalPurchases, currency)}</p>
+            <p className="text-sm text-slate-200">Credit Limit: {formatAccountingCurrency(supplier.credit_limit ?? 0, currency)}</p>
           </div>
         </div>
       )}

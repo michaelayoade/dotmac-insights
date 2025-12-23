@@ -1,42 +1,19 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { AlertTriangle, Plus, Shield, Users, UserPlus, Trash2, User, Filter, Search, RefreshCw, Scale } from 'lucide-react';
+import { AlertTriangle, Plus, Shield, Users, UserPlus, Trash2, User, RefreshCw, Scale } from 'lucide-react';
 import { useSupportTeams, useSupportTeamMutations, useSupportAgents } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className={cn('text-2xl font-bold mt-1', colorClass)}>{value}</p>
-        </div>
-        <div className="p-2 rounded-lg bg-slate-elevated">
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Button, FilterCard, FilterInput } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 export default function SupportTeamsPage() {
-  const { data, error, isLoading } = useSupportTeams();
+  const { hasAccess: canWrite, isLoading: authLoading } = useRequireScope('support:write');
+  const canFetch = !authLoading;
+  const { data, error, isLoading } = useSupportTeams({ isPaused: () => !canFetch });
   const { createTeam, updateTeam, deleteTeam, addMember, deleteMember } = useSupportTeamMutations();
-  const { data: agentsData } = useSupportAgents();
-  const { hasAccess: canWrite } = useRequireScope('support:write');
+  const { data: agentsData } = useSupportAgents(undefined, undefined, { isPaused: () => !canFetch });
 
   const agents = agentsData?.agents ?? [];
   const teams = data?.teams;
@@ -118,14 +95,14 @@ export default function SupportTeamsPage() {
             <p className="text-slate-muted text-sm">Manage queues, routing rules, and membership</p>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setShowForm(!showForm)}
           disabled={!canWrite}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Create Team
-        </button>
+        </Button>
       </div>
 
       {/* Error State */}
@@ -138,10 +115,10 @@ export default function SupportTeamsPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard label="Total Teams" value={metrics.totalTeams} icon={Shield} colorClass="text-violet-400" />
-        <MetricCard label="Total Members" value={metrics.totalMembers} icon={Users} colorClass="text-blue-400" />
-        <MetricCard label="Round Robin" value={metrics.roundRobin} icon={RefreshCw} colorClass="text-emerald-400" />
-        <MetricCard label="Load Balanced" value={metrics.loadBalanced} icon={Scale} colorClass="text-amber-400" />
+        <StatCard title="Total Teams" value={metrics.totalTeams} icon={Shield} colorClass="text-violet-400" />
+        <StatCard title="Total Members" value={metrics.totalMembers} icon={Users} colorClass="text-blue-400" />
+        <StatCard title="Round Robin" value={metrics.roundRobin} icon={RefreshCw} colorClass="text-emerald-400" />
+        <StatCard title="Load Balanced" value={metrics.loadBalanced} icon={Scale} colorClass="text-amber-400" />
       </div>
 
       {/* Create Team Form */}
@@ -183,41 +160,34 @@ export default function SupportTeamsPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-border">
-            <button
+            <Button
               type="button"
               onClick={() => setShowForm(false)}
               className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground text-sm"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={saving || !canWrite}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
             >
               {saving ? 'Creating…' : 'Create Team'}
-            </button>
+            </Button>
           </div>
         </form>
       )}
 
       {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filter</span>
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-          <input
-            type="text"
-            placeholder="Search teams by name or description..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
-      </div>
+      <FilterCard contentClassName="flex flex-wrap gap-3">
+        <FilterInput
+          type="text"
+          placeholder="Search teams by name or description..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full"
+        />
+      </FilterCard>
 
       {/* Teams List */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -253,13 +223,13 @@ export default function SupportTeamsPage() {
                       <span className="px-2 py-1 rounded-full border border-slate-border text-slate-muted text-xs">
                         {team.assignment_rule || 'round_robin'}
                       </span>
-                      <button
+                      <Button
                         onClick={() => deleteTeam(team.id)}
                         disabled={!canWrite}
                         className="px-2 py-1 rounded border border-red-500/40 text-red-300 hover:text-foreground text-xs disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -286,13 +256,13 @@ export default function SupportTeamsPage() {
                                 <p className="text-slate-muted text-xs">{member.role}</p>
                               )}
                             </div>
-                            <button
+                            <Button
                               onClick={() => deleteMember(team.id, member.id)}
                               disabled={!canWrite}
                               className="text-red-300 hover:text-foreground ml-2 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                               <Trash2 className="w-3 h-3" />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -334,7 +304,7 @@ export default function SupportTeamsPage() {
                         placeholder="Role (optional)"
                         className="w-40 bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
                       />
-                      <button
+                      <Button
                         onClick={async () => {
                           if (!canWrite) return;
                           const form = memberForms[team.id];
@@ -346,7 +316,7 @@ export default function SupportTeamsPage() {
                         className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Add
-                      </button>
+                      </Button>
                     </div>
                     {availableAgents.length === 0 && agents.length > 0 && (
                       <p className="text-xs text-slate-muted mt-2">All active agents are already members of this team</p>

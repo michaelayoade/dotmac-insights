@@ -10,19 +10,11 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  Filter,
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { formatAccountingDate } from '@/lib/formatters/accounting';
+import { FilterCard, FilterSelect } from '@/components/ui';
 
 function formatDateLong(date: string | null | undefined) {
   if (!date) return '-';
@@ -137,7 +129,7 @@ export default function FilingCalendarPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-red-400 text-sm font-medium">{Math.abs(filing.days_until_due)} days overdue</p>
-                  <p className="text-slate-muted text-xs">Due: {formatDate(filing.deadline)}</p>
+                  <p className="text-slate-muted text-xs">Due: {formatAccountingDate(filing.deadline)}</p>
                 </div>
               </div>
             ))}
@@ -177,43 +169,39 @@ export default function FilingCalendarPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-muted" />
-          <span className="text-sm text-slate-muted">Filters:</span>
-        </div>
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-4 items-center" iconClassName="text-slate-muted">
+        <FilterSelect
           value={year}
           onChange={(e) => updateFilters({ year: Number(e.target.value) })}
-          className="input-field max-w-[120px]"
+          className="max-w-[120px]"
         >
           {[...Array(3)].map((_, i) => {
             const y = new Date().getFullYear() + 1 - i;
             return <option key={y} value={y}>{y}</option>;
           })}
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={taxTypeFilter}
           onChange={(e) => updateFilters({ taxType: e.target.value })}
-          className="input-field max-w-[140px]"
+          className="max-w-[140px]"
         >
           <option value="">All Tax Types</option>
           <option value="VAT">VAT</option>
           <option value="WHT">WHT</option>
           <option value="PAYE">PAYE</option>
           <option value="CIT">CIT</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={statusFilter}
           onChange={(e) => updateFilters({ status: e.target.value })}
-          className="input-field max-w-[140px]"
+          className="max-w-[140px]"
         >
           <option value="">All Statuses</option>
           <option value="overdue">Overdue</option>
           <option value="upcoming">Upcoming (30 days)</option>
           <option value="filed">Filed</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Calendar View by Month */}
       {isLoading ? (

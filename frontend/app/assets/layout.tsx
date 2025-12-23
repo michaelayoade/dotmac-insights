@@ -13,7 +13,10 @@ import {
   Building2,
   TrendingDown,
 } from 'lucide-react';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 
 // Asset Management Flow:
 // 1. ACQUIRE: Purchase, capitalize, categorize
@@ -102,6 +105,24 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function AssetsLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('assets:read');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
+
   return (
     <ModuleLayout
       moduleName="Dotmac"

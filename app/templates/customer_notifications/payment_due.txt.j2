@@ -1,0 +1,17 @@
+{# Payment due reminder notification #}
+{% set title = "Payment Due Reminder: #" ~ (invoice_number | default('')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+This is a friendly reminder that payment for your invoice is due soon.
+
+Invoice: #{{ invoice_number }}
+Amount: {{ amount | default('₦0.00') }}
+Due Date: {{ due_date | format_date }}
+{% if days_until_due %}Days Until Due: {{ days_until_due }}{% endif %}
+
+Please ensure payment is made by the due date to avoid any service interruptions.
+
+If you've already made the payment, please disregard this notice.
+
+Thank you!

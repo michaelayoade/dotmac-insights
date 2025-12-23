@@ -3,24 +3,44 @@
 import { useParams } from "next/navigation";
 import { useExpenseClaimDetail, useExpenseMutations } from "@/hooks/useExpenses";
 import { formatDate } from "@/lib/utils";
+import { LoadingState, Button } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function ExpenseClaimDetailPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const params = useParams<{ id: string }>();
   const claimId = Number(params?.id);
-  const { data, error } = useExpenseClaimDetail(claimId);
+  const canFetch = !authLoading && !missingScope;
+  const { data, error } = useExpenseClaimDetail(claimId, { isPaused: () => !canFetch });
   const { submitClaim, approveClaim, rejectClaim, postClaim, reverseClaim } = useExpenseMutations();
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view expense claims."
+        backHref="/expenses/claims"
+        backLabel="Back to Claims"
+      />
+    );
+  }
 
   if (error) return <div className="text-red-600">Failed to load claim</div>;
   if (!data) return <div>Loading claim...</div>;
 
   const actions = [];
   if (data.status === "draft" || data.status === "returned" || data.status === "recalled") {
-    actions.push(<button key="submit" onClick={() => submitClaim(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-foreground">Submit</button>);
+    actions.push(<Button key="submit" onClick={() => submitClaim(data.id)} className="rounded-lg bg-blue-600 px-3 py-2 text-foreground">Submit</Button>);
   }
   if (data.status === "pending_approval") {
-    actions.push(<button key="approve" onClick={() => approveClaim(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-foreground">Approve</button>);
+    actions.push(<Button key="approve" onClick={() => approveClaim(data.id)} className="rounded-lg bg-green-600 px-3 py-2 text-foreground">Approve</Button>);
     actions.push(
-      <button
+      <Button
         key="reject"
         onClick={() => {
           const reason = prompt("Enter rejection reason");
@@ -29,19 +49,19 @@ export default function ExpenseClaimDetailPage() {
         className="rounded-lg bg-red-600 px-3 py-2 text-foreground"
       >
         Reject
-      </button>
+      </Button>
     );
   }
   if (data.status === "approved") {
     actions.push(
-      <button key="post" onClick={() => postClaim(data.id)} className="rounded-lg bg-indigo-600 px-3 py-2 text-foreground">
+      <Button key="post" onClick={() => postClaim(data.id)} className="rounded-lg bg-indigo-600 px-3 py-2 text-foreground">
         Post to GL
-      </button>
+      </Button>
     );
   }
   if (data.status === "posted") {
     actions.push(
-      <button
+      <Button
         key="reverse"
         onClick={() => {
           const reason = prompt("Enter reversal reason");
@@ -50,7 +70,7 @@ export default function ExpenseClaimDetailPage() {
         className="rounded-lg bg-amber-600 px-3 py-2 text-foreground"
       >
         Reverse
-      </button>
+      </Button>
     );
   }
 

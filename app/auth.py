@@ -13,7 +13,10 @@ import secrets
 import time
 from datetime import datetime
 from functools import wraps
-from typing import Optional, Union, Callable, List, Any
+from typing import Optional, Union, Callable, List, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fastapi import WebSocket
 
 import bcrypt
 import httpx
@@ -22,7 +25,7 @@ from fastapi import HTTPException, Depends, Request, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError, jwk
 from jose.exceptions import JWKError
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -35,6 +38,62 @@ logger = structlog.get_logger()
 # Security schemes
 bearer_scheme = HTTPBearer(auto_error=False)
 AUTH_COOKIE_NAME = "dotmac_access_token"
+
+
+# ============================================================================
+# Origin Validation (CSRF/CSWSH Protection)
+# ============================================================================
+
+
+def validate_origin(origin: Optional[str], allowed_origins: List[str]) -> bool:
+    """Validate Origin header against allowed CORS origins.
+
+    Used for CSRF protection on login endpoints and CSWSH protection on WebSockets.
+
+    Args:
+        origin: The Origin header value (may be None)
+        allowed_origins: List of allowed origin URLs from settings.cors_origins_list
+
+    Returns:
+        True if origin is valid, False otherwise
+    """
+    if not origin:
+        return False
+
+    # Normalize origin (strip trailing slash)
+    origin = origin.rstrip("/").lower()
+
+    for allowed in allowed_origins:
+        allowed_normalized = allowed.rstrip("/").lower()
+        if origin == allowed_normalized:
+            return True
+
+    return False
+
+
+def get_origin_from_request(request: Request) -> Optional[str]:
+    """Extract Origin header from request, falling back to Referer if needed."""
+    origin = request.headers.get("origin")
+    if origin:
+        return origin
+
+    # Fall back to Referer header (extract origin portion)
+    referer = request.headers.get("referer")
+    if referer:
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(referer)
+            if parsed.scheme and parsed.netloc:
+                return f"{parsed.scheme}://{parsed.netloc}"
+        except Exception:
+            pass
+
+    return None
+
+
+def get_origin_from_websocket(websocket: "WebSocket") -> Optional[str]:
+    """Extract Origin header from WebSocket connection."""
+    return websocket.headers.get("origin")
 
 
 # ============================================================================
@@ -67,8 +126,7 @@ class Principal(BaseModel):
     scopes: set[str] = set()  # Available permission scopes
     raw_claims: Optional[dict] = None  # Original JWT claims (for users)
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def has_scope(self, scope: str) -> bool:
         """Check if principal has a specific permission scope."""
@@ -344,19 +402,30 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
     On first login, creates a user record linked to better-auth via external_id.
     On subsequent logins, updates user info from JWT claims.
 
+    Security:
+    - Users are matched by external_id (sub claim) only in production
+    - Email fallback is only allowed in E2E test mode to handle test user variations
+    - This prevents cross-account linking if an OAuth provider misconfigures email claims
+
     Note: Users are created without superuser privileges. Promote explicitly via admin tooling.
     """
-    # First try to find by external_id
+    # First try to find by external_id (primary identity)
     user = db.query(User).filter(User.external_id == claims.sub).first()
 
-    # If not found by external_id, try by email (handles E2E test scenarios
-    # where different scope combinations generate different external_ids)
-    if not user and claims.email:
+    # Security: Email fallback is ONLY allowed in E2E test mode
+    # In production, users must match by external_id to prevent account takeover
+    # via misconfigured OAuth provider email claims
+    if not user and claims.email and settings.e2e_auth_enabled and settings.e2e_jwt_secret:
         user = db.query(User).filter(User.email == claims.email).first()
         if user:
-            # Update external_id to match current token (for E2E tests)
+            # Update external_id to match current token (for E2E tests only)
+            logger.info(
+                "user_external_id_updated_e2e",
+                user_id=user.id,
+                old_external_id=user.external_id,
+                new_external_id=claims.sub,
+            )
             user.external_id = claims.sub
-            logger.info("user_external_id_updated", user_id=user.id, external_id=claims.sub)
 
     if not user:
         # Check if this is the first user in the system (for bootstrap audit)

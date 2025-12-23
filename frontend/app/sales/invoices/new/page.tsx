@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, FileText, Plus, Trash2 } from 'lucide-react';
 import { useFinanceCustomers, useFinanceInvoiceMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/formatters';
 import { BackButton, Button } from '@/components/ui';
 
 type LineItem = {
@@ -15,14 +17,6 @@ type LineItem = {
   tax_rate: number;
 };
 
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
 
 export default function InvoiceCreatePage() {
   const router = useRouter();
@@ -41,7 +35,7 @@ export default function InvoiceCreatePage() {
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const { errors: fieldErrors, setErrors: setFieldErrors, clearAll: clearFieldErrors } = useFormErrors();
 
   const totals = lineItems.reduce(
     (acc, item) => {
@@ -76,6 +70,7 @@ export default function InvoiceCreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    clearFieldErrors();
     if (!validate()) return;
     setSubmitting(true);
     try {
@@ -250,14 +245,14 @@ export default function InvoiceCreatePage() {
               <FileText className="w-4 h-4 text-teal-electric" />
               Line Items
             </h3>
-            <button
+            <Button
               type="button"
               onClick={addLine}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-foreground hover:border-teal-electric/50"
             >
               <Plus className="w-4 h-4" />
               Add line
-            </button>
+            </Button>
           </div>
           {fieldErrors.lineItems && <p className="text-xs text-red-400">{fieldErrors.lineItems}</p>}
           <div className="space-y-2">
@@ -319,14 +314,14 @@ export default function InvoiceCreatePage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-end">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeLine(item.id)}
                     className="p-2 text-slate-muted hover:text-red-400"
                     aria-label="Remove line item"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

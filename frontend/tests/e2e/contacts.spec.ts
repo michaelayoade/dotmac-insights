@@ -14,7 +14,7 @@ import { createTestContact, deleteTestContact } from './fixtures/api-helpers';
 test.describe('Contacts - Authenticated', () => {
   test.beforeEach(async ({ page }) => {
     // Set up authentication with full customer scopes
-    await setupAuth(page, ['customers:read', 'customers:write']);
+    await setupAuth(page, ['contacts:read', 'contacts:write']);
   });
 
   test.describe('List View', () => {
@@ -22,7 +22,10 @@ test.describe('Contacts - Authenticated', () => {
       await page.goto('/contacts');
 
       // Verify page structure
-      await expect(page.getByRole('heading', { name: /Unified Contacts/i })).toBeVisible();
+      await expect(page.getByText(/access denied|not authorized/i)).toBeHidden({ timeout: 10000 });
+      await expect(
+        page.getByRole('heading', { name: /Unified Contacts|Contacts/i })
+      ).toBeVisible({ timeout: 10000 });
       await expect(page.getByRole('link', { name: /Add Contact/i })).toBeVisible();
 
       // Verify data table is present
@@ -54,11 +57,13 @@ test.describe('Contacts - Authenticated', () => {
       const searchInput = page.getByPlaceholder(/search/i);
       await searchInput.fill('Test');
 
-      // Wait for search debounce and API response
-      await page.waitForTimeout(500);
-
-      // Table should update (either showing results or empty state)
-      await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
+      // Wait for results or empty state without fixed delays
+      await expect(
+        page
+          .locator('table tbody tr, [role="grid"] [role="row"]')
+          .first()
+          .or(page.getByText(/no results|empty|no data/i))
+      ).toBeVisible({ timeout: 10000 });
     });
 
     test('filter by contact type works', async ({ page }) => {
@@ -68,10 +73,14 @@ test.describe('Contacts - Authenticated', () => {
       const typeFilter = page.locator('select').filter({ hasText: /type|all/i }).first();
       await expect(typeFilter).toBeVisible();
       await typeFilter.selectOption({ index: 1 });
-      await page.waitForTimeout(500);
 
       // Verify table is still visible after filter
-      await expect(page.locator('table, [role="grid"]').first()).toBeVisible();
+      await expect(
+        page
+          .locator('table tbody tr, [role="grid"] [role="row"]')
+          .first()
+          .or(page.getByText(/no results|empty|no data/i))
+      ).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -114,13 +123,17 @@ test.describe('Contacts - Authenticated', () => {
 
       // Should redirect to list or detail page
       await page.waitForURL(/\/contacts(?:\/\d+)?$/, { timeout: 10000 });
+      const createdIdMatch = page.url().match(/\/contacts\/(\d+)/);
 
       // Verify contact appears in list
       await page.goto('/contacts');
       await page.getByPlaceholder(/search/i).fill(testName);
-      await page.waitForTimeout(500);
 
       await expect(page.getByText(testName)).toBeVisible({ timeout: 5000 });
+
+      if (createdIdMatch) {
+        await deleteTestContact(request, Number(createdIdMatch[1]));
+      }
     });
 
   });
@@ -176,55 +189,57 @@ test.describe('Contacts - Authenticated', () => {
         email: `archive-${Date.now()}@test.com`,
       });
 
-      await page.goto(`/contacts/${contact.id}`);
+      try {
+        await page.goto(`/contacts/${contact.id}`);
 
-      // Find and click archive/delete button
-      const archiveButton = page.getByRole('button', { name: /archive|delete|remove/i });
-      await archiveButton.click();
+        // Find and click archive/delete button
+        const archiveButton = page.getByRole('button', { name: /archive|delete|remove/i });
+        await archiveButton.click();
 
-      // Confirm if modal appears
-      const confirmButton = page.getByRole('button', { name: /confirm|yes|archive|delete/i });
-      await expect(confirmButton).toBeVisible({ timeout: 2000 });
-      await confirmButton.click();
+        // Confirm if modal appears
+        const confirmButton = page.getByRole('button', { name: /confirm|yes|archive|delete/i });
+        await expect(confirmButton).toBeVisible({ timeout: 2000 });
+        await confirmButton.click();
 
-      // Should redirect to list
-      await page.waitForURL('/contacts', { timeout: 10000 });
+        // Should redirect to list
+        await page.waitForURL('/contacts', { timeout: 10000 });
 
-      // Contact should not appear in active list
-      await page.getByPlaceholder(/search/i).fill(contact.name);
-      await page.waitForTimeout(500);
-
-      await expect(page.getByText(contact.name)).not.toBeVisible();
+        // Contact should not appear in active list
+        await page.getByPlaceholder(/search/i).fill(contact.name);
+        await expect(page.getByText(contact.name)).toBeHidden({ timeout: 5000 });
+      } finally {
+        await deleteTestContact(request, contact.id);
+      }
     });
   });
 });
 
-  test.describe('Contacts - RBAC', () => {
-    test('read-only user cannot see create button', async ({ page }) => {
-      await setupAuth(page, ['customers:read']);
-      await page.goto('/contacts');
+test.describe('Contacts - RBAC', () => {
+  test('read-only user cannot see create button', async ({ page }) => {
+    await setupAuth(page, ['contacts:read']);
+    await page.goto('/contacts');
 
-      // Create button should be hidden or disabled
-      const createButton = page.getByRole('link', { name: /Add Contact/i });
-      await expect(createButton).toBeHidden();
-    });
+    // Create button should be hidden or disabled
+    const createButton = page.getByRole('link', { name: /Add Contact/i });
+    await expect(createButton).toBeHidden();
+  });
 
   test('user without customers scope sees access denied', async ({ page }) => {
-    await setupAuth(page, ['hr:read']); // No customer scopes
+    await setupAuth(page, ['hr:read']); // No contacts scopes
     await page.goto('/contacts');
 
     await expectAccessDenied(page);
   });
 });
 
-  test.describe('Contacts - Unauthenticated', () => {
-    test('redirects to login when not authenticated', async ({ page }) => {
-      // Clear any existing auth
-      await page.goto('/');
-      await page.evaluate(() => localStorage.clear());
+test.describe('Contacts - Unauthenticated', () => {
+  test('redirects to login when not authenticated', async ({ page }) => {
+    // Clear any existing auth
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
 
-      await page.goto('/contacts');
+    await page.goto('/contacts');
 
-      await expect(page).toHaveURL(/\/login|\/auth/);
-    });
+    await expect(page).toHaveURL(/\/login|\/auth/);
   });
+});

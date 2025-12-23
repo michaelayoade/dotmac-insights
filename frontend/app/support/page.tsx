@@ -24,8 +24,6 @@ import {
   AlertTriangle,
   Users,
   Target,
-  TrendingUp,
-  TrendingDown,
   ArrowRight,
   Headphones,
   MessageSquare,
@@ -36,7 +34,10 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { PageHeader } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 const CHART_PALETTE = CHART_COLORS.palette;
 const TOOLTIP_STYLE = {
@@ -47,67 +48,6 @@ const TOOLTIP_STYLE = {
   },
   labelStyle: { color: CHART_COLORS.tooltip.text },
 };
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  trend,
-  trendLabel,
-  colorClass = 'text-teal-electric',
-  loading,
-  href,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  trend?: 'up' | 'down' | 'neutral';
-  trendLabel?: string;
-  colorClass?: string;
-  loading?: boolean;
-  href?: string;
-}) {
-  const content = (
-    <div className={cn(
-      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
-      href && 'hover:border-teal-electric/50 cursor-pointer'
-    )}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          {loading ? (
-            <div className="h-8 w-16 bg-slate-elevated animate-pulse rounded mt-1" />
-          ) : (
-            <p className={cn('text-3xl font-bold mt-1', colorClass)}>{value}</p>
-          )}
-          {trendLabel && (
-            <div className="flex items-center gap-1 mt-2">
-              {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
-              {trend === 'down' && <TrendingDown className="w-3 h-3 text-rose-400" />}
-              <span className={cn('text-xs', trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-muted')}>
-                {trendLabel}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className={cn('p-3 rounded-xl', colorClass.includes('teal') ? 'bg-teal-500/10' : 'bg-slate-elevated')}>
-          <Icon className={cn('w-6 h-6', colorClass)} />
-        </div>
-      </div>
-      {href && (
-        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
-          <span>View details</span>
-          <ArrowRight className="w-3 h-3 ml-1" />
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
-}
 
 function QuickActionCard({
   title,
@@ -171,7 +111,14 @@ function SlaGauge({ attainment }: { attainment: number }) {
 }
 
 export default function SupportDashboardPage() {
-  const { data, isLoading, error, mutate } = useConsolidatedSupportDashboard();
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('support:read');
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error, mutate } = useConsolidatedSupportDashboard(
+    undefined,
+    { isPaused: () => !canFetch }
+  );
 
   // Chart data must be computed unconditionally
   const volumeTrendData = useMemo(() => {
@@ -200,6 +147,20 @@ export default function SupportDashboardPage() {
       rate: item.rate,
     }));
   }, [data?.sla_performance]);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the support:read permission to view the support dashboard."
+        backHref="/"
+        backLabel="Back to Home"
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -233,31 +194,30 @@ export default function SupportDashboardPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Open Tickets"
+        <StatCard
+          title="Open Tickets"
           value={summary?.open_tickets ?? 0}
           icon={Ticket}
           colorClass="text-blue-400"
           href="/support/tickets?status=open"
         />
-        <MetricCard
-          label="Resolved Tickets"
+        <StatCard
+          title="Resolved Tickets"
           value={summary?.resolved_tickets ?? 0}
           icon={CheckCircle2}
           colorClass="text-emerald-400"
           href="/support/tickets?status=resolved"
         />
-        <MetricCard
-          label="Overdue Tickets"
+        <StatCard
+          title="Overdue Tickets"
           value={summary?.overdue_tickets ?? 0}
           icon={AlertTriangle}
           colorClass={summary?.overdue_tickets ? 'text-rose-400' : 'text-slate-muted'}
-          trend={summary?.overdue_tickets ? 'down' : 'neutral'}
-          trendLabel={summary?.overdue_tickets ? 'Action needed' : 'All on track'}
+          trend={summary?.overdue_tickets ? { value: -1, label: 'Action needed' } : { value: 0, label: 'All on track' }}
           href="/support/tickets?overdue=true"
         />
-        <MetricCard
-          label="Avg Resolution Time"
+        <StatCard
+          title="Avg Resolution Time"
           value={`${(summary?.avg_resolution_hours ?? 0).toFixed(1)}h`}
           icon={Clock}
           colorClass="text-amber-400"

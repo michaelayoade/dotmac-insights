@@ -5,34 +5,29 @@ import { useRouter } from 'next/navigation';
 import { useOpenBankingConnections, useGatewayMutations } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { AlertTriangle, Building2, RefreshCw, Unlink, Eye, Link as LinkIcon, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
+
 import { paymentsApi } from '@/lib/api';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, StatusPill } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getStatusBadge(status: string) {
-  const config: Record<string, { icon: any; className: string }> = {
-    connected: { icon: CheckCircle, className: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    disconnected: { icon: XCircle, className: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    expired: { icon: Clock, className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    pending: { icon: Clock, className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  const config: Record<string, { icon: LucideIcon; tone: StatusTone }> = {
+    connected: { icon: CheckCircle, tone: 'success' },
+    disconnected: { icon: XCircle, tone: 'danger' },
+    expired: { icon: Clock, tone: 'warning' },
+    pending: { icon: Clock, tone: 'info' },
   };
-  const { icon: Icon, className } = config[status] || config.pending;
+  const { icon: Icon, tone } = config[status] || config.pending;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>
-      <Icon className="w-3 h-3" />
-      {status}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status)}
+      tone={tone}
+      icon={Icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -105,9 +100,9 @@ export default function OpenBankingConnectionsPage() {
         <div className="text-right">
           {item.balance != null ? (
             <>
-              <span className="font-mono text-foreground">{formatCurrency(item.balance, item.currency)}</span>
+              <span className="font-mono text-foreground">{formatAccountingCurrency(item.balance, item.currency)}</span>
               {item.balance_updated_at && (
-                <div className="text-xs text-slate-muted">Updated {formatDate(item.balance_updated_at)}</div>
+                <div className="text-xs text-slate-muted">Updated {formatAccountingDate(item.balance_updated_at)}</div>
               )}
             </>
           ) : (
@@ -129,28 +124,28 @@ export default function OpenBankingConnectionsPage() {
     {
       key: 'last_synced_at',
       header: 'Last Synced',
-      render: (item: any) => <span className="text-slate-muted text-sm">{formatDate(item.last_synced_at)}</span>,
+      render: (item: any) => <span className="text-slate-muted text-sm">{formatAccountingDate(item.last_synced_at)}</span>,
     },
     {
       key: 'actions',
       header: '',
       render: (item: any) => (
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <button
+          <Button
             onClick={() => { setSelectedConnection(item); setShowTransactionsModal(true); }}
             className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-teal-electric transition-colors"
             title="View transactions"
           >
             <Eye className="w-4 h-4" />
-          </button>
+          </Button>
           {item.status === 'connected' && (
-            <button
+            <Button
               onClick={() => { setSelectedConnection(item); setShowUnlinkModal(true); }}
               className="p-1.5 rounded hover:bg-slate-700 text-slate-muted hover:text-red-400 transition-colors"
               title="Unlink account"
             >
               <Unlink className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
       ),
@@ -170,13 +165,13 @@ export default function OpenBankingConnectionsPage() {
           <Building2 className="w-5 h-5 text-teal-electric" />
           <h1 className="text-xl font-semibold text-foreground">Open Banking Connections</h1>
         </div>
-        <button
+        <Button
           onClick={() => mutate()}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-muted transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Info Banner */}
@@ -274,18 +269,18 @@ export default function OpenBankingConnectionsPage() {
               This will revoke access to transaction data from this account.
             </p>
             <div className="flex justify-end gap-3">
-              <button
+              <Button
                 onClick={() => setShowUnlinkModal(false)}
                 className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleUnlink(selectedConnection.id)}
                 className="px-4 py-2 rounded-lg bg-red-500 text-foreground font-semibold hover:bg-red-600 transition-colors"
               >
                 Unlink
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -333,12 +328,12 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
             <h3 className="text-lg font-semibold text-foreground">{connection.bank_name} Transactions</h3>
             <p className="text-sm text-slate-muted font-mono">{connection.account_number}</p>
           </div>
-          <button
+          <Button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-slate-700 text-slate-muted hover:text-foreground transition-colors"
           >
             <XCircle className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -362,7 +357,7 @@ function TransactionsModal({ connection, onClose }: TransactionsModalProps) {
                     </div>
                   </div>
                   <div className={`text-right font-mono ${tx.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
-                    {tx.type === 'credit' ? '+' : '-'}{formatCurrency(Math.abs(tx.amount), connection.currency)}
+                    {tx.type === 'credit' ? '+' : '-'}{formatAccountingCurrency(Math.abs(tx.amount), connection.currency)}
                   </div>
                 </div>
               ))}

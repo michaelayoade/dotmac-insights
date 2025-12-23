@@ -5,13 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Receipt } from 'lucide-react';
 import { useFinanceCreditNoteMutations, useFinanceCustomers } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function CreditNoteCreatePage() {
   const router = useRouter();
   const currency = 'NGN';
   const { createCreditNote } = useFinanceCreditNoteMutations();
   const { data: customersData } = useFinanceCustomers({ limit: 100, offset: 0 });
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [customerId, setCustomerId] = useState<string>('');
   const [invoiceId, setInvoiceId] = useState<string>('');
@@ -23,7 +26,6 @@ export default function CreditNoteCreatePage() {
   const [description, setDescription] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const customers = (customersData as any)?.items || (customersData as any)?.customers || [];
 
   const validate = () => {
@@ -31,7 +33,7 @@ export default function CreditNoteCreatePage() {
     if (!customerId) errs.customerId = 'Customer is required';
     if (!amount || amount <= 0) errs.amount = 'Amount must be greater than zero';
     if (!issueDate) errs.issueDate = 'Issue date is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -195,21 +197,21 @@ export default function CreditNoteCreatePage() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Save Credit Note'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -45,6 +45,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { DataTable } from '@/components/DataTable';
+import { Button, FilterCard, FilterSelect } from '@/components/ui';
 import {
   LineChart,
   Line,
@@ -302,7 +303,7 @@ export default function CustomerAnalyticsPage() {
       {/* Sub-tabs */}
       <div className="flex gap-2 border-b border-slate-border pb-2">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
@@ -312,7 +313,7 @@ export default function CustomerAnalyticsPage() {
             }`}
           >
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -320,18 +321,17 @@ export default function CustomerAnalyticsPage() {
       {activeTab === 'trends' && (
         <div className="space-y-6">
           {/* Time Period Filter */}
-          <div className="flex items-center gap-4">
+          <FilterCard contentClassName="flex items-center gap-4">
             <label className="text-sm text-slate-muted">Time Period:</label>
-            <select
+            <FilterSelect
               value={months}
               onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric"
             >
               <option value={6}>Last 6 months</option>
               <option value={12}>Last 12 months</option>
               <option value={24}>Last 24 months</option>
-            </select>
-          </div>
+            </FilterSelect>
+          </FilterCard>
 
           {/* Growth Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">

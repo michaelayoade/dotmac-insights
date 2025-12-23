@@ -2,6 +2,7 @@
 
 import { MessageCircle, Copy, Settings, Eye, Code, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function ChatChannelPage() {
   // Widget key should be configured per-tenant - this is a placeholder for the embed code example
@@ -56,10 +57,10 @@ export default function ChatChannelPage() {
           <div className="bg-slate-elevated rounded-lg p-4 font-mono text-sm text-slate-200 overflow-x-auto">
             {widgetCode}
           </div>
-          <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors">
+          <Button className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg text-sm font-medium hover:bg-slate-border transition-colors">
             <Copy className="w-4 h-4" />
             Copy Code
-          </button>
+          </Button>
         </div>
 
         {/* Widget preview */}

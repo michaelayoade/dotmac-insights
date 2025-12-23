@@ -1,0 +1,31 @@
+{% extends "emails/_base.html.j2" %}
+
+{% block title %}Performance Report: {{ period_name }}{% endblock %}
+
+{% block content %}
+<h2>Performance Report: {{ period_name }}</h2>
+
+<h3>Summary</h3>
+<ul>
+    <li>Total Scorecards: {{ summary.total_scorecards }}</li>
+    <li>Computed: {{ summary.computed }}</li>
+    <li>Finalized: {{ summary.finalized }}</li>
+    <li>Completion Rate: {{ summary.completion_rate }}%</li>
+</ul>
+
+<h3>Score Statistics</h3>
+<ul>
+    <li>Average Score: {{ scores.average }}</li>
+    <li>Min Score: {{ scores.minimum }}</li>
+    <li>Max Score: {{ scores.maximum }}</li>
+</ul>
+
+<h3>Rating Distribution</h3>
+<ul>
+    {% for rating, count in distribution.items() %}
+    <li>{{ rating }}: {{ count }}</li>
+    {% endfor %}
+</ul>
+
+<p><small>Generated: {{ generated_at }}</small></p>
+{% endblock %}

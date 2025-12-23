@@ -1,8 +1,8 @@
 -- Report unresolved FK backfill rows for cross-module references.
 
--- Journal entry items missing account_id
-SELECT 'journal_entry_items' AS table_name, id, account AS legacy_value
-FROM journal_entry_items
+-- Journal entry accounts missing account_id
+SELECT 'journal_entry_accounts' AS table_name, id, account AS legacy_value
+FROM journal_entry_accounts
 WHERE account_id IS NULL
 ORDER BY id;
 

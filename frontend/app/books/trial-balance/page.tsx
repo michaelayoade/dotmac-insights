@@ -2,25 +2,20 @@
 
 import { useAccountingTrialBalance } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { buildApiUrl } from '@/lib/api';
 import { Scale, CheckCircle2, XCircle, Calendar, Download, BarChart2 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { usePersistentState } from '@/hooks/usePersistentState';
-
-function getAccountTypeColor(type: string) {
-  const colors: Record<string, string> = {
-    asset: 'text-blue-400',
-    liability: 'text-red-400',
-    equity: 'text-green-400',
-    income: 'text-teal-400',
-    revenue: 'text-teal-400',
-    expense: 'text-orange-400',
-  };
-  return colors[type?.toLowerCase()] || 'text-slate-muted';
-}
+import { Button } from '@/components/ui';
+import { getTrialBalanceColumns } from '@/lib/config/accounting-tables';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function TrialBalancePage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope, hasAccess } = useRequireScope('books:read');
   const [filters, setFilters] = usePersistentState<{ asOfDate: string; drill: boolean }>('books.trial-balance.filters', {
     asOfDate: '',
     drill: false,
@@ -28,7 +23,11 @@ export default function TrialBalancePage() {
   const { asOfDate, drill } = filters;
 
   const params = { end_date: asOfDate || undefined, drill: drill || undefined };
-  const { data, isLoading, error, mutate } = useAccountingTrialBalance(params);
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error, mutate } = useAccountingTrialBalance(
+    params,
+    { isPaused: () => !canFetch }
+  );
 
   const exportBalance = (format: 'csv' | 'pdf') => {
     const url = buildApiUrl('/accounting/trial-balance/export', { ...params, format });
@@ -40,66 +39,21 @@ export default function TrialBalancePage() {
     rowId: `${acc.account_number}-${acc.account_name}-${idx}`,
   }));
 
-  const columns = [
-    {
-      key: 'account_number',
-      header: 'Account #',
-      sortable: true,
-      render: (item: any) => (
-        <span className="font-mono text-teal-electric">{item.account_number}</span>
-      ),
-    },
-    {
-      key: 'account_name',
-      header: 'Account Name',
-      sortable: true,
-      render: (item: any) => (
-        <span className="text-foreground">{item.account_name}</span>
-      ),
-    },
-    {
-      key: 'account_type',
-      header: 'Type',
-      render: (item: any) => (
-        <span className={cn('capitalize', getAccountTypeColor(item.account_type))}>
-          {item.account_type || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'debit',
-      header: 'Debit',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn('font-mono', item.debit > 0 ? 'text-blue-400' : 'text-slate-muted')}>
-          {item.debit > 0 ? formatCurrency(item.debit) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'credit',
-      header: 'Credit',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn('font-mono', item.credit > 0 ? 'text-green-400' : 'text-slate-muted')}>
-          {item.credit > 0 ? formatCurrency(item.credit) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'balance',
-      header: 'Balance',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn(
-          'font-mono font-semibold',
-          (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
-        )}>
-          {formatCurrency(item.balance)}
-        </span>
-      ),
-    },
-  ];
+  const columns = getTrialBalanceColumns();
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the books:read permission to view the trial balance."
+        backHref="/books"
+        backLabel="Back to Books"
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -124,14 +78,14 @@ export default function TrialBalancePage() {
             <Scale className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Debit</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.total_debit || 0)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(data?.total_debit || 0)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Scale className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Credit</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(data?.total_credit || 0)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(data?.total_credit || 0)}</p>
         </div>
         <div className={cn(
           'border rounded-xl p-5',
@@ -165,7 +119,7 @@ export default function TrialBalancePage() {
             'text-2xl font-bold',
             difference === 0 ? 'text-foreground' : 'text-yellow-400'
           )}>
-            {formatCurrency(difference)}
+            {formatAccountingCurrency(difference)}
           </p>
         </div>
       </div>
@@ -187,28 +141,28 @@ export default function TrialBalancePage() {
           Drill-down balances
         </label>
         {asOfDate && (
-          <button
+          <Button
             onClick={() => { setFilters({ asOfDate: '', drill: false }); }}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear
-          </button>
+          </Button>
         )}
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => exportBalance('csv')}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <Download className="w-4 h-4" />
             CSV
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => exportBalance('pdf')}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <BarChart2 className="w-4 h-4" />
             PDF
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -229,11 +183,11 @@ export default function TrialBalancePage() {
             <div className="flex gap-8">
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Debit</p>
-                <p className="font-mono font-bold text-blue-400">{formatCurrency(data.total_debit)}</p>
+                <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(data.total_debit)}</p>
               </div>
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Credit</p>
-                <p className="font-mono font-bold text-green-400">{formatCurrency(data.total_credit)}</p>
+                <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(data.total_credit)}</p>
               </div>
             </div>
           </div>

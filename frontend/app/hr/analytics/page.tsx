@@ -16,6 +16,7 @@ import {
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { Activity, CalendarClock, ClipboardList, DollarSign, Factory, FileText, Users, UserPlus, Award, ArrowRightLeft, TrendingUp, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui';
 
 function FormLabel({ children }: { children: React.ReactNode }) {
   return <label className="block text-xs text-slate-muted mb-1">{children}</label>;
@@ -63,9 +64,9 @@ function Stat({
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full')}>
+      <Button type="button" onClick={onClick} className={cn(cardClasses, 'w-full')}>
         {content}
-      </button>
+      </Button>
     );
   }
 

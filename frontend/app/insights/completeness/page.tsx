@@ -16,9 +16,12 @@ import { AccessDenied } from '@/components/AccessDenied';
 
 export default function CompletenessPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+  const canFetch = hasAccess && !authLoading;
 
   // All hooks must be called before any conditional returns
-  const { data, isLoading, error, mutate } = useCustomerCompletenessInsights();
+  const { data, isLoading, error, mutate } = useCustomerCompletenessInsights({
+    isPaused: () => !canFetch,
+  });
 
   const totalCustomers = useMemo(() => {
     const value = (data as any)?.total ?? data?.total_customers ?? 0;

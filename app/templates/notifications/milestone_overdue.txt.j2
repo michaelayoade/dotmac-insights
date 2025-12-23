@@ -1,0 +1,18 @@
+{# Milestone overdue notification #}
+{% set title = "Milestone Overdue" %}
+{% set icon = "alert-circle" %}
+{% set priority = "high" %}
+
+Milestone "{{ milestone_name }}" is past its due date.
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if planned_end_date %}
+Due date: {{ planned_end_date }}
+{% endif %}
+{% if days_overdue %}
+Days overdue: {{ days_overdue }}
+{% endif %}
+{% if percent_complete %}
+Progress: {{ percent_complete }}%
+{% endif %}

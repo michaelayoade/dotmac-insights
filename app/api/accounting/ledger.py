@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -59,12 +59,12 @@ class GLEntryCreateRequest(BaseModel):
     fiscal_year: Optional[str] = None
     is_cancelled: bool = False
 
-    @validator(
+    @field_validator(
         "debit",
         "credit",
         "debit_in_account_currency",
         "credit_in_account_currency",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         if value is None:
@@ -88,12 +88,12 @@ class GLEntryUpdateRequest(BaseModel):
     fiscal_year: Optional[str] = None
     is_cancelled: Optional[bool] = None
 
-    @validator(
+    @field_validator(
         "debit",
         "credit",
         "debit_in_account_currency",
         "credit_in_account_currency",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         if value is None:

@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 // Performance Management Flow:
 // 1. SETUP: Define KPIs, KRAs, templates

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePurchasingPayments, usePurchasingSuppliers } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput, FilterSelect, LoadingState } from '@/components/ui';
 import {
   AlertTriangle,
   CreditCard,
@@ -14,38 +15,17 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  Filter,
   Search,
   Banknote,
   Receipt,
 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { formatCurrency, formatDate, formatNumber } from '@/lib/formatters';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function PurchasingPaymentsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('purchasing:read');
   const router = useRouter();
   const currency = 'NGN';
   const [page, setPage] = useState(1);
@@ -55,23 +35,44 @@ export default function PurchasingPaymentsPage() {
   const [supplierId, setSupplierId] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const canFetch = !authLoading && !missingScope;
 
-  const { data, isLoading, error } = usePurchasingPayments({
-    supplier: supplierId || undefined,
-    start_date: startDate || undefined,
-    end_date: endDate || undefined,
-    search: search || undefined,
-    currency,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
+  const { data, isLoading, error } = usePurchasingPayments(
+    {
+      supplier: supplierId || undefined,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+      search: search || undefined,
+      currency,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    },
+    { isPaused: () => !canFetch }
+  );
 
-  const { data: suppliersData } = usePurchasingSuppliers({ limit: 100, offset: 0 });
+  const { data: suppliersData } = usePurchasingSuppliers(
+    { limit: 100, offset: 0 },
+    { isPaused: () => !canFetch }
+  );
 
   const payments = data?.payments || [];
   const total = data?.total || 0;
   const totalPaid = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
   const suppliers = suppliersData?.suppliers || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the purchasing:read permission to view payments."
+        backHref="/purchasing"
+        backLabel="Back to Purchasing"
+      />
+    );
+  }
 
   const getStatusConfig = (paymentStatus: string) => {
     const statusLower = paymentStatus?.toLowerCase() || '';
@@ -234,96 +235,92 @@ export default function PurchasingPaymentsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-[200px] max-w-md relative">
-            <Search className="w-4 h-4 text-slate-muted absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search payments..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
+      <FilterCard
+        actions={(search || status || supplierId || startDate || endDate) && (
+          <Button
+            onClick={() => {
+              setSearch('');
+              setStatus('');
+              setSupplierId('');
+              setStartDate('');
+              setEndDate('');
               setPage(1);
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
-            <option value="">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          {suppliers.length > 0 && (
-            <select
-              value={supplierId}
-              onChange={(e) => {
-                setSupplierId(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
-            >
-              <option value="">All Suppliers</option>
-              {suppliers.map((supplier: any) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name || supplier.supplier_name}
-                </option>
-              ))}
-            </select>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              placeholder="Start date"
-            />
-            <span className="text-slate-muted">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              placeholder="End date"
-            />
-          </div>
-          {(search || status || supplierId || startDate || endDate) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setStatus('');
-                setSupplierId('');
-                setStartDate('');
-                setEndDate('');
-                setPage(1);
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
+            Clear filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-center"
+      >
+        <div className="flex-1 min-w-[200px] max-w-md relative">
+          <Search className="w-4 h-4 text-slate-muted absolute left-3 top-1/2 -translate-y-1/2" />
+          <FilterInput
+            type="text"
+            placeholder="Search payments..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="w-full pl-10 pr-4 placeholder:text-slate-muted focus:ring-2 focus:ring-teal-electric/50"
+          />
         </div>
-      </div>
+        <FilterSelect
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        >
+          <option value="">All Status</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </FilterSelect>
+        {suppliers.length > 0 && (
+          <FilterSelect
+            value={supplierId}
+            onChange={(e) => {
+              setSupplierId(e.target.value);
+              setPage(1);
+            }}
+            className="focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map((supplier: any) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name || supplier.supplier_name}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
+        <div className="flex items-center gap-2">
+          <FilterInput
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 focus:ring-2 focus:ring-teal-electric/50"
+            placeholder="Start date"
+          />
+          <span className="text-slate-muted">to</span>
+          <FilterInput
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 focus:ring-2 focus:ring-teal-electric/50"
+            placeholder="End date"
+          />
+        </div>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

@@ -1,0 +1,35 @@
+{# Reusable macros for customer notifications #}
+
+{# Standard greeting #}
+{% macro greeting(name) -%}
+Dear {{ name | default('Valued Customer') }},
+{%- endmacro %}
+
+{# Order details block #}
+{% macro order_details(order_number, order_type, scheduled_date, scheduled_time, service_address) %}
+Order: #{{ order_number }}
+{% if order_type %}Type: {{ order_type | title_case }}{% endif %}
+{% if scheduled_date %}Date: {{ scheduled_date | format_date }}{% endif %}
+{% if scheduled_time %}Time: {{ scheduled_time }}{% endif %}
+{% if service_address %}Address: {{ service_address }}{% endif %}
+{% endmacro %}
+
+{# Ticket details block #}
+{% macro ticket_details(ticket_id, subject, status, priority) %}
+Ticket: #{{ ticket_id }}
+{% if subject %}Subject: {{ subject }}{% endif %}
+{% if status %}Status: {{ status }}{% endif %}
+{% if priority %}Priority: {{ priority }}{% endif %}
+{% endmacro %}
+
+{# Invoice details block #}
+{% macro invoice_details(invoice_number, amount, due_date) %}
+Invoice: #{{ invoice_number }}
+{% if amount %}Amount: {{ amount | currency }}{% endif %}
+{% if due_date %}Due Date: {{ due_date | format_date }}{% endif %}
+{% endmacro %}
+
+{# Standard closing #}
+{% macro closing() %}
+Thank you for your business!
+{% endmacro %}

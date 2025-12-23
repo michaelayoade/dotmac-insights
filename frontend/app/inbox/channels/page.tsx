@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 interface Channel {
   id: string;
@@ -98,10 +99,10 @@ export default function ChannelsPage() {
             <p className="text-slate-muted text-sm">Configure communication channels</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <Button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Plus className="w-4 h-4" />
           Add Channel
-        </button>
+        </Button>
       </div>
 
       {/* Channel stats */}

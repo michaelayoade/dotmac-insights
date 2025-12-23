@@ -1,0 +1,46 @@
+{% extends "reports/expenses/_base.html.j2" %}
+
+{% block title %}Cash Advances Report{% endblock %}
+{% block report_title %}Cash Advances Report{% endblock %}
+
+{% block summary %}
+<div class="summary">
+    <h3>Summary</h3>
+    <table class="summary-table">
+        <tr><td>Total Advances:</td><td>{{ summary.total_advances }}</td></tr>
+        <tr><td>Total Requested:</td><td class="number">{{ summary.total_requested | format_number }}</td></tr>
+        <tr><td>Total Disbursed:</td><td class="number">{{ summary.total_disbursed | format_number }}</td></tr>
+        <tr><td>Total Outstanding:</td><td class="number">{{ summary.total_outstanding | format_number }}</td></tr>
+    </table>
+</div>
+{% endblock %}
+
+{% block content %}
+<h3>Advances Detail</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Advance #</th>
+            <th>Employee</th>
+            <th>Purpose</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Requested</th>
+            <th>Outstanding</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for adv in advances %}
+        <tr>
+            <td>{{ adv.advance_number }}</td>
+            <td>{{ adv.employee_id }}</td>
+            <td>{{ adv.purpose }}</td>
+            <td>{{ adv.request_date }}</td>
+            <td>{{ adv.status }}</td>
+            <td class="number">{{ adv.requested_amount | format_number }}</td>
+            <td class="number">{{ adv.outstanding_balance | format_number }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

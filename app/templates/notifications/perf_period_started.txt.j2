@@ -1,0 +1,12 @@
+{# Performance period started notification #}
+{% set title = "Performance Evaluation Started" %}
+{% set icon = "calendar" %}
+{% set priority = "normal" %}
+
+The {{ period_name | default('evaluation period') }} has begun. Your scorecard is being prepared.
+{% if start_date %}
+Start Date: {{ start_date | format_date }}
+{% endif %}
+{% if end_date %}
+End Date: {{ end_date | format_date }}
+{% endif %}

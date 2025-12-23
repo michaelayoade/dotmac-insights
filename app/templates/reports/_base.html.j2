@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Report{% endblock %}</title>
+    <style>
+        {% include 'reports/_styles.css' %}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company_name | default('dotMac Limited') }}</h1>
+        <h2>{% block report_title %}Report{% endblock %}</h2>
+        <p class="report-date">{% block report_subtitle %}{% endblock %}</p>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <div class="footer">
+        {% block footer %}
+        {% if is_balanced is defined %}
+        <p>Balanced: {{ is_balanced | yesno("Yes", "No") }}</p>
+        {% endif %}
+        <p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+        {% endblock %}
+    </div>
+</body>
+</html>

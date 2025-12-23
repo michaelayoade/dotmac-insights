@@ -3,15 +3,10 @@
 import { useState } from 'react';
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   Clock,
   MessageSquare,
   Users,
   CheckCircle,
-  Loader2,
-  AlertTriangle,
-  RefreshCw,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -36,89 +31,9 @@ import {
   useInboxAnalyticsChannels,
 } from '@/hooks/useInbox';
 import { PageHeader, Select } from '@/components/ui';
+import { INBOX_CHANNEL_CHART_COLORS, INBOX_PERIOD_OPTIONS } from '@/lib/config/inbox-analytics';
+import { ChartErrorState, ChartSkeleton, MetricCard } from '@/components/inbox/analytics/shared';
 
-const CHANNEL_COLORS: Record<string, string> = {
-  email: '#3b82f6',
-  chat: '#10b981',
-  whatsapp: '#22c55e',
-  phone: '#8b5cf6',
-  sms: '#06b6d4',
-  social: '#ec4899',
-};
-
-function MetricCard({
-  label,
-  value,
-  change,
-  changeLabel,
-  icon: Icon,
-  colorClass = 'text-blue-400',
-  isLoading = false,
-}: {
-  label: string;
-  value: string;
-  change?: number;
-  changeLabel?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  isLoading?: boolean;
-}) {
-  const isPositive = change && change > 0;
-  const isNegative = change && change < 0;
-
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          {isLoading ? (
-            <div className="h-9 w-20 bg-slate-elevated rounded mt-1 animate-pulse" />
-          ) : (
-            <p className={cn('text-3xl font-bold mt-1', colorClass)}>{value}</p>
-          )}
-          {change !== undefined && !isLoading && (
-            <div className="flex items-center gap-1 mt-2">
-              {isPositive && <TrendingUp className="w-3 h-3 text-emerald-400" />}
-              {isNegative && <TrendingDown className="w-3 h-3 text-rose-400" />}
-              <span className={cn('text-xs', isPositive ? 'text-emerald-400' : isNegative ? 'text-rose-400' : 'text-slate-muted')}>
-                {isPositive ? '+' : ''}{change}% {changeLabel}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className={cn('p-3 rounded-xl', colorClass.includes('blue') ? 'bg-blue-500/10' : 'bg-slate-elevated')}>
-          <Icon className={cn('w-6 h-6', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChartSkeleton({ height = 250 }: { height?: number }) {
-  return (
-    <div className="flex items-center justify-center" style={{ height }}>
-      <Loader2 className="w-8 h-8 animate-spin text-slate-muted" />
-    </div>
-  );
-}
-
-function ChartErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-48 text-slate-muted">
-      <AlertTriangle className="w-8 h-8 mb-2 text-rose-400" />
-      <p className="text-sm text-rose-400 mb-3">{message}</p>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-elevated hover:bg-slate-border rounded-lg text-xs text-foreground transition-colors"
-        >
-          <RefreshCw className="w-3 h-3" />
-          Retry
-        </button>
-      )}
-    </div>
-  );
-}
 
 export default function InboxAnalyticsPage() {
   const [days, setDays] = useState(7);
@@ -161,7 +76,7 @@ export default function InboxAnalyticsPage() {
   const channelBreakdown = Object.entries(summary?.by_channel || {}).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value: value as number,
-    color: CHANNEL_COLORS[name] || '#64748b',
+    color: INBOX_CHANNEL_CHART_COLORS[name] || '#64748b',
   }));
 
   // Calculate resolution stats from summary
@@ -178,11 +93,7 @@ export default function InboxAnalyticsPage() {
       ]
     : [];
 
-  const periodOptions = [
-    { value: '7', label: 'Last 7 days' },
-    { value: '30', label: 'Last 30 days' },
-    { value: '90', label: 'Last 90 days' },
-  ];
+  const periodOptions = INBOX_PERIOD_OPTIONS;
 
   return (
     <div className="space-y-6">
@@ -208,6 +119,7 @@ export default function InboxAnalyticsPage() {
           value={summary?.total_conversations?.toLocaleString() || '0'}
           icon={MessageSquare}
           colorClass="text-blue-400"
+          iconWrapperClassName="bg-blue-500/10"
           isLoading={summaryLoading}
         />
         <MetricCard

@@ -307,7 +307,7 @@ export default function SyncPage() {
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={() => handleSync(source, false)}
                     disabled={isSyncing || !canWrite}
                     className={cn(
@@ -323,8 +323,8 @@ export default function SyncPage() {
                       <Play className="w-4 h-4" />
                     )}
                     Quick Sync
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleFullSyncClick(source)}
                     disabled={isSyncing || !canWrite}
                     className={cn(
@@ -336,7 +336,7 @@ export default function SyncPage() {
                   >
                     <RefreshCw className="w-4 h-4" />
                     Full Sync
-                  </button>
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -351,12 +351,12 @@ export default function SyncPage() {
             <CardTitle>Sync History</CardTitle>
             <CardDescription>Recent synchronization activity</CardDescription>
           </div>
-          <button
+          <Button
             onClick={() => refreshLogs()}
             className="text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className="w-5 h-5" />
-          </button>
+          </Button>
         </div>
         <DataTable
           columns={[
@@ -453,19 +453,19 @@ export default function SyncPage() {
         size="sm"
       >
         <div className="flex gap-3 justify-end mt-6">
-          <button
+          <Button
             onClick={() => setConfirmModal({ open: false, source: null })}
             className="px-4 py-2 rounded-lg text-sm font-medium text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={confirmFullSync}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-warn text-slate-deep hover:bg-amber-400 transition-colors"
           >
             <RefreshCw className="w-4 h-4 inline mr-2" />
             Start Full Sync
-          </button>
+          </Button>
         </div>
       </Modal>
       </div>

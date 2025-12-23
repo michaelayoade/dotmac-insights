@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Expense Report{% endblock %}</title>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company_name | default('dotMac Limited') }}</h1>
+        <h2>{% block report_title %}Expense Report{% endblock %}</h2>
+        <p>Period: {{ period.start | default('Beginning') }} to {{ period.end | default('Present') }}</p>
+    </div>
+
+    {% block summary %}{% endblock %}
+
+    {% block content %}{% endblock %}
+
+    <div class="footer">
+        <p class="generated">Generated: {{ generated_at }}</p>
+    </div>
+</body>
+</html>

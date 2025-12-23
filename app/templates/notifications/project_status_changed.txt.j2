@@ -1,0 +1,12 @@
+{# Project status changed notification #}
+{% set title = "Project Status Updated" %}
+{% set icon = "refresh-cw" %}
+{% set priority = "normal" %}
+
+Project "{{ project_name }}" status has changed.
+{% if from_status and to_status %}
+From: {{ from_status }} -> {{ to_status }}
+{% endif %}
+{% if changed_by_name %}
+Updated by: {{ changed_by_name }}
+{% endif %}

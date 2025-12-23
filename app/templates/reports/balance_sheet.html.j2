@@ -1,0 +1,58 @@
+{% extends "reports/_base.html.j2" %}
+{% from "reports/_macros.html.j2" import format_num, render_section, spacer %}
+
+{% block title %}Balance Sheet{% endblock %}
+
+{% block report_title %}Balance Sheet{% endblock %}
+
+{% block report_subtitle %}As of {{ data.as_of_date | default('') }}{% endblock %}
+
+{% block content %}
+<table>
+    <tbody>
+        {# Assets Section #}
+        {{ render_section("Assets", data.assets | default({})) }}
+
+        {{ spacer() }}
+
+        {# Liabilities Section #}
+        {{ render_section("Liabilities", data.liabilities | default({})) }}
+
+        {{ spacer() }}
+
+        {# Equity Section #}
+        <tr class="section-header">
+            <td colspan="2">Equity</td>
+        </tr>
+        {% for acc in data.equity.accounts | default([]) %}
+        <tr>
+            <td class="indent">{{ acc.account | default(acc.account_name) }}</td>
+            <td class="number">{{ format_num(acc.balance) }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+            <td class="indent">Retained Earnings</td>
+            <td class="number">{{ format_num(data.retained_earnings) }}</td>
+        </tr>
+        <tr class="subtotal">
+            <td>Total Equity</td>
+            <td class="number">{{ format_num(data.equity.total | default(0)) }}</td>
+        </tr>
+    </tbody>
+    <tfoot>
+        <tr class="total">
+            <td>Total Assets</td>
+            <td class="number">{{ format_num(data.total_assets) }}</td>
+        </tr>
+        <tr class="total">
+            <td>Total Liabilities + Equity</td>
+            <td class="number">{{ format_num(data.total_liabilities_equity) }}</td>
+        </tr>
+    </tfoot>
+</table>
+{% endblock %}
+
+{% block footer %}
+<p>Balanced: {{ data.is_balanced | yesno("Yes", "No") }}</p>
+<p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+{% endblock %}

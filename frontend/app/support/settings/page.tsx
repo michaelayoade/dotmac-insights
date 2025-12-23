@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSupportSettings, useSupportSettingsMutations } from '@/hooks/useApi';
+import { Button } from '@/components/ui';
 import type {
   SupportSettingsResponse,
   SupportSettingsUpdate,
@@ -162,7 +163,7 @@ export default function SupportSettingsPage() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
-              <button
+              <Button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
@@ -174,7 +175,7 @@ export default function SupportSettingsPage() {
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -197,13 +198,13 @@ export default function SupportSettingsPage() {
             {saveMessage}
           </span>
         )}
-        <button
+        <Button
           onClick={handleSave}
           disabled={saving}
           className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -818,7 +819,7 @@ function DisplayTab({ form, setForm, updateForm }: TabProps) {
               {notificationChannelOptions.map((opt) => {
                 const isSelected = (form.notification_channels || ['EMAIL', 'IN_APP']).includes(opt.value);
                 return (
-                  <button
+                  <Button
                     key={opt.value}
                     type="button"
                     onClick={() => toggleChannel(opt.value)}
@@ -830,7 +831,7 @@ function DisplayTab({ form, setForm, updateForm }: TabProps) {
                     )}
                   >
                     {opt.label}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

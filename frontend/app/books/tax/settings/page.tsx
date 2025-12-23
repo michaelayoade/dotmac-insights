@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { Button } from '@/components/ui';
 
 const PAYE_FILING_FREQUENCIES = [
   { value: 'MONTHLY', label: 'Monthly' },
@@ -329,23 +330,9 @@ export default function TaxSettingsPage() {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
-          >
-            {saving ? (
-              <>
-                <Settings className="w-4 h-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                Save Settings
-              </>
-            )}
-          </button>
+          <Button type="submit" disabled={saving} loading={saving} module="books" icon={Save}>
+            {saving ? 'Saving...' : 'Save Settings'}
+          </Button>
         </div>
       </form>
     </div>

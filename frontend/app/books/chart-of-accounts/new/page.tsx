@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Save, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { accountingApi, AccountingAccountPayload } from '@/lib/api/domains/accounting';
-import { cn } from '@/lib/utils';
+import { Button, LinkButton } from '@/components/ui';
 
 const ROOT_TYPES = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'] as const;
 
@@ -53,13 +52,9 @@ export default function NewAccountPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link
-          href="/books/chart-of-accounts"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
-        >
-          <ArrowLeft className="w-4 h-4" />
+        <LinkButton href="/books/chart-of-accounts" variant="secondary" icon={ArrowLeft}>
           Back
-        </Link>
+        </LinkButton>
         <div>
           <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Chart of Accounts</p>
           <h1 className="text-xl font-semibold text-foreground">New Account</h1>
@@ -161,23 +156,12 @@ export default function NewAccountPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className={cn(
-              'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90',
-              saving && 'opacity-60 cursor-not-allowed'
-            )}
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <Button type="submit" disabled={saving} loading={saving} module="books" icon={Save}>
             {saving ? 'Creating...' : 'Create Account'}
-          </button>
-          <Link
-            href="/books/chart-of-accounts"
-            className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
-          >
+          </Button>
+          <LinkButton href="/books/chart-of-accounts" variant="secondary">
             Cancel
-          </Link>
+          </LinkButton>
         </div>
       </form>
     </div>

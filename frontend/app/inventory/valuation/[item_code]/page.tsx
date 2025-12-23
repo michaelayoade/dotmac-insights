@@ -41,8 +41,8 @@ export default function InventoryValuationDetailPage() {
             <Info label="Item" value={data?.item_name || code} />
             <Info label="Warehouse" value={data?.warehouse || '—'} />
             <Info label="Qty" value={data?.qty ?? 0} />
-            <Info label="Valuation Rate" value={formatCurrency(data?.valuation_rate, data?.currency || 'NGN')} />
-            <Info label="Value" value={formatCurrency(data?.valuation, data?.currency || 'NGN')} />
+            <Info label="Valuation Rate" value={formatCurrency(data?.valuation_rate ?? 0, data?.currency || 'NGN')} />
+            <Info label="Value" value={formatCurrency(data?.valuation ?? 0, data?.currency || 'NGN')} />
             <Info label="Method" value={data?.valuation_method || '—'} />
           </div>
 

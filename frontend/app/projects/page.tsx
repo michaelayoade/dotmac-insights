@@ -7,7 +7,6 @@ import { DataTable, Pagination } from '@/components/DataTable';
 import { useProjects, useProjectsDashboard } from '@/hooks/useApi';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
-  Filter,
   Plus,
   ClipboardList,
   AlertTriangle,
@@ -22,27 +21,11 @@ import {
   BarChart3,
   ArrowRight,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-function formatDate(dateStr: string | null | undefined) {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatCurrency(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { formatDate, formatNumber, formatCurrency } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Button, FilterCard, FilterInput, FilterSelect, StatusPill } from '@/components/ui';
 
 // Mini progress ring component
 function ProgressRing({ percent, size = 48, strokeWidth = 4 }: { percent: number; size?: number; strokeWidth?: number }) {
@@ -115,7 +98,7 @@ interface KPICardProps {
   title: string;
   value: string | number;
   subtitle?: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   colorClass?: string;
   trend?: { value: number; isPositive: boolean };
   children?: React.ReactNode;
@@ -208,18 +191,29 @@ export default function ProjectsPage() {
       header: 'Status',
       render: (item: any) => {
         const s = item.status || 'open';
-        const config: Record<string, { icon: React.ElementType; color: string }> = {
-          open: { icon: ClipboardList, color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-          completed: { icon: CheckCircle2, color: 'text-green-400 bg-green-500/10 border-green-500/30' },
-          on_hold: { icon: Pause, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-          cancelled: { icon: XCircle, color: 'text-red-400 bg-red-500/10 border-red-500/30' },
+        const icons: Record<string, LucideIcon> = {
+          open: ClipboardList,
+          completed: CheckCircle2,
+          on_hold: Pause,
+          cancelled: XCircle,
         };
-        const { icon: StatusIcon, color } = config[s] || config.open;
+        const tones: Record<string, StatusTone> = {
+          open: 'info',
+          completed: 'success',
+          on_hold: 'warning',
+          cancelled: 'danger',
+        };
+        const labels: Record<string, string> = {
+          on_hold: 'On Hold',
+        };
+        const StatusIcon = icons[s] || icons.open;
         return (
-          <span className={cn('px-2 py-1 rounded-full text-xs font-medium border inline-flex items-center gap-1', color)}>
-            <StatusIcon className="w-3 h-3" />
-            {s.replace('_', ' ')}
-          </span>
+          <StatusPill
+            label={labels[s] || formatStatusLabel(s)}
+            tone={tones[s] || 'default'}
+            icon={StatusIcon}
+            className="border border-current/30"
+          />
         );
       },
     },
@@ -401,84 +395,78 @@ export default function ProjectsPage() {
       )}
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
+      <FilterCard contentClassName="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <FilterInput
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Search projects..."
+          className="focus:ring-2 focus:ring-teal-electric/50 col-span-2 lg:col-span-1"
+        />
+        <FilterSelect
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        >
+          <option value="">All Statuses</option>
+          <option value="open">Open</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="on_hold">On Hold</option>
+        </FilterSelect>
+        <FilterSelect
+          value={priority}
+          onChange={(e) => {
+            setPriority(e.target.value);
+            setPage(1);
+          }}
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        >
+          <option value="">All Priorities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </FilterSelect>
+        <FilterInput
+          value={department}
+          onChange={(e) => {
+            setDepartment(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Department"
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        />
+        <FilterInput
+          value={projectType}
+          onChange={(e) => {
+            setProjectType(e.target.value);
+            setPage(1);
+          }}
+          placeholder="Project type"
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        />
+        {(status || priority || department || projectType || search) && (
+          <Button
+            onClick={() => {
+              setStatus('');
+              setPriority('');
+              setDepartment('');
+              setProjectType('');
+              setSearch('');
               setPage(1);
             }}
-            placeholder="Search projects..."
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 col-span-2 lg:col-span-1"
-          />
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+            className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
           >
-            <option value="">All Statuses</option>
-            <option value="open">Open</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="on_hold">On Hold</option>
-          </select>
-          <select
-            value={priority}
-            onChange={(e) => {
-              setPriority(e.target.value);
-              setPage(1);
-            }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="">All Priorities</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          <input
-            value={department}
-            onChange={(e) => {
-              setDepartment(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Department"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-          <input
-            value={projectType}
-            onChange={(e) => {
-              setProjectType(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Project type"
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-          {(status || priority || department || projectType || search) && (
-            <button
-              onClick={() => {
-                setStatus('');
-                setPriority('');
-                setDepartment('');
-                setProjectType('');
-                setSearch('');
-                setPage(1);
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <XCircle className="w-4 h-4" />
-              Clear
-            </button>
-          )}
-        </div>
-      </div>
+            <XCircle className="w-4 h-4" />
+            Clear
+          </Button>
+        )}
+      </FilterCard>
 
       {/* Projects Table */}
       {error && (

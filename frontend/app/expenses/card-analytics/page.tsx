@@ -26,7 +26,6 @@ import {
   Receipt,
   Users,
   Target,
-  Filter,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -48,6 +47,10 @@ import {
 } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { LoadingState, Button, FilterCard, FilterSelect } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 const STATUS_COLORS: Record<string, string> = {
   matched: CHART_COLORS.success,
@@ -69,81 +72,6 @@ const TOOLTIP_STYLE = {
 // =============================================================================
 // UTILITY COMPONENTS
 // =============================================================================
-
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  colorClass = 'text-violet-400',
-  trend,
-  loading,
-  href,
-  onClick,
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  trend?: { value: number; positive?: boolean };
-  loading?: boolean;
-  href?: string;
-  onClick?: () => void;
-}) {
-  const isClickable = Boolean(href || onClick);
-
-  const content = (
-    <div className="flex items-start justify-between">
-      <div className="space-y-1">
-        <p className="text-slate-muted text-sm">{title}</p>
-        {loading ? (
-          <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-        ) : (
-          <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-        )}
-        {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-        {trend && (
-          <div className={cn('flex items-center gap-1 text-xs', trend.positive ? 'text-emerald-400' : 'text-rose-400')}>
-            {trend.positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            <span>{Math.abs(trend.value).toFixed(1)}%</span>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-        {isClickable && (
-          <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all duration-200" />
-        )}
-      </div>
-    </div>
-  );
-
-  const cardClasses = cn(
-    'bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors group',
-    isClickable && 'cursor-pointer hover:bg-slate-card/80'
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className={cn(cardClasses, 'block')}>
-        {content}
-      </Link>
-    );
-  }
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full text-left')}>
-        {content}
-      </button>
-    );
-  }
-
-  return <div className={cardClasses}>{content}</div>;
-}
 
 function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
   return (
@@ -205,19 +133,22 @@ function ProgressBar({ value, max, color = 'bg-violet-500' }: { value: number; m
 // =============================================================================
 
 export default function CardAnalyticsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const [months, setMonths] = useState(6);
   const [days, setDays] = useState(30);
 
+  const canFetch = !authLoading && !missingScope;
   // Fetch all analytics data
-  const { data: overview, isLoading: overviewLoading } = useCardAnalyticsOverview({ months });
-  const { data: spendTrend } = useCardSpendTrend({ months });
-  const { data: topMerchants } = useCardTopMerchants({ days, limit: 10 });
-  const { data: categoryData } = useCardByCategory({ days });
-  const { data: utilization } = useCardUtilization({ days });
-  const { data: statusBreakdown } = useCardStatusBreakdown({ days });
-  const { data: topSpenders } = useCardTopSpenders({ days, limit: 10 });
-  const { data: reconciliationTrend } = useCardReconciliationTrend({ months });
-  const { data: statementSummary } = useCardStatementSummary();
+  const { data: overview, isLoading: overviewLoading } = useCardAnalyticsOverview({ months }, { isPaused: () => !canFetch });
+  const { data: spendTrend } = useCardSpendTrend({ months }, { isPaused: () => !canFetch });
+  const { data: topMerchants } = useCardTopMerchants({ days, limit: 10 }, { isPaused: () => !canFetch });
+  const { data: categoryData } = useCardByCategory({ days }, { isPaused: () => !canFetch });
+  const { data: utilization } = useCardUtilization({ days }, { isPaused: () => !canFetch });
+  const { data: statusBreakdown } = useCardStatusBreakdown({ days }, { isPaused: () => !canFetch });
+  const { data: topSpenders } = useCardTopSpenders({ days, limit: 10 }, { isPaused: () => !canFetch });
+  const { data: reconciliationTrend } = useCardReconciliationTrend({ months }, { isPaused: () => !canFetch });
+  const { data: statementSummary } = useCardStatementSummary({ isPaused: () => !canFetch });
 
   // Calculate trends
   const latestSpend = spendTrend?.[spendTrend.length - 1];
@@ -225,6 +156,20 @@ export default function CardAnalyticsPage() {
   const spendTrendPct = latestSpend && prevSpend && prevSpend.total_spend > 0
     ? ((latestSpend.total_spend - prevSpend.total_spend) / prevSpend.total_spend) * 100
     : 0;
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view card analytics."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   // Prepare pie chart data for status breakdown
   const pieData = statusBreakdown?.by_status.map((item) => ({
@@ -249,54 +194,46 @@ export default function CardAnalyticsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-violet-400" />
-          <span className="text-foreground text-sm font-medium">Time Range</span>
+      <FilterCard title="Time Range" contentClassName="flex flex-wrap gap-4 items-center" iconClassName="text-violet-400">
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Trend Months</label>
+          <FilterSelect
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+          >
+            <option value={3}>3 months</option>
+            <option value={6}>6 months</option>
+            <option value={12}>12 months</option>
+          </FilterSelect>
         </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Trend Months</label>
-            <select
-              value={months}
-              onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-            >
-              <option value={3}>3 months</option>
-              <option value={6}>6 months</option>
-              <option value={12}>12 months</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Breakdown Days</label>
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-            </select>
-          </div>
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Breakdown Days</label>
+          <FilterSelect
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </FilterSelect>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Key Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        <MetricCard
+        <StatCard
           title="Total Spend"
           value={`${((overview?.spend.total || 0) / 1000).toFixed(0)}K`}
           subtitle={`${months} months`}
           icon={CreditCard}
           colorClass="text-violet-400"
           loading={overviewLoading}
-          trend={spendTrendPct ? { value: spendTrendPct, positive: spendTrendPct < 0 } : undefined}
-          href="/expenses/cards/transactions"
+          trend={spendTrendPct ? { value: spendTrendPct < 0 ? 1 : -1, label: `${Math.abs(spendTrendPct).toFixed(1)}%` } : undefined}
+          href="/expenses/transactions"
         />
-        <MetricCard
+        <StatCard
           title="Active Cards"
           value={overview?.cards.active ?? 0}
           subtitle={`${overview?.cards.suspended ?? 0} suspended`}
@@ -305,16 +242,16 @@ export default function CardAnalyticsPage() {
           loading={overviewLoading}
           href="/expenses/cards"
         />
-        <MetricCard
+        <StatCard
           title="Transactions"
           value={overview?.transactions.total ?? 0}
           subtitle={`${months} months`}
           icon={Receipt}
           colorClass="text-blue-400"
           loading={overviewLoading}
-          href="/expenses/cards/transactions"
+          href="/expenses/transactions"
         />
-        <MetricCard
+        <StatCard
           title="Reconciliation"
           value={`${overview?.transactions.reconciliation_rate ?? 0}%`}
           subtitle={`${overview?.transactions.unmatched ?? 0} unmatched`}
@@ -327,16 +264,16 @@ export default function CardAnalyticsPage() {
               : 'text-rose-400'
           }
           loading={overviewLoading}
-          href="/expenses/cards/transactions?status=unmatched"
+          href="/expenses/transactions?status=unmatched"
         />
-        <MetricCard
+        <StatCard
           title="Disputed"
           value={overview?.transactions.disputed ?? 0}
           subtitle={`${overview?.transactions.personal ?? 0} personal`}
           icon={AlertTriangle}
           colorClass="text-rose-400"
           loading={overviewLoading}
-          href="/expenses/cards/transactions?status=disputed"
+          href="/expenses/transactions?status=disputed"
         />
       </div>
 

@@ -1,0 +1,12 @@
+{# Milestone completed notification #}
+{% set title = "Milestone Completed" %}
+{% set icon = "flag" %}
+{% set priority = "normal" %}
+
+Milestone "{{ milestone_name }}" has been completed.
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if completed_at %}
+Completed: {{ completed_at }}
+{% endif %}

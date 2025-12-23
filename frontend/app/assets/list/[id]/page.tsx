@@ -20,18 +20,20 @@ import {
   Edit,
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatStatusLabel, type StatusTone } from "@/lib/status-pill";
 import { useAsset, useAssetMutations } from "@/hooks/useApi";
 import type { AssetDetail } from "@/lib/api";
+import { Button, StatusPill } from '@/components/ui';
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-slate-500/20 text-slate-400 border-slate-500/40",
-  submitted: "bg-blue-500/20 text-blue-400 border-blue-500/40",
-  partially_depreciated: "bg-amber-500/20 text-amber-400 border-amber-500/40",
-  fully_depreciated: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40",
-  sold: "bg-purple-500/20 text-purple-400 border-purple-500/40",
-  scrapped: "bg-coral-alert/20 text-coral-alert border-coral-alert/40",
-  in_maintenance: "bg-orange-500/20 text-orange-400 border-orange-500/40",
-  out_of_order: "bg-red-500/20 text-red-400 border-red-500/40",
+const STATUS_TONES: Record<string, StatusTone> = {
+  draft: "default",
+  submitted: "info",
+  partially_depreciated: "warning",
+  fully_depreciated: "success",
+  sold: "info",
+  scrapped: "danger",
+  in_maintenance: "warning",
+  out_of_order: "danger",
 };
 
 function InfoCard({
@@ -143,14 +145,11 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-foreground">{asset.asset_name}</h1>
-              <span
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-full border capitalize",
-                  STATUS_COLORS[asset.status ?? 'draft'] ?? STATUS_COLORS.draft
-                )}
-              >
-                {asset.status?.replace(/_/g, " ")}
-              </span>
+              <StatusPill
+                label={formatStatusLabel(asset.status)}
+                tone={STATUS_TONES[asset.status ?? "draft"] || "default"}
+                size="md"
+              />
             </div>
             {asset.item_code && (
               <p className="text-sm text-slate-muted mt-1">Item: {asset.item_code}</p>
@@ -160,39 +159,39 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
 
         <div className="flex items-center gap-2">
           {asset.status === "draft" && (
-            <button
+            <Button
               onClick={handleSubmit}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
               Submit
-            </button>
+            </Button>
           )}
           {asset.status === "in_maintenance" && (
-            <button
+            <Button
               onClick={handleCompleteMaintenance}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm text-foreground transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
               Complete Maintenance
-            </button>
+            </Button>
           )}
           {asset.status && ["submitted", "partially_depreciated"].includes(asset.status) && (
             <>
-              <button
+              <Button
                 onClick={handleMarkMaintenance}
                 className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 <Wrench className="w-4 h-4" />
                 Mark for Maintenance
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleScrap}
                 className="flex items-center gap-2 px-4 py-2 bg-coral-alert hover:bg-red-600 rounded-lg text-sm text-foreground transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
                 Scrap
-              </button>
+              </Button>
             </>
           )}
         </div>

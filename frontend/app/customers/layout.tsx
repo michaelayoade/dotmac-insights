@@ -3,7 +3,8 @@
 import { Users } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
-import { ModuleLayout, NavSection } from '@/components/ModuleLayout';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
   {

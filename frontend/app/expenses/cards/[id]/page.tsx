@@ -4,22 +4,25 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, CreditCard, Calendar, Building2, User, Wallet, Pause, Play, XCircle, Edit2, Receipt } from 'lucide-react';
 import { useCorporateCardDetail, useCorporateCardMutations, useCorporateCardTransactions } from '@/hooks/useExpenses';
-import { cn } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import type { CorporateCardStatus, CardTransactionStatus } from '@/lib/expenses.types';
+import { LoadingState, Button, StatusPill } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-const STATUS_COLORS: Record<CorporateCardStatus, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Active' },
-  suspended: { bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Suspended' },
-  cancelled: { bg: 'bg-red-500/15', text: 'text-red-300', label: 'Cancelled' },
+const STATUS_TONES: Record<CorporateCardStatus, StatusTone> = {
+  active: 'success',
+  suspended: 'warning',
+  cancelled: 'danger',
 };
 
-const TXN_STATUS_COLORS: Record<CardTransactionStatus, { bg: string; text: string }> = {
-  imported: { bg: 'bg-slate-500/15', text: 'text-foreground-secondary' },
-  matched: { bg: 'bg-emerald-500/15', text: 'text-emerald-300' },
-  unmatched: { bg: 'bg-amber-500/15', text: 'text-amber-300' },
-  disputed: { bg: 'bg-red-500/15', text: 'text-red-300' },
-  excluded: { bg: 'bg-slate-500/15', text: 'text-slate-400' },
-  personal: { bg: 'bg-violet-500/15', text: 'text-violet-300' },
+const TXN_STATUS_TONES: Record<CardTransactionStatus, StatusTone> = {
+  imported: 'default',
+  matched: 'success',
+  unmatched: 'warning',
+  disputed: 'danger',
+  excluded: 'default',
+  personal: 'info',
 };
 
 function InfoItem({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | number | null | undefined }) {
@@ -37,12 +40,15 @@ function InfoItem({ icon: Icon, label, value }: { icon: React.ElementType; label
 }
 
 export default function CardDetailPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const params = useParams();
   const router = useRouter();
   const cardId = params.id ? Number(params.id) : undefined;
 
-  const { data: card, isLoading } = useCorporateCardDetail(cardId);
-  const { data: transactions } = useCorporateCardTransactions({ card_id: cardId, limit: 10 });
+  const canFetch = !authLoading && !missingScope;
+  const { data: card, isLoading } = useCorporateCardDetail(cardId, { isPaused: () => !canFetch });
+  const { data: transactions } = useCorporateCardTransactions({ card_id: cardId, limit: 10 }, { isPaused: () => !canFetch });
   const { suspendCard, activateCard, cancelCard } = useCorporateCardMutations();
 
   const handleSuspend = async () => {
@@ -61,6 +67,20 @@ export default function CardDetailPage() {
       await cancelCard(cardId);
     }
   };
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view corporate cards."
+        backHref="/expenses/cards"
+        backLabel="Back to Cards"
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -84,7 +104,7 @@ export default function CardDetailPage() {
     );
   }
 
-  const statusStyle = STATUS_COLORS[card.status];
+  const statusTone = STATUS_TONES[card.status] || STATUS_TONES.active;
 
   return (
     <div className="space-y-6">
@@ -104,9 +124,11 @@ export default function CardDetailPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-foreground">{card.card_name}</h1>
-                <span className={cn('inline-flex items-center px-3 py-1 rounded-full text-sm font-medium', statusStyle.bg, statusStyle.text)}>
-                  {statusStyle.label}
-                </span>
+                <StatusPill
+                  label={formatStatusLabel(card.status)}
+                  tone={statusTone}
+                  size="md"
+                />
               </div>
               <p className="text-slate-muted mt-1">
                 ****{card.card_number_last4} &middot; {card.bank_name || card.card_provider || 'Corporate Card'}
@@ -115,31 +137,31 @@ export default function CardDetailPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {card.status === 'active' && (
-              <button
+              <Button
                 onClick={handleSuspend}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
               >
                 <Pause className="w-4 h-4" />
                 Suspend
-              </button>
+              </Button>
             )}
             {card.status === 'suspended' && (
-              <button
+              <Button
                 onClick={handleActivate}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
               >
                 <Play className="w-4 h-4" />
                 Activate
-              </button>
+              </Button>
             )}
             {card.status !== 'cancelled' && (
-              <button
+              <Button
                 onClick={handleCancel}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Cancel
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -191,7 +213,7 @@ export default function CardDetailPage() {
         ) : (
           <div className="space-y-2">
             {transactions.map((txn) => {
-              const statusStyle = TXN_STATUS_COLORS[txn.status] || TXN_STATUS_COLORS.imported;
+              const statusTone = TXN_STATUS_TONES[txn.status] || TXN_STATUS_TONES.imported;
               return (
                 <div
                   key={txn.id}
@@ -208,9 +230,10 @@ export default function CardDetailPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-foreground font-semibold">{txn.amount.toLocaleString()} {txn.currency}</p>
-                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs', statusStyle.bg, statusStyle.text)}>
-                      {txn.status}
-                    </span>
+                    <StatusPill
+                      label={formatStatusLabel(txn.status)}
+                      tone={statusTone}
+                    />
                   </div>
                 </div>
               );

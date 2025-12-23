@@ -10,7 +10,6 @@ import {
   Clock,
   MapPin,
   User,
-  Filter,
   Grid3X3,
   List,
   Truck,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button, FilterSelect } from '@/components/ui';
 
 type ViewMode = 'calendar' | 'dispatch' | 'list';
 
@@ -179,45 +179,44 @@ export default function SchedulePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
+          <Button
             onClick={() => navigateMonth(-1)}
             className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
-          </button>
+          </Button>
           <h2 className="text-xl font-semibold text-foreground min-w-[200px] text-center">
             {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </h2>
-          <button
+          <Button
             onClick={() => navigateMonth(1)}
             className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <ChevronRight className="w-5 h-5" />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setCurrentDate(new Date())}
             className="px-3 py-1.5 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Today
-          </button>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Team Filter */}
-          <select
+          <FilterSelect
             value={selectedTeam}
             onChange={(e) => setSelectedTeam(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
           >
             <option value="all">All Teams</option>
             {teams?.map((team: any) => (
               <option key={team.id} value={team.id}>{team.name}</option>
             ))}
-          </select>
+          </FilterSelect>
 
           {/* View Toggle */}
           <div className="flex items-center bg-slate-elevated border border-slate-border rounded-lg p-1">
-            <button
+            <Button
               onClick={() => setViewMode('calendar')}
               className={cn(
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
@@ -228,8 +227,8 @@ export default function SchedulePage() {
             >
               <Grid3X3 className="w-4 h-4" />
               Calendar
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setViewMode('dispatch')}
               className={cn(
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
@@ -240,8 +239,8 @@ export default function SchedulePage() {
             >
               <Truck className="w-4 h-4" />
               Dispatch
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setViewMode('list')}
               className={cn(
                 'flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors',
@@ -252,7 +251,7 @@ export default function SchedulePage() {
             >
               <List className="w-4 h-4" />
               List
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -337,9 +336,9 @@ export default function SchedulePage() {
                 <AlertTriangle className="w-5 h-5" />
                 <span>{errorMessage}</span>
               </div>
-              <button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-300">
+              <Button onClick={() => setErrorMessage(null)} className="text-red-400 hover:text-red-300">
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           )}
 

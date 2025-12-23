@@ -5,11 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, ClipboardList } from 'lucide-react';
 import { useProjectMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function ProjectCreatePage() {
   const router = useRouter();
   const { createProject } = useProjectMutations();
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [projectName, setProjectName] = useState('');
   const [projectType, setProjectType] = useState('');
@@ -24,13 +27,12 @@ export default function ProjectCreatePage() {
   const [notes, setNotes] = useState('');
 
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!projectName.trim()) errs.projectName = 'Project name is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -225,20 +227,20 @@ export default function ProjectCreatePage() {
         </div>
 
         <div className="lg:col-span-2 flex justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Create Project'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

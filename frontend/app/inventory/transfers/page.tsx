@@ -15,7 +15,10 @@ import {
   Truck,
   Send,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { formatStatusLabel, type StatusTone } from "@/lib/status-pill";
+import { Button, FilterCard, FilterSelect, StatusPill, LoadingState } from '@/components/ui';
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Status" },
@@ -31,33 +34,54 @@ const STATUS_OPTIONS = [
 function getStatusBadge(status: string) {
   switch (status) {
     case "draft":
-      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary", icon: Clock };
+      return { label: "Draft", tone: "default" as StatusTone, icon: Clock };
     case "pending_approval":
-      return { label: "Pending", className: "bg-amber-500/20 text-amber-300", icon: Clock };
+      return { label: "Pending", tone: "warning" as StatusTone, icon: Clock };
     case "approved":
-      return { label: "Approved", className: "bg-blue-500/20 text-blue-300", icon: CheckCircle };
+      return { label: "Approved", tone: "info" as StatusTone, icon: CheckCircle };
     case "rejected":
-      return { label: "Rejected", className: "bg-red-500/20 text-red-300", icon: XCircle };
+      return { label: "Rejected", tone: "danger" as StatusTone, icon: XCircle };
     case "in_transit":
-      return { label: "In Transit", className: "bg-purple-500/20 text-purple-300", icon: Truck };
+      return { label: "In Transit", tone: "info" as StatusTone, icon: Truck };
     case "completed":
-      return { label: "Completed", className: "bg-emerald-500/20 text-emerald-300", icon: CheckCircle };
+      return { label: "Completed", tone: "success" as StatusTone, icon: CheckCircle };
     case "cancelled":
-      return { label: "Cancelled", className: "bg-red-500/20 text-red-300", icon: XCircle };
+      return { label: "Cancelled", tone: "danger" as StatusTone, icon: XCircle };
     default:
-      return { label: status, className: "bg-slate-500/20 text-foreground-secondary", icon: Clock };
+      return { label: formatStatusLabel(status || "unknown"), tone: "default" as StatusTone, icon: Clock };
   }
 }
 
 export default function TransfersPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
   const [status, setStatus] = useState("");
-  const { data, isLoading, error, mutate } = useInventoryTransfers({
-    status: status || undefined,
-    limit: 100,
-  });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error, mutate } = useInventoryTransfers(
+    {
+      status: status || undefined,
+      limit: 100,
+    },
+    { isPaused: () => !canFetch }
+  );
   const { submit, approve, reject, execute } = useInventoryTransferMutations();
 
   const transfers = data?.transfers || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view transfers."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   const handleAction = async (id: number, action: "submit" | "approve" | "reject" | "execute") => {
     try {
@@ -97,19 +121,19 @@ export default function TransfersPage() {
         </Link>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
+      <FilterCard contentClassName="space-y-4" iconClassName="text-amber-400">
         <div className="flex flex-col md:flex-row gap-4">
-          <select
+          <FilterSelect
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="focus:ring-2 focus:ring-amber-500/50"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </FilterSelect>
         </div>
 
         {isLoading && (
@@ -188,48 +212,50 @@ export default function TransfersPage() {
                         {(transfer.total_value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3">
-                        <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs", statusInfo.className)}>
-                          <StatusIcon className="w-3 h-3" />
-                          {statusInfo.label}
-                        </span>
+                        <StatusPill
+                          label={statusInfo.label}
+                          tone={statusInfo.tone}
+                          icon={StatusIcon}
+                          className="border border-current/30"
+                        />
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           {transfer.status === "draft" && (
-                            <button
+                            <Button
                               onClick={() => handleAction(transfer.id, "submit")}
                               className="p-1.5 text-amber-400 hover:bg-amber-500/20 rounded transition-colors"
                               title="Submit for approval"
                             >
                               <Send className="w-4 h-4" />
-                            </button>
+                            </Button>
                           )}
                           {transfer.status === "pending_approval" && (
                             <>
-                              <button
+                              <Button
                                 onClick={() => handleAction(transfer.id, "approve")}
                                 className="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded transition-colors"
                                 title="Approve"
                               >
                                 <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button
+                              </Button>
+                              <Button
                                 onClick={() => handleAction(transfer.id, "reject")}
                                 className="p-1.5 text-red-400 hover:bg-red-500/20 rounded transition-colors"
                                 title="Reject"
                               >
                                 <XCircle className="w-4 h-4" />
-                              </button>
+                              </Button>
                             </>
                           )}
                           {transfer.status === "approved" && (
-                            <button
+                            <Button
                               onClick={() => handleAction(transfer.id, "execute")}
                               className="p-1.5 text-purple-400 hover:bg-purple-500/20 rounded transition-colors"
                               title="Execute transfer"
                             >
                               <Truck className="w-4 h-4" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -246,7 +272,7 @@ export default function TransfersPage() {
             Showing {transfers.length} of {data.total} transfers
           </div>
         )}
-      </div>
+      </FilterCard>
     </div>
   );
 }

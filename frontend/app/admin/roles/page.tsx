@@ -6,6 +6,9 @@ import { Plus, RefreshCw, Shield, Trash2, Save, CheckCircle2 } from 'lucide-reac
 import { adminApi, type RoleResponse, type PermissionResponse } from '@/lib/api/domains';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
+import { Button, LoadingState } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type FormState = {
   name: string;
@@ -14,17 +17,39 @@ type FormState = {
 };
 
 export default function RolesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('admin:roles:read');
+  const canFetch = !authLoading && !missingScope;
   const { toast } = useToast();
-  const { data: roles, mutate: mutateRoles, isLoading: rolesLoading } = useSWR<RoleResponse[]>('admin-roles', adminApi.listRoles);
-  const { data: permissions, isLoading: permsLoading } = useSWR<PermissionResponse[]>('admin-permissions', () =>
-    adminApi.listPermissions()
+  const { data: roles, mutate: mutateRoles, isLoading: rolesLoading } = useSWR<RoleResponse[]>(
+    'admin-roles',
+    adminApi.listRoles,
+    { isPaused: () => !canFetch }
+  );
+  const { data: permissions, isLoading: permsLoading } = useSWR<PermissionResponse[]>(
+    'admin-permissions',
+    () => adminApi.listPermissions(),
+    { isPaused: () => !canFetch }
   );
 
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const selectedRole = useMemo(() => roles?.find((r) => r.id === selectedRoleId) || null, [roles, selectedRoleId]);
+  const selectedRole = useMemo(
+    () => roles?.find((r) => r.id === selectedRoleId) || null,
+    [roles, selectedRoleId]
+  );
+
+  const groupedPermissions = useMemo(() => {
+    if (!permissions) return {};
+    return permissions.reduce<Record<string, PermissionResponse[]>>((acc, perm) => {
+      const key = perm.category || 'general';
+      acc[key] = acc[key] || [];
+      acc[key].push(perm);
+      return acc;
+    }, {});
+  }, [permissions]);
 
   const [form, setForm] = useState<FormState>({
     name: '',
@@ -45,6 +70,20 @@ export default function RolesPage() {
       setForm({ name: '', description: '', permissionIds: [] });
     }
   }, [selectedRole, permissions]);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the admin:roles:read permission to view this page."
+        backHref="/admin"
+        backLabel="Back to Admin"
+      />
+    );
+  }
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
@@ -105,16 +144,6 @@ export default function RolesPage() {
     });
   };
 
-  const groupedPermissions = useMemo(() => {
-    if (!permissions) return {};
-    return permissions.reduce<Record<string, PermissionResponse[]>>((acc, perm) => {
-      const key = perm.category || 'general';
-      acc[key] = acc[key] || [];
-      acc[key].push(perm);
-      return acc;
-    }, {});
-  }, [permissions]);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -123,7 +152,7 @@ export default function RolesPage() {
           <p className="text-slate-muted">Create roles and assign permission scopes for modular RBAC.</p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => {
               setSelectedRoleId(null);
               setForm({ name: '', description: '', permissionIds: [] });
@@ -132,14 +161,14 @@ export default function RolesPage() {
           >
             <Plus className="w-4 h-4" />
             New Role
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => mutateRoles()}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -202,14 +231,14 @@ export default function RolesPage() {
               </p>
             </div>
             {selectedRole && !selectedRole.is_system && (
-              <button
+              <Button
                 onClick={handleDelete}
                 disabled={deleting}
                 className="text-rose-300 hover:text-rose-200 text-sm inline-flex items-center gap-1"
               >
                 <Trash2 className="w-4 h-4" />
                 {deleting ? 'Deleting...' : 'Delete'}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -272,7 +301,7 @@ export default function RolesPage() {
           </div>
 
           <div className="flex justify-end gap-2">
-            <button
+            <Button
               onClick={handleSubmit}
               disabled={saving || selectedRole?.is_system}
               className={cn(
@@ -284,7 +313,7 @@ export default function RolesPage() {
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Saving...' : selectedRole ? 'Save Changes' : 'Create Role'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -1,0 +1,74 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link "BOS" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e8]
+          - generic [ref=e10]: BOS
+        - link "Dotmac Administration" [ref=e12] [cursor=pointer]:
+          - /url: /admin
+          - img [ref=e14]
+          - generic [ref=e19]:
+            - generic [ref=e20]: Dotmac
+            - generic [ref=e21]: Administration
+      - generic [ref=e22]:
+        - button "Search ⌘K" [ref=e23] [cursor=pointer]:
+          - img [ref=e24]
+          - generic [ref=e27]: Search
+          - generic [ref=e28]: ⌘K
+        - button "Switch to dark mode" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+        - generic [ref=e32]:
+          - img [ref=e34]
+          - button "Sign out" [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+    - generic [ref=e41]:
+      - complementary [ref=e42]:
+        - generic [ref=e43]:
+          - heading "Admin" [level=1] [ref=e44]
+          - paragraph [ref=e45]: Platform and settings
+        - generic [ref=e46]:
+          - button "Administration Platform and access" [ref=e48] [cursor=pointer]:
+            - generic [ref=e49]:
+              - img [ref=e50]
+              - generic [ref=e53]:
+                - generic [ref=e54]: Administration
+                - text: Platform and access
+            - img [ref=e55]
+          - button "Settings Configuration" [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]:
+              - img [ref=e60]
+              - generic [ref=e63]:
+                - generic [ref=e64]: Settings
+                - text: Configuration
+            - img [ref=e65]
+          - generic [ref=e67]:
+            - button "Webhooks Inbound and outbound" [ref=e68] [cursor=pointer]:
+              - generic [ref=e69]:
+                - img [ref=e70]
+                - generic [ref=e74]:
+                  - generic [ref=e75]: Webhooks
+                  - text: Inbound and outbound
+              - img [ref=e76]
+            - generic [ref=e78]:
+              - link "Overview Webhook registry" [ref=e79] [cursor=pointer]:
+                - /url: /admin/webhooks
+                - generic [ref=e80]: Overview
+                - generic [ref=e81]: Webhook registry
+              - link "Inbound Inbound events" [ref=e82] [cursor=pointer]:
+                - /url: /admin/webhooks/inbound
+                - generic [ref=e83]: Inbound
+                - generic [ref=e84]: Inbound events
+              - link "Omnichannel Channel integrations" [ref=e85] [cursor=pointer]:
+                - /url: /admin/webhooks/omni
+                - generic [ref=e86]: Omnichannel
+                - generic [ref=e87]: Channel integrations
+      - generic [ref=e93]: Loading webhook...
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e94]
+```

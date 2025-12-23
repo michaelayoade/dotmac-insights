@@ -13,17 +13,41 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FilterCard, FilterInput, LoadingState } from "@/components/ui";
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function BatchesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
   const [itemCode, setItemCode] = useState("");
   const [includeDisabled, setIncludeDisabled] = useState(false);
-  const { data, isLoading, error } = useInventoryBatches({
-    item_code: itemCode || undefined,
-    include_disabled: includeDisabled,
-    limit: 100,
-  });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error } = useInventoryBatches(
+    {
+      item_code: itemCode || undefined,
+      include_disabled: includeDisabled,
+      limit: 100,
+    },
+    { isPaused: () => !canFetch }
+  );
 
   const batches = data?.batches || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view batches."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   const isExpiringSoon = (expiryDate: string | null | undefined) => {
     if (!expiryDate) return false;
@@ -54,14 +78,13 @@ export default function BatchesPage() {
         </Link>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
+      <FilterCard contentClassName="space-y-4" iconClassName="text-amber-400">
         <div className="flex flex-col md:flex-row gap-4">
-          <input
+          <FilterInput
             type="text"
             placeholder="Filter by item code..."
             value={itemCode}
             onChange={(e) => setItemCode(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
           <label className="flex items-center gap-2 text-slate-muted text-sm">
             <input
@@ -201,7 +224,7 @@ export default function BatchesPage() {
             Showing {batches.length} of {data.total} batches
           </div>
         )}
-      </div>
+      </FilterCard>
     </div>
   );
 }

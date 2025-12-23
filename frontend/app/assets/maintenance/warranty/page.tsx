@@ -11,6 +11,7 @@ import {
 import { cn, formatDate } from "@/lib/utils";
 import { useWarrantyExpiring } from "@/hooks/useApi";
 import type { WarrantyExpiringAsset } from "@/lib/api";
+import { Button, FilterCard } from '@/components/ui';
 
 export default function WarrantyExpiringPage() {
   const [days, setDays] = useState(30);
@@ -29,38 +30,36 @@ export default function WarrantyExpiringPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-4">
-          <label className="text-sm text-slate-muted">Expiring within:</label>
-          <div className="flex items-center gap-2">
-            {[7, 14, 30, 60, 90].map((d) => (
-              <button
-                key={d}
-                onClick={() => setDays(d)}
-                className={cn(
-                  "px-3 py-1.5 text-sm rounded-lg transition-colors",
-                  days === d
-                    ? "bg-indigo-500 text-foreground"
-                    : "bg-slate-elevated text-slate-muted hover:text-foreground"
-                )}
-              >
-                {d} days
-              </button>
-            ))}
-          </div>
+      <FilterCard contentClassName="flex flex-wrap items-center gap-4" iconClassName="text-indigo-400">
+        <label className="text-sm text-slate-muted">Expiring within:</label>
+        <div className="flex items-center gap-2">
+          {[7, 14, 30, 60, 90].map((d) => (
+            <Button
+              key={d}
+              onClick={() => setDays(d)}
+              className={cn(
+                "px-3 py-1.5 text-sm rounded-lg transition-colors",
+                days === d
+                  ? "bg-indigo-500 text-foreground"
+                  : "bg-slate-elevated text-slate-muted hover:text-foreground"
+              )}
+            >
+              {d} days
+            </Button>
+          ))}
         </div>
-      </div>
+      </FilterCard>
 
       {/* Stats */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">

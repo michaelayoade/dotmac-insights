@@ -1,0 +1,9 @@
+{# Performance review reminder notification #}
+{% set title = "Review Reminder" %}
+{% set icon = "clock" %}
+{% set priority = "high" %}
+
+You have {{ pending_count | default(0) }} performance review{{ pending_count | pluralize }} pending.
+{% if deadline %}
+Deadline: {{ deadline | format_date }}
+{% endif %}

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Home, Save } from 'lucide-react';
 import { useInventoryWarehouseMutations } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function InventoryWarehouseCreatePage() {
   const router = useRouter();
@@ -151,7 +152,7 @@ export default function InventoryWarehouseCreatePage() {
           </label>
         </div>
 
-        <button
+        <Button
           type="submit"
           disabled={submitting}
           className={cn(
@@ -161,7 +162,7 @@ export default function InventoryWarehouseCreatePage() {
         >
           <Save className="w-4 h-4" />
           {submitting ? 'Saving...' : 'Create Warehouse'}
-        </button>
+        </Button>
       </form>
     </div>
   );

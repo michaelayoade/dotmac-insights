@@ -1,0 +1,72 @@
+{# Reusable macros for report templates #}
+
+{# Format a number for display #}
+{% macro format_num(value, decimals=2) -%}
+{{ value | format_number(decimals) if value is not none else '0.00' }}
+{%- endmacro %}
+
+{# Render a section with accounts #}
+{% macro render_section(section_name, section_data, value_field='balance') %}
+<tr class="section-header">
+    <td colspan="2">{{ section_name }}</td>
+</tr>
+{% for acc in section_data.accounts | default([]) %}
+<tr>
+    <td class="indent">{{ acc.account | default(acc.account_name) }}</td>
+    <td class="number">{{ format_num(acc[value_field]) }}</td>
+</tr>
+{% endfor %}
+<tr class="subtotal">
+    <td>Total {{ section_name }}</td>
+    <td class="number">{{ format_num(section_data.total) }}</td>
+</tr>
+{% endmacro %}
+
+{# Render a table row for trial balance #}
+{% macro trial_balance_row(acc) %}
+<tr>
+    <td>{{ acc.account_name | default('') }}</td>
+    <td>{{ acc.root_type | default('') }}</td>
+    <td class="number">{{ format_num(acc.debit) }}</td>
+    <td class="number">{{ format_num(acc.credit) }}</td>
+    <td class="number">{{ format_num(acc.balance) }}</td>
+</tr>
+{% endmacro %}
+
+{# Render aging bucket headers #}
+{% macro aging_headers(buckets) %}
+<tr>
+    <th>Party</th>
+    {% for bucket in buckets %}
+    <th class="number">{{ bucket }}</th>
+    {% endfor %}
+    <th class="number">Total</th>
+</tr>
+{% endmacro %}
+
+{# Render aging row #}
+{% macro aging_row(row, buckets) %}
+<tr>
+    <td>{{ row.party | default('') }}</td>
+    {% for bucket in buckets %}
+    <td class="number">{{ format_num(row[bucket] | default(0)) }}</td>
+    {% endfor %}
+    <td class="number total-col">{{ format_num(row.total) }}</td>
+</tr>
+{% endmacro %}
+
+{# Render aging summary row #}
+{% macro aging_summary(summary, buckets) %}
+<tr class="total">
+    <td>TOTAL</td>
+    {% for bucket in buckets %}
+    <td class="number">{{ format_num(summary[bucket] | default(0)) }}</td>
+    {% endfor %}
+    <td class="number">{{ format_num(summary.total) }}</td>
+</tr>
+{% endmacro %}
+
+{# Spacer row #}
+{% macro spacer() %}
+<tr class="spacer"><td colspan="10"></td></tr>
+{% endmacro %}

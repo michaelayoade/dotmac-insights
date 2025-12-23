@@ -4,11 +4,9 @@ import { useState } from 'react';
 import { useCustomerCreditStatus, useCustomerCreditMutations } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ShieldCheck, Lock, Unlock, CreditCard } from 'lucide-react';
-
-function formatCurrency(value: number | null | undefined, currency = 'NGN') {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', { style: 'currency', currency }).format(value);
-}
+import { Button } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function CreditManagementPage() {
   const [customerId, setCustomerId] = useState<string>('');
@@ -61,12 +59,9 @@ export default function CreditManagementPage() {
               placeholder="Amount"
               className="input-field"
             />
-            <button
-              onClick={onUpdateLimit}
-              className="px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
-            >
+            <Button onClick={onUpdateLimit} module="books">
               Update Limit
-            </button>
+            </Button>
           </div>
         </div>
         <div className="flex flex-col gap-2 flex-1 min-w-[220px]">
@@ -78,18 +73,12 @@ export default function CreditManagementPage() {
             className="input-field"
           />
           <div className="flex gap-2">
-            <button
-              onClick={() => onToggleHold(true)}
-              className="px-3 py-2 rounded-lg border border-slate-border text-foreground text-sm hover:bg-slate-elevated"
-            >
-              <Lock className="w-4 h-4 inline" /> Place Hold
-            </button>
-            <button
-              onClick={() => onToggleHold(false)}
-              className="px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
-            >
-              <Unlock className="w-4 h-4 inline" /> Release
-            </button>
+            <Button onClick={() => onToggleHold(true)} variant="secondary" icon={Lock}>
+              Place Hold
+            </Button>
+            <Button onClick={() => onToggleHold(false)} module="books" icon={Unlock}>
+              Release
+            </Button>
           </div>
         </div>
       </div>
@@ -105,14 +94,14 @@ export default function CreditManagementPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard
             title="Credit Limit"
-            value={formatCurrency(data.credit_limit)}
-            subtitle={`Used: ${formatCurrency(data.credit_used)}`}
+            value={formatAccountingCurrency(data.credit_limit)}
+            subtitle={`Used: ${formatAccountingCurrency(data.credit_used)}`}
             icon={ShieldCheck}
             colorClass="text-teal-electric"
           />
           <StatCard
             title="Available"
-            value={formatCurrency((data.credit_limit || 0) - (data.credit_used || 0))}
+            value={formatAccountingCurrency((data.credit_limit || 0) - (data.credit_used || 0))}
             subtitle={`Usage ${(data.usage_percent ?? 0).toFixed(1)}%`}
             icon={CreditCard}
             colorClass="text-blue-400"
@@ -126,31 +115,6 @@ export default function CreditManagementPage() {
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  colorClass,
-}: {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  colorClass?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className={cn('w-4 h-4', colorClass)} />
-        <p className="text-slate-muted text-sm">{title}</p>
-      </div>
-      <p className={cn('text-xl font-semibold', colorClass)}>{value}</p>
-      {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
     </div>
   );
 }

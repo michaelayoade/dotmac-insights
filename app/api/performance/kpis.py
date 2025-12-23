@@ -7,7 +7,7 @@ from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime, date
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 from app.database import get_db
@@ -97,8 +97,7 @@ class KPIResponse(BaseModel):
     updated_at: datetime
     kra_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KPIListResponse(BaseModel):
@@ -126,8 +125,7 @@ class KPIBindingResponse(BaseModel):
     effective_to: Optional[date]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============= ENDPOINTS =============

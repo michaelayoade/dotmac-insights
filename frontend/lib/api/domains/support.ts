@@ -1082,6 +1082,25 @@ export const supportApi = {
 
   getCannedCategories: () =>
     fetchApi<string[]>('/support/canned-responses/categories'),
+
+  // =========================================================================
+  // SETTINGS
+  // =========================================================================
+
+  getSettings: (params?: { company?: string }) =>
+    fetchApi<SupportSettingsResponse>('/support/settings', { params }),
+
+  updateSettings: (body: SupportSettingsUpdate, company?: string) =>
+    fetchApi<SupportSettingsResponse>('/support/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      params: company ? { company } : undefined,
+    }),
+
+  seedDefaults: () =>
+    fetchApi<{ message: string; id: number }>('/support/settings/seed-defaults', {
+      method: 'POST',
+    }),
 };
 
 export default supportApi;

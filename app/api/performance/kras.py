@@ -7,7 +7,7 @@ from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
 from app.auth import Require
@@ -49,8 +49,7 @@ class KPILinkResponse(BaseModel):
     weightage: float
     idx: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KRAResponse(BaseModel):
@@ -65,8 +64,7 @@ class KRAResponse(BaseModel):
     kpi_count: int = 0
     kpis: List[KPILinkResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KRAListResponse(BaseModel):

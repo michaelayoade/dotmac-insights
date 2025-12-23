@@ -1,0 +1,80 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "Back to app home" [ref=e7]:
+          - /url: /
+          - img [ref=e8]
+        - link "Dotmac Administration" [ref=e11]:
+          - /url: /admin
+          - img [ref=e13]
+          - generic [ref=e18]:
+            - generic [ref=e19]: Dotmac
+            - generic [ref=e20]: Administration
+      - generic [ref=e21]:
+        - button "Search" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+        - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+        - button "Toggle menu" [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - button "Administration Platform and access" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - generic [ref=e40]:
+              - generic [ref=e41]: Administration
+              - text: Platform and access
+          - img [ref=e42]
+        - button "Settings Configuration" [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - generic [ref=e50]:
+              - generic [ref=e51]: Settings
+              - text: Configuration
+          - img [ref=e52]
+        - generic [ref=e54]:
+          - button "Webhooks Inbound and outbound" [ref=e55] [cursor=pointer]:
+            - generic [ref=e56]:
+              - img [ref=e57]
+              - generic [ref=e61]:
+                - generic [ref=e62]: Webhooks
+                - text: Inbound and outbound
+            - img [ref=e63]
+          - generic [ref=e65]:
+            - link "Overview Webhook registry" [ref=e66]:
+              - /url: /admin/webhooks
+              - generic [ref=e67]: Overview
+              - generic [ref=e68]: Webhook registry
+            - link "Inbound Inbound events" [ref=e69]:
+              - /url: /admin/webhooks/inbound
+              - generic [ref=e70]: Inbound
+              - generic [ref=e71]: Inbound events
+            - link "Omnichannel Channel integrations" [ref=e72]:
+              - /url: /admin/webhooks/omni
+              - generic [ref=e73]: Omnichannel
+              - generic [ref=e74]: Channel integrations
+      - generic [ref=e75]:
+        - button "Dark mode" [ref=e76] [cursor=pointer]:
+          - generic [ref=e77]: Dark mode
+          - img [ref=e78]
+        - button "Sign out" [ref=e80] [cursor=pointer]:
+          - generic [ref=e81]: Sign out
+          - img [ref=e82]
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - heading "Omnichannel Webhooks" [level=1] [ref=e90]
+          - paragraph [ref=e91]: Channel delivery webhooks and secrets.
+        - button "Refresh" [ref=e92] [cursor=pointer]:
+          - img [ref=e93]
+          - text: Refresh
+      - generic [ref=e99]: No channels found.
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e100]
+```

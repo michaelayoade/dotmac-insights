@@ -16,7 +16,7 @@ Environment variables:
     FF_CONTACTS_RECONCILIATION_ENABLED=true
     FF_SOFT_DELETE_ENABLED=true
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.config import settings
 
 
@@ -101,10 +101,11 @@ class FeatureFlags(BaseSettings):
     # Enable native billing APIs (bypass ERPNext)
     # BILLING_NATIVE_ENABLED: bool = False
 
-    class Config:
-        env_prefix = "FF_"
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_prefix="FF_",
+        env_file=".env",
+        extra="ignore",
+    )
 
 
 # Singleton instance
@@ -133,13 +134,26 @@ def is_feature_enabled(flag_name: str) -> bool:
     return getattr(feature_flags, flag_name, False)
 
 
-def refresh_feature_flags():
+async def refresh_feature_flags_async():
     """
-    Refresh feature flags from platform (best effort).
-    This is a synchronous wrapper; platform integration logic lives in
-    app.services.platform_integration.refresh_feature_flags_from_platform.
+    Async refresh feature flags from platform (preferred).
+
+    Uses the async platform client for non-blocking refresh.
     """
-    from app.services.platform_integration import refresh_feature_flags_from_platform
+    from app.services.platform_integration import refresh_feature_flags_from_platform_async
 
     if settings.platform_api_url:
-        refresh_feature_flags_from_platform()
+        await refresh_feature_flags_from_platform_async()
+
+
+def refresh_feature_flags():
+    """
+    Sync refresh feature flags from platform (backward compatibility).
+
+    Note: For async contexts, prefer refresh_feature_flags_async().
+    """
+    import asyncio
+    from app.services.platform_integration import refresh_feature_flags_from_platform_async
+
+    if settings.platform_api_url:
+        asyncio.run(refresh_feature_flags_from_platform_async())

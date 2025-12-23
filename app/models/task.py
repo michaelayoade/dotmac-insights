@@ -10,7 +10,7 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.project import Project
+    from app.models.project import Project, Milestone
     from app.models.expense import Expense
     from app.models.employee import Employee
 
@@ -100,6 +100,11 @@ class Task(Base):
     is_group: Mapped[bool] = mapped_column(default=False)
     is_template: Mapped[bool] = mapped_column(default=False)
 
+    # Milestone link
+    milestone_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("milestones.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     # Company
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -126,6 +131,7 @@ class Task(Base):
 
     # Relationships
     project: Mapped[Optional["Project"]] = relationship(back_populates="tasks")
+    milestone: Mapped[Optional["Milestone"]] = relationship(back_populates="tasks")
     parent: Mapped[Optional["Task"]] = relationship(
         "Task", remote_side="Task.id", back_populates="sub_tasks", foreign_keys=[parent_task_id]
     )

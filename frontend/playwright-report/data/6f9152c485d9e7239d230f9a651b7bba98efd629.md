@@ -1,0 +1,201 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Back to app home" [ref=e15]:
+          - /url: /
+          - img [ref=e16]
+        - link "Dotmac Support" [ref=e19]:
+          - /url: /support
+          - img [ref=e21]
+          - generic [ref=e23]:
+            - generic [ref=e24]: Dotmac
+            - generic [ref=e25]: Support
+      - generic [ref=e26]:
+        - button "Search" [ref=e27] [cursor=pointer]:
+          - img [ref=e28]
+        - button "Switch to dark mode" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+        - button "Toggle menu" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - link "New Ticket" [ref=e39]:
+          - /url: /support/tickets/new
+          - img [ref=e40]
+          - generic [ref=e43]: New Ticket
+        - link "Inbox" [ref=e44]:
+          - /url: /support/tickets
+          - img [ref=e45]
+          - generic [ref=e47]: Inbox
+        - link "Analytics" [ref=e48]:
+          - /url: /support/analytics
+          - img [ref=e49]
+          - generic [ref=e51]: Analytics
+        - link "SLA Watch" [ref=e52]:
+          - /url: /support/sla
+          - img [ref=e53]
+          - generic [ref=e55]: SLA Watch
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - button "Omnichannel Desk Tickets, conversations, and assignments" [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]:
+              - img [ref=e60]
+              - generic [ref=e63]:
+                - generic [ref=e64]: Omnichannel Desk
+                - text: Tickets, conversations, and assignments
+            - img [ref=e65]
+          - generic [ref=e67]:
+            - link "Dashboard Overview & metrics" [ref=e68]:
+              - /url: /support
+              - generic [ref=e69]: Dashboard
+              - generic [ref=e70]: Overview & metrics
+            - link "Tickets Inbox, SLA, assignments" [ref=e71]:
+              - /url: /support/tickets
+              - generic [ref=e72]: Tickets
+              - generic [ref=e73]: Inbox, SLA, assignments
+            - link "Agents People, capacity, skills" [ref=e74]:
+              - /url: /support/agents
+              - generic [ref=e75]: Agents
+              - generic [ref=e76]: People, capacity, skills
+            - link "Teams Queues, members, routing" [ref=e77]:
+              - /url: /support/teams
+              - generic [ref=e78]: Teams
+              - generic [ref=e79]: Queues, members, routing
+        - button "Analytics Performance, SLA, backlog" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]:
+            - img [ref=e83]
+            - generic [ref=e85]:
+              - generic [ref=e86]: Analytics
+              - text: Performance, SLA, backlog
+          - img [ref=e87]
+        - button "Automation & SLA Rules, calendars, routing" [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]:
+            - img [ref=e92]
+            - generic [ref=e95]:
+              - generic [ref=e96]: Automation & SLA
+              - text: Rules, calendars, routing
+          - img [ref=e97]
+        - button "Knowledge & Canned Knowledge base & snippets" [ref=e100] [cursor=pointer]:
+          - generic [ref=e101]:
+            - img [ref=e102]
+            - generic [ref=e104]:
+              - generic [ref=e105]: Knowledge & Canned
+              - text: Knowledge base & snippets
+          - img [ref=e106]
+        - button "Configuration Support settings" [ref=e109] [cursor=pointer]:
+          - generic [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e114]:
+              - generic [ref=e115]: Configuration
+              - text: Support settings
+          - img [ref=e116]
+      - generic [ref=e118]:
+        - button "Dark mode" [ref=e119] [cursor=pointer]:
+          - generic [ref=e120]: Dark mode
+          - img [ref=e121]
+        - button "Sign out" [ref=e123] [cursor=pointer]:
+          - generic [ref=e124]: Sign out
+          - img [ref=e125]
+    - generic [ref=e130]:
+      - generic [ref=e132]:
+        - link "Back" [ref=e133]:
+          - /url: /support/tickets
+          - img [ref=e134]
+          - text: Back
+        - generic [ref=e136]:
+          - img [ref=e138]
+          - generic [ref=e145]:
+            - heading "New Ticket" [level=1] [ref=e146]
+            - paragraph [ref=e147]: Ticket number auto-generates on create
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - img [ref=e151]
+            - heading "Ticket Details" [level=2] [ref=e153]
+          - generic [ref=e154]:
+            - text: Subject *
+            - textbox "Brief description of the issue" [ref=e155]
+          - generic [ref=e156]:
+            - text: Description
+            - textbox "Steps to reproduce, impact, etc." [ref=e157]
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - text: Status
+              - combobox [ref=e160]:
+                - option "Open" [selected]
+                - option "Replied"
+                - option "Resolved"
+                - option "Closed"
+                - option "On Hold"
+            - generic [ref=e161]:
+              - text: Priority
+              - combobox [ref=e162]:
+                - option "Low"
+                - option "Medium" [selected]
+                - option "High"
+                - option "Urgent"
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - text: Ticket Type
+              - textbox "Support / Incident / etc." [ref=e165]
+            - generic [ref=e166]:
+              - text: Issue Type
+              - textbox "Outage / Billing / etc." [ref=e167]
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - img [ref=e171]
+              - heading "Assignment" [level=2] [ref=e176]
+            - generic [ref=e177]:
+              - text: Assign to Agent
+              - combobox [ref=e178]:
+                - option "-- Select an agent --" [selected]
+            - generic [ref=e179]:
+              - text: Resolution Team
+              - combobox [ref=e180]:
+                - option "-- Select a team --" [selected]
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - text: Response By
+                - textbox [ref=e183]
+              - generic [ref=e184]:
+                - text: Resolution By
+                - textbox [ref=e185]
+          - generic [ref=e186]:
+            - generic [ref=e187]:
+              - img [ref=e188]
+              - heading "Customer Information" [level=2] [ref=e191]
+            - generic [ref=e192]:
+              - generic [ref=e193]:
+                - text: Customer Name
+                - textbox "Full name" [ref=e194]
+              - generic [ref=e195]:
+                - text: Customer Email
+                - textbox "customer@email.com" [ref=e196]
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - text: Customer Phone
+                - textbox "+234..." [ref=e199]
+              - generic [ref=e200]:
+                - text: Region
+                - textbox "Lagos, Abuja, etc." [ref=e201]
+            - generic [ref=e202]:
+              - text: Base Station
+              - textbox "Station identifier" [ref=e203]
+        - generic [ref=e204]:
+          - button "Cancel" [ref=e205] [cursor=pointer]
+          - button "Create Ticket" [ref=e206] [cursor=pointer]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e207]
+```

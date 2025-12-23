@@ -1,0 +1,8 @@
+{# Card Transactions CSV Report Template #}
+Card Transactions Report
+Generated: {{ generated_at }}
+
+Card,Date,Merchant,Description,Amount,Currency,Status,Reference
+{% for t in transactions -%}
+{{ t.card_name | csv_escape }},{{ t.transaction_date | csv_escape }},{{ t.merchant | csv_escape }},{{ t.description | csv_escape }},{{ t.amount | format_number | csv_escape }},{{ t.currency | csv_escape }},{{ t.status | csv_escape }},{{ t.reference | csv_escape }}
+{% endfor -%}

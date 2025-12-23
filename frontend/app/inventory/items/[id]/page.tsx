@@ -21,6 +21,7 @@ import { inventoryApi, InventoryItemPayload } from '@/lib/api/domains/inventory'
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { useSWRStatus } from '@/hooks/useSWRStatus';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function ItemDetailPage() {
   const router = useRouter();
@@ -135,38 +136,38 @@ export default function ItemDetailPage() {
                   <BarChart3 className="w-4 h-4" />
                   Valuation
                 </Link>
-                <button
+                <Button
                   onClick={() => setIsEditing(true)}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
                 >
                   <Pencil className="w-4 h-4" />
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setDeleteConfirm(true)}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-coral-alert/10 border border-coral-alert/30 text-coral-alert text-sm hover:bg-coral-alert/20"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
-                </button>
+                </Button>
               </>
             ) : (
               <>
-                <button
+                <Button
                   onClick={handleSave}
                   disabled={saving}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={cancelEdit}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
                 >
                   <X className="w-4 h-4" />
                   Cancel
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -183,18 +184,18 @@ export default function ItemDetailPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={handleDelete}
                   className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
                 >
                   Yes, Delete
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setDeleteConfirm(false)}
                   className="px-3 py-1.5 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           </div>

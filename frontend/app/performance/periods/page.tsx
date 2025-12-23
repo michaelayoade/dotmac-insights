@@ -16,27 +16,19 @@ import { usePeriodList, useActivatePeriod, useStartScoring, useFinalizePeriod } 
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import type { EvaluationPeriod, PeriodStatus } from '@/lib/performance.types';
+import { Button, FilterCard, FilterSelect, StatusPill } from '@/components/ui';
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function getStatusColor(status: PeriodStatus): string {
-  switch (status) {
-    case 'draft': return 'text-slate-400 bg-slate-400/10';
-    case 'active': return 'text-emerald-400 bg-emerald-400/10';
-    case 'scoring': return 'text-amber-400 bg-amber-400/10';
-    case 'review': return 'text-cyan-400 bg-cyan-400/10';
-    case 'finalized': return 'text-violet-400 bg-violet-400/10';
-    case 'archived': return 'text-slate-500 bg-slate-500/10';
-    default: return 'text-slate-400 bg-slate-400/10';
-  }
-}
+const STATUS_TONES: Record<PeriodStatus, StatusTone> = {
+  draft: 'default',
+  active: 'success',
+  scoring: 'warning',
+  review: 'info',
+  finalized: 'info',
+  archived: 'default',
+};
 
 export default function PeriodsPage() {
   const [offset, setOffset] = useState(0);
@@ -89,12 +81,10 @@ export default function PeriodsPage() {
       key: 'status',
       header: 'Status',
       render: (item: EvaluationPeriod) => (
-        <span className={cn(
-          'px-2 py-1 rounded-full text-xs font-medium capitalize',
-          getStatusColor(item.status)
-        )}>
-          {item.status}
-        </span>
+        <StatusPill
+          label={formatStatusLabel(item.status)}
+          tone={STATUS_TONES[item.status] || 'default'}
+        />
       ),
     },
     {
@@ -158,14 +148,28 @@ export default function PeriodsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <select
+      <FilterCard
+        actions={statusFilter && (
+          <Button
+            onClick={() => {
+              setStatusFilter('');
+              setOffset(0);
+            }}
+            className="text-slate-400 text-sm hover:text-foreground transition-colors"
+          >
+            Clear filter
+          </Button>
+        )}
+        iconClassName="text-violet-400"
+        contentClassName="flex gap-3"
+      >
+        <FilterSelect
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value as PeriodStatus | '');
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Statuses</option>
           <option value="draft">Draft</option>
@@ -174,19 +178,8 @@ export default function PeriodsPage() {
           <option value="review">Review</option>
           <option value="finalized">Finalized</option>
           <option value="archived">Archived</option>
-        </select>
-        {statusFilter && (
-          <button
-            onClick={() => {
-              setStatusFilter('');
-              setOffset(0);
-            }}
-            className="text-slate-400 text-sm hover:text-foreground transition-colors"
-          >
-            Clear filter
-          </button>
-        )}
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Status Summary */}
       <div className="flex gap-3 flex-wrap">
@@ -199,7 +192,7 @@ export default function PeriodsPage() {
         ].map((item) => {
           const count = data?.items.filter(p => p.status === item.status).length || 0;
           return (
-            <button
+            <Button
               key={item.status}
               onClick={() => setStatusFilter(item.status as PeriodStatus)}
               className={cn(
@@ -212,7 +205,7 @@ export default function PeriodsPage() {
               <item.icon className="w-3.5 h-3.5" />
               {item.label}
               <span className="ml-1 text-xs opacity-70">({count})</span>
-            </button>
+            </Button>
           );
         })}
       </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { Landmark, CreditCard } from 'lucide-react';
-import { ModuleLayout, NavSection } from '@/components/ModuleLayout';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
   {

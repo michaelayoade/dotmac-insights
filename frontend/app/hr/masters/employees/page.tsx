@@ -7,8 +7,13 @@ import { hrApi, HrEmployee, HrEmployeePayload } from '@/lib/api/domains/hr';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { useSWRStatus } from '@/hooks/useSWRStatus';
+import { Button, LoadingState } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function EmployeesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('hr:read');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
@@ -17,14 +22,29 @@ export default function EmployeesPage() {
   const [formData, setFormData] = useState<HrEmployeePayload>({});
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const canFetch = !authLoading && !missingScope;
 
   const employeesRes = useSWR(
-    ['hr-employees', page, pageSize, search],
+    canFetch ? ['hr-employees', page, pageSize, search] : null,
     () => hrApi.getEmployees({ search: search || undefined, limit: pageSize, offset: (page - 1) * pageSize })
   );
   const { isLoading, error, retry } = useSWRStatus(employeesRes);
   const employees = employeesRes.data?.items || [];
   const total = employeesRes.data?.total || 0;
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the hr:read permission to view employees."
+        backHref="/hr"
+        backLabel="Back to HR"
+      />
+    );
+  }
 
   const handleCreate = async () => {
     if (!formData.first_name?.trim()) return;
@@ -127,37 +147,37 @@ export default function EmployeesPage() {
         <div className="flex items-center justify-end gap-2">
           {deleteConfirm === item.id ? (
             <>
-              <button
+              <Button
                 onClick={() => handleDelete(item.id)}
                 className="p-1.5 rounded bg-coral-alert/20 text-coral-alert hover:bg-coral-alert/30"
                 title="Confirm Delete"
               >
                 <Check className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(null)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
                 title="Cancel"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 onClick={() => startEdit(item)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(item.id)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-coral-alert/20 hover:text-coral-alert"
                 title="Delete"
               >
                 <Trash2 className="w-4 h-4" />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -174,13 +194,13 @@ export default function EmployeesPage() {
             <h1 className="text-xl font-semibold text-foreground">Employees</h1>
           </div>
           {!isCreating && (
-            <button
+            <Button
               onClick={() => { setIsCreating(true); setEditingId(null); setFormData({}); }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
             >
               <Plus className="w-4 h-4" />
               Add Employee
-            </button>
+            </Button>
           )}
         </div>
 
@@ -267,19 +287,19 @@ export default function EmployeesPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <button
+              <Button
                 onClick={() => isCreating ? handleCreate() : handleUpdate(editingId!)}
                 disabled={!formData.first_name?.trim()}
                 className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCreating ? 'Create' : 'Save'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={cancelEdit}
                 className="px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}

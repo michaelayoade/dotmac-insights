@@ -10,7 +10,11 @@ import {
   useHrLifecycleMutations,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { ArrowRightLeft, Flag, Rocket, UserCheck, CheckCircle2, Clock, XCircle, FileEdit, Send, AlertCircle, ArrowRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button, StatusPill } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -30,29 +34,29 @@ function FormLabel({ children, required }: { children: React.ReactNode; required
 function StatusBadge({ status, type = 'onboarding' }: { status: string; type?: 'onboarding' | 'separation' | 'promotion' | 'transfer' }) {
   const normalizedStatus = (status || '').toLowerCase();
 
-  const configs: Record<string, Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }>> = {
+  const configs: Record<string, Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }>> = {
     onboarding: {
-      open: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
-      in_progress: { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-300', icon: <ArrowRight className="w-3 h-3" /> },
-      completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <XCircle className="w-3 h-3" /> },
+      open: { tone: 'warning', icon: Clock },
+      in_progress: { tone: 'info', icon: ArrowRight, label: 'In progress' },
+      completed: { tone: 'success', icon: CheckCircle2 },
+      closed: { tone: 'default', icon: XCircle },
     },
     separation: {
-      open: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
-      in_progress: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <ArrowRight className="w-3 h-3" /> },
-      closed: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <CheckCircle2 className="w-3 h-3" /> },
+      open: { tone: 'warning', icon: Clock },
+      in_progress: { tone: 'danger', icon: ArrowRight, label: 'In progress' },
+      closed: { tone: 'default', icon: CheckCircle2 },
     },
     promotion: {
-      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
-      submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
-      approved: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-      rejected: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
+      draft: { tone: 'default', icon: FileEdit },
+      submitted: { tone: 'warning', icon: Send },
+      approved: { tone: 'success', icon: CheckCircle2 },
+      rejected: { tone: 'danger', icon: XCircle },
     },
     transfer: {
-      draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
-      submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
-      approved: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-      rejected: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <XCircle className="w-3 h-3" /> },
+      draft: { tone: 'default', icon: FileEdit },
+      submitted: { tone: 'warning', icon: Send },
+      approved: { tone: 'success', icon: CheckCircle2 },
+      rejected: { tone: 'danger', icon: XCircle },
     },
   };
 
@@ -61,34 +65,12 @@ function StatusBadge({ status, type = 'onboarding' }: { status: string; type?: '
   const style = typeConfig[normalizedStatus] || typeConfig[defaultKey];
 
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', style.bg, style.border, style.text)}>
-      {style.icon}
-      <span className="capitalize">{(status || defaultKey).replace('_', ' ')}</span>
-    </span>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-amber-400',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
-      </div>
-    </div>
+    <StatusPill
+      label={style.label || formatStatusLabel(status || defaultKey)}
+      tone={style.tone}
+      icon={style.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -155,10 +137,10 @@ export default function HrLifecyclePage() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard label="Onboardings" value={onboardingList.total} icon={UserCheck} tone="text-emerald-400" />
-        <StatCard label="Separations" value={separationList.total} icon={Flag} tone="text-rose-400" />
-        <StatCard label="Promotions" value={promotionList.total} icon={Rocket} tone="text-amber-400" />
-        <StatCard label="Transfers" value={transferList.total} icon={ArrowRightLeft} tone="text-violet-400" />
+        <StatCard title="Onboardings" value={onboardingList.total} icon={UserCheck} colorClass="text-emerald-400" />
+        <StatCard title="Separations" value={separationList.total} icon={Flag} colorClass="text-rose-400" />
+        <StatCard title="Promotions" value={promotionList.total} icon={Rocket} colorClass="text-amber-400" />
+        <StatCard title="Transfers" value={transferList.total} icon={ArrowRightLeft} colorClass="text-violet-400" />
       </div>
 
 
@@ -196,13 +178,13 @@ export default function HrLifecyclePage() {
                 <option value="closed">Closed</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={() => handleStatusUpdate('onboarding')}
               disabled={!statusForm.onboardingId}
               className="bg-amber-500 text-slate-deep px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Onboarding
-            </button>
+            </Button>
           </div>
 
           <div className="pt-4 border-t border-slate-border space-y-3">
@@ -234,13 +216,13 @@ export default function HrLifecyclePage() {
                 <option value="closed">Closed</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={() => handleStatusUpdate('separation')}
               disabled={!statusForm.separationId}
               className="px-4 py-2 rounded-lg text-sm font-semibold border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Separation
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -276,13 +258,13 @@ export default function HrLifecyclePage() {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={() => handleStatusUpdate('promotion')}
               disabled={!statusForm.promotionId}
               className="bg-amber-500 text-slate-deep px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Promotion
-            </button>
+            </Button>
           </div>
 
           <div className="pt-4 border-t border-slate-border space-y-3">
@@ -315,13 +297,13 @@ export default function HrLifecyclePage() {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-            <button
+            <Button
               onClick={() => handleStatusUpdate('transfer')}
               disabled={!statusForm.transferId}
               className="px-4 py-2 rounded-lg text-sm font-semibold border border-violet-500/40 text-violet-300 hover:bg-violet-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Update Transfer
-            </button>
+            </Button>
           </div>
         </div>
       </div>

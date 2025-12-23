@@ -1,0 +1,16 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Dunning Notice Sent" %}
+{% set icon = "mail" %}
+{% set priority = "normal" %}
+
+{% block content %}
+A dunning notice has been sent to a customer.
+
+Customer: {{ customer_name | default('Customer') }}
+Invoice: {{ invoice_number | default('N/A') }}
+Amount Overdue: {{ amount | default('N/A') }}
+Days Overdue: {{ days_overdue | default('N/A') }}
+Dunning Level: {{ dunning_level | default('1') }}
+
+The customer has been notified about the overdue payment.
+{% endblock %}

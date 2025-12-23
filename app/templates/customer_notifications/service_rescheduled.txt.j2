@@ -1,0 +1,16 @@
+{# Service rescheduled notification #}
+{% set title = "Service Rescheduled: " ~ (order_type | default('Service') | title_case) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your service order #{{ order_number }} has been rescheduled.
+
+New Date: {{ scheduled_date | format_date }}
+New Time: {{ scheduled_time | default('TBD') }}
+Address: {{ service_address }}
+
+{% if notes %}Reason: {{ notes }}{% endif %}
+
+We apologize for any inconvenience. Please contact us if this new time doesn't work for you.
+
+Thank you for your understanding.

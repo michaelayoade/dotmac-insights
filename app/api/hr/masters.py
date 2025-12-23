@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
@@ -35,7 +35,7 @@ class EmployeeCreateRequest(BaseModel):
     salary: Optional[Decimal] = None
     currency: Optional[str] = "NGN"
 
-    @validator("salary", pre=True)
+    @field_validator("salary", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
@@ -58,7 +58,7 @@ class EmployeeUpdateRequest(BaseModel):
     salary: Optional[Decimal] = None
     currency: Optional[str] = None
 
-    @validator("salary", pre=True)
+    @field_validator("salary", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 

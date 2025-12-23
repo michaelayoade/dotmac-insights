@@ -7,6 +7,7 @@ import { usePurchasingBillMutations, useAccountingSuppliers } from '@/hooks/useA
 import { AlertTriangle, ArrowLeft, Save, Plus, Trash2, Percent, Calendar as CalendarIcon, Hash, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SupplierSearch } from '@/components/EntitySearch';
+import { Button } from '@/components/ui';
 
 export default function NewBillPage() {
   const router = useRouter();
@@ -164,14 +165,16 @@ export default function NewBillPage() {
           </div>
 
           {/* More options toggle */}
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setShowMoreOptions(!showMoreOptions)}
-            className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm py-2"
           >
             {showMoreOptions ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             More options
-          </button>
+          </Button>
 
           {/* Optional fields */}
           {showMoreOptions && (
@@ -211,14 +214,16 @@ export default function NewBillPage() {
               <p className="text-sm text-foreground font-semibold">Line Items</p>
               <p className="text-xs text-slate-muted">Item, quantity, unit cost, and per-line tax</p>
             </div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={addLine}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-foreground hover:bg-slate-elevated"
+              className="inline-flex items-center gap-2 text-sm py-2"
             >
               <Plus className="w-4 h-4" />
               Add line
-            </button>
+            </Button>
           </div>
           <div className="space-y-3">
             {lineItems.map((item, idx) => (
@@ -264,14 +269,16 @@ export default function NewBillPage() {
                   />
                 </div>
                 <div className="flex justify-end">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => removeLine(idx)}
-                    className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-card rounded-lg"
+                    className="p-2 hover:text-coral-alert"
                     aria-label="Remove line"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -302,14 +309,15 @@ export default function NewBillPage() {
           >
             Cancel
           </Link>
-          <button
+          <Button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60"
+            module="books"
+            className="inline-flex items-center gap-2 font-semibold"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Create Bill'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

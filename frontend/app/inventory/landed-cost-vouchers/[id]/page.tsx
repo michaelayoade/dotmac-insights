@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useLandedCostVoucherDetail, useLandedCostVoucherMutations } from '@/hooks/useApi';
 import { AlertTriangle, ArrowLeft, Boxes, CheckCircle2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui';
 
 export default function LandedCostVoucherDetailPage() {
   const params = useParams();
@@ -37,12 +38,12 @@ export default function LandedCostVoucherDetailPage() {
           <h1 className="text-xl font-semibold text-foreground">Voucher {id}</h1>
         </div>
         {data?.status === 'draft' ? (
-          <button
+          <Button
             onClick={onSubmit}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90"
           >
             Submit
-          </button>
+          </Button>
         ) : (
           <span className="inline-flex items-center gap-2 text-green-400 text-sm">
             <CheckCircle2 className="w-4 h-4" />

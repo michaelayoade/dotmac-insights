@@ -11,6 +11,7 @@ Create Date: 2025-12-21
 from typing import Sequence, Union
 from alembic import op
 import os
+import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '20251221_backfill_null_company'
@@ -134,13 +135,16 @@ def upgrade() -> None:
     for table in ALL_TABLES:
         # Check if table exists before updating
         result = conn.execute(
-            f"""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_name = '{table}'
-            )
-            """
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                    AND table_name = :table_name
+                )
+                """
+            ),
+            {"table_name": table},
         )
         table_exists = result.scalar()
 
@@ -150,14 +154,17 @@ def upgrade() -> None:
 
         # Check if table has company column
         result = conn.execute(
-            f"""
-            SELECT EXISTS (
-                SELECT FROM information_schema.columns
-                WHERE table_schema = 'public'
-                AND table_name = '{table}'
-                AND column_name = 'company'
-            )
-            """
+            sa.text(
+                """
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = :table_name
+                    AND column_name = 'company'
+                )
+                """
+            ),
+            {"table_name": table},
         )
         has_company = result.scalar()
 
@@ -166,7 +173,9 @@ def upgrade() -> None:
             continue
 
         # Count NULL records
-        result = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE company IS NULL")
+        result = conn.execute(
+            sa.text(f"SELECT COUNT(*) FROM {table} WHERE company IS NULL")
+        )
         null_count = result.scalar()
 
         if null_count == 0:
@@ -176,11 +185,14 @@ def upgrade() -> None:
         # Perform the backfill
         print(f"  Backfilling {table}: {null_count} records")
         conn.execute(
-            f"""
-            UPDATE {table}
-            SET company = '{DEFAULT_COMPANY}'
-            WHERE company IS NULL
-            """
+            sa.text(
+                f"""
+                UPDATE {table}
+                SET company = :default_company
+                WHERE company IS NULL
+                """
+            ),
+            {"default_company": DEFAULT_COMPANY},
         )
         conn.commit()
 

@@ -29,7 +29,12 @@ import {
 } from '@/hooks/useApi';
 import type { HrPayrollPayoutRequest } from '@/lib/api';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { Button, StatusPill, LoadingState } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 import {
   Banknote,
   Briefcase,
@@ -49,6 +54,7 @@ import {
   Users,
   ArrowRight,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -64,45 +70,6 @@ const TOOLTIP_STYLE = {
   },
   labelStyle: { color: CHART_COLORS.tooltip.text },
 };
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  trend,
-  trendValue,
-  className,
-}: {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  className?: string;
-}) {
-  return (
-    <div className={cn('bg-slate-card border border-slate-border rounded-xl p-5', className)}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-2xl font-bold text-foreground mt-1 font-mono">{value}</p>
-          {trendValue && (
-            <div className="flex items-center gap-1 mt-2">
-              {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
-              {trend === 'down' && <TrendingDown className="w-3 h-3 text-rose-400" />}
-              <span className={cn('text-xs', trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-muted')}>
-                {trendValue}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="p-3 bg-violet-500/10 rounded-xl">
-          <Icon className="w-6 h-6 text-violet-400" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ChartCard({ title, subtitle, children, className }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
@@ -123,14 +90,14 @@ function CollapsibleSection({
   defaultOpen = false,
 }: {
   title: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   children: React.ReactNode;
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated/50 transition-colors rounded-xl"
       >
@@ -139,32 +106,35 @@ function CollapsibleSection({
           <span className="text-foreground font-semibold">{title}</span>
         </div>
         {isOpen ? <ChevronUp className="w-5 h-5 text-slate-muted" /> : <ChevronDown className="w-5 h-5 text-slate-muted" />}
-      </button>
+      </Button>
       {isOpen && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { bg: string; text: string; border: string; icon: React.ElementType }> = {
-    paid: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 },
-    submitted: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/40', icon: CheckCircle2 },
-    void: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle },
-    draft: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock },
+  const statusConfig: Record<string, { tone: StatusTone; icon: LucideIcon }> = {
+    paid: { tone: 'success', icon: CheckCircle2 },
+    submitted: { tone: 'info', icon: CheckCircle2 },
+    void: { tone: 'danger', icon: XCircle },
+    draft: { tone: 'warning', icon: Clock },
   };
   const config = statusConfig[status.toLowerCase()] || statusConfig.draft;
-  const Icon = config.icon;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
-      <Icon className="w-3 h-3" />
-      {status}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status || 'draft')}
+      tone={config.tone}
+      icon={config.icon}
+      className="border border-current/30"
+    />
   );
 }
 
 const SINGLE_COMPANY = '';
 
 export default function HrPayrollPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('hr:read');
   const [assignmentLimit, setAssignmentLimit] = useState(20);
   const [assignmentOffset, setAssignmentOffset] = useState(0);
   const [slipLimit, setSlipLimit] = useState(20);
@@ -205,22 +175,38 @@ export default function HrPayrollPage() {
     state: 'idle',
   });
   const company = SINGLE_COMPANY;
+  const canFetch = !authLoading && !missingScope;
 
-  const { data: salaryComponents, isLoading: componentsLoading } = useHrSalaryComponents({ company: SINGLE_COMPANY || undefined });
-  const { data: salaryStructures, isLoading: structuresLoading } = useHrSalaryStructures({ company: SINGLE_COMPANY || undefined });
-  const { data: assignments, isLoading: assignmentsLoading } = useHrSalaryStructureAssignments({
-    company: SINGLE_COMPANY || undefined,
-    limit: assignmentLimit,
-    offset: assignmentOffset,
-  });
-  const { data: payrollEntries, isLoading: payrollEntriesLoading } = useHrPayrollEntries({ company: SINGLE_COMPANY || undefined });
-  const { data: salarySlips, isLoading: salarySlipsLoading } = useHrSalarySlips({
-    company: SINGLE_COMPANY || undefined,
-    limit: slipLimit,
-    offset: slipOffset,
-    payroll_entry: payoutForm.entryId ? `PAYROLL-${payoutForm.entryId}` : undefined,
-  });
-  const { data: analyticsOverview } = useHrAnalyticsOverview();
+  const { data: salaryComponents, isLoading: componentsLoading } = useHrSalaryComponents(
+    { company: SINGLE_COMPANY || undefined },
+    { isPaused: () => !canFetch }
+  );
+  const { data: salaryStructures, isLoading: structuresLoading } = useHrSalaryStructures(
+    { company: SINGLE_COMPANY || undefined },
+    { isPaused: () => !canFetch }
+  );
+  const { data: assignments, isLoading: assignmentsLoading } = useHrSalaryStructureAssignments(
+    {
+      company: SINGLE_COMPANY || undefined,
+      limit: assignmentLimit,
+      offset: assignmentOffset,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: payrollEntries, isLoading: payrollEntriesLoading } = useHrPayrollEntries(
+    { company: SINGLE_COMPANY || undefined },
+    { isPaused: () => !canFetch }
+  );
+  const { data: salarySlips, isLoading: salarySlipsLoading } = useHrSalarySlips(
+    {
+      company: SINGLE_COMPANY || undefined,
+      limit: slipLimit,
+      offset: slipOffset,
+      payroll_entry: payoutForm.entryId ? `PAYROLL-${payoutForm.entryId}` : undefined,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: analyticsOverview } = useHrAnalyticsOverview(undefined, { isPaused: () => !canFetch });
   const payrollEntryMutations = useHrPayrollEntryMutations();
   const salarySlipMutations = useHrSalarySlipMutations();
 
@@ -335,6 +321,20 @@ export default function HrPayrollPage() {
       color: status === 'paid' ? CHART_COLORS.success : status === 'submitted' ? CHART_COLORS.info : status === 'void' ? CHART_COLORS.danger : CHART_COLORS.warning,
     }));
   }, [salarySlipList.items]);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the hr:read permission to view payroll."
+        backHref="/hr"
+        backLabel="Back to HR"
+      />
+    );
+  }
 
   const handleGenerateSlips = async () => {
     setActionError(null);
@@ -463,42 +463,44 @@ export default function HrPayrollPage() {
             <p className="text-slate-muted text-sm mt-1">Salary structures, entries, and slips</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
+            <Button
               onClick={handleExportRegister}
               disabled={exporting}
               className="px-4 py-2 bg-violet-500/20 text-violet-300 rounded-lg text-sm font-medium hover:bg-violet-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
               {exporting ? 'Exporting...' : 'Export Register'}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Gross Pay (30d)"
+          <StatCard
+            title="Gross Pay (30d)"
             value={formatCurrency(payroll30d.gross_total || 0, 'NGN', { maximumFractionDigits: 0 })}
             icon={DollarSign}
-            trend="neutral"
-            trendValue={`${payroll30d.slip_count || 0} slips`}
+            colorClass="text-violet-400"
+            trend={{ value: 0, label: `${payroll30d.slip_count || 0} slips` }}
           />
-          <MetricCard
-            label="Net Pay (30d)"
+          <StatCard
+            title="Net Pay (30d)"
             value={formatCurrency(payroll30d.net_total || 0, 'NGN', { maximumFractionDigits: 0 })}
             icon={Wallet2}
-            trend="up"
-            trendValue="After deductions"
+            colorClass="text-violet-400"
+            trend={{ value: 1, label: "After deductions" }}
           />
-          <MetricCard
-            label="Salary Structures"
+          <StatCard
+            title="Salary Structures"
             value={String(structureList.total)}
             icon={ClipboardList}
+            colorClass="text-violet-400"
           />
-          <MetricCard
-            label="Active Assignments"
+          <StatCard
+            title="Active Assignments"
             value={String(assignmentList.total)}
             icon={Users}
+            colorClass="text-violet-400"
           />
         </div>
       </div>
@@ -642,12 +644,12 @@ export default function HrPayrollPage() {
               />
               Regenerate existing drafts
             </label>
-            <button
+            <Button
               onClick={handleGenerateSlips}
               className="bg-violet-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
             >
               Generate Slips
-            </button>
+            </Button>
           </div>
 
           {/* Salary Slip Actions */}
@@ -680,12 +682,12 @@ export default function HrPayrollPage() {
                   <option value="cash">Cash</option>
                   <option value="cheque">Cheque</option>
                 </select>
-                <button
+                <Button
                   onClick={handleMarkSlipPaid}
                   className="bg-emerald-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-400 transition-colors"
                 >
                   Mark Paid
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -707,12 +709,12 @@ export default function HrPayrollPage() {
                   className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
-              <button
+              <Button
                 onClick={handleVoidSlip}
                 className="bg-rose-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-400 transition-colors"
               >
                 Void Slip
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -860,7 +862,7 @@ export default function HrPayrollPage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       payrollEntryMutations.generateSlips(item.id, {
@@ -876,7 +878,7 @@ export default function HrPayrollPage() {
                     className="px-2 py-1 rounded border border-violet-500/40 text-violet-300 hover:bg-violet-500/10 transition-colors"
                   >
                     Generate
-                  </button>
+                  </Button>
                 </div>
               ),
             },
@@ -1003,14 +1005,14 @@ export default function HrPayrollPage() {
             {payoutStatus.state === 'success' && <span className="text-emerald-400">{payoutStatus.message}</span>}
             {payoutStatus.state === 'submitting' && <span className="text-slate-muted">Submitting payouts…</span>}
           </div>
-          <button
+          <Button
             onClick={submitPayouts}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-foreground hover:bg-emerald-400 transition-colors disabled:opacity-50"
             disabled={payoutStatus.state === 'submitting'}
           >
             <ArrowRight className="w-4 h-4" />
             Send to Books
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -1051,7 +1053,7 @@ export default function HrPayrollPage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       salarySlipMutations.markPaid(item.id, {
@@ -1063,8 +1065,8 @@ export default function HrPayrollPage() {
                     className="px-2 py-1 rounded border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
                   >
                     Pay
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => {
                       e.stopPropagation();
                       salarySlipMutations.void(item.id, { void_reason: 'Voided from list' }).catch((err: any) => setActionError(err?.message || 'Void failed'));
@@ -1072,7 +1074,7 @@ export default function HrPayrollPage() {
                     className="px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 transition-colors"
                   >
                     Void
-                  </button>
+                  </Button>
                 </div>
               ),
             },

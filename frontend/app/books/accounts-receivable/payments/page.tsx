@@ -1,31 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useFinancePayments } from '@/hooks/useApi';
-import { formatCurrency, cn } from '@/lib/utils';
-import { Plus, Filter, Calendar, CreditCard, User, CheckCircle2, Clock, AlertTriangle, XCircle } from 'lucide-react';
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  return new Date(value).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { Plus, Calendar, CreditCard, User, CheckCircle2, Clock, AlertTriangle, XCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
+import { FilterCard, FilterInput, FilterSelect, StatusPill, LinkButton } from '@/components/ui';
 
 function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = (status || '').toLowerCase();
-  const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    pending: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Clock className="w-3 h-3" /> },
-    completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-    failed: { bg: 'bg-rose-500/10', border: 'border-rose-500/40', text: 'text-rose-300', icon: <AlertTriangle className="w-3 h-3" /> },
-    refunded: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <XCircle className="w-3 h-3" /> },
+  const config: Record<string, { tone: StatusTone; icon: LucideIcon }> = {
+    pending: { tone: 'warning', icon: Clock },
+    completed: { tone: 'success', icon: CheckCircle2 },
+    failed: { tone: 'danger', icon: AlertTriangle },
+    refunded: { tone: 'default', icon: XCircle },
   };
   const style = config[normalizedStatus] || config.pending;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', style.bg, style.border, style.text)}>
-      {style.icon}
-      <span className="capitalize">{status || 'Pending'}</span>
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status || 'pending')}
+      tone={style.tone}
+      icon={style.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -54,7 +53,7 @@ export default function BooksPaymentsPage() {
       render: (item: any) => (
         <div className="flex flex-col">
           <span className="font-mono text-foreground">{item.receipt_number || `#${item.id}`}</span>
-          <span className="text-slate-muted text-sm">{formatDate(item.payment_date)}</span>
+          <span className="text-slate-muted text-sm">{formatAccountingDate(item.payment_date)}</span>
         </div>
       ),
     },
@@ -74,7 +73,7 @@ export default function BooksPaymentsPage() {
       align: 'right' as const,
       render: (item: any) => (
         <div className="text-right">
-          <div className="text-foreground font-mono">{formatCurrency(item.amount, item.currency)}</div>
+          <div className="text-foreground font-mono">{formatAccountingCurrency(item.amount, item.currency)}</div>
           <div className="text-xs text-slate-muted">{item.payment_method || '—'}</div>
         </div>
       ),
@@ -100,46 +99,33 @@ export default function BooksPaymentsPage() {
           <h1 className="text-2xl font-bold text-foreground">AR Payments</h1>
           <p className="text-slate-muted text-sm">Record and review customer payments</p>
         </div>
-        <Link
-          href="/books/accounts-receivable/payments/new"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90"
-        >
-          <Plus className="w-4 h-4" />
+        <LinkButton href="/books/accounts-receivable/payments/new" module="books" icon={Plus}>
           New Payment
-        </Link>
+        </LinkButton>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search receipt/reference"
-            className="input-field"
-          />
-          <select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="input-field"
-          >
-            <option value="">Status</option>
-            <option value="pending">Pending</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-            <option value="refunded">Refunded</option>
-          </select>
-          <input
-            value={currency}
-            onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
-            placeholder="Currency"
-            className="input-field"
-          />
-        </div>
-      </div>
+      <FilterCard contentClassName="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <FilterInput
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Search receipt/reference"
+        />
+        <FilterSelect
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+        >
+          <option value="">Status</option>
+          <option value="pending">Pending</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="refunded">Refunded</option>
+        </FilterSelect>
+        <FilterInput
+          value={currency}
+          onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
+          placeholder="Currency"
+        />
+      </FilterCard>
 
       <DataTable
         columns={columns}

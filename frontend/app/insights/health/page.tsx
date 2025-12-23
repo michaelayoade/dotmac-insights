@@ -13,7 +13,10 @@ import { AccessDenied } from '@/components/AccessDenied';
 
 export default function HealthPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
-  const { data, isLoading, error, mutate } = useCustomerHealthInsights();
+  const canFetch = hasAccess && !authLoading;
+  const { data, isLoading, error, mutate } = useCustomerHealthInsights({
+    isPaused: () => !canFetch,
+  });
 
   if (authLoading || isLoading) {
     return <LoadingState />;

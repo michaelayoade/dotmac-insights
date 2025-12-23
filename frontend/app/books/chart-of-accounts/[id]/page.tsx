@@ -1,21 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, BookOpen, FileText, Pencil, Save, X, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAccountingAccountDetail } from '@/hooks/useApi';
 import { accountingApi, AccountingAccountPayload } from '@/lib/api/domains/accounting';
-import { cn, formatCurrency } from '@/lib/utils';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { cn } from '@/lib/utils';
+import { Button, LinkButton } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 const ROOT_TYPES = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'] as const;
 
@@ -119,13 +111,14 @@ export default function AccountDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load account</p>
-        <button
+        <Button
           onClick={() => router.back()}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
+          variant="secondary"
+          icon={ArrowLeft}
+          className="mt-3"
         >
-          <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -138,13 +131,9 @@ export default function AccountDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link
-            href="/books/chart-of-accounts"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
-          >
-            <ArrowLeft className="w-4 h-4" />
+          <LinkButton href="/books/chart-of-accounts" variant="secondary" icon={ArrowLeft}>
             Back to chart
-          </Link>
+          </LinkButton>
           <div>
             <p className="text-xs uppercase tracking-[0.12em] text-slate-muted">Account</p>
             <h1 className="text-xl font-semibold text-foreground">{acct.name || acct.account_name || `Account #${acct.id}`}</h1>
@@ -153,38 +142,21 @@ export default function AccountDetailPage() {
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
-              >
-                <Pencil className="w-4 h-4" />
+              <Button onClick={() => setIsEditing(true)} variant="secondary" icon={Pencil}>
                 Edit
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-coral-alert/10 border border-coral-alert/30 text-coral-alert text-sm hover:bg-coral-alert/20"
-              >
-                <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button onClick={() => setDeleteConfirm(true)} variant="danger" icon={Trash2}>
                 Delete
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <Button onClick={handleSave} disabled={saving} loading={saving} module="books" icon={Save}>
                 Save
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
-              >
-                <X className="w-4 h-4" />
+              </Button>
+              <Button onClick={cancelEdit} variant="secondary" icon={X}>
                 Cancel
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -201,18 +173,12 @@ export default function AccountDetailPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleDelete}
-                className="px-3 py-1.5 rounded-lg bg-coral-alert text-foreground text-sm font-medium hover:bg-coral-alert/80"
-              >
+              <Button onClick={handleDelete} variant="danger" size="sm">
                 Yes, Delete
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(false)}
-                className="px-3 py-1.5 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
-              >
+              </Button>
+              <Button onClick={() => setDeleteConfirm(false)} variant="secondary" size="sm">
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -321,15 +287,15 @@ export default function AccountDetailPage() {
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Balance</p>
-              <p className="text-foreground font-semibold">{formatCurrency(acct.balance ?? acct.debit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatAccountingCurrency(acct.balance ?? acct.debit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Debit</p>
-              <p className="text-foreground font-semibold">{formatCurrency(acct.debit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatAccountingCurrency(acct.debit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Credit</p>
-              <p className="text-foreground font-semibold">{formatCurrency(acct.credit ?? 0, data.currency || 'NGN')}</p>
+              <p className="text-foreground font-semibold">{formatAccountingCurrency(acct.credit ?? 0, data.currency || 'NGN')}</p>
             </div>
             <div>
               <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Parent</p>
@@ -374,14 +340,14 @@ export default function AccountDetailPage() {
               <tbody>
                 {ledger.map((entry: any, idx: number) => (
                   <tr key={idx} className="border-t border-slate-border/60">
-                    <td className="px-2 py-2 text-slate-200">{formatDate(entry.posting_date)}</td>
+                    <td className="px-2 py-2 text-slate-200">{formatAccountingDate(entry.posting_date)}</td>
                     <td className="px-2 py-2 text-foreground font-mono flex items-center gap-2">
                       {entry.voucher_type && <FileText className="w-3 h-3 text-slate-muted" />}
                       <span>{entry.voucher_type || ''} {entry.voucher_no || ''}</span>
                     </td>
                     <td className="px-2 py-2 text-slate-200">{entry.party || '-'}</td>
-                    <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(entry.debit, data.currency || 'NGN')}</td>
-                    <td className="px-2 py-2 text-right text-slate-200">{formatCurrency(entry.credit, data.currency || 'NGN')}</td>
+                    <td className="px-2 py-2 text-right text-slate-200">{formatAccountingCurrency(entry.debit, data.currency || 'NGN')}</td>
+                    <td className="px-2 py-2 text-right text-slate-200">{formatAccountingCurrency(entry.credit, data.currency || 'NGN')}</td>
                     <td className="px-2 py-2 text-slate-200">{entry.cost_center || '-'}</td>
                   </tr>
                 ))}

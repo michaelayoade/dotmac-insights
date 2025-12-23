@@ -14,20 +14,19 @@ import { useScorecardList, usePeriodList } from '@/hooks/usePerformance';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import type { Scorecard, ScorecardStatus } from '@/lib/performance.types';
+import { Button, FilterCard, FilterInput, FilterSelect, StatusPill } from '@/components/ui';
 
-function getStatusColor(status: ScorecardStatus): string {
-  switch (status) {
-    case 'pending': return 'text-slate-400 bg-slate-400/10';
-    case 'computing': return 'text-amber-400 bg-amber-400/10';
-    case 'computed': return 'text-cyan-400 bg-cyan-400/10';
-    case 'in_review': return 'text-violet-400 bg-violet-400/10';
-    case 'approved': return 'text-emerald-400 bg-emerald-400/10';
-    case 'disputed': return 'text-red-400 bg-red-400/10';
-    case 'finalized': return 'text-violet-400 bg-violet-400/10';
-    default: return 'text-slate-400 bg-slate-400/10';
-  }
-}
+const STATUS_TONES: Record<ScorecardStatus, StatusTone> = {
+  pending: 'default',
+  computing: 'warning',
+  computed: 'info',
+  in_review: 'info',
+  approved: 'success',
+  disputed: 'danger',
+  finalized: 'info',
+};
 
 function formatScore(score: number | null): string {
   if (score === null) return '-';
@@ -95,12 +94,10 @@ export default function ScorecardsPage() {
       key: 'status',
       header: 'Status',
       render: (item: Scorecard) => (
-        <span className={cn(
-          'px-2 py-1 rounded-full text-xs font-medium capitalize',
-          getStatusColor(item.status)
-        )}>
-          {item.status.replace('_', ' ')}
-        </span>
+        <StatusPill
+          label={formatStatusLabel(item.status)}
+          tone={STATUS_TONES[item.status] || 'default'}
+        />
       ),
     },
     {
@@ -163,50 +160,9 @@ export default function ScorecardsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <select
-          value={periodId || ''}
-          onChange={(e) => {
-            setPeriodId(e.target.value ? Number(e.target.value) : undefined);
-            setOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-        >
-          <option value="">All Periods</option>
-          {periods?.items.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} ({p.status})
-            </option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as ScorecardStatus | '');
-            setOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="computing">Computing</option>
-          <option value="computed">Computed</option>
-          <option value="in_review">In Review</option>
-          <option value="approved">Approved</option>
-          <option value="finalized">Finalized</option>
-        </select>
-        <input
-          type="text"
-          placeholder="Filter by department..."
-          value={departmentFilter}
-          onChange={(e) => {
-            setDepartmentFilter(e.target.value);
-            setOffset(0);
-          }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-        />
-        {(periodId || statusFilter || departmentFilter) && (
-          <button
+      <FilterCard
+        actions={(periodId || statusFilter || departmentFilter) && (
+          <Button
             onClick={() => {
               setPeriodId(undefined);
               setStatusFilter('');
@@ -216,9 +172,53 @@ export default function ScorecardsPage() {
             className="text-slate-400 text-sm hover:text-foreground transition-colors"
           >
             Clear filters
-          </button>
+          </Button>
         )}
-      </div>
+        iconClassName="text-violet-400"
+        contentClassName="flex gap-3 flex-wrap"
+      >
+        <FilterSelect
+          value={periodId || ''}
+          onChange={(e) => {
+            setPeriodId(e.target.value ? Number(e.target.value) : undefined);
+            setOffset(0);
+          }}
+          className="focus:ring-2 focus:ring-violet-500/50"
+        >
+          <option value="">All Periods</option>
+          {periods?.items.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} ({p.status})
+            </option>
+          ))}
+        </FilterSelect>
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value as ScorecardStatus | '');
+            setOffset(0);
+          }}
+          className="focus:ring-2 focus:ring-violet-500/50"
+        >
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="computing">Computing</option>
+          <option value="computed">Computed</option>
+          <option value="in_review">In Review</option>
+          <option value="approved">Approved</option>
+          <option value="finalized">Finalized</option>
+        </FilterSelect>
+        <FilterInput
+          type="text"
+          placeholder="Filter by department..."
+          value={departmentFilter}
+          onChange={(e) => {
+            setDepartmentFilter(e.target.value);
+            setOffset(0);
+          }}
+          className="placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500/50"
+        />
+      </FilterCard>
 
       {/* Summary Stats */}
       {data && (

@@ -22,31 +22,45 @@ import {
   TrendingUp,
   Save,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useTaskDetail, useTaskMutations } from '@/hooks/useApi';
 import { useEmployeeOptions } from '@/hooks/usePickers';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { EmployeeSearch } from '@/components/EntitySearch';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+import { Button, StatusPill } from '@/components/ui';
 
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-    open: { icon: ListTodo, color: 'text-blue-400 bg-blue-500/10 border-blue-500/30', label: 'Open' },
-    working: { icon: Clock, color: 'text-amber-400 bg-amber-500/10 border-amber-500/30', label: 'Working' },
-    pending_review: { icon: Target, color: 'text-purple-400 bg-purple-500/10 border-purple-500/30', label: 'Pending Review' },
-    completed: { icon: CheckCircle2, color: 'text-green-400 bg-green-500/10 border-green-500/30', label: 'Completed' },
-    cancelled: { icon: AlertTriangle, color: 'text-red-400 bg-red-500/10 border-red-500/30', label: 'Cancelled' },
-    overdue: { icon: AlertTriangle, color: 'text-rose-400 bg-rose-500/10 border-rose-500/30', label: 'Overdue' },
+  const icons: Record<string, LucideIcon> = {
+    open: ListTodo,
+    working: Clock,
+    pending_review: Target,
+    completed: CheckCircle2,
+    cancelled: AlertTriangle,
+    overdue: AlertTriangle,
   };
-  const { icon: Icon, color, label } = config[status] || config.open;
+  const tones: Record<string, StatusTone> = {
+    open: 'info',
+    working: 'warning',
+    pending_review: 'info',
+    completed: 'success',
+    cancelled: 'default',
+    overdue: 'danger',
+  };
+  const labels: Record<string, string> = {
+    pending_review: 'Pending Review',
+  };
+  const Icon = icons[status] || icons.open;
+
   return (
-    <span className={cn('px-3 py-1.5 rounded-full text-sm font-medium border inline-flex items-center gap-2', color)}>
-      <Icon className="w-4 h-4" />
-      {label}
-    </span>
+    <StatusPill
+      label={labels[status] || formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+      size="md"
+      icon={Icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -102,7 +116,7 @@ function ProgressRing({ percent, size = 80, strokeWidth = 8 }: { percent: number
   );
 }
 
-function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
+function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: LucideIcon }) {
   return (
     <div className="flex items-start gap-3 py-2">
       {Icon && <Icon className="w-4 h-4 text-slate-muted mt-0.5" />}
@@ -135,13 +149,13 @@ export default function TaskDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Invalid task ID.</p>
-        <button
+        <Button
           onClick={() => router.push('/projects/tasks')}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to tasks
-        </button>
+        </Button>
       </div>
     );
   }
@@ -165,13 +179,13 @@ export default function TaskDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load task</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -210,13 +224,13 @@ export default function TaskDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => {
               if (editMode) {
                 setEditMode(false);
@@ -237,7 +251,7 @@ export default function TaskDetailPage() {
           >
             <Edit className="w-4 h-4" />
             {editMode ? 'Cancel' : 'Edit'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -354,7 +368,7 @@ export default function TaskDetailPage() {
               ) : (
                 <span />
               )}
-              <button
+              <Button
                 onClick={async () => {
                   setSaveError(null);
                   if (!assigneeDirty) {
@@ -390,7 +404,7 @@ export default function TaskDetailPage() {
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
+              </Button>
             </div>
           )}
         </div>

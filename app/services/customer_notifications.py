@@ -31,334 +31,36 @@ from app.models.customer import Customer
 from app.models.ticket import Ticket
 from app.models.project import Project
 from app.models.invoice import Invoice
+from app.templates.environment import get_template_env
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# MESSAGE TEMPLATES
+# TEMPLATE CONFIGURATION
 # =============================================================================
 
-NOTIFICATION_TEMPLATES: Dict[CustomerNotificationType, Dict[str, str]] = {
-    # Service Order Templates
-    CustomerNotificationType.SERVICE_SCHEDULED: {
-        "title": "Service Scheduled: {order_type}",
-        "message": """Dear {customer_name},
-
-Your {order_type} service has been scheduled.
-
-Order: #{order_number}
-Date: {scheduled_date}
-Time: {scheduled_time}
-Address: {service_address}
-
-Description: {title}
-
-Our team will arrive at the scheduled time. Please ensure someone is available to provide access.
-
-If you need to reschedule, please contact us as soon as possible.
-
-Thank you for choosing us!""",
-        "short": "Service scheduled for {scheduled_date} at {scheduled_time}. Order #{order_number}",
-    },
-
-    CustomerNotificationType.SERVICE_RESCHEDULED: {
-        "title": "Service Rescheduled: {order_type}",
-        "message": """Dear {customer_name},
-
-Your service order #{order_number} has been rescheduled.
-
-New Date: {scheduled_date}
-New Time: {scheduled_time}
-Address: {service_address}
-
-Reason: {notes}
-
-We apologize for any inconvenience. Please contact us if this new time doesn't work for you.
-
-Thank you for your understanding.""",
-        "short": "Service rescheduled to {scheduled_date} at {scheduled_time}. Order #{order_number}",
-    },
-
-    CustomerNotificationType.TECHNICIAN_ASSIGNED: {
-        "title": "Technician Assigned: {order_type}",
-        "message": """Dear {customer_name},
-
-A technician has been assigned to your service order #{order_number}.
-
-Technician: {technician_name}
-Scheduled Date: {scheduled_date}
-Scheduled Time: {scheduled_time}
-
-Your technician will contact you if needed before the appointment.
-
-Thank you!""",
-        "short": "{technician_name} assigned to your service. {scheduled_date}",
-    },
-
-    CustomerNotificationType.TECHNICIAN_EN_ROUTE: {
-        "title": "Technician On The Way!",
-        "message": """Dear {customer_name},
-
-Great news! Your technician {technician_name} is on the way to your location.
-
-Order: #{order_number}
-Estimated Arrival: {eta}
-Address: {service_address}
-
-Please ensure someone is available to provide access.
-
-You can track their progress or contact them if needed.""",
-        "short": "{technician_name} is on the way! ETA: {eta}",
-    },
-
-    CustomerNotificationType.TECHNICIAN_ARRIVED: {
-        "title": "Technician Has Arrived",
-        "message": """Dear {customer_name},
-
-Your technician {technician_name} has arrived at your location.
-
-Order: #{order_number}
-Arrival Time: {arrival_time}
-
-The service work will begin shortly.""",
-        "short": "{technician_name} has arrived for your service.",
-    },
-
-    CustomerNotificationType.SERVICE_STARTED: {
-        "title": "Service Work Started",
-        "message": """Dear {customer_name},
-
-Your {order_type} service has started.
-
-Order: #{order_number}
-Started: {start_time}
-Technician: {technician_name}
-
-Estimated Duration: {estimated_duration}
-
-We'll notify you when the work is complete.""",
-        "short": "Service started. Estimated completion: {estimated_duration}",
-    },
-
-    CustomerNotificationType.SERVICE_COMPLETED: {
-        "title": "Service Completed Successfully",
-        "message": """Dear {customer_name},
-
-Your {order_type} service has been completed successfully!
-
-Order: #{order_number}
-Completed: {end_time}
-Duration: {actual_duration}
-
-Work Performed:
-{work_performed}
-
-{resolution_notes}
-
-We hope you're satisfied with our service. Please let us know if you have any questions or concerns.
-
-Thank you for your business!""",
-        "short": "Service completed! Order #{order_number}. Thank you!",
-    },
-
-    CustomerNotificationType.SERVICE_CANCELLED: {
-        "title": "Service Cancelled",
-        "message": """Dear {customer_name},
-
-Your service order #{order_number} has been cancelled.
-
-Reason: {notes}
-
-If you did not request this cancellation or have any questions, please contact us immediately.
-
-We apologize for any inconvenience.""",
-        "short": "Service #{order_number} cancelled. Contact us with questions.",
-    },
-
-    CustomerNotificationType.SERVICE_DELAYED: {
-        "title": "Service Delay Notice",
-        "message": """Dear {customer_name},
-
-We regret to inform you that your service order #{order_number} is experiencing a delay.
-
-Reason: {notes}
-New Estimated Time: {eta}
-
-We sincerely apologize for the inconvenience. Our team is working to complete your service as soon as possible.
-
-Thank you for your patience and understanding.""",
-        "short": "Service delayed. New ETA: {eta}. We apologize for the inconvenience.",
-    },
-
-    # Ticket Templates
-    CustomerNotificationType.TICKET_CREATED: {
-        "title": "Support Ticket Created: #{ticket_id}",
-        "message": """Dear {customer_name},
-
-Your support ticket has been created and our team will review it shortly.
-
-Ticket: #{ticket_id}
-Subject: {subject}
-Priority: {priority}
-
-We'll get back to you as soon as possible. You can track your ticket status in your account.
-
-Thank you for contacting us!""",
-        "short": "Ticket #{ticket_id} created. We'll respond soon.",
-    },
-
-    CustomerNotificationType.TICKET_UPDATED: {
-        "title": "Ticket Update: #{ticket_id}",
-        "message": """Dear {customer_name},
-
-Your support ticket has been updated.
-
-Ticket: #{ticket_id}
-Status: {status}
-
-{notes}
-
-Thank you for your patience.""",
-        "short": "Ticket #{ticket_id} updated. Status: {status}",
-    },
-
-    CustomerNotificationType.TICKET_REPLY: {
-        "title": "New Reply on Ticket #{ticket_id}",
-        "message": """Dear {customer_name},
-
-You have a new reply on your support ticket.
-
-Ticket: #{ticket_id}
-Subject: {subject}
-
-Reply:
-{reply}
-
-Please log in to your account to view the full conversation and respond.
-
-Thank you!""",
-        "short": "New reply on ticket #{ticket_id}. Check your account.",
-    },
-
-    CustomerNotificationType.TICKET_RESOLVED: {
-        "title": "Ticket Resolved: #{ticket_id}",
-        "message": """Dear {customer_name},
-
-Your support ticket has been resolved.
-
-Ticket: #{ticket_id}
-Subject: {subject}
-Resolution: {resolution}
-
-If you're satisfied with the resolution, no action is needed. If you have any remaining concerns, please reply to this ticket or create a new one.
-
-Thank you for your patience!""",
-        "short": "Ticket #{ticket_id} resolved. Thank you!",
-    },
-
-    # Project Templates
-    CustomerNotificationType.PROJECT_STARTED: {
-        "title": "Project Started: {project_name}",
-        "message": """Dear {customer_name},
-
-Your project has officially started!
-
-Project: {project_name}
-Start Date: {start_date}
-Expected Completion: {expected_end_date}
-Project Manager: {project_manager}
-
-We're excited to begin work on your project. You'll receive regular updates on our progress.
-
-Thank you for your trust in us!""",
-        "short": "Project '{project_name}' has started. Expected completion: {expected_end_date}",
-    },
-
-    CustomerNotificationType.PROJECT_MILESTONE: {
-        "title": "Project Milestone: {milestone_name}",
-        "message": """Dear {customer_name},
-
-We're pleased to inform you that a milestone has been reached on your project.
-
-Project: {project_name}
-Milestone: {milestone_name}
-Completion: {completion}%
-
-{notes}
-
-We're making great progress! Thank you for your continued partnership.""",
-        "short": "Project milestone reached: {milestone_name} ({completion}%)",
-    },
-
-    CustomerNotificationType.PROJECT_COMPLETED: {
-        "title": "Project Completed: {project_name}",
-        "message": """Dear {customer_name},
-
-Congratulations! Your project has been successfully completed.
-
-Project: {project_name}
-Completion Date: {end_date}
-
-{summary}
-
-We hope you're pleased with the results. Please don't hesitate to contact us if you have any questions or need further assistance.
-
-Thank you for choosing us for your project!""",
-        "short": "Project '{project_name}' completed! Thank you for your business.",
-    },
-
-    # Invoice Templates
-    CustomerNotificationType.INVOICE_GENERATED: {
-        "title": "New Invoice: #{invoice_number}",
-        "message": """Dear {customer_name},
-
-A new invoice has been generated for your account.
-
-Invoice: #{invoice_number}
-Amount: {amount}
-Due Date: {due_date}
-
-{description}
-
-Please ensure payment is made by the due date to avoid any service interruptions.
-
-Thank you for your business!""",
-        "short": "Invoice #{invoice_number} for {amount} due {due_date}",
-    },
-
-    CustomerNotificationType.PAYMENT_RECEIVED: {
-        "title": "Payment Received: Thank You!",
-        "message": """Dear {customer_name},
-
-Thank you! We've received your payment.
-
-Amount: {amount}
-Reference: {reference}
-Invoice: #{invoice_number}
-
-Your account is now up to date. Thank you for your prompt payment!""",
-        "short": "Payment of {amount} received. Thank you!",
-    },
-
-    CustomerNotificationType.PAYMENT_DUE: {
-        "title": "Payment Due Reminder: #{invoice_number}",
-        "message": """Dear {customer_name},
-
-This is a friendly reminder that payment for your invoice is due soon.
-
-Invoice: #{invoice_number}
-Amount: {amount}
-Due Date: {due_date}
-Days Until Due: {days_until_due}
-
-Please ensure payment is made by the due date to avoid any service interruptions.
-
-If you've already made the payment, please disregard this notice.
-
-Thank you!""",
-        "short": "Payment reminder: {amount} due {due_date} for invoice #{invoice_number}",
-    },
+# Template name mapping for CustomerNotificationType to Jinja2 template files
+TEMPLATE_NAME_MAP: Dict[CustomerNotificationType, str] = {
+    CustomerNotificationType.SERVICE_SCHEDULED: "service_scheduled",
+    CustomerNotificationType.SERVICE_RESCHEDULED: "service_rescheduled",
+    CustomerNotificationType.TECHNICIAN_ASSIGNED: "technician_assigned",
+    CustomerNotificationType.TECHNICIAN_EN_ROUTE: "technician_en_route",
+    CustomerNotificationType.TECHNICIAN_ARRIVED: "technician_arrived",
+    CustomerNotificationType.SERVICE_STARTED: "service_started",
+    CustomerNotificationType.SERVICE_COMPLETED: "service_completed",
+    CustomerNotificationType.SERVICE_CANCELLED: "service_cancelled",
+    CustomerNotificationType.SERVICE_DELAYED: "service_delayed",
+    CustomerNotificationType.TICKET_CREATED: "ticket_created",
+    CustomerNotificationType.TICKET_UPDATED: "ticket_updated",
+    CustomerNotificationType.TICKET_REPLY: "ticket_reply",
+    CustomerNotificationType.TICKET_RESOLVED: "ticket_resolved",
+    CustomerNotificationType.PROJECT_STARTED: "project_started",
+    CustomerNotificationType.PROJECT_MILESTONE: "project_milestone",
+    CustomerNotificationType.PROJECT_COMPLETED: "project_completed",
+    CustomerNotificationType.INVOICE_GENERATED: "invoice_generated",
+    CustomerNotificationType.PAYMENT_RECEIVED: "payment_received",
+    CustomerNotificationType.PAYMENT_DUE: "payment_due",
 }
 
 
@@ -371,6 +73,7 @@ class CustomerNotificationService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.template_env = get_template_env()
 
     def get_customer_preferences(
         self,
@@ -404,30 +107,55 @@ class CustomerNotificationService:
         notification_type: CustomerNotificationType,
         data: Dict[str, Any]
     ) -> Dict[str, str]:
-        """Format notification message using template."""
-        template = NOTIFICATION_TEMPLATES.get(notification_type, {
-            "title": "Notification",
-            "message": str(data),
-            "short": "You have a new notification",
-        })
+        """Format notification message using Jinja2 template.
 
-        # Replace placeholders with data
-        title = template["title"]
-        message = template["message"]
-        short = template.get("short", template["title"])
+        Args:
+            notification_type: The type of customer notification
+            data: Template context data
 
-        for key, value in data.items():
-            placeholder = "{" + key + "}"
-            str_value = str(value) if value is not None else ""
-            title = title.replace(placeholder, str_value)
-            message = message.replace(placeholder, str_value)
-            short = short.replace(placeholder, str_value)
+        Returns:
+            Dict with 'title', 'message', and 'short' keys
+
+        Raises:
+            ValueError: If no template mapping exists for notification type
+            jinja2.TemplateNotFound: If the template file is missing
+        """
+        template_name = TEMPLATE_NAME_MAP.get(notification_type)
+
+        if not template_name:
+            raise ValueError(
+                f"No template mapping for notification type: {notification_type.value}"
+            )
+
+        template_path = f"customer_notifications/{template_name}.txt.j2"
+        template = self.template_env.get_template(template_path)
+
+        # Render the template
+        message = template.render(data)
+
+        # Get title from template module or generate from type
+        module = template.module
+        title = getattr(module, "title", None)
+        if title is None:
+            title = notification_type.value.replace("_", " ").title()
+
+        # Generate short message (first 160 chars of message)
+        short = self._truncate(message, 160)
 
         return {
-            "title": title,
-            "message": message,
+            "title": str(title),
+            "message": message.strip(),
             "short": short,
         }
+
+    def _truncate(self, text: str, length: int) -> str:
+        """Truncate text to specified length, adding ellipsis if needed."""
+        text = text.strip()
+        # Get first line for short message
+        first_line = text.split("\n")[0].strip()
+        if len(first_line) <= length:
+            return first_line
+        return first_line[:length - 3] + "..."
 
     def create_notification(
         self,

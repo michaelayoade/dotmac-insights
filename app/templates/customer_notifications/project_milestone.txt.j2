@@ -1,0 +1,14 @@
+{# Project milestone notification #}
+{% set title = "Project Milestone: " ~ (milestone_name | default('Milestone Reached')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+We're pleased to inform you that a milestone has been reached on your project.
+
+Project: {{ project_name }}
+Milestone: {{ milestone_name }}
+Completion: {{ completion | default(0) }}%
+
+{% if notes %}{{ notes }}{% endif %}
+
+We're making great progress! Thank you for your continued partnership.

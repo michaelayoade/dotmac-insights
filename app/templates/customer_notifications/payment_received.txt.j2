@@ -1,0 +1,12 @@
+{# Payment received notification #}
+{% set title = "Payment Received: Thank You!" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Thank you! We've received your payment.
+
+Amount: {{ amount | default('₦0.00') }}
+Reference: {{ reference | default('N/A') }}
+{% if invoice_number %}Invoice: #{{ invoice_number }}{% endif %}
+
+Your account is now up to date. Thank you for your prompt payment!

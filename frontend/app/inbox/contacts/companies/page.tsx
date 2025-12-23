@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import {
   Building2,
   Users,
-  Search,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -14,42 +13,11 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useInboxCompanies } from '@/hooks/useInbox';
-import { PageHeader, SearchInput } from '@/components/ui';
+import { Button, FilterInput, PageHeader } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 type SortField = 'company' | 'contact_count';
 type SortOrder = 'asc' | 'desc';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-blue-400',
-  isLoading = false,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-  isLoading?: boolean;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          {isLoading ? (
-            <div className="h-9 w-20 bg-slate-elevated rounded mt-1 animate-pulse" />
-          ) : (
-            <p className={cn('text-3xl font-bold mt-1', colorClass)}>{value}</p>
-          )}
-        </div>
-        <div className={cn('p-3 rounded-xl bg-slate-elevated')}>
-          <Icon className={cn('w-6 h-6', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function InboxCompaniesPage() {
   const [search, setSearch] = useState('');
@@ -111,13 +79,13 @@ export default function InboxCompaniesPage() {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-muted">
         <AlertTriangle className="w-12 h-12 mb-4 text-rose-400" />
         <p className="text-lg text-rose-400 mb-4">Failed to load companies</p>
-        <button
+        <Button
           onClick={() => refresh()}
           className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -144,34 +112,31 @@ export default function InboxCompaniesPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <MetricCard
-          label="Total Companies"
+        <StatCard
+          title="Total Companies"
           value={total || totalCompanies}
           icon={Building2}
           colorClass="text-blue-400"
-          isLoading={isLoading}
+          loading={isLoading}
         />
-        <MetricCard
-          label="Total Contacts"
+        <StatCard
+          title="Total Contacts"
           value={totalContacts.toLocaleString()}
           icon={Users}
           colorClass="text-emerald-400"
-          isLoading={isLoading}
+          loading={isLoading}
         />
       </div>
 
       {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-          <input
-            type="text"
-            placeholder="Search companies..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-elevated border border-slate-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-          />
-        </div>
+        <FilterInput
+          type="text"
+          placeholder="Search companies..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 max-w-md"
+        />
       </div>
 
       {/* Companies Table */}

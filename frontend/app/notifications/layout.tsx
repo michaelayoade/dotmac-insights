@@ -1,7 +1,8 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { ModuleLayout, NavSection } from '@/components/ModuleLayout';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSection } from '@/components/ModuleLayout/types';
 
 const sections: NavSection[] = [
   {

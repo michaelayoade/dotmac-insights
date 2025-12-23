@@ -4,17 +4,10 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Landmark, FileText } from 'lucide-react';
 import { useAccountingBankTransactionDetail } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
-import { ReconciliationPanel } from '@/components/bank/ReconciliationPanel';
 
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { ReconciliationPanel } from '@/components/bank/ReconciliationPanel';
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 export default function BankTransactionDetailPage() {
   const params = useParams();
@@ -41,13 +34,13 @@ export default function BankTransactionDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load bank transaction</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -56,7 +49,7 @@ export default function BankTransactionDetailPage() {
 
   const summary = [
     { label: 'Transaction', value: data.erpnext_id || `#${data.id}` },
-    { label: 'Date', value: formatDate(data.transaction_date) },
+    { label: 'Date', value: formatAccountingDate(data.transaction_date) },
     { label: 'Account', value: data.account },
     { label: 'Company', value: data.company || '—' },
     { label: 'Type', value: data.transaction_type || '—' },
@@ -95,18 +88,18 @@ export default function BankTransactionDetailPage() {
       <div className="bg-slate-card border border-slate-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Deposit</p>
-          <p className="text-foreground font-semibold">{formatCurrency(data.deposit ?? 0, currency)}</p>
+          <p className="text-foreground font-semibold">{formatAccountingCurrency(data.deposit ?? 0, currency)}</p>
         </div>
         <div>
           <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Withdrawal</p>
-          <p className="text-foreground font-semibold">{formatCurrency(data.withdrawal ?? 0, currency)}</p>
+          <p className="text-foreground font-semibold">{formatAccountingCurrency(data.withdrawal ?? 0, currency)}</p>
         </div>
         <div>
           <p className="text-slate-muted text-xs uppercase tracking-[0.1em]">Allocated</p>
           <p className="text-foreground font-semibold">
-            {formatCurrency(data.allocated_amount ?? 0, currency)} / {formatCurrency(data.amount ?? data.deposit ?? 0, currency)}
+            {formatAccountingCurrency(data.allocated_amount ?? 0, currency)} / {formatAccountingCurrency(data.amount ?? data.deposit ?? 0, currency)}
           </p>
-          <p className="text-xs text-slate-muted">Unallocated: {formatCurrency(data.unallocated_amount ?? 0, currency)}</p>
+          <p className="text-xs text-slate-muted">Unallocated: {formatAccountingCurrency(data.unallocated_amount ?? 0, currency)}</p>
         </div>
       </div>
 
@@ -146,7 +139,7 @@ export default function BankTransactionDetailPage() {
                     <td className="px-2 py-2 text-slate-200">{pay.payment_document || '-'}</td>
                     <td className="px-2 py-2 text-foreground font-mono">{pay.payment_entry || '-'}</td>
                     <td className="px-2 py-2 text-right text-foreground font-mono">
-                      {formatCurrency(pay.allocated_amount ?? 0, currency)}
+                      {formatAccountingCurrency(pay.allocated_amount ?? 0, currency)}
                     </td>
                   </tr>
                 ))}

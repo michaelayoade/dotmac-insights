@@ -457,6 +457,7 @@ export type {
   PurchasingSupplierListResponse,
   PurchasingSupplierRecentBill,
   PurchasingSupplierDetail,
+  PurchasingSupplierPayload,
   PurchasingSupplierGroupsResponse,
   PurchasingSupplierListParams,
   // Expenses
@@ -584,6 +585,13 @@ export type {
   HrLifecycleEventsBreakdown,
   HrEmployee,
   HrEmployeeListResponse,
+  HrEmployeePayload,
+  HrDepartment,
+  HrDepartmentListResponse,
+  HrDepartmentPayload,
+  HrDesignation,
+  HrDesignationListResponse,
+  HrDesignationPayload,
   // Params
   HrLeaveTypeListParams,
   HrHolidayListParams,
@@ -595,6 +603,16 @@ export type {
   HrPayrollEntryListParams,
   HrTrainingEventListParams,
   HrAppraisalListParams,
+  HrSalarySlipListParams,
+  // Payroll Config
+  CalculationMethod,
+  DeductionRuleType,
+  PayrollRegion,
+  PayrollRegionPayload,
+  DeductionRule,
+  DeductionRulePayload,
+  TaxBand,
+  TaxBandPayload,
 } from './hr';
 
 // Analytics Domain (Cross-Domain Reports)
@@ -722,3 +740,13 @@ export type {
   ContactsDashboardResponse,
   CustomersDashboardResponse,
 } from './dashboards';
+
+// Workflow Tasks Domain (Unified Tasks, Scheduled Actions)
+export { workflowTasksApi } from './workflow-tasks';
+export type {
+  WorkflowTask,
+  WorkflowTaskListResponse,
+  WorkflowTaskSummary,
+  ScheduledTask,
+  ScheduleReminderPayload,
+} from './workflow-tasks';

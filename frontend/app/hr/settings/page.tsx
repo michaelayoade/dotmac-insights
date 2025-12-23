@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHRSettings, useHRSettingsMutations } from '@/hooks/useApi';
+import { Button } from '@/components/ui';
 import type {
   HRSettingsResponse,
   HRSettingsUpdate,
@@ -159,7 +160,7 @@ export default function HRSettingsPage() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
-              <button
+              <Button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
@@ -171,7 +172,7 @@ export default function HRSettingsPage() {
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -194,13 +195,13 @@ export default function HRSettingsPage() {
             {saveMessage}
           </span>
         )}
-        <button
+        <Button
           onClick={handleSave}
           disabled={saving}
           className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -909,7 +910,7 @@ function PerformanceTab({ form, updateForm }: TabProps) {
               {weekDays.map((day) => {
                 const isSelected = (form.work_week_days || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']).includes(day);
                 return (
-                  <button
+                  <Button
                     key={day}
                     type="button"
                     onClick={() => {
@@ -929,7 +930,7 @@ function PerformanceTab({ form, updateForm }: TabProps) {
                     )}
                   >
                     {day.slice(0, 3)}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

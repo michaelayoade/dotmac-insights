@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, ShieldAlert, ServerCrash, Inbox, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui';
 
 // Re-export DashboardShell components for convenience
 export { DashboardShell, DashboardLoadingState, DashboardErrorState, DashboardEmptyState } from '@/components/ui/DashboardShell';
@@ -121,13 +122,15 @@ export function ErrorDisplay({ message, error, onRetry }: ErrorDisplayProps) {
             <p className="text-xs text-slate-muted mt-2">Error code: {status}</p>
           )}
           {onRetry && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={RefreshCw}
               onClick={onRetry}
-              className="mt-3 flex items-center gap-2 text-sm text-teal-electric hover:text-teal-glow transition-colors"
+              className="mt-3 text-teal-electric hover:text-teal-glow hover:bg-transparent"
             >
-              <RefreshCw className="w-4 h-4" />
               Try again
-            </button>
+            </Button>
           )}
         </div>
       </div>

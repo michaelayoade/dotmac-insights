@@ -20,16 +20,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface AccountLineProps {
   name: string;
@@ -56,7 +48,7 @@ function AccountLine({ name, amount, indent = 0, bold, className, pct }: Account
           <span className="text-slate-muted text-sm w-16 text-right">{pct.toFixed(1)}%</span>
         )}
         <span className={cn('font-mono w-32 text-right', amount >= 0 ? 'text-foreground' : 'text-red-400')}>
-          {formatCurrency(amount)}
+          {formatAccountingCurrency(amount)}
         </span>
       </div>
     </div>
@@ -86,7 +78,7 @@ function CollapsibleSection({
 
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
       >
@@ -96,14 +88,14 @@ function CollapsibleSection({
           <span className="text-slate-muted text-sm">({items.length} accounts)</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(total)}</span>
+          <span className={cn('font-mono font-bold', colorClass)}>{formatAccountingCurrency(total)}</span>
           {isOpen ? (
             <ChevronDown className="w-5 h-5 text-slate-muted" />
           ) : (
             <ChevronRight className="w-5 h-5 text-slate-muted" />
           )}
         </div>
-      </button>
+      </Button>
       {isOpen && items.length > 0 && (
         <div className="px-4 pb-4 space-y-1">
           {items.map((item, index) => (
@@ -150,7 +142,7 @@ function EquitySection({ title, data, colorClass, showPct, totalAssets }: Equity
 
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
       >
@@ -159,14 +151,14 @@ function EquitySection({ title, data, colorClass, showPct, totalAssets }: Equity
           <h3 className={cn('text-lg font-semibold', colorClass)}>{title}</h3>
         </div>
         <div className="flex items-center gap-3">
-          <span className={cn('font-mono font-bold', colorClass)}>{formatCurrency(data.total || 0)}</span>
+          <span className={cn('font-mono font-bold', colorClass)}>{formatAccountingCurrency(data.total || 0)}</span>
           {isOpen ? (
             <ChevronDown className="w-5 h-5 text-slate-muted" />
           ) : (
             <ChevronRight className="w-5 h-5 text-slate-muted" />
           )}
         </div>
-      </button>
+      </Button>
       {isOpen && (
         <div className="px-4 pb-4 space-y-4">
           {components.map((component, idx) => (
@@ -280,7 +272,7 @@ export default function BalanceSheetPage() {
             Common size
           </label>
           {asOfDate && (
-            <button
+            <Button
               onClick={() => {
                 setAsOfDate('');
                 setCommonSize(false);
@@ -288,23 +280,23 @@ export default function BalanceSheetPage() {
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={() => exportSheet('csv')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => exportSheet('pdf')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -316,21 +308,21 @@ export default function BalanceSheetPage() {
             <Building2 className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Assets</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(totalAssets, currency)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(totalAssets, currency)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <CreditCard className="w-5 h-5 text-red-400" />
             <p className="text-red-400 text-sm">Total Liabilities</p>
           </div>
-          <p className="text-2xl font-bold text-red-400">{formatCurrency(totalLiabilities, currency)}</p>
+          <p className="text-2xl font-bold text-red-400">{formatAccountingCurrency(totalLiabilities, currency)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <PiggyBank className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Equity</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(totalEquity, currency)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(totalEquity, currency)}</p>
         </div>
         <div className={cn(
           'border rounded-xl p-5',
@@ -341,7 +333,7 @@ export default function BalanceSheetPage() {
             <p className={cn('text-sm', workingCapital >= 0 ? 'text-teal-400' : 'text-orange-400')}>Working Capital</p>
           </div>
           <p className={cn('text-2xl font-bold', workingCapital >= 0 ? 'text-teal-400' : 'text-orange-400')}>
-            {formatCurrency(workingCapital, currency)}
+            {formatAccountingCurrency(workingCapital, currency)}
           </p>
         </div>
       </div>
@@ -455,17 +447,17 @@ export default function BalanceSheetPage() {
         <div className="flex items-center justify-center gap-4 text-lg flex-wrap">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Assets</p>
-            <p className="font-mono font-bold text-blue-400">{formatCurrency(totalAssets, currency)}</p>
+            <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(totalAssets, currency)}</p>
           </div>
           <span className="text-slate-muted text-2xl">=</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Liabilities</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(totalLiabilities, currency)}</p>
+            <p className="font-mono font-bold text-red-400">{formatAccountingCurrency(totalLiabilities, currency)}</p>
           </div>
           <span className="text-slate-muted text-2xl">+</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Equity</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(totalEquity, currency)}</p>
+            <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(totalEquity, currency)}</p>
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-slate-border text-center">
@@ -477,7 +469,7 @@ export default function BalanceSheetPage() {
                 data?.is_balanced ? 'text-green-400' : 'text-red-400'
               )}
             >
-              {formatCurrency(data?.difference || 0, currency)}
+              {formatAccountingCurrency(data?.difference || 0, currency)}
             </span>
             {data?.is_balanced && (
               <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">

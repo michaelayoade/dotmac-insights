@@ -23,21 +23,27 @@ import {
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { formatCurrency } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 type InsightsTab = 'segments' | 'health' | 'completeness' | 'plan-changes';
 type SegmentsView = keyof CustomerSegmentsInsightsResponse;
 
 export default function CustomerInsightsPage() {
   const { hasAccess, isLoading: authLoading } = useRequireScope('analytics:read');
+  const canFetch = hasAccess && !authLoading;
 
   const [activeTab, setActiveTab] = useState<InsightsTab>('segments');
   const [segmentsView, setSegmentsView] = useState<SegmentsView>('by_status');
   const [planMonths, setPlanMonths] = useState(6);
 
-  const { data: segmentsData, isLoading: segmentsLoading, error: segmentsError, mutate: mutateSegments } = useCustomerSegmentsInsights();
-  const { data: healthData, isLoading: healthLoading, error: healthError, mutate: mutateHealth } = useCustomerHealthInsights();
-  const { data: completenessData, isLoading: completenessLoading, error: completenessError, mutate: mutateCompleteness } = useCustomerCompletenessInsights();
-  const { data: planChangesData, isLoading: planChangesLoading, error: planChangesError, mutate: mutatePlanChanges } = useCustomerPlanChanges(planMonths);
+  const { data: segmentsData, isLoading: segmentsLoading, error: segmentsError, mutate: mutateSegments } =
+    useCustomerSegmentsInsights({ isPaused: () => !canFetch });
+  const { data: healthData, isLoading: healthLoading, error: healthError, mutate: mutateHealth } =
+    useCustomerHealthInsights({ isPaused: () => !canFetch });
+  const { data: completenessData, isLoading: completenessLoading, error: completenessError, mutate: mutateCompleteness } =
+    useCustomerCompletenessInsights({ isPaused: () => !canFetch });
+  const { data: planChangesData, isLoading: planChangesLoading, error: planChangesError, mutate: mutatePlanChanges } =
+    useCustomerPlanChanges(planMonths, { isPaused: () => !canFetch });
 
   const isLoading = segmentsLoading || healthLoading || completenessLoading || planChangesLoading;
   const error = segmentsError || healthError || completenessError || planChangesError;
@@ -112,7 +118,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
       {/* Sub-tabs */}
       <div className="flex gap-2 border-b border-slate-border pb-2">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
@@ -122,7 +128,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
             }`}
           >
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -138,7 +144,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
 
           <div className="flex flex-wrap gap-2">
             {segmentViews.map((view) => (
-              <button
+              <Button
                 key={view.key}
                 onClick={() => setSegmentsView(view.key)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -148,7 +154,7 @@ const segmentViews: Array<{ key: SegmentsView; label: string; mrr?: boolean }> =
                 }`}
               >
                 {view.label}
-              </button>
+              </Button>
             ))}
           </div>
 

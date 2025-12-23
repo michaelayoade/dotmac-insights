@@ -9,6 +9,8 @@ from app.auth import get_current_principal
 from app.middleware.metrics import get_metrics_response
 from app.observability.otel import setup_otel, shutdown_otel
 from app.middleware.license import enforce_license
+from app.services.rbac_sync import ensure_admin_has_all_permissions
+from app.services.platform_client import init_platform_client, close_platform_client
 
 # Configure structured logging
 structlog.configure(
@@ -51,9 +53,16 @@ async def lifespan(app: FastAPI):
     if otel_initialized:
         logger.info("otel_setup_complete")
 
+    # Initialize async platform client for license validation & feature flags
+    await init_platform_client()
+    logger.info("platform_client_initialized")
+
+    ensure_admin_has_all_permissions()
+
     yield
 
     # Shutdown
+    await close_platform_client()
     shutdown_otel()
     logger.info("shutting_down_application")
 

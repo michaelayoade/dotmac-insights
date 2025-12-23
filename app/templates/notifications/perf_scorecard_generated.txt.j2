@@ -1,0 +1,9 @@
+{# Performance scorecard generated notification #}
+{% set title = "Performance Scorecard Ready" %}
+{% set icon = "clipboard-list" %}
+{% set priority = "normal" %}
+
+Your performance scorecard for {{ period_name | default('this period') }} has been generated and is ready for tracking.
+{% if kpi_count %}
+KPIs Assigned: {{ kpi_count }}
+{% endif %}

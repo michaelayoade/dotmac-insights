@@ -1,0 +1,18 @@
+{# Milestone approaching notification #}
+{% set title = "Milestone Approaching" %}
+{% set icon = "flag" %}
+{% set priority = "high" %}
+
+Milestone "{{ milestone_name }}" is approaching its due date.
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if planned_end_date %}
+Due: {{ planned_end_date }}
+{% endif %}
+{% if days_remaining %}
+Days remaining: {{ days_remaining }}
+{% endif %}
+{% if percent_complete %}
+Progress: {{ percent_complete }}%
+{% endif %}

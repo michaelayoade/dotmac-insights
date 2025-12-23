@@ -3,26 +3,9 @@
 import { useState } from 'react';
 import { useAccountingPayables } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { AlertTriangle, ArrowDownToLine, Calendar } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { AlertTriangle, ArrowDownToLine } from 'lucide-react';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getAgingBadge(daysOverdue: number | undefined | null) {
   if (daysOverdue === undefined || daysOverdue === null || daysOverdue <= 0) {
@@ -92,38 +75,38 @@ export default function AccountsPayablePage() {
       header: 'Total Payable',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-foreground">{formatCurrency(item.total_payable)}</span>
+        <span className="font-mono text-foreground">{formatAccountingCurrency(item.total_payable)}</span>
       ),
     },
     {
       key: 'current',
       header: 'Current',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-green-400">{formatCurrency(item.current)}</span>,
+      render: (item: any) => <span className="font-mono text-green-400">{formatAccountingCurrency(item.current)}</span>,
     },
     {
       key: 'overdue_1_30',
       header: '1-30',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-yellow-400">{formatCurrency(item.overdue_1_30)}</span>,
+      render: (item: any) => <span className="font-mono text-yellow-400">{formatAccountingCurrency(item.overdue_1_30)}</span>,
     },
     {
       key: 'overdue_31_60',
       header: '31-60',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-orange-400">{formatCurrency(item.overdue_31_60)}</span>,
+      render: (item: any) => <span className="font-mono text-orange-400">{formatAccountingCurrency(item.overdue_31_60)}</span>,
     },
     {
       key: 'overdue_61_90',
       header: '61-90',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-orange-400">{formatCurrency(item.overdue_61_90)}</span>,
+      render: (item: any) => <span className="font-mono text-orange-400">{formatAccountingCurrency(item.overdue_61_90)}</span>,
     },
     {
       key: 'overdue_over_90',
       header: '90+',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-red-400">{formatCurrency(item.overdue_over_90)}</span>,
+      render: (item: any) => <span className="font-mono text-red-400">{formatAccountingCurrency(item.overdue_over_90)}</span>,
     },
     {
       key: 'invoice_count',
@@ -134,7 +117,7 @@ export default function AccountsPayablePage() {
     {
       key: 'oldest_invoice_date',
       header: 'Oldest Bill',
-      render: (item: any) => <span className="text-slate-muted">{formatDate(item.oldest_invoice_date)}</span>,
+      render: (item: any) => <span className="text-slate-muted">{formatAccountingDate(item.oldest_invoice_date)}</span>,
     },
   ];
 
@@ -153,54 +136,53 @@ export default function AccountsPayablePage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total AP</p>
-          <p className="text-2xl font-bold text-foreground">{formatCurrency(data?.total_payable)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatAccountingCurrency(data?.total_payable)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Current</p>
-          <p className="text-xl font-bold text-green-400">{formatCurrency(summary.current)}</p>
+          <p className="text-xl font-bold text-green-400">{formatAccountingCurrency(summary.current)}</p>
         </div>
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
           <p className="text-yellow-400 text-sm">1-30 Days</p>
-          <p className="text-xl font-bold text-yellow-400">{formatCurrency(summary['1_30'])}</p>
+          <p className="text-xl font-bold text-yellow-400">{formatAccountingCurrency(summary['1_30'])}</p>
         </div>
         <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
           <p className="text-orange-400 text-sm">31-60 Days</p>
-          <p className="text-xl font-bold text-orange-400">{formatCurrency(summary['31_60'])}</p>
+          <p className="text-xl font-bold text-orange-400">{formatAccountingCurrency(summary['31_60'])}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
           <p className="text-red-400 text-sm">60+ Days</p>
-          <p className="text-xl font-bold text-red-400">{formatCurrency(summary.over_90)}</p>
+          <p className="text-xl font-bold text-red-400">{formatAccountingCurrency(summary.over_90)}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="number"
-            placeholder="Filter by supplier id"
-            value={supplierId}
-            onChange={(e) => { setSupplierId(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
-        <select
-          value={currency}
-          onChange={(e) => { setCurrency(e.target.value); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-        >
-          <option value="NGN">NGN</option>
-          <option value="USD">USD</option>
-        </select>
-        {supplierId && (
-          <button
+      <FilterCard
+        actions={supplierId && (
+          <Button
             onClick={() => { setSupplierId(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
-          </button>
+          </Button>
         )}
-      </div>
+        contentClassName="flex flex-wrap gap-4 items-center"
+      >
+        <FilterInput
+          type="number"
+          placeholder="Filter by supplier id"
+          value={supplierId}
+          onChange={(e) => { setSupplierId(e.target.value); setOffset(0); }}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <FilterSelect
+          value={currency}
+          onChange={(e) => { setCurrency(e.target.value); setOffset(0); }}
+        >
+          <option value="NGN">NGN</option>
+          <option value="USD">USD</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

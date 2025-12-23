@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 # =============================================================================
@@ -290,8 +290,7 @@ class AccountResponse(BaseModel):
     is_group: bool
     disabled: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountListResponse(PaginatedResponse):
@@ -381,8 +380,7 @@ class JournalEntryResponse(BaseModel):
     docstatus: Optional[int] = None
     lines: Optional[List[JournalEntryLineResponse]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class JournalEntryListResponse(PaginatedResponse):
@@ -433,8 +431,7 @@ class SupplierResponse(BaseModel):
     mobile_no: Optional[str] = None
     disabled: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SupplierListResponse(PaginatedResponse):
@@ -463,8 +460,7 @@ class GLEntryResponse(BaseModel):
     remarks: Optional[str] = None
     is_cancelled: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GLEntryListResponse(PaginatedResponse):
@@ -525,8 +521,7 @@ class WorkflowResponse(BaseModel):
     is_active: bool
     steps: Optional[List[WorkflowStepResponse]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================
@@ -555,8 +550,7 @@ class FiscalPeriodResponse(BaseModel):
     closed_by_id: Optional[int] = None
     closed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================
@@ -609,8 +603,7 @@ class TaxFilingPeriodResponse(BaseModel):
     status: str
     filed_date: Optional[date] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================

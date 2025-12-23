@@ -1,0 +1,15 @@
+{# Task comment notification #}
+{% set title = "New Comment on Task" %}
+{% set icon = "message-square" %}
+{% set priority = "normal" %}
+
+A new comment was added to task "{{ task_subject }}".
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if commenter_name %}
+By: {{ commenter_name }}
+{% endif %}
+{% if comment_preview %}
+"{{ comment_preview }}"
+{% endif %}

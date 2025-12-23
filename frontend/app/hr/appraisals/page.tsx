@@ -4,7 +4,11 @@ import { useState } from 'react';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useHrAppraisalTemplates, useHrAppraisals, useHrAppraisalMutations } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { Award, Target, FileEdit, CheckCircle2, Clock, Send, Eye, XCircle, AlertCircle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button, FilterCard, FilterSelect, StatusPill } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -23,43 +27,21 @@ function FormLabel({ children, required }: { children: React.ReactNode; required
 
 function StatusBadge({ status }: { status: string }) {
   const normalizedStatus = (status || 'draft').toLowerCase();
-  const config: Record<string, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
-    draft: { bg: 'bg-slate-500/10', border: 'border-slate-500/40', text: 'text-foreground-secondary', icon: <FileEdit className="w-3 h-3" /> },
-    submitted: { bg: 'bg-amber-500/10', border: 'border-amber-500/40', text: 'text-amber-300', icon: <Send className="w-3 h-3" /> },
-    'under review': { bg: 'bg-violet-500/10', border: 'border-violet-500/40', text: 'text-violet-300', icon: <Eye className="w-3 h-3" /> },
-    completed: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/40', text: 'text-emerald-300', icon: <CheckCircle2 className="w-3 h-3" /> },
-    closed: { bg: 'bg-cyan-500/10', border: 'border-cyan-500/40', text: 'text-cyan-300', icon: <XCircle className="w-3 h-3" /> },
+  const config: Record<string, { tone: StatusTone; icon: LucideIcon; label?: string }> = {
+    draft: { tone: 'default', icon: FileEdit },
+    submitted: { tone: 'warning', icon: Send },
+    'under review': { tone: 'info', icon: Eye, label: 'Under review' },
+    completed: { tone: 'success', icon: CheckCircle2 },
+    closed: { tone: 'info', icon: XCircle },
   };
   const style = config[normalizedStatus] || config.draft;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border', style.bg, style.border, style.text)}>
-      {style.icon}
-      <span className="capitalize">{status || 'Draft'}</span>
-    </span>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-amber-400',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <p className="text-slate-muted text-sm">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-      </div>
-      <div className="p-2 rounded-lg bg-slate-elevated">
-        <Icon className={cn('w-5 h-5', tone)} />
-      </div>
-    </div>
+    <StatusPill
+      label={style.label || formatStatusLabel(status || 'draft')}
+      tone={style.tone}
+      icon={style.icon}
+      className="border border-current/30"
+    />
   );
 }
 
@@ -87,34 +69,30 @@ export default function HrAppraisalsPage() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <StatCard label="Appraisal Templates" value={templateList.total} icon={Target} tone="text-amber-400" />
-        <StatCard label="Appraisals" value={appraisalList.total} icon={Award} tone="text-violet-400" />
+        <StatCard title="Appraisal Templates" value={templateList.total} icon={Target} colorClass="text-amber-400" />
+        <StatCard title="Appraisals" value={appraisalList.total} icon={Award} colorClass="text-violet-400" />
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <p className="text-xs text-slate-muted mb-3">Filter Appraisals</p>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <FormLabel>Status</FormLabel>
-            <select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setOffset(0);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            >
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="submitted">Submitted</option>
-              <option value="under review">Under Review</option>
-              <option value="completed">Completed</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
+      <FilterCard title="Filter Appraisals" contentClassName="flex flex-wrap gap-3 items-end" iconClassName="text-amber-400">
+        <div>
+          <FormLabel>Status</FormLabel>
+          <FilterSelect
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setOffset(0);
+            }}
+          >
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="submitted">Submitted</option>
+            <option value="under review">Under Review</option>
+            <option value="completed">Completed</option>
+            <option value="closed">Closed</option>
+          </FilterSelect>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Appraisal Templates */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5 space-y-3">
@@ -187,28 +165,28 @@ export default function HrAppraisalsPage() {
                 return (
                   <div className="flex gap-2 text-xs">
                     {isDraft && (
-                      <button
+                      <Button
                         onClick={(e) => { e.stopPropagation(); appraisalMutations.submit(item.id).catch((err: any) => setActionError(err?.message || 'Submit failed')); }}
                         className="px-2 py-1 rounded border border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
                       >
                         Submit
-                      </button>
+                      </Button>
                     )}
                     {isSubmitted && (
-                      <button
+                      <Button
                         onClick={(e) => { e.stopPropagation(); appraisalMutations.review(item.id).catch((err: any) => setActionError(err?.message || 'Review failed')); }}
                         className="px-2 py-1 rounded border border-violet-500/40 text-violet-300 hover:bg-violet-500/10"
                       >
                         Review
-                      </button>
+                      </Button>
                     )}
                     {canClose && (
-                      <button
+                      <Button
                         onClick={(e) => { e.stopPropagation(); appraisalMutations.close(item.id).catch((err: any) => setActionError(err?.message || 'Close failed')); }}
                         className="px-2 py-1 rounded border border-slate-border text-slate-muted hover:bg-slate-elevated/50"
                       >
                         Close
-                      </button>
+                      </Button>
                     )}
                   </div>
                 );

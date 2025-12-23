@@ -1,0 +1,12 @@
+{# Project completed notification #}
+{% set title = "Project Completed" %}
+{% set icon = "check-circle" %}
+{% set priority = "normal" %}
+
+Project "{{ project_name }}" has been marked as completed.
+{% if completed_by_name %}
+Completed by: {{ completed_by_name }}
+{% endif %}
+{% if actual_end_date %}
+Completion date: {{ actual_end_date }}
+{% endif %}

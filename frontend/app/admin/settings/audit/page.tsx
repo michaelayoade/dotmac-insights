@@ -5,23 +5,14 @@ import { History, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSettingsAuditLog } from '@/hooks/useApi';
 import { SettingsAuditEntry } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { formatDateTime } from '@/lib/formatters';
+import { Button } from '@/components/ui';
 
 export default function SettingsAuditPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const { data: entries, isLoading } = useSettingsAuditLog({ limit: 100 }) as {
     data: SettingsAuditEntry[] | undefined;
     isLoading: boolean;
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-NG', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const formatJson = (jsonStr: string | null | undefined) => {
@@ -65,7 +56,7 @@ export default function SettingsAuditPage() {
           <div className="divide-y divide-slate-border">
             {entries.map((entry: SettingsAuditEntry) => (
               <div key={entry.id}>
-                <button
+                <Button
                   onClick={() =>
                     setExpandedId(expandedId === entry.id ? null : entry.id)
                   }
@@ -100,7 +91,7 @@ export default function SettingsAuditPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-slate-muted text-sm">
-                      {formatDate(entry.created_at)}
+                      {formatDateTime(entry.created_at)}
                     </span>
                     {expandedId === entry.id ? (
                       <ChevronUp className="w-4 h-4 text-slate-muted" />
@@ -108,7 +99,7 @@ export default function SettingsAuditPage() {
                       <ChevronDown className="w-4 h-4 text-slate-muted" />
                     )}
                   </div>
-                </button>
+                </Button>
 
                 {expandedId === entry.id && (
                   <div className="px-4 pb-4 space-y-4">

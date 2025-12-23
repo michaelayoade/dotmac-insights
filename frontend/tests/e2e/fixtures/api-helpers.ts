@@ -35,7 +35,7 @@ export async function createTestContact(
   }> = {}
 ): Promise<{ id: number; name: string; email: string }> {
   const response = await request.post(`${API_BASE}/api/contacts`, {
-    headers: getAuthHeaders(['customers:write']),
+    headers: getAuthHeaders(['contacts:write']),
     data: {
       name: data.name || `Test Contact ${Date.now()}`,
       email: data.email || `test-${Date.now()}@example.com`,
@@ -60,7 +60,19 @@ export async function deleteTestContact(
   contactId: number
 ): Promise<void> {
   await request.delete(`${API_BASE}/api/contacts/${contactId}`, {
-    headers: getAuthHeaders(['customers:write']),
+    headers: getAuthHeaders(['contacts:write']),
+  });
+}
+
+/**
+ * Delete a test support ticket via API.
+ */
+export async function deleteTestTicket(
+  request: APIRequestContext,
+  ticketId: number
+): Promise<void> {
+  await request.delete(`${API_BASE}/api/support/tickets/${ticketId}`, {
+    headers: getAuthHeaders(['support:write']),
   });
 }
 
@@ -77,7 +89,7 @@ export async function createTestTicket(
   }> = {}
 ): Promise<{ id: number; ticket_number: string; subject: string }> {
   const response = await request.post(`${API_BASE}/api/support/tickets`, {
-    headers: getAuthHeaders(['customers:write']),
+    headers: getAuthHeaders(['support:write']),
     data: {
       subject: data.subject || `Test Ticket ${Date.now()}`,
       description: data.description || 'Test ticket description',
@@ -164,8 +176,8 @@ export async function createTestWebhook(
     events: string[];
   }> = {}
 ): Promise<{ id: number; name: string; secret: string }> {
-  const response = await request.post(`${API_BASE}/api/admin/webhooks`, {
-    headers: getAuthHeaders(['admin:write']),
+  const response = await request.post(`${API_BASE}/api/notifications/webhooks`, {
+    headers: getAuthHeaders(['books:admin']),
     data: {
       name: data.name || `Test Webhook ${Date.now()}`,
       url: data.url || 'https://example.com/webhook',
@@ -178,6 +190,18 @@ export async function createTestWebhook(
   }
 
   return response.json();
+}
+
+/**
+ * Delete a test webhook configuration via API.
+ */
+export async function deleteTestWebhook(
+  request: APIRequestContext,
+  webhookId: number
+): Promise<void> {
+  await request.delete(`${API_BASE}/api/notifications/webhooks/${webhookId}`, {
+    headers: getAuthHeaders(['books:admin']),
+  });
 }
 
 /**
@@ -229,9 +253,20 @@ export async function deleteTestBankTransaction(
   request: APIRequestContext,
   transactionId: number
 ): Promise<void> {
-  await request.delete(`${API_BASE}/api/v1/accounting/bank-transactions/${transactionId}`, {
-    headers: getAuthHeaders(['books:write']),
-  });
+  const url = `${API_BASE}/api/v1/accounting/bank-transactions/${transactionId}`;
+  const headers = getAuthHeaders(['books:write']);
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await request.delete(url, { headers });
+      return;
+    } catch (error) {
+      if (attempt === 3) {
+        console.warn(`Failed to delete test bank transaction ${transactionId}`, error);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
 }
 
 /**

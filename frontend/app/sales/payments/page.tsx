@@ -7,24 +7,8 @@ import { useFinancePayments } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, CreditCard, Banknote, Wallet } from 'lucide-react';
-
-function formatCurrency(value: number, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { FilterCard, FilterInput, FilterSelect } from '@/components/ui';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 function getPaymentMethodIcon(method: string) {
   const methodLower = method?.toLowerCase() || '';
@@ -158,60 +142,54 @@ export default function PaymentsPage() {
         </Link>
       </div>
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-4 items-center">
+        <FilterSelect
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All Status</option>
           <option value="completed">Completed</option>
           <option value="pending">Pending</option>
           <option value="failed">Failed</option>
-        </select>
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="text"
-            placeholder="Search receipts or references..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
-        <select
+        </FilterSelect>
+        <FilterInput
+          type="text"
+          placeholder="Search receipts or references..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <FilterSelect
           value={paymentMethod}
           onChange={(e) => {
             setPaymentMethod(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="">All Methods</option>
           <option value="bank_transfer">Bank Transfer</option>
           <option value="card">Card</option>
           <option value="cash">Cash</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={sortBy}
           onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="payment_date">Payment date</option>
           <option value="amount">Amount</option>
           <option value="status">Status</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={sortOrder}
           onChange={(e) => { setSortOrder(e.target.value as typeof sortOrder); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

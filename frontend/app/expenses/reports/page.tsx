@@ -19,6 +19,10 @@ import { cn } from '@/lib/utils';
 import { useExpenseSummaryReport, useExpenseReportExports } from '@/hooks/useExpenses';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { ExpenseSummaryReport } from '@/lib/expenses.types';
+import { LoadingState, Button, FilterSelect } from '@/components/ui';
+import { formatCurrency } from '@/lib/formatters';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type ReportType = 'claims' | 'advances' | 'transactions';
 type ExportFormat = 'csv' | 'excel' | 'pdf';
@@ -35,15 +39,6 @@ const FORMAT_CONFIG: Record<ExportFormat, { label: string; icon: typeof FileText
   pdf: { label: 'PDF', icon: FileText, color: 'text-red-400' },
 };
 
-function formatCurrency(amount: number, currency: string = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 function getDefaultDateRange() {
   const end = new Date();
   const start = new Date();
@@ -55,6 +50,8 @@ function getDefaultDateRange() {
 }
 
 export default function ExpenseReportsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const { handleError } = useErrorHandler();
   const defaultRange = getDefaultDateRange();
   const [startDate, setStartDate] = useState(defaultRange.start);
@@ -65,10 +62,11 @@ export default function ExpenseReportsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  const canFetch = !authLoading && !missingScope;
   const { data: summary, isLoading: summaryLoading } = useExpenseSummaryReport({
     start_date: startDate,
     end_date: endDate,
-  });
+  }, { isPaused: () => !canFetch });
 
   const { exportClaims, exportAdvances, exportTransactions } = useExpenseReportExports();
 
@@ -102,6 +100,20 @@ export default function ExpenseReportsPage() {
   // Ensure selected format is available for current report
   if (!availableFormats.includes(selectedFormat)) {
     setSelectedFormat(availableFormats[0]);
+  }
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view expense reports."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
   }
 
   return (
@@ -153,13 +165,13 @@ export default function ExpenseReportsPage() {
                 { label: 'This Quarter', getValue: () => { const d = new Date(); const q = Math.floor(d.getMonth() / 3); return { start: new Date(d.getFullYear(), q * 3, 1).toISOString().slice(0, 10), end: d.toISOString().slice(0, 10) }; } },
                 { label: 'This Year', getValue: () => { const d = new Date(); return { start: new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10), end: d.toISOString().slice(0, 10) }; } },
               ].map((preset) => (
-                <button
+                <Button
                   key={preset.label}
                   onClick={() => { const v = preset.getValue(); setStartDate(v.start); setEndDate(v.end); }}
                   className="px-3 py-1.5 text-xs font-medium bg-slate-elevated hover:bg-slate-border/50 text-slate-muted hover:text-foreground rounded-lg transition-colors"
                 >
                   {preset.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -175,7 +187,7 @@ export default function ExpenseReportsPage() {
                 const Icon = report.icon;
                 const isSelected = selectedReport === report.id;
                 return (
-                  <button
+                  <Button
                     key={report.id}
                     onClick={() => setSelectedReport(report.id)}
                     className={cn(
@@ -196,7 +208,7 @@ export default function ExpenseReportsPage() {
                       <p className="text-xs text-slate-muted mt-0.5">{report.description}</p>
                     </div>
                     <ChevronRight className={cn('w-4 h-4', isSelected ? 'text-violet-400' : 'text-slate-muted')} />
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -218,7 +230,7 @@ export default function ExpenseReportsPage() {
                     const config = FORMAT_CONFIG[format];
                     const isSelected = selectedFormat === format;
                     return (
-                      <button
+                      <Button
                         key={format}
                         onClick={() => setSelectedFormat(format)}
                         className={cn(
@@ -230,7 +242,7 @@ export default function ExpenseReportsPage() {
                       >
                         <config.icon className={cn('w-4 h-4', isSelected ? config.color : '')} />
                         {config.label}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -239,10 +251,10 @@ export default function ExpenseReportsPage() {
               {/* Status Filter */}
               <div>
                 <label className="block text-sm text-slate-muted mb-2">Status Filter</label>
-                <select
+                <FilterSelect
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full"
                 >
                   <option value="">All statuses</option>
                   {selectedReport === 'claims' && (
@@ -272,7 +284,7 @@ export default function ExpenseReportsPage() {
                       <option value="disputed">Disputed</option>
                     </>
                   )}
-                </select>
+                </FilterSelect>
               </div>
 
               {/* Include Line Items (Claims only) */}
@@ -293,7 +305,7 @@ export default function ExpenseReportsPage() {
             </div>
 
             {/* Export Button */}
-            <button
+            <Button
               onClick={handleExport}
               disabled={exporting}
               className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 hover:bg-violet-700 text-foreground font-semibold rounded-xl transition-colors disabled:opacity-50"
@@ -304,7 +316,7 @@ export default function ExpenseReportsPage() {
                 <Download className="w-5 h-5" />
               )}
               {exporting ? 'Generating Report...' : `Download ${FORMAT_CONFIG[selectedFormat].label}`}
-            </button>
+            </Button>
           </div>
         </div>
 

@@ -6,71 +6,32 @@ import {
   Users,
   Clock,
   MessageSquare,
-  Loader2,
   AlertTriangle,
   RefreshCw,
-  ArrowUpDown,
   ChevronLeft,
   User,
   Award,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useInboxAnalyticsAgents } from '@/hooks/useInbox';
-import { PageHeader, Select } from '@/components/ui';
+import { useTableSort } from '@/hooks/useTableSort';
+import { Button, PageHeader, Select } from '@/components/ui';
 import type { InboxAgentStats } from '@/lib/inbox.types';
+import { formatInboxResponseTime, INBOX_PERIOD_OPTIONS } from '@/lib/config/inbox-analytics';
+import {
+  MetricCard,
+  ChartSkeleton,
+  NoDataFallback,
+  SortHeader,
+} from '@/components/inbox/analytics/shared';
 
-type SortField = 'name' | 'conversations' | 'messages_sent' | 'avg_response_time_hours';
-type SortOrder = 'asc' | 'desc';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-blue-400',
-  isLoading = false,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-  isLoading?: boolean;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          {isLoading ? (
-            <div className="h-9 w-20 bg-slate-elevated rounded mt-1 animate-pulse" />
-          ) : (
-            <p className={cn('text-3xl font-bold mt-1', colorClass)}>{value}</p>
-          )}
-        </div>
-        <div className={cn('p-3 rounded-xl bg-slate-elevated')}>
-          <Icon className={cn('w-6 h-6', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatResponseTime(hours: number | null | undefined): string {
-  if (hours === null || hours === undefined) return '-';
-  if (hours < 1) return `${Math.round(hours * 60)}m`;
-  if (hours < 24) return `${hours.toFixed(1)}h`;
-  return `${(hours / 24).toFixed(1)}d`;
-}
+type AgentSortField = 'name' | 'conversations' | 'messages_sent' | 'avg_response_time_hours';
 
 export default function InboxAgentAnalyticsPage() {
   const [days, setDays] = useState(7);
-  const [sortField, setSortField] = useState<SortField>('conversations');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const dayOptions = [
-    { value: '7', label: 'Last 7 days' },
-    { value: '30', label: 'Last 30 days' },
-    { value: '90', label: 'Last 90 days' },
-  ];
+  const dayOptions = INBOX_PERIOD_OPTIONS;
 
   const {
     data,
@@ -80,6 +41,12 @@ export default function InboxAgentAnalyticsPage() {
   } = useInboxAnalyticsAgents({ days });
 
   const agents = useMemo(() => data?.agents ?? [], [data?.agents]);
+
+  // Use centralized sort hook
+  const { sortedItems: sortedAgents, sortField, sortOrder, toggleSort } = useTableSort<
+    AgentSortField,
+    InboxAgentStats
+  >(agents, { defaultField: 'conversations', defaultOrder: 'desc' });
 
   // Compute summary stats
   const totalAgents = agents.length;
@@ -94,54 +61,18 @@ export default function InboxAgentAnalyticsPage() {
     ? [...agents].sort((a, b) => (b.conversations || 0) - (a.conversations || 0))[0]
     : null;
 
-  // Sort agents
-  const sortedAgents = useMemo(() => {
-    return [...agents].sort((a, b) => {
-      let aVal: string | number = a[sortField] ?? '';
-      let bVal: string | number = b[sortField] ?? '';
-
-      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
-      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [agents, sortField, sortOrder]);
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
-  };
-
-  const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <th
-      className="text-left py-3 px-4 text-sm font-medium text-slate-muted cursor-pointer hover:text-foreground transition-colors"
-      onClick={() => toggleSort(field)}
-    >
-      <div className="flex items-center gap-1">
-        {children}
-        <ArrowUpDown className={cn('w-3.5 h-3.5', sortField === field ? 'text-blue-400' : 'opacity-50')} />
-      </div>
-    </th>
-  );
-
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-muted">
         <AlertTriangle className="w-12 h-12 mb-4 text-rose-400" />
         <p className="text-lg text-rose-400 mb-4">Failed to load agent analytics</p>
-        <button
+        <Button
           onClick={() => refresh()}
           className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -197,7 +128,7 @@ export default function InboxAgentAnalyticsPage() {
         />
         <MetricCard
           label="Avg Response Time"
-          value={formatResponseTime(avgResponseTime)}
+          value={formatInboxResponseTime(avgResponseTime)}
           icon={Clock}
           colorClass="text-amber-400"
           isLoading={isLoading}
@@ -215,7 +146,7 @@ export default function InboxAgentAnalyticsPage() {
               <p className="text-sm text-amber-400 font-medium">Top Performer</p>
               <p className="text-xl font-bold text-foreground">{topPerformer.name}</p>
               <p className="text-sm text-slate-muted">
-                {topPerformer.conversations} conversations handled with {formatResponseTime(topPerformer.avg_response_time_hours)} avg response
+                {topPerformer.conversations} conversations handled with {formatInboxResponseTime(topPerformer.avg_response_time_hours)} avg response
               </p>
             </div>
           </div>
@@ -242,10 +173,10 @@ export default function InboxAgentAnalyticsPage() {
             <table className="w-full">
               <thead className="bg-slate-elevated border-b border-slate-border">
                 <tr>
-                  <SortHeader field="name">Agent</SortHeader>
-                  <SortHeader field="conversations">Conversations</SortHeader>
-                  <SortHeader field="messages_sent">Messages Sent</SortHeader>
-                  <SortHeader field="avg_response_time_hours">Avg Response</SortHeader>
+                  <SortHeader field="name" currentField={sortField} sortOrder={sortOrder} onSort={toggleSort}>Agent</SortHeader>
+                  <SortHeader field="conversations" currentField={sortField} sortOrder={sortOrder} onSort={toggleSort}>Conversations</SortHeader>
+                  <SortHeader field="messages_sent" currentField={sortField} sortOrder={sortOrder} onSort={toggleSort}>Messages Sent</SortHeader>
+                  <SortHeader field="avg_response_time_hours" currentField={sortField} sortOrder={sortOrder} onSort={toggleSort}>Avg Response</SortHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-border">
@@ -278,7 +209,7 @@ export default function InboxAgentAnalyticsPage() {
                     </td>
                     <td className="py-4 px-4">
                       <span className="text-slate-muted">
-                        {formatResponseTime(agent.avg_response_time_hours)}
+                        {formatInboxResponseTime(agent.avg_response_time_hours)}
                       </span>
                     </td>
                   </tr>

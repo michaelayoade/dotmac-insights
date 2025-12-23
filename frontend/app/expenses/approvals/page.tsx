@@ -16,12 +16,15 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
-  Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useExpenseClaims, useExpenseMutations, useCashAdvances, useCashAdvanceMutations } from '@/hooks/useExpenses';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { ExpenseClaim, CashAdvance } from '@/lib/expenses.types';
+import { LoadingState, Button, FilterSelect } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type ItemType = 'claim' | 'advance';
 
@@ -38,24 +41,9 @@ interface ApprovalItem {
   lineCount?: number;
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatCurrency(amount: number, currency: string = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export default function ApprovalsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
@@ -63,8 +51,9 @@ export default function ApprovalsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'claims' | 'advances'>('all');
 
-  const { data: claims, isLoading: claimsLoading } = useExpenseClaims({ status: 'pending_approval' });
-  const { data: advances, isLoading: advancesLoading } = useCashAdvances({ status: 'pending_approval' });
+  const canFetch = !authLoading && !missingScope;
+  const { data: claims, isLoading: claimsLoading } = useExpenseClaims({ status: 'pending_approval' }, { isPaused: () => !canFetch });
+  const { data: advances, isLoading: advancesLoading } = useCashAdvances({ status: 'pending_approval' }, { isPaused: () => !canFetch });
 
   const { approveClaim, rejectClaim } = useExpenseMutations();
   const { approveAdvance, rejectAdvance } = useCashAdvanceMutations();
@@ -209,6 +198,20 @@ export default function ApprovalsPage() {
     }
   };
 
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view pending approvals."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -273,29 +276,28 @@ export default function ApprovalsPage() {
             <div className="h-6 w-px bg-slate-border" />
 
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-slate-muted" />
-              <select
+              <FilterSelect
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-2 py-1 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="px-2 py-1"
               >
                 <option value="all">All types</option>
                 <option value="claims">Claims only</option>
                 <option value="advances">Advances only</option>
-              </select>
+              </FilterSelect>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setShowRejectModal(true)}
               disabled={selectedItems.size === 0 || processing}
               className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <XCircle className="w-4 h-4" />
               Reject Selected
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleBulkApprove}
               disabled={selectedItems.size === 0 || processing}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -306,7 +308,7 @@ export default function ApprovalsPage() {
                 <CheckCircle className="w-4 h-4" />
               )}
               Approve Selected
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -346,12 +348,12 @@ export default function ApprovalsPage() {
                       className="w-4 h-4 rounded border-slate-border bg-slate-elevated text-violet-500 focus:ring-violet-500/50"
                     />
 
-                    <button
+                    <Button
                       onClick={() => setExpandedItem(isExpanded ? null : key)}
                       className="p-1 text-slate-muted hover:text-foreground transition-colors"
                     >
                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    </button>
+                    </Button>
 
                     <div
                       className={cn(
@@ -397,14 +399,14 @@ export default function ApprovalsPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </Link>
-                      <button
+                      <Button
                         onClick={() => handleSingleApprove(item)}
                         disabled={processing}
                         className="p-2 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors disabled:opacity-50"
                         title="Approve"
                       >
                         <CheckCircle className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -455,9 +457,9 @@ export default function ApprovalsPage() {
                 <AlertTriangle className="w-5 h-5 text-rose-400" />
                 Reject {selectedItems.size} Item{selectedItems.size > 1 ? 's' : ''}
               </h3>
-              <button onClick={() => setShowRejectModal(false)} className="text-slate-muted hover:text-foreground">
+              <Button onClick={() => setShowRejectModal(false)} className="text-slate-muted hover:text-foreground">
                 <XCircle className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
             <div className="p-5 space-y-4">
               <p className="text-sm text-slate-muted">
@@ -474,20 +476,20 @@ export default function ApprovalsPage() {
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button
+                <Button
                   onClick={() => setShowRejectModal(false)}
                   className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleBulkReject}
                   disabled={!rejectReason.trim() || processing}
                   className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-foreground text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                 >
                   {processing && <Loader2 className="w-4 h-4 animate-spin" />}
                   Reject
-                </button>
+                </Button>
               </div>
             </div>
           </div>

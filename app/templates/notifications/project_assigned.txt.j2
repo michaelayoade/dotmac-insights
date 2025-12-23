@@ -1,0 +1,12 @@
+{# Project assigned notification #}
+{% set title = "Added to Project" %}
+{% set icon = "user-plus" %}
+{% set priority = "normal" %}
+
+You have been added to project "{{ project_name }}".
+{% if assigned_by_name %}
+Assigned by: {{ assigned_by_name }}
+{% endif %}
+{% if role %}
+Role: {{ role }}
+{% endif %}

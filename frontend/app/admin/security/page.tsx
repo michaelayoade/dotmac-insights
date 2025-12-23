@@ -24,66 +24,9 @@ import {
 import { adminApi, type RoleResponse, type SettingsAuditEntry } from '@/lib/api/domains';
 import { useSettingsAuditLog } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  variant = 'default',
-  href,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  variant?: 'default' | 'success' | 'warning' | 'danger';
-  href?: string;
-}) {
-  const content = (
-    <div
-      className={cn(
-        'bg-slate-card border border-slate-border rounded-xl p-5 transition-all',
-        href && 'hover:border-slate-border/80 hover:bg-slate-elevated/30 cursor-pointer group'
-      )}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
-        </div>
-        <div
-          className={cn(
-            'p-3 rounded-xl',
-            variant === 'success' && 'bg-emerald-500/10',
-            variant === 'warning' && 'bg-amber-500/10',
-            variant === 'danger' && 'bg-rose-500/10',
-            variant === 'default' && 'bg-slate-elevated'
-          )}
-        >
-          <Icon
-            className={cn(
-              'w-6 h-6',
-              variant === 'success' && 'text-emerald-400',
-              variant === 'warning' && 'text-amber-400',
-              variant === 'danger' && 'text-rose-400',
-              variant === 'default' && 'text-slate-400'
-            )}
-          />
-        </div>
-      </div>
-      {href && (
-        <div className="flex items-center gap-1 mt-3 text-sm text-slate-muted group-hover:text-teal-electric transition-colors">
-          <span>Manage</span>
-          <ArrowRight className="w-4 h-4" />
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
-}
+import { formatDateTime } from '@/lib/formatters';
+import { Button } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function QuickActionCard({
   title,
@@ -137,16 +80,6 @@ function QuickActionCard({
   );
 }
 
-function formatDate(dateStr: string) {
-  const date = new Date(dateStr);
-  return date.toLocaleString('en-NG', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function SecurityPage() {
   const {
     data: roles,
@@ -186,14 +119,14 @@ export default function SecurityPage() {
             </p>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => refetchRoles()}
           disabled={isLoading}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors self-start"
         >
           <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Security Overview */}
@@ -203,30 +136,28 @@ export default function SecurityPage() {
           <h2 className="text-lg font-semibold text-foreground">Security Overview</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Total Roles"
+          <StatCard
+            title="Total Roles"
             value={isLoading ? '...' : securityStats.totalRoles}
             icon={Shield}
-            variant="default"
             href="/admin/roles"
           />
-          <MetricCard
-            label="Users with Roles"
+          <StatCard
+            title="Users with Roles"
             value={isLoading ? '...' : securityStats.totalUsers}
             icon={Users}
             variant="success"
           />
-          <MetricCard
-            label="Custom Roles"
+          <StatCard
+            title="Custom Roles"
             value={isLoading ? '...' : securityStats.customRoles}
             icon={UserCog}
-            variant="default"
           />
-          <MetricCard
-            label="Recent Audit Events"
+          <StatCard
+            title="Recent Audit Events"
             value={isLoading ? '...' : securityStats.recentAuditCount}
             icon={Activity}
-            variant={securityStats.recentAuditCount > 0 ? 'warning' : 'default'}
+            variant={securityStats.recentAuditCount > 0 ? 'warning' : undefined}
             href="/admin/settings/audit"
           />
         </div>
@@ -431,7 +362,7 @@ export default function SecurityPage() {
                         <span className="truncate">{entry.user_email}</span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {formatDate(entry.created_at)}
+                          {formatDateTime(entry.created_at)}
                         </span>
                       </p>
                     </div>

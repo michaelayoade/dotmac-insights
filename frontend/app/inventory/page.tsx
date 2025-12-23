@@ -14,12 +14,45 @@ import {
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LoadingState } from "@/components/ui";
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function InventoryDashboard() {
-  const { data: summaryData, isLoading: summaryLoading } = useInventoryStockSummary();
-  const { data: itemsData, isLoading: itemsLoading } = useInventoryItems({ has_stock: true, limit: 5 });
-  const { data: entriesData, isLoading: entriesLoading } = useInventoryStockEntries({ limit: 5 });
-  const { data: alertsData, isLoading: alertsLoading } = useInventoryReorderAlerts({ limit: 10 });
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
+  const canFetch = !authLoading && !missingScope;
+
+  const { data: summaryData, isLoading: summaryLoading } = useInventoryStockSummary(
+    undefined,
+    { isPaused: () => !canFetch }
+  );
+  const { data: itemsData, isLoading: itemsLoading } = useInventoryItems(
+    { has_stock: true, limit: 5 },
+    { isPaused: () => !canFetch }
+  );
+  const { data: entriesData, isLoading: entriesLoading } = useInventoryStockEntries(
+    { limit: 5 },
+    { isPaused: () => !canFetch }
+  );
+  const { data: alertsData, isLoading: alertsLoading } = useInventoryReorderAlerts(
+    { limit: 10 },
+    { isPaused: () => !canFetch }
+  );
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view the inventory dashboard."
+        backHref="/"
+        backLabel="Back to Home"
+      />
+    );
+  }
 
   const totalValue = summaryData?.total_value ?? 0;
   const totalItems = summaryData?.total_items ?? 0;

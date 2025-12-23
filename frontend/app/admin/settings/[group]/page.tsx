@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useSettings, useSettingsSchema, useSettingsMutations } from '@/hooks/useApi';
 import { SettingsSchemaResponse } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 const GROUP_LABELS: Record<string, string> = {
   email: 'Email Configuration',
@@ -172,7 +173,7 @@ export default function SettingsGroupPage() {
 
         <div className="flex items-center gap-3">
           {canTest && (
-            <button
+            <Button
               onClick={handleTest}
               disabled={testing}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-border text-foreground text-sm font-medium hover:bg-slate-elevated disabled:opacity-50 transition-colors"
@@ -183,9 +184,9 @@ export default function SettingsGroupPage() {
                 <TestTube className="w-4 h-4" />
               )}
               Test
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 text-sm font-semibold hover:bg-teal-electric/90 disabled:opacity-50 transition-colors"
@@ -196,7 +197,7 @@ export default function SettingsGroupPage() {
               <Save className="w-4 h-4" />
             )}
             Save Changes
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -294,7 +295,7 @@ export default function SettingsGroupPage() {
                       className="w-full px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none pr-10"
                     />
                     {isSecret && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => toggleSecret(fieldName)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-muted hover:text-foreground"
@@ -304,7 +305,7 @@ export default function SettingsGroupPage() {
                         ) : (
                           <Eye className="w-4 h-4" />
                         )}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}

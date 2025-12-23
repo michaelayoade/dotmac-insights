@@ -13,6 +13,7 @@ import {
 import { usePerformanceTrends, useScoreDistribution, usePeriodList, useKRABreakdown } from '@/hooks/usePerformance';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 function formatScore(score: number | null): string {
   if (score === null) return '-';
@@ -63,20 +64,20 @@ export default function AnalyticsPage() {
             Trends, distributions, and insights across periods
           </p>
         </div>
-        <button
+        <Button
           className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg hover:bg-slate-elevated/80 transition-colors border border-slate-border"
         >
           <Download className="w-4 h-4" />
           Export Report
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <select
+      <FilterCard contentClassName="flex gap-3 flex-wrap" iconClassName="text-violet-400">
+        <FilterSelect
           value={periodId || ''}
           onChange={(e) => setPeriodId(e.target.value ? Number(e.target.value) : undefined)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.map((p) => (
@@ -84,15 +85,15 @@ export default function AnalyticsPage() {
               {p.name}
             </option>
           ))}
-        </select>
-        <input
+        </FilterSelect>
+        <FilterInput
           type="text"
           placeholder="Filter by department..."
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500/50"
         />
-      </div>
+      </FilterCard>
 
       {/* Trends Chart */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">

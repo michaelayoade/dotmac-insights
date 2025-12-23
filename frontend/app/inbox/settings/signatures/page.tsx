@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import {
   FileText,
-  Search,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -15,7 +14,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useSupportCannedResponses } from '@/hooks/useApi';
-import { PageHeader } from '@/components/ui';
+import { Button, FilterInput, PageHeader } from '@/components/ui';
 
 export default function InboxSignaturesPage() {
   const [search, setSearch] = useState('');
@@ -69,13 +68,13 @@ export default function InboxSignaturesPage() {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-muted">
         <AlertTriangle className="w-12 h-12 mb-4 text-rose-400" />
         <p className="text-lg text-rose-400 mb-4">Failed to load signatures</p>
-        <button
+        <Button
           onClick={() => refresh()}
           className="flex items-center gap-2 px-4 py-2 bg-slate-elevated hover:bg-slate-border rounded-lg text-sm text-foreground transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -114,16 +113,13 @@ export default function InboxSignaturesPage() {
 
       {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-          <input
-            type="text"
-            placeholder="Search signatures..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-elevated border border-slate-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-          />
-        </div>
+        <FilterInput
+          type="text"
+          placeholder="Search signatures..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 max-w-md"
+        />
       </div>
 
       {/* Signatures Grid */}
@@ -153,7 +149,7 @@ export default function InboxSignaturesPage() {
                   </div>
                   <h3 className="font-medium text-foreground">{signature.title}</h3>
                 </div>
-                <button
+                <Button
                   onClick={() => copyToClipboard(signature.content || '', signature.id)}
                   className="p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                   title="Copy to clipboard"
@@ -163,7 +159,7 @@ export default function InboxSignaturesPage() {
                   ) : (
                     <Copy className="w-4 h-4" />
                   )}
-                </button>
+                </Button>
               </div>
 
               <div className="p-4">

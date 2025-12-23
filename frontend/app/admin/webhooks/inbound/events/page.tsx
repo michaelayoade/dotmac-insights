@@ -7,6 +7,7 @@ import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@dotmac/core';
 import { useState } from 'react';
+import { Button } from '@/components/ui';
 
 export default function InboundEventsPage() {
   const { toast } = useToast();
@@ -41,13 +42,13 @@ export default function InboundEventsPage() {
             placeholder="Filter by provider"
             className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:border-teal-electric focus:outline-none"
           />
-          <button
+          <Button
             onClick={() => mutate()}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -96,13 +97,13 @@ export default function InboundEventsPage() {
                     >
                       Details
                     </Link>
-                    <button
+                    <Button
                       onClick={() => handleReplay(event.id)}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-xs text-teal-electric hover:text-teal-glow"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       Replay
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>

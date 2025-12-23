@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Receipt, Filter, MoreVertical, Link2, Unlink, AlertTriangle, XCircle, User, Check } from 'lucide-react';
+import { Receipt, MoreVertical, Link2, Unlink, AlertTriangle, XCircle, User, Check } from 'lucide-react';
 import { useCorporateCardTransactions, useTransactionMutations, useCorporateCards } from '@/hooks/useExpenses';
 import { cn } from '@/lib/utils';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import type { CorporateCardTransaction, CardTransactionStatus } from '@/lib/expenses.types';
+import { LoadingState, Button, FilterCard, FilterSelect } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 const STATUS_CONFIG: Record<CardTransactionStatus, { bg: string; text: string; label: string }> = {
   imported: { bg: 'bg-slate-500/15', text: 'text-foreground-secondary', label: 'Imported' },
@@ -56,68 +59,68 @@ function TransactionRow({
           )}
         </div>
         <div className="relative">
-          <button
+          <Button
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
-          </button>
+          </Button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-full mt-1 z-20 bg-slate-card border border-slate-border rounded-lg shadow-xl py-1 min-w-[180px]">
                 {transaction.status !== 'matched' && transaction.status !== 'excluded' && transaction.status !== 'personal' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('match', transaction); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Link2 className="w-4 h-4" />
                     Match to expense
-                  </button>
+                  </Button>
                 )}
                 {transaction.status === 'matched' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('unmatch', transaction); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Unlink className="w-4 h-4" />
                     Unmatch
-                  </button>
+                  </Button>
                 )}
                 {transaction.status !== 'disputed' && transaction.status !== 'excluded' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('dispute', transaction); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:text-amber-300 hover:bg-slate-elevated transition-colors"
                   >
                     <AlertTriangle className="w-4 h-4" />
                     Dispute
-                  </button>
+                  </Button>
                 )}
                 {transaction.status === 'disputed' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('resolve', transaction); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-emerald-400 hover:text-emerald-300 hover:bg-slate-elevated transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     Resolve dispute
-                  </button>
+                  </Button>
                 )}
                 {transaction.status !== 'excluded' && transaction.status !== 'personal' && (
                   <>
-                    <button
+                    <Button
                       onClick={() => { onAction('exclude', transaction); setMenuOpen(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                     >
                       <XCircle className="w-4 h-4" />
                       Exclude
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => { onAction('personal', transaction); setMenuOpen(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-violet-400 hover:text-violet-300 hover:bg-slate-elevated transition-colors"
                     >
                       <User className="w-4 h-4" />
                       Mark personal
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -130,6 +133,8 @@ function TransactionRow({
 }
 
 export default function TransactionsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const searchParams = useSearchParams();
   const initialCardId = searchParams.get('card_id');
   const { handleError } = useErrorHandler();
@@ -138,14 +143,29 @@ export default function TransactionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [unmatchedOnly, setUnmatchedOnly] = useState(false);
 
-  const { data: cards } = useCorporateCards({ include_inactive: true });
+  const canFetch = !authLoading && !missingScope;
+  const { data: cards } = useCorporateCards({ include_inactive: true }, { isPaused: () => !canFetch });
   const { data: transactions, isLoading } = useCorporateCardTransactions({
     card_id: cardFilter ? Number(cardFilter) : undefined,
     status: statusFilter || undefined,
     unmatched_only: unmatchedOnly,
     limit: 100,
-  });
+  }, { isPaused: () => !canFetch });
   const { matchTransaction, unmatchTransaction, disputeTransaction, excludeTransaction, markPersonal, resolveDispute } = useTransactionMutations();
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view card transactions."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   const handleAction = async (action: string, txn: CorporateCardTransaction) => {
     try {
@@ -185,11 +205,11 @@ export default function TransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-3" iconClassName="text-violet-300">
+        <FilterSelect
           value={cardFilter}
           onChange={(e) => setCardFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
+          className="focus:border-violet-500"
         >
           <option value="">All cards</option>
           {cards?.map((card) => (
@@ -197,11 +217,11 @@ export default function TransactionsPage() {
               {card.card_name} (****{card.card_number_last4})
             </option>
           ))}
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
+          className="focus:border-violet-500"
         >
           <option value="">All statuses</option>
           <option value="imported">Imported</option>
@@ -210,7 +230,7 @@ export default function TransactionsPage() {
           <option value="disputed">Disputed</option>
           <option value="excluded">Excluded</option>
           <option value="personal">Personal</option>
-        </select>
+        </FilterSelect>
         <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-foreground transition-colors">
           <input
             type="checkbox"
@@ -220,7 +240,7 @@ export default function TransactionsPage() {
           />
           Unmatched only
         </label>
-      </div>
+      </FilterCard>
 
       {/* Transactions list */}
       <div className="space-y-3">

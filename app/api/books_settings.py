@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 
@@ -149,8 +149,7 @@ class BooksSettingsResponse(BooksSettingsBase):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Document Number Format Schemas ---
@@ -163,10 +162,10 @@ class DocumentNumberFormatBase(BaseModel):
     starting_number: int = Field(1, ge=0)
     reset_frequency: ResetFrequency = ResetFrequency.NEVER
 
-    @validator('format_pattern')
+    @field_validator("format_pattern")
     def validate_pattern(cls, v):
         # Must contain a sequence placeholder
-        if '{#' not in v:
+        if "{#" not in v:
             raise ValueError("Format pattern must contain sequence placeholder like {####}")
         return v
 
@@ -194,8 +193,7 @@ class DocumentNumberFormatResponse(DocumentNumberFormatBase):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NumberPreviewRequest(BaseModel):
@@ -259,8 +257,7 @@ class CurrencySettingsResponse(CurrencySettingsBase):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FormatAmountRequest(BaseModel):

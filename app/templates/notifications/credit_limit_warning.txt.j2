@@ -1,0 +1,12 @@
+{# Credit limit warning notification #}
+{% set title = "Credit Limit Warning" %}
+{% set icon = "alert-circle" %}
+{% set priority = "high" %}
+
+Customer {{ customer_name | default('') }} is at {{ utilization_percent | default(0) }}% of credit limit.
+{% if credit_limit %}
+Credit Limit: {{ credit_limit | currency }}
+{% endif %}
+{% if outstanding %}
+Outstanding: {{ outstanding | currency }}
+{% endif %}

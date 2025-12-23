@@ -10,10 +10,12 @@ import {
   Users,
   UserPlus,
   Activity,
-  Car,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSection } from '@/components/ModuleLayout/types';
 import { useEntitlements } from '@/hooks/useApi';
 
 // HR Information Flow:
@@ -65,15 +67,6 @@ const baseSections: NavSection[] = [
     ],
   },
   {
-    key: 'fleet',
-    label: 'Fleet Management',
-    description: 'Vehicles and driver assignments',
-    icon: Car,
-    items: [
-      { name: 'Vehicles', href: '/hr/fleet', description: 'Vehicle tracking & insurance' },
-    ],
-  },
-  {
     key: 'development',
     label: 'Development',
     description: 'Training and performance',
@@ -97,7 +90,6 @@ const baseSections: NavSection[] = [
 const quickLinks: QuickLink[] = [
   { label: 'Leave', href: '/hr/leave', icon: CalendarClock, color: 'amber-400' },
   { label: 'Payroll', href: '/hr/payroll', icon: Wallet2, color: 'violet-400' },
-  { label: 'Fleet', href: '/hr/fleet', icon: Car, color: 'orange-400' },
   { label: 'Recruit', href: '/hr/recruitment', icon: UserPlus, color: 'emerald-400' },
 ];
 
@@ -119,12 +111,14 @@ function getWorkflowPhase(sectionKey: string | null): string {
   if (!sectionKey) return 'setup';
   if (sectionKey === 'overview') return 'analyze';
   if (sectionKey === 'people' || sectionKey === 'config') return 'setup';
-  // time, compensation, fleet, development are all 'operate'
+  // time, compensation, development are all 'operate'
   return 'operate';
 }
 
 export default function HrLayout({ children }: { children: React.ReactNode }) {
-  const { data: entitlements } = useEntitlements();
+  const { hasAccess, isLoading: authLoading } = useRequireScope('hr:read');
+  const canFetch = !authLoading;
+  const { data: entitlements } = useEntitlements({ isPaused: () => !canFetch });
   const nigeriaEnabled = entitlements?.feature_flags?.NIGERIA_COMPLIANCE_ENABLED ?? false;
   const sections = useMemo(() => {
     if (!nigeriaEnabled) {
@@ -141,6 +135,22 @@ export default function HrLayout({ children }: { children: React.ReactNode }) {
       };
     });
   }, [nigeriaEnabled]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
 
   return (
     <ModuleLayout

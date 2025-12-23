@@ -5,22 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, CreditCard } from 'lucide-react';
 import { useFinanceCustomers, useFinancePaymentMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
+import { formatCurrency } from '@/lib/formatters';
+import { Button } from '@/components/ui';
 
 export default function PaymentCreatePage() {
   const router = useRouter();
   const currency = 'NGN';
   const { createPayment } = useFinancePaymentMutations();
   const { data: customersData } = useFinanceCustomers({ limit: 100, offset: 0 });
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [customerId, setCustomerId] = useState<string>('');
   const [invoiceId, setInvoiceId] = useState<string>('');
@@ -33,7 +28,6 @@ export default function PaymentCreatePage() {
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const customers = (customersData as any)?.items || (customersData as any)?.customers || [];
 
   const validate = () => {
@@ -41,7 +35,7 @@ export default function PaymentCreatePage() {
     if (!customerId) errs.customerId = 'Customer is required';
     if (!amount || amount <= 0) errs.amount = 'Amount must be greater than zero';
     if (!paymentDate) errs.paymentDate = 'Payment date is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -228,21 +222,21 @@ export default function PaymentCreatePage() {
             Total: <span className="text-foreground font-mono">{formatCurrency(amount, currency)}</span>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
               onClick={() => router.back()}
               className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               disabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={submitting}
               className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
             >
               {submitting ? 'Saving...' : 'Save Payment'}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

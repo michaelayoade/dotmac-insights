@@ -15,20 +15,11 @@ import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import type { BonusEligibility } from '@/lib/performance.types';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 function formatScore(score: number | null): string {
   if (score === null) return '-';
   return score.toFixed(1);
-}
-
-function formatCurrency(amount: number | null): string {
-  if (amount === null) return '-';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 export default function BonusReportPage() {
@@ -167,12 +158,12 @@ export default function BonusReportPage() {
             Performance-based bonus calculations and eligibility
           </p>
         </div>
-        <button
+        <Button
           className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 text-foreground rounded-lg hover:bg-violet-600 transition-colors"
         >
           <Download className="w-4 h-4" />
           Export CSV
-        </button>
+        </Button>
       </div>
 
       {/* Summary Stats */}
@@ -215,14 +206,14 @@ export default function BonusReportPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <select
+      <FilterCard contentClassName="flex gap-3 flex-wrap" iconClassName="text-violet-400">
+        <FilterSelect
           value={periodId || ''}
           onChange={(e) => {
             setPeriodId(e.target.value ? Number(e.target.value) : 0);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Periods</option>
           {periods?.items.filter(p => ['finalized', 'review'].includes(p.status)).map((p) => (
@@ -230,8 +221,8 @@ export default function BonusReportPage() {
               {p.name}
             </option>
           ))}
-        </select>
-        <input
+        </FilterSelect>
+        <FilterInput
           type="text"
           placeholder="Filter by department..."
           value={departmentFilter}
@@ -239,9 +230,9 @@ export default function BonusReportPage() {
             setDepartmentFilter(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500/50"
         />
-      </div>
+      </FilterCard>
 
       {/* Info Card */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-4">

@@ -7,7 +7,7 @@ from sqlalchemy import func, and_
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 from app.database import get_db
@@ -53,8 +53,7 @@ class KPIResultResponse(BaseModel):
     weighted_score: Optional[float]
     evidence_links: Optional[List[str]]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KRAResultResponse(BaseModel):
@@ -68,8 +67,7 @@ class KRAResultResponse(BaseModel):
     weighted_score: Optional[float]
     kpi_results: List[KPIResultResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScorecardResponse(BaseModel):
@@ -93,8 +91,7 @@ class ScorecardResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScorecardDetailResponse(ScorecardResponse):

@@ -1,0 +1,59 @@
+{% extends "reports/_base.html.j2" %}
+{% from "reports/_macros.html.j2" import format_num, aging_headers, aging_row, aging_summary %}
+
+{% set buckets = data.buckets | default(["Current", "1-30", "31-60", "61-90", "90+"]) %}
+
+{% block title %}Receivables Aging{% endblock %}
+
+{% block report_title %}Receivables Aging Report{% endblock %}
+
+{% block report_subtitle %}As of {{ data.as_of_date | default('') }}{% endblock %}
+
+{% block content %}
+<table>
+    <thead>
+        {{ aging_headers(buckets) }}
+    </thead>
+    <tbody>
+        {% for row in data.rows | default([]) %}
+        {{ aging_row(row, buckets) }}
+        {% else %}
+        <tr>
+            <td colspan="{{ buckets | length + 2 }}" style="text-align: center; color: #999;">
+                No outstanding receivables
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        {{ aging_summary(data.summary | default({}), buckets) }}
+    </tfoot>
+</table>
+
+{% if data.summary %}
+<div class="summary-section no-break">
+    <h3>Summary</h3>
+    <table>
+        <tr>
+            <td>Total Outstanding</td>
+            <td class="number">{{ format_num(data.summary.total) }}</td>
+        </tr>
+        <tr>
+            <td>Current (Not Due)</td>
+            <td class="number">{{ format_num(data.summary.Current | default(0)) }}</td>
+        </tr>
+        <tr>
+            <td>Past Due (Total)</td>
+            <td class="number">
+                {% set past_due = (data.summary['1-30'] | default(0)) + (data.summary['31-60'] | default(0)) + (data.summary['61-90'] | default(0)) + (data.summary['90+'] | default(0)) %}
+                {{ format_num(past_due) }}
+            </td>
+        </tr>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block footer %}
+<p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+{% endblock %}

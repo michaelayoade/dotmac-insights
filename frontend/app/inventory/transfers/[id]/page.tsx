@@ -18,26 +18,27 @@ import {
   Send,
   Package,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { formatStatusLabel, type StatusTone } from "@/lib/status-pill";
+import { Button, StatusPill } from '@/components/ui';
 
 function getStatusBadge(status: string) {
   switch (status) {
     case "draft":
-      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary border-slate-500/30", icon: Clock };
+      return { label: "Draft", tone: "default" as StatusTone, icon: Clock };
     case "pending_approval":
-      return { label: "Pending Approval", className: "bg-amber-500/20 text-amber-300 border-amber-500/30", icon: Clock };
+      return { label: "Pending Approval", tone: "warning" as StatusTone, icon: Clock };
     case "approved":
-      return { label: "Approved", className: "bg-blue-500/20 text-blue-300 border-blue-500/30", icon: CheckCircle };
+      return { label: "Approved", tone: "info" as StatusTone, icon: CheckCircle };
     case "rejected":
-      return { label: "Rejected", className: "bg-red-500/20 text-red-300 border-red-500/30", icon: XCircle };
+      return { label: "Rejected", tone: "danger" as StatusTone, icon: XCircle };
     case "in_transit":
-      return { label: "In Transit", className: "bg-purple-500/20 text-purple-300 border-purple-500/30", icon: Truck };
+      return { label: "In Transit", tone: "info" as StatusTone, icon: Truck };
     case "completed":
-      return { label: "Completed", className: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30", icon: CheckCircle };
+      return { label: "Completed", tone: "success" as StatusTone, icon: CheckCircle };
     case "cancelled":
-      return { label: "Cancelled", className: "bg-red-500/20 text-red-300 border-red-500/30", icon: XCircle };
+      return { label: "Cancelled", tone: "danger" as StatusTone, icon: XCircle };
     default:
-      return { label: status, className: "bg-slate-500/20 text-foreground-secondary border-slate-500/30", icon: Clock };
+      return { label: formatStatusLabel(status || "unknown"), tone: "default" as StatusTone, icon: Clock };
   }
 }
 
@@ -125,51 +126,54 @@ export default function TransferDetailPage() {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-foreground">Transfer #{transfer.id}</h1>
-            <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm border", statusInfo.className)}>
-              <StatusIcon className="w-4 h-4" />
-              {statusInfo.label}
-            </span>
-          </div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-semibold text-foreground">Transfer #{transfer.id}</h1>
+              <StatusPill
+                label={statusInfo.label}
+                tone={statusInfo.tone}
+                icon={StatusIcon}
+                size="md"
+                className="border border-current/30"
+              />
+            </div>
           <p className="text-slate-muted text-sm">Warehouse transfer request</p>
         </div>
         <div className="flex items-center gap-2">
           {transfer.status === "draft" && (
-            <button
+            <Button
               onClick={() => handleAction("submit")}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-slate-950 font-semibold hover:bg-amber-400 transition-colors"
             >
               <Send className="w-4 h-4" />
               Submit for Approval
-            </button>
+            </Button>
           )}
           {transfer.status === "pending_approval" && (
             <>
-              <button
+              <Button
                 onClick={() => handleAction("approve")}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-foreground font-semibold hover:bg-emerald-400 transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
                 Approve
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleAction("reject")}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-400 font-semibold hover:bg-red-500/30 transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Reject
-              </button>
+              </Button>
             </>
           )}
           {transfer.status === "approved" && (
-            <button
+            <Button
               onClick={() => handleAction("execute")}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-foreground font-semibold hover:bg-purple-400 transition-colors"
             >
               <Truck className="w-4 h-4" />
               Execute Transfer
-            </button>
+            </Button>
           )}
         </div>
       </div>

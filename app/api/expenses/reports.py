@@ -1,7 +1,6 @@
 """Expense reports and exports module."""
 from __future__ import annotations
 
-import csv
 import io
 from datetime import datetime, date
 from decimal import Decimal
@@ -224,62 +223,18 @@ def _build_claims_report_data(claims: List[ExpenseClaim], include_lines: bool, s
 
 
 def _claims_to_csv(data: Dict[str, Any], include_lines: bool) -> str:
-    """Convert claims report to CSV."""
-    output = io.StringIO()
-    writer = csv.writer(output)
+    """Convert claims report to CSV using Jinja2 template."""
+    from app.templates.environment import get_template_env
 
-    # Header info
-    writer.writerow(["Expense Claims Report"])
-    writer.writerow([f"Generated: {data['generated_at']}"])
-    writer.writerow([f"Period: {data['period']['start']} to {data['period']['end']}"])
-    writer.writerow([])
-
-    # Summary
-    summary = data["summary"]
-    writer.writerow(["Summary"])
-    writer.writerow(["Total Claims", summary["total_claims"]])
-    writer.writerow(["Total Claimed", _format_number(summary["total_claimed"])])
-    writer.writerow(["Total Approved", _format_number(summary["total_approved"])])
-    writer.writerow([])
-
-    if include_lines:
-        # Detailed with lines
-        writer.writerow(["Claim #", "Title", "Employee ID", "Date", "Status", "Line Category", "Line Description", "Line Date", "Line Amount", "Currency"])
-        for claim in data["claims"]:
-            lines = claim.get("lines", [])
-            if lines:
-                for i, line in enumerate(lines):
-                    if i == 0:
-                        writer.writerow([
-                            claim["claim_number"], claim["title"], claim["employee_id"],
-                            claim["claim_date"], claim["status"],
-                            line["category"], line["description"], line["expense_date"],
-                            _format_number(line["amount"]), line["currency"]
-                        ])
-                    else:
-                        writer.writerow([
-                            "", "", "", "", "",
-                            line["category"], line["description"], line["expense_date"],
-                            _format_number(line["amount"]), line["currency"]
-                        ])
-            else:
-                writer.writerow([
-                    claim["claim_number"], claim["title"], claim["employee_id"],
-                    claim["claim_date"], claim["status"],
-                    "", "", "", _format_number(claim["total_claimed"]), claim["currency"]
-                ])
-    else:
-        # Summary only
-        writer.writerow(["Claim #", "Title", "Employee ID", "Date", "Status", "Lines", "Total Claimed", "Approved", "Currency"])
-        for claim in data["claims"]:
-            writer.writerow([
-                claim["claim_number"], claim["title"], claim["employee_id"],
-                claim["claim_date"], claim["status"], claim["line_count"],
-                _format_number(claim["total_claimed"]), _format_number(claim["approved_amount"]),
-                claim["currency"]
-            ])
-
-    return output.getvalue()
+    env = get_template_env()
+    template = env.get_template("reports/expenses/claims.csv.j2")
+    return template.render(
+        generated_at=data["generated_at"],
+        period=data["period"],
+        summary=data["summary"],
+        claims=data["claims"],
+        include_lines=include_lines,
+    )
 
 
 def _claims_to_excel(data: Dict[str, Any], include_lines: bool) -> bytes:
@@ -386,96 +341,25 @@ def _claims_to_excel(data: Dict[str, Any], include_lines: bool) -> bytes:
 
 
 def _claims_to_pdf(data: Dict[str, Any], include_lines: bool) -> bytes:
-    """Convert claims report to PDF."""
-    summary = data["summary"]
+    """Convert claims report to PDF using Jinja2 template."""
+    from app.templates.environment import get_template_env
+    from pathlib import Path
 
-    # Build table rows
-    if include_lines:
-        headers = "<th>Claim #</th><th>Title</th><th>Date</th><th>Status</th><th>Category</th><th>Amount</th>"
-        rows = ""
-        for claim in data["claims"]:
-            lines = claim.get("lines", [])
-            if lines:
-                for i, line in enumerate(lines):
-                    if i == 0:
-                        rows += f"""
-                        <tr>
-                            <td rowspan="{len(lines)}">{claim['claim_number']}</td>
-                            <td rowspan="{len(lines)}">{claim['title']}</td>
-                            <td rowspan="{len(lines)}">{claim['claim_date']}</td>
-                            <td rowspan="{len(lines)}">{claim['status']}</td>
-                            <td>{line['category']}</td>
-                            <td class="number">{_format_number(line['amount'])}</td>
-                        </tr>
-                        """
-                    else:
-                        rows += f"""
-                        <tr>
-                            <td>{line['category']}</td>
-                            <td class="number">{_format_number(line['amount'])}</td>
-                        </tr>
-                        """
-            else:
-                rows += f"""
-                <tr>
-                    <td>{claim['claim_number']}</td>
-                    <td>{claim['title']}</td>
-                    <td>{claim['claim_date']}</td>
-                    <td>{claim['status']}</td>
-                    <td>-</td>
-                    <td class="number">{_format_number(claim['total_claimed'])}</td>
-                </tr>
-                """
-    else:
-        headers = "<th>Claim #</th><th>Title</th><th>Employee</th><th>Date</th><th>Status</th><th>Claimed</th><th>Approved</th>"
-        rows = ""
-        for claim in data["claims"]:
-            rows += f"""
-            <tr>
-                <td>{claim['claim_number']}</td>
-                <td>{claim['title']}</td>
-                <td>{claim['employee_id']}</td>
-                <td>{claim['claim_date']}</td>
-                <td>{claim['status']}</td>
-                <td class="number">{_format_number(claim['total_claimed'])}</td>
-                <td class="number">{_format_number(claim['approved_amount'])}</td>
-            </tr>
-            """
+    env = get_template_env()
+    template = env.get_template("reports/expenses/claims.html.j2")
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>Expense Claims Report</title></head>
-    <body>
-        <div class="header">
-            <h1>dotMac Limited</h1>
-            <h2>Expense Claims Report</h2>
-            <p>Period: {data['period']['start']} to {data['period']['end']}</p>
-        </div>
+    html_content = template.render(
+        period=data["period"],
+        summary=data["summary"],
+        claims=data["claims"],
+        include_lines=include_lines,
+        generated_at=data["generated_at"],
+    )
 
-        <div class="summary">
-            <h3>Summary</h3>
-            <table class="summary-table">
-                <tr><td>Total Claims:</td><td>{summary['total_claims']}</td></tr>
-                <tr><td>Total Claimed:</td><td class="number">{_format_number(summary['total_claimed'])}</td></tr>
-                <tr><td>Total Approved:</td><td class="number">{_format_number(summary['total_approved'])}</td></tr>
-            </table>
-        </div>
+    # Load CSS from template file
+    css_path = Path(__file__).parent.parent.parent / "templates" / "reports" / "expenses" / "_styles.css"
+    css = css_path.read_text()
 
-        <h3>Claims Detail</h3>
-        <table class="data-table">
-            <thead><tr>{headers}</tr></thead>
-            <tbody>{rows}</tbody>
-        </table>
-
-        <div class="footer">
-            <p class="generated">Generated: {data['generated_at']}</p>
-        </div>
-    </body>
-    </html>
-    """
-
-    css = _get_pdf_css()
     html = HTML(string=html_content)
     return cast(bytes, html.write_pdf(stylesheets=[CSS(string=css)]))
 
@@ -599,34 +483,17 @@ def _build_advances_report_data(advances: List[CashAdvance], start_date: Optiona
 
 
 def _advances_to_csv(data: Dict[str, Any]) -> str:
-    """Convert advances report to CSV."""
-    output = io.StringIO()
-    writer = csv.writer(output)
+    """Convert advances report to CSV using Jinja2 template."""
+    from app.templates.environment import get_template_env
 
-    writer.writerow(["Cash Advances Report"])
-    writer.writerow([f"Generated: {data['generated_at']}"])
-    writer.writerow([f"Period: {data['period']['start']} to {data['period']['end']}"])
-    writer.writerow([])
-
-    summary = data["summary"]
-    writer.writerow(["Summary"])
-    writer.writerow(["Total Advances", summary["total_advances"]])
-    writer.writerow(["Total Requested", _format_number(summary["total_requested"])])
-    writer.writerow(["Total Disbursed", _format_number(summary["total_disbursed"])])
-    writer.writerow(["Total Settled", _format_number(summary["total_settled"])])
-    writer.writerow(["Total Outstanding", _format_number(summary["total_outstanding"])])
-    writer.writerow([])
-
-    writer.writerow(["Advance #", "Employee ID", "Purpose", "Request Date", "Status", "Currency", "Requested", "Disbursed", "Settled", "Outstanding"])
-    for adv in data["advances"]:
-        writer.writerow([
-            adv["advance_number"], adv["employee_id"], adv["purpose"],
-            adv["request_date"], adv["status"], adv["currency"],
-            _format_number(adv["requested_amount"]), _format_number(adv["disbursed_amount"]),
-            _format_number(adv["settled_amount"]), _format_number(adv["outstanding_balance"])
-        ])
-
-    return output.getvalue()
+    env = get_template_env()
+    template = env.get_template("reports/expenses/advances.csv.j2")
+    return template.render(
+        generated_at=data["generated_at"],
+        period=data["period"],
+        summary=data["summary"],
+        advances=data["advances"],
+    )
 
 
 def _advances_to_excel(data: Dict[str, Any]) -> bytes:
@@ -696,63 +563,24 @@ def _advances_to_excel(data: Dict[str, Any]) -> bytes:
 
 
 def _advances_to_pdf(data: Dict[str, Any]) -> bytes:
-    """Convert advances report to PDF."""
-    summary = data["summary"]
+    """Convert advances report to PDF using Jinja2 template."""
+    from app.templates.environment import get_template_env
+    from pathlib import Path
 
-    rows = ""
-    for adv in data["advances"]:
-        rows += f"""
-        <tr>
-            <td>{adv['advance_number']}</td>
-            <td>{adv['employee_id']}</td>
-            <td>{adv['purpose']}</td>
-            <td>{adv['request_date']}</td>
-            <td>{adv['status']}</td>
-            <td class="number">{_format_number(adv['requested_amount'])}</td>
-            <td class="number">{_format_number(adv['outstanding_balance'])}</td>
-        </tr>
-        """
+    env = get_template_env()
+    template = env.get_template("reports/expenses/advances.html.j2")
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head><title>Cash Advances Report</title></head>
-    <body>
-        <div class="header">
-            <h1>dotMac Limited</h1>
-            <h2>Cash Advances Report</h2>
-            <p>Period: {data['period']['start']} to {data['period']['end']}</p>
-        </div>
+    html_content = template.render(
+        period=data["period"],
+        summary=data["summary"],
+        advances=data["advances"],
+        generated_at=data["generated_at"],
+    )
 
-        <div class="summary">
-            <h3>Summary</h3>
-            <table class="summary-table">
-                <tr><td>Total Advances:</td><td>{summary['total_advances']}</td></tr>
-                <tr><td>Total Requested:</td><td class="number">{_format_number(summary['total_requested'])}</td></tr>
-                <tr><td>Total Disbursed:</td><td class="number">{_format_number(summary['total_disbursed'])}</td></tr>
-                <tr><td>Total Outstanding:</td><td class="number">{_format_number(summary['total_outstanding'])}</td></tr>
-            </table>
-        </div>
+    # Load CSS from template file
+    css_path = Path(__file__).parent.parent.parent / "templates" / "reports" / "expenses" / "_styles.css"
+    css = css_path.read_text()
 
-        <h3>Advances Detail</h3>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Advance #</th><th>Employee</th><th>Purpose</th><th>Date</th>
-                    <th>Status</th><th>Requested</th><th>Outstanding</th>
-                </tr>
-            </thead>
-            <tbody>{rows}</tbody>
-        </table>
-
-        <div class="footer">
-            <p class="generated">Generated: {data['generated_at']}</p>
-        </div>
-    </body>
-    </html>
-    """
-
-    css = _get_pdf_css()
     html = HTML(string=html_content)
     return cast(bytes, html.write_pdf(stylesheets=[CSS(string=css)]))
 
@@ -930,19 +758,16 @@ def export_transactions_report(
     transaction_items = cast(List[Dict[str, Any]], data["transactions"])
 
     if format == "csv":
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["Card Transactions Report"])
-        writer.writerow([f"Generated: {data['generated_at']}"])
-        writer.writerow([])
-        writer.writerow(["Card", "Date", "Merchant", "Description", "Amount", "Currency", "Status", "Reference"])
-        for t in transaction_items:
-            writer.writerow([
-                t["card_name"], t["transaction_date"], t["merchant"], t["description"],
-                _format_number(t["amount"]), t["currency"], t["status"], t["reference"]
-            ])
+        from app.templates.environment import get_template_env
+
+        env = get_template_env()
+        template = env.get_template("reports/expenses/transactions.csv.j2")
+        csv_content = template.render(
+            generated_at=data["generated_at"],
+            transactions=transaction_items,
+        )
         return StreamingResponse(
-            iter([output.getvalue()]),
+            iter([csv_content]),
             media_type="text/csv",
             headers=_export_headers(base_filename, "csv"),
         )
@@ -982,89 +807,3 @@ def export_transactions_report(
         )
 
 
-# =============================================================================
-# PDF STYLESHEET
-# =============================================================================
-
-def _get_pdf_css() -> str:
-    """Get CSS styles for PDF reports."""
-    return """
-    @page {
-        size: A4 landscape;
-        margin: 1.5cm;
-    }
-    body {
-        font-family: Arial, sans-serif;
-        font-size: 9pt;
-        line-height: 1.4;
-    }
-    .header {
-        text-align: center;
-        margin-bottom: 15px;
-        border-bottom: 2px solid #333;
-        padding-bottom: 8px;
-    }
-    .header h1 {
-        font-size: 16pt;
-        margin: 0 0 3px 0;
-        color: #1a365d;
-    }
-    .header h2 {
-        font-size: 12pt;
-        margin: 0 0 3px 0;
-        color: #555;
-    }
-    .header p {
-        margin: 2px 0;
-        color: #666;
-        font-size: 9pt;
-    }
-    .summary {
-        margin: 15px 0;
-    }
-    .summary h3 {
-        font-size: 11pt;
-        margin-bottom: 8px;
-        color: #1a365d;
-    }
-    .summary-table {
-        width: auto;
-        border-collapse: collapse;
-    }
-    .summary-table td {
-        padding: 3px 15px 3px 0;
-    }
-    .data-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0;
-    }
-    .data-table th, .data-table td {
-        padding: 5px 8px;
-        border: 1px solid #ddd;
-        text-align: left;
-        font-size: 8pt;
-    }
-    .data-table th {
-        background-color: #1a365d;
-        color: white;
-        font-weight: bold;
-    }
-    .data-table tbody tr:nth-child(even) {
-        background-color: #f9f9f9;
-    }
-    .number {
-        text-align: right;
-        font-family: 'Courier New', monospace;
-    }
-    .footer {
-        margin-top: 15px;
-        border-top: 1px solid #ddd;
-        padding-top: 8px;
-    }
-    .generated {
-        color: #999;
-        font-size: 7pt;
-        text-align: right;
-    }
-    """

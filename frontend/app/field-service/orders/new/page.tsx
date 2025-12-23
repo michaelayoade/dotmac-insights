@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi, customersApi, FieldServiceOrderPriority, FieldServiceOrderCreatePayload } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 const orderTypes = [
   { value: 'installation', label: 'Installation' },
@@ -510,22 +511,22 @@ export default function NewServiceOrderPage() {
           >
             Cancel
           </Link>
-          <button
+          <Button
             type="button"
             onClick={(e) => handleSubmit(e, true)}
             disabled={isSubmitting}
             className="px-4 py-2 rounded-lg border border-teal-electric text-teal-electric hover:bg-teal-electric/10 transition-colors disabled:opacity-50"
           >
             Save & Create Another
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={isSubmitting}
             className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? 'Creating...' : 'Create Order'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

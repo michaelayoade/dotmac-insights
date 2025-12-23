@@ -1,0 +1,21 @@
+{# Service completed notification #}
+{% set title = "Service Completed Successfully" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your {{ order_type | default('service') | title_case }} service has been completed successfully!
+
+Order: #{{ order_number }}
+Completed: {{ end_time | default('Today') }}
+Duration: {{ actual_duration | default('N/A') }}
+
+{% if work_performed %}
+Work Performed:
+{{ work_performed }}
+{% endif %}
+
+{% if resolution_notes %}{{ resolution_notes }}{% endif %}
+
+We hope you're satisfied with our service. Please let us know if you have any questions or concerns.
+
+Thank you for your business!

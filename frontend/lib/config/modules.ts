@@ -1,6 +1,12 @@
 /**
  * Centralized module registry for Dotmac Insights
  * Defines all available modules, their metadata, and categories
+ *
+ * This is the single source of truth for:
+ * - Module identifiers and labels
+ * - Layout shell assignments (which sidebar to show)
+ * - Module brand colors (via AccentColor)
+ * - Path-to-module mapping
  */
 
 import { LucideIcon } from 'lucide-react';
@@ -22,20 +28,21 @@ import {
   Landmark,
   Contact2,
   Database,
+  CheckSquare,
 } from 'lucide-react';
-import type { AccentColor } from './colors';
+import { getButtonColors, type AccentColor, type ButtonColorConfig } from './colors';
+import type { Scope } from '@/lib/auth-context';
+
+// Re-export ButtonColorConfig for convenience
+export type { ButtonColorConfig };
+
+// Re-export Scope for consumers that import from modules.ts
+export type { Scope };
 
 export type ModuleCategory = 'core' | 'operations' | 'finance' | 'admin';
 
-export type Scope =
-  | 'hr:read'
-  | 'hr:write'
-  | 'analytics:read'
-  | 'analytics:write'
-  | 'admin:read'
-  | 'admin:write'
-  | 'explore:read'
-  | '*';
+/** Layout shell type - determines which sidebar navigation to render */
+export type LayoutShell = 'books' | 'hr' | 'default';
 
 export interface ModuleDefinition {
   key: string;
@@ -48,10 +55,26 @@ export interface ModuleDefinition {
   requiredScopes?: Scope[];
   stub?: boolean;
   category: ModuleCategory;
+  /** Which layout shell to use for this module's routes */
+  shell: LayoutShell;
 }
+
+export type ModuleKey = ModuleDefinition['key'];
 
 export const MODULES: ModuleDefinition[] = [
   // Core Operations
+  {
+    key: 'crm',
+    name: 'CRM',
+    description: 'Unified contact and pipeline management.',
+    href: '/crm',
+    icon: Contact2,
+    badge: 'CRM',
+    accentColor: 'cyan',
+    category: 'core',
+    shell: 'default',
+    requiredScopes: ['crm:read'],
+  },
   {
     key: 'contacts',
     name: 'Contacts',
@@ -61,6 +84,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'CRM',
     accentColor: 'indigo',
     category: 'core',
+    shell: 'default',
+    requiredScopes: ['contacts:read'],
   },
   {
     key: 'hr',
@@ -72,17 +97,19 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'amber',
     requiredScopes: ['hr:read'],
     category: 'operations',
+    shell: 'hr',
   },
   {
     key: 'fleet',
     name: 'Fleet',
     description: 'Vehicle tracking, insurance, and driver assignments.',
-    href: '/hr/fleet',
+    href: '/fleet',
     icon: Car,
-    badge: 'HR',
+    badge: 'Ops',
     accentColor: 'orange',
-    requiredScopes: ['hr:read'],
+    requiredScopes: ['fleet:read'],
     category: 'operations',
+    shell: 'default',
   },
   {
     key: 'support',
@@ -93,6 +120,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'Helpdesk',
     accentColor: 'teal',
     category: 'core',
+    shell: 'default',
+    requiredScopes: ['support:read'],
   },
   {
     key: 'inbox',
@@ -103,6 +132,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'Omnichannel',
     accentColor: 'blue',
     category: 'core',
+    shell: 'default',
+    requiredScopes: ['inbox:read'],
   },
   {
     key: 'sales',
@@ -114,6 +145,7 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'emerald',
     requiredScopes: ['analytics:read'],
     category: 'core',
+    shell: 'default',
   },
   // Operations
   {
@@ -125,6 +157,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'WMS',
     accentColor: 'lime',
     category: 'operations',
+    shell: 'books',
+    requiredScopes: ['inventory:read'],
   },
   {
     key: 'field-service',
@@ -135,6 +169,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'FSM',
     accentColor: 'orange',
     category: 'operations',
+    shell: 'default',
+    requiredScopes: ['field-service:read'],
   },
   {
     key: 'projects',
@@ -145,6 +181,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'PM',
     accentColor: 'purple',
     category: 'operations',
+    shell: 'default',
+    requiredScopes: ['projects:read'],
   },
   {
     key: 'purchasing',
@@ -154,8 +192,9 @@ export const MODULES: ModuleDefinition[] = [
     icon: ShoppingCart,
     badge: 'Procurement',
     accentColor: 'violet',
-    requiredScopes: ['analytics:read'],
+    requiredScopes: ['purchasing:read'],
     category: 'operations',
+    shell: 'default',
   },
   // Finance
   {
@@ -166,8 +205,21 @@ export const MODULES: ModuleDefinition[] = [
     icon: BookOpen,
     badge: 'Accounting',
     accentColor: 'teal',
-    requiredScopes: ['analytics:read'],
+    requiredScopes: ['books:read'],
     category: 'finance',
+    shell: 'books',
+  },
+  {
+    key: 'reports',
+    name: 'Reports',
+    description: 'Financial reports, dashboards, and analytics.',
+    href: '/reports',
+    icon: LayoutDashboard,
+    badge: 'Analytics',
+    accentColor: 'teal',
+    requiredScopes: ['reports:read'],
+    category: 'finance',
+    shell: 'books',
   },
   {
     key: 'assets',
@@ -178,6 +230,8 @@ export const MODULES: ModuleDefinition[] = [
     badge: 'FAM',
     accentColor: 'stone',
     category: 'finance',
+    shell: 'default',
+    requiredScopes: ['assets:read'],
   },
   {
     key: 'expenses',
@@ -187,8 +241,9 @@ export const MODULES: ModuleDefinition[] = [
     icon: Wallet2,
     badge: 'Spend',
     accentColor: 'sky',
-    requiredScopes: ['analytics:read'],
+    requiredScopes: ['expenses:read'],
     category: 'finance',
+    shell: 'default',
   },
   {
     key: 'analytics',
@@ -199,6 +254,7 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'cyan',
     requiredScopes: ['analytics:read'],
     category: 'finance',
+    shell: 'default',
   },
   {
     key: 'explorer',
@@ -207,8 +263,21 @@ export const MODULES: ModuleDefinition[] = [
     href: '/explorer',
     icon: Database,
     accentColor: 'slate',
-    requiredScopes: ['explore:read'],
+    requiredScopes: ['explorer:read'],
     category: 'admin',
+    shell: 'default',
+  },
+  // Workflow
+  {
+    key: 'tasks',
+    name: 'My Tasks',
+    description: 'Unified workflow tasks from all modules.',
+    href: '/tasks',
+    icon: CheckSquare,
+    badge: 'Workflow',
+    accentColor: 'indigo',
+    category: 'core',
+    shell: 'default',
   },
   // Admin
   {
@@ -220,6 +289,7 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'rose',
     requiredScopes: ['admin:read'],
     category: 'admin',
+    shell: 'default',
   },
   {
     key: 'security',
@@ -230,6 +300,7 @@ export const MODULES: ModuleDefinition[] = [
     accentColor: 'slate',
     requiredScopes: ['admin:read'],
     category: 'admin',
+    shell: 'default',
   },
 ];
 
@@ -287,4 +358,128 @@ export function isModuleAccessible(moduleKey: string, userScopes: Scope[]): bool
   if (!moduleDef.requiredScopes || moduleDef.requiredScopes.length === 0) return true;
   if (userScopes.includes('*')) return true;
   return moduleDef.requiredScopes.some((scope) => userScopes.includes(scope));
+}
+
+// -----------------------------------------------------------------------------
+// Path-to-Module Mapping
+// -----------------------------------------------------------------------------
+
+/**
+ * Maps URL path segments to module keys.
+ * Some paths map to different modules (e.g., 'performance' -> 'hr')
+ */
+const PATH_TO_MODULE_KEY: Record<string, string> = {
+  books: 'books',
+  sales: 'sales',
+  expenses: 'expenses',
+  hr: 'hr',
+  fleet: 'fleet',
+  purchasing: 'purchasing',
+  inventory: 'inventory',
+  support: 'support',
+  contacts: 'crm', // Redirect old contacts to CRM
+  crm: 'crm',
+  admin: 'security',
+  insights: 'analytics',
+  analytics: 'analytics',
+  performance: 'hr',
+  projects: 'projects',
+  reports: 'reports',
+  'field-service': 'field-service',
+  assets: 'assets',
+  explorer: 'explorer',
+  inbox: 'inbox',
+  notifications: 'notifications',
+  customers: 'sales',
+  tasks: 'tasks',
+};
+
+/**
+ * Special path rules that override the simple segment mapping.
+ * Returns the shell to use, or null if no special rule applies.
+ */
+function getSpecialPathShell(pathname: string): LayoutShell | null {
+  // /sales/customers uses the books shell (AR management)
+  if (pathname.startsWith('/sales/customers')) {
+    return 'books';
+  }
+  return null;
+}
+
+/**
+ * Get module from URL pathname
+ */
+export function getModuleFromPath(pathname: string): ModuleDefinition | undefined {
+  const segments = pathname.split('/').filter(Boolean);
+  const firstSegment = segments[0]?.toLowerCase();
+  const moduleKey = PATH_TO_MODULE_KEY[firstSegment];
+  return moduleKey ? getModule(moduleKey) : undefined;
+}
+
+/**
+ * Determine which layout shell to use for a given pathname
+ */
+export function getLayoutShell(pathname: string): LayoutShell {
+  // Check for special path rules first
+  const specialShell = getSpecialPathShell(pathname);
+  if (specialShell) {
+    return specialShell;
+  }
+
+  // Get module from path and return its shell
+  const moduleDef = getModuleFromPath(pathname);
+  if (moduleDef) {
+    return moduleDef.shell;
+  }
+
+  return 'default';
+}
+
+/**
+ * Check if a pathname should use the books shell
+ */
+export function isBooksShell(pathname: string): boolean {
+  return getLayoutShell(pathname) === 'books';
+}
+
+/**
+ * Check if a pathname should use the HR shell
+ */
+export function isHrShell(pathname: string): boolean {
+  return getLayoutShell(pathname) === 'hr';
+}
+
+/**
+ * Get all modules that use a specific shell
+ */
+export function getModulesByShell(shell: LayoutShell): ModuleDefinition[] {
+  return MODULES.filter((m) => m.shell === shell);
+}
+
+// -----------------------------------------------------------------------------
+// Button Colors (convenience helpers)
+// -----------------------------------------------------------------------------
+
+/**
+ * Get button colors for a module by key.
+ *
+ * @example
+ * const colors = getModuleButtonColors('sales');
+ * <button className={`${colors.primary} ${colors.primaryHover}`}>Action</button>
+ */
+export function getModuleButtonColors(moduleKey: string): ButtonColorConfig {
+  const moduleDef = getModule(moduleKey);
+  return getButtonColors(moduleDef?.accentColor ?? 'teal');
+}
+
+/**
+ * Get button colors from a URL pathname.
+ *
+ * @example
+ * const colors = getButtonColorsFromPath('/sales/invoices');
+ * <button className={`${colors.primary} ${colors.primaryHover}`}>Action</button>
+ */
+export function getButtonColorsFromPath(pathname: string): ButtonColorConfig {
+  const moduleDef = getModuleFromPath(pathname);
+  return getButtonColors(moduleDef?.accentColor ?? 'teal');
 }

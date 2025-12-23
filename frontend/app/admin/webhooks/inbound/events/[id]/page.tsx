@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, RefreshCw, RotateCcw } from 'lucide-react';
 import { webhooksApi } from '@/lib/api';
 import { useToast } from '@dotmac/core';
+import { Button } from '@/components/ui';
 
 export default function InboundEventDetailPage() {
   const params = useParams();
@@ -38,30 +39,30 @@ export default function InboundEventDetailPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button
+          <Button
             onClick={() => router.back()}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
-          </button>
+          </Button>
           <h1 className="text-2xl font-bold text-foreground">Event {data.id}</h1>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleReplay}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric text-slate-950 font-medium hover:bg-teal-electric/90"
           >
             <RotateCcw className="w-4 h-4" />
             Replay
-          </button>
+          </Button>
         </div>
       </div>
 

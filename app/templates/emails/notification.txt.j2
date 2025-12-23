@@ -1,0 +1,12 @@
+{# Plain text notification email #}
+{{ title | default('Notification') }}
+{{ '=' * (title | default('Notification') | length) }}
+
+{{ message | default('') }}
+
+{% if action_url %}
+View Details: {{ action_url }}
+{% endif %}
+
+---
+This is an automated notification from {{ product_name | default('DotMac Insights') }}.

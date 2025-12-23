@@ -12,9 +12,12 @@ import {
   Settings,
   Headphones,
 } from 'lucide-react';
+import { useRequireScope } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
+import { AccessDenied } from '@/components/AccessDenied';
 import { useConsolidatedSupportDashboard, useSupportSlaBreachesSummary } from '@/hooks/useApi';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
   {
@@ -150,6 +153,24 @@ function MobileOverdueBadge() {
 }
 
 export default function SupportLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('support:read');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
+
   return (
     <ModuleLayout
       moduleName="Dotmac"

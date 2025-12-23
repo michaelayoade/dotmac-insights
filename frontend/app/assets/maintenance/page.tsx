@@ -12,6 +12,7 @@ import {
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useMaintenanceDue, useAssetMutations } from "@/hooks/useApi";
 import type { MaintenanceDueAsset } from "@/lib/api";
+import { Button } from '@/components/ui';
 
 export default function MaintenanceDuePage() {
   const { data, isLoading, mutate } = useMaintenanceDue();
@@ -39,13 +40,13 @@ export default function MaintenanceDuePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -125,13 +126,13 @@ export default function MaintenanceDuePage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        <Button
                           onClick={() => handleComplete(asset.id)}
                           className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
                         >
                           <CheckCircle className="w-3 h-3" />
                           Complete
-                        </button>
+                        </Button>
                         <Link
                           href={`/assets/list/${asset.id}`}
                           className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"

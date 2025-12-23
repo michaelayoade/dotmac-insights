@@ -1,0 +1,6 @@
+{# Performance period closing notification #}
+{% set title = "Evaluation Period Ending" %}
+{% set icon = "alert-triangle" %}
+{% set priority = "high" %}
+
+The {{ period_name | default('evaluation period') }} ends on {{ end_date | format_date | default('N/A') }}. Please complete all pending reviews.

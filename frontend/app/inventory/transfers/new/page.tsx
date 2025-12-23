@@ -8,6 +8,7 @@ import {
   useInventoryItems,
   useInventoryTransferMutations,
 } from "@/hooks/useApi";
+import { Button } from '@/components/ui';
 import {
   ArrowRightLeft,
   ArrowLeft,
@@ -204,26 +205,26 @@ export default function NewTransferPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Items</h2>
-            <button
+            <Button
               type="button"
               onClick={addItem}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
               Add Item
-            </button>
+            </Button>
           </div>
 
           {items.length === 0 ? (
             <div className="text-center py-8 text-slate-muted">
               <p>No items added yet</p>
-              <button
+              <Button
                 type="button"
                 onClick={addItem}
                 className="mt-2 text-amber-400 hover:text-amber-300"
               >
                 Add your first item
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -281,13 +282,13 @@ export default function NewTransferPage() {
                         {(item.qty * item.valuation_rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-2">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => removeItem(idx)}
                           className="p-1.5 text-red-400 hover:bg-red-500/20 rounded transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -319,7 +320,7 @@ export default function NewTransferPage() {
           >
             Cancel
           </Link>
-          <button
+          <Button
             type="submit"
             disabled={saving || items.length === 0}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-slate-950 font-semibold hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -330,7 +331,7 @@ export default function NewTransferPage() {
               <Save className="w-4 h-4" />
             )}
             Create Transfer
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -6,7 +6,7 @@ and alert thresholds.
 from typing import Optional
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -38,8 +38,7 @@ class AssetSettingsResponse(BaseModel):
     warranty_alert_days: int
     insurance_alert_days: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetSettingsUpdate(BaseModel):

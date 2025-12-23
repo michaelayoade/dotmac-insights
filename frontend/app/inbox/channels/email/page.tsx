@@ -2,6 +2,7 @@
 
 import { Mail, Plus, Settings, CheckCircle, XCircle, Trash2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 const EMAIL_ACCOUNTS = [
   { id: '1', email: 'support@company.com', name: 'Support Email', provider: 'Gmail', status: 'connected', lastSync: '2 min ago' },
@@ -22,10 +23,10 @@ export default function EmailChannelPage() {
             <p className="text-slate-muted text-sm">Connect and manage email accounts</p>
           </div>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
+        <Button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-foreground rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">
           <Plus className="w-4 h-4" />
           Connect Account
-        </button>
+        </Button>
       </div>
 
       {/* Stats */}
@@ -75,15 +76,15 @@ export default function EmailChannelPage() {
                 <p className="text-xs text-slate-muted mt-1">{account.lastSync}</p>
               </div>
               <div className="flex items-center gap-1">
-                <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Sync now">
+                <Button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Sync now">
                   <RefreshCw className="w-4 h-4" />
-                </button>
-                <button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Settings">
+                </Button>
+                <Button className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors" title="Settings">
                   <Settings className="w-4 h-4" />
-                </button>
-                <button className="p-2 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors" title="Remove">
+                </Button>
+                <Button className="p-2 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors" title="Remove">
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </div>

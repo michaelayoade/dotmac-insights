@@ -9,7 +9,21 @@ from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
 from app.models.conversation import Conversation, Message
 from app.models.sync_log import SyncLog
 from app.models.employee import Employee
-from app.models.project import Project
+from app.models.project import (
+    Project,
+    ProjectUser,
+    Milestone,
+    MilestoneStatus,
+    ProjectComment,
+    ProjectActivity,
+    ProjectActivityType,
+    ProjectStatus,
+    ProjectPriority,
+    ProjectType,
+    ProjectTemplate,
+    TaskTemplate,
+    MilestoneTemplate,
+)
 from app.models.task import Task, TaskDependency, TaskStatus, TaskPriority
 from app.models.ticket import Ticket
 from app.models.expense import Expense
@@ -315,6 +329,17 @@ from app.models.tax import (
     TaxFilingPeriod,
     TaxPayment,
 )
+from app.models.workflow_task import (
+    WorkflowTask,
+    WorkflowTaskStatus,
+    WorkflowTaskPriority,
+    WorkflowTaskModule,
+    WorkflowTaskSourceType,
+)
+from app.models.scheduled_task import (
+    ScheduledTask,
+    ScheduledTaskStatus,
+)
 
 __all__ = [
     "Customer",
@@ -336,6 +361,15 @@ __all__ = [
     "CreditNote",
     "Ticket",
     "Project",
+    "ProjectUser",
+    "ProjectStatus",
+    "ProjectPriority",
+    "ProjectType",
+    "Milestone",
+    "MilestoneStatus",
+    "ProjectComment",
+    "ProjectActivity",
+    "ProjectActivityType",
     "Task",
     "TaskDependency",
     "TaskStatus",
@@ -618,4 +652,13 @@ __all__ = [
     "TaxFilingType",
     "TaxFilingPeriod",
     "TaxPayment",
+    # Workflow task models
+    "WorkflowTask",
+    "WorkflowTaskStatus",
+    "WorkflowTaskPriority",
+    "WorkflowTaskModule",
+    "WorkflowTaskSourceType",
+    # Scheduled task models
+    "ScheduledTask",
+    "ScheduledTaskStatus",
 ]

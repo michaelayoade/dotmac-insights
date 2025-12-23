@@ -7,6 +7,7 @@ import { hrApi, HrDesignation, HrDesignationPayload } from '@/lib/api/domains/hr
 import { DataTable } from '@/components/DataTable';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { useSWRStatus } from '@/hooks/useSWRStatus';
+import { Button } from '@/components/ui';
 
 export default function DesignationsPage() {
   const [isCreating, setIsCreating] = useState(false);
@@ -112,54 +113,54 @@ export default function DesignationsPage() {
         <div className="flex items-center justify-end gap-2">
           {editingId === item.id ? (
             <>
-              <button
+              <Button
                 onClick={() => handleUpdate(item.id)}
                 className="p-1.5 rounded bg-teal-electric/20 text-teal-electric hover:bg-teal-electric/30"
                 title="Save"
               >
                 <Check className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={cancelEdit}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
                 title="Cancel"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </>
           ) : deleteConfirm === item.id ? (
             <>
-              <button
+              <Button
                 onClick={() => handleDelete(item.id)}
                 className="p-1.5 rounded bg-coral-alert/20 text-coral-alert hover:bg-coral-alert/30"
                 title="Confirm Delete"
               >
                 <Check className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(null)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
                 title="Cancel"
               >
                 <X className="w-4 h-4" />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 onClick={() => startEdit(item)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
                 title="Edit"
               >
                 <Pencil className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(item.id)}
                 className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-coral-alert/20 hover:text-coral-alert"
                 title="Delete"
               >
                 <Trash2 className="w-4 h-4" />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -176,13 +177,13 @@ export default function DesignationsPage() {
             <h1 className="text-xl font-semibold text-foreground">Designations</h1>
           </div>
           {!isCreating && (
-            <button
+            <Button
               onClick={() => { setIsCreating(true); setEditingId(null); setFormData({ designation_name: '' }); }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
             >
               <Plus className="w-4 h-4" />
               Add Designation
-            </button>
+            </Button>
           )}
         </div>
 
@@ -218,19 +219,19 @@ export default function DesignationsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <button
+              <Button
                 onClick={handleCreate}
                 disabled={!formData.designation_name.trim()}
                 className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={cancelEdit}
                 className="px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}

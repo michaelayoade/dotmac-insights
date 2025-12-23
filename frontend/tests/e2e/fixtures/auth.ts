@@ -1,60 +1,137 @@
 /**
  * Playwright auth fixtures for authenticated E2E tests.
  *
- * Sets up localStorage with a test JWT token containing the specified scopes.
- * Uses storage state to persist auth across tests for efficiency.
+ * Sets up an httpOnly cookie with a test JWT token containing the specified scopes.
+ * Uses browser context cookies to persist auth across tests for efficiency.
  */
 
 import { createHmac, createHash } from 'crypto';
 import { test as base, expect, type Page } from '@playwright/test';
 
 // All available scopes matching the backend RBAC system
+// Keep in sync with frontend/lib/auth-context.tsx and backend Require() calls
 export type Scope =
-  | 'customers:read'
-  | 'customers:write'
-  | 'analytics:read'
-  | 'sync:read'
-  | 'sync:write'
-  | 'explore:read'
+  // Wildcard
+  | '*'
+  // Admin scopes
   | 'admin:read'
   | 'admin:write'
+  | 'admin:users:read'
+  | 'admin:users:write'
+  | 'admin:roles:read'
+  | 'admin:roles:write'
+  | 'admin:tokens:read'
+  | 'admin:tokens:write'
+  // Analytics & Explorer
+  | 'analytics:read'
+  | 'explorer:read'
+  // Sync scopes
+  | 'sync:read'
+  | 'sync:write'
+  | 'sync:splynx:read'
+  | 'sync:splynx:write'
+  | 'sync:erpnext:write'
+  | 'sync:chatwoot:write'
+  // Customer & Contact scopes
+  | 'customers:read'
+  | 'customers:write'
+  | 'contacts:read'
+  | 'contacts:write'
+  // CRM scopes
+  | 'crm:read'
+  | 'crm:write'
+  | 'crm:admin'
+  // HR scopes
   | 'hr:read'
   | 'hr:write'
+  | 'hr:admin'
+  // Fleet scopes
+  | 'fleet:read'
+  | 'fleet:write'
+  // Support scopes
+  | 'support:read'
+  | 'support:write'
+  | 'support:admin'
+  | 'support:automation:read'
+  | 'support:automation:write'
+  | 'support:csat:read'
+  | 'support:csat:write'
+  | 'support:kb:read'
+  | 'support:kb:write'
+  | 'support:sla:read'
+  | 'support:sla:write'
+  // Tickets scopes
+  | 'tickets:read'
+  | 'tickets:write'
+  // Inbox scopes
+  | 'inbox:read'
+  | 'inbox:write'
+  // Accounting scopes
   | 'accounting:read'
   | 'accounting:write'
+  // Assets scopes
+  | 'assets:read'
+  | 'assets:write'
+  // Books/Finance scopes
+  | 'books:read'
+  | 'books:write'
+  | 'books:approve'
+  | 'books:admin'
+  | 'books:close'
+  | 'billing:write'
+  // Expenses scopes
+  | 'expenses:read'
+  | 'expenses:write'
+  // Field Service scopes
+  | 'field-service:read'
+  | 'field-service:write'
+  | 'field-service:dispatch'
+  | 'field-service:admin'
+  | 'field-service:mobile'
+  // Purchasing scopes
+  | 'purchasing:read'
+  | 'purchasing:write'
+  // Projects scopes
+  | 'projects:read'
+  | 'projects:write'
+  // Reports scopes
+  | 'reports:read'
+  | 'reports:write'
+  // Payments & Banking scopes
   | 'payments:read'
   | 'payments:write'
   | 'openbanking:read'
   | 'openbanking:write'
   | 'gateway:read'
-  | 'gateway:write';
+  | 'gateway:write'
+  // Inventory scopes
+  | 'inventory:read'
+  | 'inventory:write'
+  | 'inventory:approve'
+  // Sales scopes
+  | 'sales:read'
+  | 'sales:write'
+  // Settings scopes
+  | 'settings:read'
+  | 'settings:write'
+  | 'settings:audit_view'
+  | 'settings:test'
+  // Performance Management scopes
+  | 'performance:read'
+  | 'performance:write'
+  | 'performance:admin'
+  | 'performance:review'
+  | 'performance:self'
+  | 'performance:team';
 
-const ALL_SCOPES: Scope[] = [
-  'customers:read',
-  'customers:write',
-  'analytics:read',
-  'sync:read',
-  'sync:write',
-  'explore:read',
-  'admin:read',
-  'admin:write',
-  'hr:read',
-  'hr:write',
-  'accounting:read',
-  'accounting:write',
-  'payments:read',
-  'payments:write',
-  'openbanking:read',
-  'openbanking:write',
-  'gateway:read',
-  'gateway:write',
-];
+// Common scope sets for E2E testing - use '*' for admin tests
+const ALL_SCOPES: Scope[] = ['*'];
 
 // Test user configurations for different role scenarios
 export const TEST_USERS = {
   admin: {
     email: 'admin@test.dotmac.io',
-    scopes: ALL_SCOPES,
+    scopes: ['*'] as Scope[],
   },
   readonly: {
     email: 'readonly@test.dotmac.io',
@@ -110,20 +187,57 @@ export function createExpiredToken(scopes: Scope[]): string {
 /**
  * Set up authentication in the browser context.
  * Call this in beforeEach or use the authenticated test fixture.
+ *
+ * Uses Playwright route interception to mock the /api/admin/me endpoint,
+ * avoiding cross-origin cookie issues between frontend and backend.
  */
 export async function setupAuth(page: Page, scopes: Scope[] = ALL_SCOPES): Promise<void> {
+  const allowOrigin = process.env.E2E_BASE_URL || 'http://localhost:3000';
+  const apiBase = process.env.E2E_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const token = createTestToken(scopes);
-  const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+  const corsHeaders = {
+    'access-control-allow-origin': allowOrigin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-headers': 'content-type, authorization',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+  };
 
   await page.context().addCookies([{
     name: 'dotmac_access_token',
     value: token,
-    url: baseURL,
+    url: apiBase,
     httpOnly: true,
     sameSite: 'Lax',
-    secure: baseURL.startsWith('https://'),
+    secure: apiBase.startsWith('https'),
     path: '/',
   }]);
+
+  // Mock the /api/admin/me endpoint to return the test user's permissions
+  // This avoids cross-origin cookie issues between frontend and backend
+  // Set route on browser context so it persists across all navigations
+  // Use regex for reliable matching across any origin
+  await page.context().route(/.*\/api\/admin\/me.*/, async (route) => {
+    console.log(`[E2E Auth] Intercepted ${route.request().method()} ${route.request().url()}`);
+
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: corsHeaders,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: corsHeaders,
+      body: JSON.stringify({
+        id: 'e2e-test-user',
+        email: 'test@dotmac.io',
+        permissions: scopes,
+      }),
+    });
+  });
 
   // Navigate to pick up the auth state
   await page.goto('/');
@@ -133,7 +247,34 @@ export async function setupAuth(page: Page, scopes: Scope[] = ALL_SCOPES): Promi
  * Clear authentication from the browser context.
  */
 export async function clearAuth(page: Page): Promise<void> {
+  const allowOrigin = process.env.E2E_BASE_URL || 'http://localhost:3000';
+  const corsHeaders = {
+    'access-control-allow-origin': allowOrigin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-headers': 'content-type, authorization',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+  };
+
   await page.context().clearCookies();
+  // Remove the mock route to simulate unauthenticated state
+  await page.context().unroute('**/admin/me**');
+  // Re-add route that returns 401
+  await page.context().route('**/admin/me**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: corsHeaders,
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      headers: corsHeaders,
+      body: JSON.stringify({ detail: 'Not authenticated' }),
+    });
+  });
 }
 
 /**

@@ -5,7 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, FileText, Plus, Trash2 } from 'lucide-react';
 import { useFinanceCustomers, useFinanceInvoiceDetail, useFinanceInvoiceMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/formatters';
+import { Button } from '@/components/ui';
 
 type LineItem = {
   id: string;
@@ -14,15 +17,6 @@ type LineItem = {
   unit_price: number;
   tax_rate: number;
 };
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
 
 export default function InvoiceEditPage() {
   const params = useParams();
@@ -42,7 +36,7 @@ export default function InvoiceEditPage() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   useEffect(() => {
     if (data) {
@@ -91,7 +85,7 @@ export default function InvoiceEditPage() {
       if (item.quantity <= 0) errs[`line-${idx}-quantity`] = 'Quantity must be positive';
       if (item.unit_price < 0) errs[`line-${idx}-unit_price`] = 'Unit price must be positive';
     });
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -155,13 +149,13 @@ export default function InvoiceEditPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load invoice</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -308,14 +302,14 @@ export default function InvoiceEditPage() {
               <FileText className="w-4 h-4 text-teal-electric" />
               Line Items
             </h3>
-            <button
+            <Button
               type="button"
               onClick={addLine}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-foreground hover:border-teal-electric/50"
             >
               <Plus className="w-4 h-4" />
               Add line
-            </button>
+            </Button>
           </div>
           {fieldErrors.lineItems && <p className="text-xs text-red-400">{fieldErrors.lineItems}</p>}
           <div className="space-y-2">
@@ -377,14 +371,14 @@ export default function InvoiceEditPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-end">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => removeLine(item.id)}
                     className="p-2 text-slate-muted hover:text-red-400"
                     aria-label="Remove line item"
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -392,21 +386,21 @@ export default function InvoiceEditPage() {
         </div>
 
         <div className="flex items-center justify-end gap-3 sticky bottom-4 bg-slate-deep/80 backdrop-blur-sm p-3 rounded-lg border border-slate-border/60">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Update Invoice'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

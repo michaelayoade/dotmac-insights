@@ -1,0 +1,15 @@
+{# Task overdue notification #}
+{% set title = "Task Overdue" %}
+{% set icon = "alert-triangle" %}
+{% set priority = "high" %}
+
+Task "{{ task_subject }}" is past its due date.
+{% if project_name %}
+Project: {{ project_name }}
+{% endif %}
+{% if exp_end_date %}
+Due date: {{ exp_end_date }}
+{% endif %}
+{% if days_overdue %}
+Days overdue: {{ days_overdue }}
+{% endif %}

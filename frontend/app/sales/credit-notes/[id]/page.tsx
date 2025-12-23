@@ -6,24 +6,8 @@ import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, Receipt, FileText, Pencil } from 'lucide-react';
 import { useFinanceCreditNoteDetail } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function formatCurrency(value: number | null | undefined, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '—';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -62,13 +46,13 @@ export default function CreditNoteDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load credit note</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -77,13 +61,13 @@ export default function CreditNoteDetailPage() {
 
   return (
     <div className="space-y-6">
-      <button
+      <Button
         onClick={() => router.back()}
         className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
       >
         <ArrowLeft className="w-4 h-4" />
         Back
-      </button>
+      </Button>
       <div className="flex items-center gap-2">
         <Link
           href="/sales/credit-notes"

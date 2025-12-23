@@ -5,14 +5,22 @@ import { useRouter } from 'next/navigation';
 import { CreditCard, Save } from 'lucide-react';
 import { useCorporateCardMutations } from '@/hooks/useExpenses';
 import type { CorporateCardCreatePayload } from '@/lib/expenses.types';
-import { BackButton, Button } from '@/components/ui';
+import { LoadingState, BackButton, Button } from '@/components/ui';
 import { EmployeeSearch } from '@/components/EntitySearch';
 import { useEmployeeOptions } from '@/hooks/usePickers';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 export default function NewCardPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:write');
   const router = useRouter();
   const { createCard } = useCorporateCardMutations();
-  const { employees, isLoading: employeesLoading } = useEmployeeOptions();
+  const canFetch = !authLoading && !missingScope;
+  const { employees, isLoading: employeesLoading } = useEmployeeOptions(
+    undefined,
+    { isPaused: () => !canFetch }
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<{ id: number; name: string } | null>(null);
@@ -67,6 +75,20 @@ export default function NewCardPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:write permission to create corporate cards."
+        backHref="/expenses/cards"
+        backLabel="Back to Cards"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

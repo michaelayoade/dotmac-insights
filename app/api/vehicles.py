@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.database import get_db
 from app.models.vehicle import Vehicle
@@ -54,8 +54,7 @@ class VehicleResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VehicleUpdatePayload(BaseModel):
@@ -98,7 +97,7 @@ class VehicleListResponse(BaseModel):
 
 # ============= ENDPOINTS =============
 
-@router.get("", response_model=VehicleListResponse, dependencies=[Depends(Require("hr:read"))])
+@router.get("", response_model=VehicleListResponse, dependencies=[Depends(Require("fleet:read"))])
 async def list_vehicles(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
@@ -176,7 +175,7 @@ async def list_vehicles(
     )
 
 
-@router.get("/summary", response_model=VehicleSummary, dependencies=[Depends(Require("hr:read"))])
+@router.get("/summary", response_model=VehicleSummary, dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle_summary(db: Session = Depends(get_db)):
     """Get fleet summary statistics."""
     # Count totals
@@ -242,7 +241,7 @@ async def get_vehicle_summary(db: Session = Depends(get_db)):
     )
 
 
-@router.get("/insurance/expiring", response_model=List[VehicleResponse], dependencies=[Depends(Require("hr:read"))])
+@router.get("/insurance/expiring", response_model=List[VehicleResponse], dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicles_insurance_expiring(
     db: Session = Depends(get_db),
     days: int = Query(30, ge=1, le=365, description="Days until expiry"),
@@ -276,7 +275,7 @@ async def get_vehicles_insurance_expiring(
     return items
 
 
-@router.get("/makes", response_model=List[str], dependencies=[Depends(Require("hr:read"))])
+@router.get("/makes", response_model=List[str], dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle_makes(db: Session = Depends(get_db)):
     """Get list of distinct vehicle makes."""
     rows = db.execute(
@@ -288,7 +287,7 @@ async def get_vehicle_makes(db: Session = Depends(get_db)):
     return rows
 
 
-@router.get("/fuel-types", response_model=List[str], dependencies=[Depends(Require("hr:read"))])
+@router.get("/fuel-types", response_model=List[str], dependencies=[Depends(Require("fleet:read"))])
 async def get_fuel_types(db: Session = Depends(get_db)):
     """Get list of distinct fuel types."""
     rows = db.execute(
@@ -300,7 +299,7 @@ async def get_fuel_types(db: Session = Depends(get_db)):
     return rows
 
 
-@router.get("/{vehicle_id}", response_model=VehicleResponse, dependencies=[Depends(Require("hr:read"))])
+@router.get("/{vehicle_id}", response_model=VehicleResponse, dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     """Get a single vehicle by ID."""
     query = (
@@ -320,7 +319,7 @@ async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     return item
 
 
-@router.patch("/{vehicle_id}", response_model=VehicleResponse, dependencies=[Depends(Require("hr:write"))])
+@router.patch("/{vehicle_id}", response_model=VehicleResponse, dependencies=[Depends(Require("fleet:write"))])
 async def update_vehicle(
     vehicle_id: int,
     payload: VehicleUpdatePayload,
@@ -355,7 +354,7 @@ async def update_vehicle(
     return item
 
 
-@router.get("/by-driver/{employee_id}", response_model=List[VehicleResponse], dependencies=[Depends(Require("hr:read"))])
+@router.get("/by-driver/{employee_id}", response_model=List[VehicleResponse], dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicles_by_driver(employee_id: int, db: Session = Depends(get_db)):
     """Get all vehicles assigned to a specific driver."""
     query = (

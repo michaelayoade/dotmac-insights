@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAssetSettings, useAssetSettingsMutations } from "@/hooks/useAssetSettings";
 import type { AssetSettingsUpdate } from "@/lib/api/domains/assets";
+import { Button } from '@/components/ui';
 
 export default function AssetSettingsPage() {
   const { data: settings, isLoading, error, mutate } = useAssetSettings();
@@ -91,7 +92,7 @@ export default function AssetSettingsPage() {
             Configure default behaviors for asset management
           </p>
         </div>
-        <button
+        <Button
           onClick={handleSave}
           disabled={saving}
           className={cn(
@@ -107,7 +108,7 @@ export default function AssetSettingsPage() {
             <Save className="w-4 h-4" />
           )}
           {saveSuccess ? "Saved!" : "Save Changes"}
-        </button>
+        </Button>
       </div>
 
       {/* Error/Success Messages */}

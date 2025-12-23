@@ -42,7 +42,7 @@ test.describe('Settings - Authenticated', () => {
 
       expect(count).toBeGreaterThan(1);
       await navItems.nth(1).click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       await expect(page.locator('body')).toBeVisible();
     });
   });
@@ -193,24 +193,32 @@ test.describe('User Preferences', () => {
   test('can update display preferences', async ({ page }) => {
     await page.goto('/settings/preferences');
 
-    const themeToggle = page.locator('[role="switch"], input[type="checkbox"]').first();
-    await expect(themeToggle).toBeVisible();
-    await themeToggle.click();
-
-    await page.waitForTimeout(500);
+      const themeToggle = page.locator('[role="switch"], input[type="checkbox"]').first();
+      await expect(themeToggle).toBeVisible();
+      const initialState = await themeToggle.getAttribute('aria-checked');
+      if (initialState !== null) {
+        await themeToggle.click();
+        await expect(themeToggle).not.toHaveAttribute('aria-checked', initialState);
+      } else {
+        const wasChecked = await themeToggle.isChecked();
+        await themeToggle.click();
+        await expect(themeToggle).toHaveJSProperty('checked', !wasChecked);
+      }
   });
 
   test('preferences persist across sessions', async ({ page }) => {
     await page.goto('/settings/preferences');
 
     // Make a change
-    const toggle = page.locator('[role="switch"]').first();
-    await expect(toggle).toBeVisible();
-    const initialState = await toggle.getAttribute('aria-checked');
-    await toggle.click();
-    await page.waitForTimeout(500);
+      const toggle = page.locator('[role="switch"]').first();
+      await expect(toggle).toBeVisible();
+      const initialState = await toggle.getAttribute('aria-checked');
+      await toggle.click();
+      if (initialState !== null) {
+        await expect(toggle).not.toHaveAttribute('aria-checked', initialState);
+      }
 
-    await page.reload();
+      await page.reload();
 
     const newState = await toggle.getAttribute('aria-checked');
     expect(newState).not.toBe(initialState);

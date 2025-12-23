@@ -25,9 +25,10 @@ import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { Button } from '@/components/ui';
 
 export default function ExplorerPage() {
-  const { hasAccess, isLoading: authLoading } = useRequireScope('explore:read');
+  const { hasAccess, isLoading: authLoading } = useRequireScope('explorer:read');
   const swrGuard = { isPaused: () => authLoading || !hasAccess };
 
   // All hooks must be called before any conditional returns
@@ -260,7 +261,7 @@ export default function ExplorerPage() {
           ) : (
             Object.entries(filteredCategories).map(([category, tables]) => (
               <div key={category} className="mb-2">
-                <button
+                <Button
                   onClick={() => toggleCategory(category)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-muted hover:text-foreground transition-colors"
                 >
@@ -276,11 +277,11 @@ export default function ExplorerPage() {
                   <Badge variant="default" size="sm">
                     {tables.length}
                   </Badge>
-                </button>
+                </Button>
                 {expandedCategories.has(category) && (
                   <div className="ml-4 space-y-0.5">
                     {tables.map((table: EnhancedTableInfo) => (
-                      <button
+                      <Button
                         key={table.name}
                         onClick={() => selectTable(table.name)}
                         className={cn(
@@ -292,7 +293,7 @@ export default function ExplorerPage() {
                       >
                         <span className="truncate">{table.name}</span>
                         <span className="text-xs opacity-60">{table.count.toLocaleString()}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -334,15 +335,15 @@ export default function ExplorerPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => refetchTableData()}
                       className="p-2 text-slate-muted hover:text-foreground transition-colors"
                       title="Refresh"
                     >
                       <RefreshCw className="w-4 h-4" />
-                    </button>
+                    </Button>
                     <div className="flex items-center bg-slate-elevated rounded-lg p-1">
-                      <button
+                      <Button
                         onClick={() => setViewMode('table')}
                         className={cn(
                           'p-2 rounded-md transition-colors',
@@ -352,8 +353,8 @@ export default function ExplorerPage() {
                         )}
                       >
                         <Table className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => setViewMode('json')}
                         className={cn(
                           'p-2 rounded-md transition-colors',
@@ -363,7 +364,7 @@ export default function ExplorerPage() {
                         )}
                       >
                         <FileJson className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -425,27 +426,27 @@ export default function ExplorerPage() {
 
                 {/* Export Buttons */}
                 <div className="flex items-center gap-1">
-                  <button
+                  <Button
                     onClick={() => handleExport('csv')}
                     disabled={exporting || !tableData?.data?.length}
                     className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg transition-colors disabled:opacity-50"
                   >
                     <Download className="w-4 h-4" />
                     CSV
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleExport('json')}
                     disabled={exporting || !tableData?.data?.length}
                     className="flex items-center gap-1 px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg transition-colors disabled:opacity-50"
                   >
                     <FileJson className="w-4 h-4" />
                     JSON
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Active Filters */}
                 {(tableSearchQuery || selectedDateColumn) && (
-                  <button
+                  <Button
                     onClick={() => {
                       setTableSearchQuery('');
                       setSelectedDateColumn('');
@@ -455,7 +456,7 @@ export default function ExplorerPage() {
                   >
                     <X className="w-3 h-3" />
                     Clear filters
-                  </button>
+                  </Button>
                 )}
               </div>
             </Card>
@@ -490,23 +491,23 @@ export default function ExplorerPage() {
                         {tableData.total.toLocaleString()} records
                       </span>
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={() => setOffset(Math.max(0, offset - limit))}
                           disabled={offset === 0}
                           className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Previous
-                        </button>
+                        </Button>
                         <span className="text-sm text-slate-muted">
                           Page {Math.floor(offset / limit) + 1} of {Math.ceil(tableData.total / limit)}
                         </span>
-                        <button
+                        <Button
                           onClick={() => setOffset(offset + limit)}
                           disabled={offset + limit >= tableData.total}
                           className="px-3 py-1.5 text-sm rounded-lg border border-slate-border text-slate-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Next
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}

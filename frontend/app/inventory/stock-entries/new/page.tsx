@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Plus, Save } from 'lucide-react';
 import { useInventoryStockEntryCreate } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function InventoryStockEntryCreatePage() {
   const router = useRouter();
@@ -130,14 +131,14 @@ export default function InventoryStockEntryCreatePage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-foreground font-semibold">Lines</h3>
-            <button
+            <Button
               type="button"
               onClick={addLine}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Plus className="w-4 h-4" />
               Add Line
-            </button>
+            </Button>
           </div>
           <div className="space-y-3">
             {lines.map((line, idx) => (
@@ -193,7 +194,7 @@ export default function InventoryStockEntryCreatePage() {
           </div>
         </div>
 
-        <button
+        <Button
           type="submit"
           disabled={submitting}
           className={cn(
@@ -203,7 +204,7 @@ export default function InventoryStockEntryCreatePage() {
         >
           <Save className="w-4 h-4" />
           {submitting ? 'Saving...' : 'Create Stock Entry'}
-        </button>
+        </Button>
       </form>
     </div>
   );

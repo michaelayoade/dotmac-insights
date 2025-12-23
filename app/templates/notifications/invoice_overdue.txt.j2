@@ -1,0 +1,12 @@
+{# Invoice overdue notification #}
+{% set title = "Invoice Overdue" %}
+{% set icon = "alert-triangle" %}
+{% set priority = "high" %}
+
+Invoice {{ invoice_number | default('') }} is {{ days_overdue | default(0) }} day{{ days_overdue | pluralize }} overdue.
+{% if amount %}
+Outstanding: {{ amount | currency }}
+{% endif %}
+{% if customer_name %}
+Customer: {{ customer_name }}
+{% endif %}

@@ -14,6 +14,7 @@ import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import type { KRADefinition } from '@/lib/performance.types';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Operations': 'text-cyan-400 bg-cyan-400/10',
@@ -155,10 +156,10 @@ export default function KRAsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <FilterCard contentClassName="flex gap-3 flex-wrap" iconClassName="text-violet-400">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
+          <FilterInput
             type="text"
             placeholder="Search KRAs..."
             value={search}
@@ -166,16 +167,16 @@ export default function KRAsPage() {
               setSearch(e.target.value);
               setOffset(0);
             }}
-            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full pl-9 pr-3 placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500/50"
           />
         </div>
-        <select
+        <FilterSelect
           value={categoryFilter}
           onChange={(e) => {
             setCategoryFilter(e.target.value);
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Categories</option>
           {categories.map((cat) => (
@@ -183,15 +184,15 @@ export default function KRAsPage() {
               {cat}
             </option>
           ))}
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Category Quick Filters */}
       <div className="flex gap-3 flex-wrap">
         {Object.keys(CATEGORY_COLORS).map((category) => {
           const count = data?.items.filter(k => k.category === category).length || 0;
           return (
-            <button
+            <Button
               key={category}
               onClick={() => setCategoryFilter(category === categoryFilter ? '' : category)}
               className={cn(
@@ -204,7 +205,7 @@ export default function KRAsPage() {
               <Target className="w-3.5 h-3.5" />
               {category}
               <span className="ml-1 text-xs opacity-70">({count})</span>
-            </button>
+            </Button>
           );
         })}
       </div>

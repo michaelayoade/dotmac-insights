@@ -1,0 +1,9 @@
+{# Performance rating published notification #}
+{% set title = "Performance Rating Published" %}
+{% set icon = "eye" %}
+{% set priority = "normal" %}
+
+Your performance rating for {{ period_name | default('this period') }} has been published. View your detailed scorecard.
+{% if rating %}
+Rating: {{ rating }}
+{% endif %}

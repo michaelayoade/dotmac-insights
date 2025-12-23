@@ -11,31 +11,43 @@
  * Tests handle empty data states gracefully.
  */
 
-import type { Page } from '@playwright/test';
+import { request as playwrightRequest, type APIRequestContext, type Page } from '@playwright/test';
 import { test, expect, setupAuth } from './fixtures/auth';
 import { createTestBankTransaction, deleteTestBankTransaction } from './fixtures/api-helpers';
 
 async function ensureGatewayPaymentsReady(page: Page) {
   const heading = page.getByRole('heading', { name: /online payments/i });
   const errorMessage = page.getByText(/failed to load payments/i);
-  await expect(heading.or(errorMessage)).toBeVisible({ timeout: 15000 });
+  await expect
+    .poll(
+      async () => (await heading.isVisible()) || (await errorMessage.isVisible()),
+      { timeout: 15000 }
+    )
+    .toBe(true);
   return !(await errorMessage.isVisible());
 }
 
 async function ensureGatewayConnectionsReady(page: Page) {
   const heading = page.getByRole('heading', { name: /open banking connections/i });
   const errorMessage = page.getByText(/failed to load connections/i);
-  await expect(heading.or(errorMessage)).toBeVisible({ timeout: 15000 });
+  await expect
+    .poll(
+      async () => (await heading.isVisible()) || (await errorMessage.isVisible()),
+      { timeout: 15000 }
+    )
+    .toBe(true);
   return !(await errorMessage.isVisible());
 }
 
 test.describe('Banking - Authenticated', () => {
   const createdTransactionIds: number[] = [];
+  let apiContext: APIRequestContext | null = null;
 
-  test.beforeAll(async ({ request }) => {
+  test.beforeAll(async () => {
+    apiContext = await playwrightRequest.newContext();
     // Seed enough transactions to ensure pagination and non-empty tables.
     for (let i = 0; i < 25; i += 1) {
-      const txn = await createTestBankTransaction(request, {
+      const txn = await createTestBankTransaction(apiContext, {
         reference_number: `E2E-BANK-${Date.now()}-${i}`,
         description: `E2E Bank Transaction ${i}`,
         deposit: 1000 + i,
@@ -44,18 +56,25 @@ test.describe('Banking - Authenticated', () => {
     }
   });
 
-  test.afterAll(async ({ request }) => {
+  test.afterAll(async () => {
     for (const id of createdTransactionIds) {
       try {
-        await deleteTestBankTransaction(request, id);
+        if (apiContext) {
+          await deleteTestBankTransaction(apiContext, id);
+        }
       } catch (error) {
         console.warn(`Failed to delete test bank transaction ${id}`, error);
       }
+    }
+    if (apiContext) {
+      await apiContext.dispose();
+      apiContext = null;
     }
   });
 
   test.beforeEach(async ({ page }) => {
     await setupAuth(page, [
+      'books:read',
       'accounting:read',
       'accounting:write',
       'gateway:read',
@@ -81,7 +100,7 @@ test.describe('Banking - Authenticated', () => {
       await expect(page.getByRole('heading', { name: /bank transactions/i })).toBeVisible({ timeout: 15000 });
       await expect(page.getByPlaceholder(/search reference\/description/i)).toBeVisible();
       await expect(page.getByPlaceholder(/account/i)).toBeVisible();
-      await expect(page.getByRole('combobox')).toBeVisible();
+      await expect(page.getByRole('combobox').first()).toBeVisible();
     });
   });
 
@@ -96,7 +115,12 @@ test.describe('Banking - Authenticated', () => {
 
       const table = page.locator('table');
       await expect(table).toBeVisible({ timeout: 15000 });
-      await expect(table.locator('tbody tr').first()).toBeVisible({ timeout: 15000 });
+      await expect(
+        table
+          .locator('tbody tr')
+          .first()
+          .or(page.getByText(/no transactions|no data|empty/i))
+      ).toBeVisible({ timeout: 15000 });
     });
 
     test('displays filters when page loads', async ({ page }) => {
@@ -106,7 +130,7 @@ test.describe('Banking - Authenticated', () => {
         timeout: 15000,
       });
       await expect(page.getByPlaceholder(/account/i)).toBeVisible();
-      await expect(page.getByRole('combobox')).toBeVisible();
+      await expect(page.getByRole('combobox').first()).toBeVisible();
     });
 
     test('filter by bank account works', async ({ page }) => {

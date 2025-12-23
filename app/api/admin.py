@@ -13,7 +13,7 @@ from typing import List, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -53,8 +53,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_login_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdateRequest(BaseModel):
@@ -72,8 +71,7 @@ class RoleResponse(BaseModel):
     user_count: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleCreateRequest(BaseModel):
@@ -94,8 +92,7 @@ class PermissionResponse(BaseModel):
     description: Optional[str]
     category: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceTokenResponse(BaseModel):
@@ -111,8 +108,7 @@ class ServiceTokenResponse(BaseModel):
     created_at: datetime
     created_by_email: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ServiceTokenCreateRequest(BaseModel):
@@ -619,8 +615,7 @@ class TeamResponse(BaseModel):
     domain: Optional[str] = None  # support|field|mixed
     is_active: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TeamsListResponse(BaseModel):

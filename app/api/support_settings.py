@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -141,8 +141,7 @@ class SupportSettingsResponse(BaseModel):
     date_format: str
     time_format: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SupportSettingsUpdate(BaseModel):
@@ -274,8 +273,7 @@ class EscalationLevelResponse(BaseModel):
     change_priority: bool
     new_priority: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EscalationPolicyCreate(BaseModel):
@@ -296,8 +294,7 @@ class EscalationPolicyResponse(BaseModel):
     is_active: bool
     levels: List[EscalationLevelResponse]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Support Queue Schemas
@@ -329,8 +326,7 @@ class SupportQueueResponse(BaseModel):
     color: Optional[str]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Ticket Field Config Schemas
@@ -370,8 +366,7 @@ class TicketFieldConfigResponse(BaseModel):
     applies_to_types: Optional[List[str]]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Email Template Schemas
@@ -394,8 +389,7 @@ class EmailTemplateResponse(BaseModel):
     supported_placeholders: List[str]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================

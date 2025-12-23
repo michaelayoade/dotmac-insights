@@ -357,42 +357,34 @@ class NotificationService:
     def _get_email_template(
         self, event_type: NotificationEventType, payload: Dict[str, Any]
     ) -> tuple[str, str, str]:
-        """Get email subject, HTML body, and text body for event type."""
-        template = self.template_registry.get_template(event_type)
-        context = {**template.context, **payload}
-        title = render_template(template.title, context)
-        message = render_template(template.message, context)
+        """Get email subject, HTML body, and text body for event type.
 
-        if template.email_body_html or template.email_body_text or template.email_subject:
-            subject = render_template(
-                template.email_subject or "[DotMac] {title}",
-                {**context, "title": title, "message": message},
-            )
-            body_html = render_template(
-                template.email_body_html or "",
-                {**context, "title": title, "message": message},
-            )
-            body_text = render_template(
-                template.email_body_text or "",
-                {**context, "title": title, "message": message},
-            )
-            return subject, body_html, body_text
+        Args:
+            event_type: The notification event type
+            payload: Event data payload
 
-        # Simple HTML template
-        body_html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">{title}</h2>
-            <p style="color: #666; font-size: 16px;">{message}</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px;">
-                This is an automated notification from DotMac Insights.
-            </p>
-        </body>
-        </html>
+        Returns:
+            Tuple of (subject, html_body, text_body)
         """
+        from app.templates.environment import get_template_env
 
-        body_text = f"{title}\n\n{message}\n\n---\nThis is an automated notification from DotMac Insights."
+        template = self.template_registry.get_template(event_type, payload)
+        title = template.title
+        message = template.message
+
+        env = get_template_env()
+        email_context = {
+            **template.context,
+            **payload,
+            "title": title,
+            "message": message,
+        }
+
+        html_template = env.get_template("emails/notification.html.j2")
+        text_template = env.get_template("emails/notification.txt.j2")
+
+        body_html = html_template.render(email_context)
+        body_text = text_template.render(email_context)
 
         return f"[DotMac] {title}", body_html, body_text
 

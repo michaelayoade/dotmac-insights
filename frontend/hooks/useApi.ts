@@ -37,6 +37,7 @@ import {
   PurchasingBillPayload,
   PurchasingOrderPayload,
   PurchasingDebitNotePayload,
+  PurchasingSupplierPayload,
   SupportTeamPayload,
   SupportTeamMemberPayload,
   SupportTicketCommentPayload,
@@ -56,12 +57,15 @@ import {
   HrTrainingEventPayload,
   HrTrainingResultPayload,
   HrJobOpeningPayload,
+  HrEmployeePayload,
+  HrDepartmentPayload,
+  HrDesignationPayload,
   AccountingGeneralLedgerResponse,
   AccountingBankTransactionListResponse,
   AccountingBankTransactionDetail,
   PurchasingSupplierDetail,
 } from '@/lib/api';
-import { crmApi, dashboardsApi } from '@/lib/api/domains';
+import { crmApi, dashboardsApi, workflowTasksApi } from '@/lib/api/domains';
 
 type ApiGroup = Record<string, (...args: any[]) => any>;
 
@@ -592,6 +596,15 @@ export function useTaskDetail(id: number | null, config?: SWRConfiguration) {
 export function useTaskMutations() {
   const { mutate } = useSWRConfig();
   return {
+    createTask: async (payload: Parameters<typeof api.createTask>[0]) => {
+      const res = await api.createTask(payload);
+      if (payload.project_id) {
+        await mutate(['project-tasks', payload.project_id]);
+      }
+      await mutate('all-tasks');
+      await mutate('projects');
+      return res;
+    },
     updateTask: async (id: number, payload: import('@/lib/api').ProjectTaskUpdatePayload) => {
       const res = await api.updateTask(id, payload);
       await mutate(['task-detail', id]);
@@ -641,6 +654,274 @@ export function useProjectsPerformance(config?: SWRConfiguration) {
 
 export function useProjectsDepartmentSummary(months = 12, config?: SWRConfiguration) {
   return useSWR(['projects-dept-summary', months], () => api.getProjectsDepartmentSummary(months), config);
+}
+
+// Milestone Hooks
+export function useProjectMilestones(
+  projectId: number | null,
+  status?: import('@/lib/api').MilestoneStatus,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    projectId ? ['project-milestones', projectId, status] as const : null,
+    ([, pid, s]) => api.getProjectMilestones(pid, s),
+    config
+  );
+}
+
+export function useMilestoneDetail(id: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['milestone-detail', id] as const : null,
+    ([, milestoneId]) => api.getMilestone(milestoneId),
+    config
+  );
+}
+
+export function useMilestoneMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createMilestone: async (
+      projectId: number,
+      payload: import('@/lib/api').MilestoneCreatePayload
+    ) => {
+      const res = await api.createMilestone(projectId, payload);
+      await mutate(['project-milestones', projectId]);
+      await mutate(['project-detail', projectId]);
+      return res;
+    },
+    updateMilestone: async (
+      milestoneId: number,
+      payload: import('@/lib/api').MilestoneUpdatePayload,
+      projectId?: number
+    ) => {
+      const res = await api.updateMilestone(milestoneId, payload);
+      await mutate(['milestone-detail', milestoneId]);
+      if (projectId) {
+        await mutate(['project-milestones', projectId]);
+        await mutate(['project-detail', projectId]);
+      }
+      return res;
+    },
+    deleteMilestone: async (milestoneId: number, projectId?: number) => {
+      await api.deleteMilestone(milestoneId);
+      if (projectId) {
+        await mutate(['project-milestones', projectId]);
+        await mutate(['project-detail', projectId]);
+      }
+    },
+    assignTaskToMilestone: async (
+      taskId: number,
+      milestoneId: number | null,
+      projectId?: number
+    ) => {
+      const res = await api.assignTaskToMilestone(taskId, milestoneId);
+      await mutate(['task-detail', taskId]);
+      if (projectId) {
+        await mutate(['project-milestones', projectId]);
+        await mutate(['project-tasks', projectId]);
+      }
+      return res;
+    },
+  };
+}
+
+// Comment Hooks
+export function useEntityComments(
+  entityType: import('@/lib/api').EntityType | null,
+  entityId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    entityType && entityId ? ['entity-comments', entityType, entityId] as const : null,
+    ([, type, id]) => api.getEntityComments(type, id),
+    config
+  );
+}
+
+export function useCommentMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createComment: async (
+      entityType: import('@/lib/api').EntityType,
+      entityId: number,
+      payload: import('@/lib/api').CommentCreatePayload
+    ) => {
+      const res = await api.createComment(entityType, entityId, payload);
+      await mutate(['entity-comments', entityType, entityId]);
+      await mutate(['entity-activities', entityType, entityId]);
+      return res;
+    },
+    updateComment: async (
+      commentId: number,
+      payload: import('@/lib/api').CommentUpdatePayload,
+      entityType?: import('@/lib/api').EntityType,
+      entityId?: number
+    ) => {
+      const res = await api.updateComment(commentId, payload);
+      if (entityType && entityId) {
+        await mutate(['entity-comments', entityType, entityId]);
+      }
+      return res;
+    },
+    deleteComment: async (
+      commentId: number,
+      entityType?: import('@/lib/api').EntityType,
+      entityId?: number
+    ) => {
+      await api.deleteComment(commentId);
+      if (entityType && entityId) {
+        await mutate(['entity-comments', entityType, entityId]);
+      }
+    },
+  };
+}
+
+// Activity Hooks
+export function useEntityActivities(
+  entityType: import('@/lib/api').EntityType | null,
+  entityId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    entityType && entityId ? ['entity-activities', entityType, entityId] as const : null,
+    ([, type, id]) => api.getEntityActivities(type, id),
+    config
+  );
+}
+
+export function useProjectActivityTimeline(
+  projectId: number | null,
+  limit?: number,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    projectId ? ['project-activity-timeline', projectId, limit] as const : null,
+    ([, pid, lim]) => api.getProjectActivityTimeline(pid, lim),
+    config
+  );
+}
+
+// Project Attachment Hooks
+export function useEntityAttachments(
+  entityType: import('@/lib/api').EntityType | null,
+  entityId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    entityType && entityId ? ['entity-attachments', entityType, entityId] as const : null,
+    ([, type, id]) => api.getEntityAttachments(type, id),
+    config
+  );
+}
+
+export function useAttachmentMutations() {
+  return {
+    uploadAttachment: async (
+      entityType: import('@/lib/api').EntityType,
+      entityId: number,
+      file: File,
+      options?: { attachment_type?: string; description?: string; is_primary?: boolean }
+    ) => {
+      return api.uploadAttachment(entityType, entityId, file, options);
+    },
+    deleteAttachment: async (attachmentId: number) => {
+      return api.deleteAttachment(attachmentId);
+    },
+    getDownloadUrl: (attachmentId: number) => {
+      return api.getAttachmentDownloadUrl(attachmentId);
+    },
+  };
+}
+
+// Project Approval Hooks
+export function useProjectApprovalStatus(
+  projectId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    projectId ? ['project-approval-status', projectId] as const : null,
+    ([, id]) => api.getProjectApprovalStatus(id),
+    config
+  );
+}
+
+export function useCanApproveProject(
+  projectId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    projectId ? ['can-approve-project', projectId] as const : null,
+    ([, id]) => api.canApproveProject(id),
+    config
+  );
+}
+
+export function useApprovalMutations() {
+  return {
+    submitForApproval: async (projectId: number, remarks?: string) => {
+      return api.submitProjectForApproval(projectId, remarks);
+    },
+    approve: async (projectId: number, remarks?: string) => {
+      return api.approveProject(projectId, remarks);
+    },
+    reject: async (projectId: number, reason: string) => {
+      return api.rejectProject(projectId, reason);
+    },
+  };
+}
+
+// Project Template Hooks
+export function useProjectTemplates(
+  params?: { is_active?: boolean; project_type?: string },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['project-templates', params],
+    () => api.getTemplates(params),
+    config
+  );
+}
+
+export function useProjectTemplate(
+  templateId: number | null,
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    templateId ? ['project-template', templateId] as const : null,
+    ([, id]) => api.getTemplate(id),
+    config
+  );
+}
+
+export function useTemplateMutations() {
+  return {
+    create: async (payload: Parameters<typeof api.createTemplate>[0]) => {
+      return api.createTemplate(payload);
+    },
+    update: async (templateId: number, payload: Parameters<typeof api.updateTemplate>[1]) => {
+      return api.updateTemplate(templateId, payload);
+    },
+    delete: async (templateId: number) => {
+      return api.deleteTemplate(templateId);
+    },
+    createFromTemplate: async (templateId: number, payload: Parameters<typeof api.createFromTemplate>[1]) => {
+      return api.createFromTemplate(templateId, payload);
+    },
+  };
+}
+
+// Change History Hooks
+export function useEntityHistory(
+  entityType: 'project' | 'task' | 'milestone' | null,
+  entityId: number | null,
+  params?: { limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    entityType && entityId ? ['entity-history', entityType, entityId, params] as const : null,
+    ([, type, id, p]) => api.getEntityHistory(type, id, p),
+    config
+  );
 }
 
 // Customer Domain Hooks
@@ -2567,6 +2848,27 @@ export function usePurchasingDebitNoteMutations() {
   };
 }
 
+export function usePurchasingSupplierMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    createSupplier: async (payload: PurchasingSupplierPayload) => {
+      const res = await api.createPurchasingSupplier(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-suppliers');
+      return res;
+    },
+    updateSupplier: async (id: number, payload: Partial<PurchasingSupplierPayload>) => {
+      const res = await api.updatePurchasingSupplier(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-suppliers');
+      await mutate(['purchasing-supplier-detail', id]);
+      return res;
+    },
+    deleteSupplier: async (id: number, soft = true) => {
+      await api.deletePurchasingSupplier(id, soft);
+      await mutate((key) => Array.isArray(key) && key[0] === 'purchasing-suppliers');
+    },
+  };
+}
+
 export function usePurchasingExpenses(
   params?: {
     account?: string;
@@ -3617,6 +3919,181 @@ export function useHrLifecycleMutations() {
       await api.updateHrEmployeeTransfer(id, { status });
       await refresh('hr-employee-transfers');
       await mutate(['hr-employee-transfer-detail', id]);
+    },
+  };
+}
+
+// HR Employee mutations
+export function useHrEmployeeMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrEmployeePayload) => {
+      const res = await api.createHrEmployee(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-employees');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrEmployeePayload>) => {
+      const res = await api.updateHrEmployee(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-employees');
+      await mutate(['hr-employee-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrEmployee(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-employees');
+    },
+  };
+}
+
+// HR Department mutations
+export function useHrDepartmentMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrDepartmentPayload) => {
+      const res = await api.createHrDepartment(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-departments');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrDepartmentPayload>) => {
+      const res = await api.updateHrDepartment(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-departments');
+      await mutate(['hr-department-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrDepartment(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-departments');
+    },
+  };
+}
+
+// HR Designation mutations
+export function useHrDesignationMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: HrDesignationPayload) => {
+      const res = await api.createHrDesignation(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-designations');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<HrDesignationPayload>) => {
+      const res = await api.updateHrDesignation(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-designations');
+      await mutate(['hr-designation-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrDesignation(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'hr-designations');
+    },
+  };
+}
+
+// =============================================================================
+// PAYROLL CONFIG HOOKS
+// =============================================================================
+
+export function usePayrollRegions(params?: { limit?: number; offset?: number }, config?: SWRConfiguration) {
+  return useSWR(['payroll-regions', params], () => api.getHrPayrollRegions(params), config);
+}
+
+export function usePayrollRegionDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['payroll-region-detail', id] as const : null,
+    ([, regionId]) => api.getHrPayrollRegion(regionId),
+    config
+  );
+}
+
+export function usePayrollRegionMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: import('@/lib/api').PayrollRegionPayload) => {
+      const res = await api.createHrPayrollRegion(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'payroll-regions');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<import('@/lib/api').PayrollRegionPayload>) => {
+      const res = await api.updateHrPayrollRegion(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'payroll-regions');
+      await mutate(['payroll-region-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrPayrollRegion(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'payroll-regions');
+    },
+  };
+}
+
+export function useDeductionRules(
+  params?: { rule_type?: import('@/lib/api').DeductionRuleType; is_active?: boolean; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['deduction-rules', params], () => api.getHrDeductionRules(params), config);
+}
+
+export function useDeductionRuleDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['deduction-rule-detail', id] as const : null,
+    ([, ruleId]) => api.getHrDeductionRule(ruleId),
+    config
+  );
+}
+
+export function useDeductionRuleMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: import('@/lib/api').DeductionRulePayload) => {
+      const res = await api.createHrDeductionRule(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'deduction-rules');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<import('@/lib/api').DeductionRulePayload>) => {
+      const res = await api.updateHrDeductionRule(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'deduction-rules');
+      await mutate(['deduction-rule-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrDeductionRule(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'deduction-rules');
+    },
+  };
+}
+
+export function useTaxBands(
+  params?: { deduction_rule_id?: number; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['tax-bands', params], () => api.getHrTaxBands(params), config);
+}
+
+export function useTaxBandDetail(id: number | string | null, config?: SWRConfiguration) {
+  return useSWR(
+    id ? ['tax-band-detail', id] as const : null,
+    ([, bandId]) => api.getHrTaxBand(bandId),
+    config
+  );
+}
+
+export function useTaxBandMutations() {
+  const { mutate } = useSWRConfig();
+  return {
+    create: async (payload: import('@/lib/api').TaxBandPayload) => {
+      const res = await api.createHrTaxBand(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'tax-bands');
+      return res;
+    },
+    update: async (id: number | string, payload: Partial<import('@/lib/api').TaxBandPayload>) => {
+      const res = await api.updateHrTaxBand(id, payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'tax-bands');
+      await mutate(['tax-band-detail', id]);
+      return res;
+    },
+    delete: async (id: number | string) => {
+      await api.deleteHrTaxBand(id);
+      await mutate((key) => Array.isArray(key) && key[0] === 'tax-bands');
     },
   };
 }
@@ -5431,6 +5908,130 @@ export function useConsolidatedCustomersDashboard(currency?: string, config?: SW
       ...config,
     }
   );
+}
+
+// =============================================================================
+// WORKFLOW TASKS HOOKS
+// =============================================================================
+
+/**
+ * Get my workflow tasks (unified task list across all modules)
+ */
+export function useMyWorkflowTasks(
+  params?: {
+    status?: string;
+    module?: string;
+    priority?: string;
+    overdue_only?: boolean;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['workflow-tasks-my', params],
+    () => workflowTasksApi.getMyTasks(params),
+    config
+  );
+}
+
+/**
+ * Get my workflow task summary (counts by module, priority, overdue)
+ */
+export function useMyWorkflowTasksSummary(config?: SWRConfiguration) {
+  return useSWR(
+    'workflow-tasks-summary',
+    () => workflowTasksApi.getMyTasksSummary(),
+    {
+      refreshInterval: 60000, // Refresh every minute
+      ...config,
+    }
+  );
+}
+
+/**
+ * Get a specific workflow task
+ */
+export function useWorkflowTask(taskId: number | null, config?: SWRConfiguration) {
+  return useSWR(
+    taskId ? ['workflow-task', taskId] as const : null,
+    ([, id]) => workflowTasksApi.getTask(id),
+    config
+  );
+}
+
+/**
+ * Workflow task mutations (complete, snooze, update status)
+ */
+export function useWorkflowTaskMutations() {
+  const { mutate } = useSWRConfig();
+
+  return {
+    completeTask: async (taskId: number) => {
+      const result = await workflowTasksApi.completeTask(taskId);
+      await mutate((key) => Array.isArray(key) && key[0] === 'workflow-tasks-my');
+      await mutate('workflow-tasks-summary');
+      return result;
+    },
+    snoozeTask: async (taskId: number, snoozeUntil: string) => {
+      const result = await workflowTasksApi.snoozeTask(taskId, snoozeUntil);
+      await mutate((key) => Array.isArray(key) && key[0] === 'workflow-tasks-my');
+      await mutate('workflow-tasks-summary');
+      return result;
+    },
+    updateTaskStatus: async (taskId: number, status: string) => {
+      const result = await workflowTasksApi.updateTaskStatus(taskId, status);
+      await mutate((key) => Array.isArray(key) && key[0] === 'workflow-tasks-my');
+      await mutate('workflow-tasks-summary');
+      return result;
+    },
+  };
+}
+
+/**
+ * Get scheduled tasks
+ */
+export function useScheduledTasks(
+  params?: {
+    status?: string;
+    source_type?: string;
+    source_id?: number;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['scheduled-tasks', params],
+    () => workflowTasksApi.getScheduledTasks(params),
+    config
+  );
+}
+
+/**
+ * Scheduled task mutations (schedule reminder, cancel)
+ */
+export function useScheduledTaskMutations() {
+  const { mutate } = useSWRConfig();
+
+  return {
+    scheduleReminder: async (payload: {
+      entity_type: string;
+      entity_id: number;
+      remind_at: string;
+      message: string;
+      title?: string;
+    }) => {
+      const result = await workflowTasksApi.scheduleReminder(payload);
+      await mutate((key) => Array.isArray(key) && key[0] === 'scheduled-tasks');
+      return result;
+    },
+    cancelScheduledTask: async (scheduledTaskId: number, reason?: string) => {
+      const result = await workflowTasksApi.cancelScheduledTask(scheduledTaskId, reason);
+      await mutate((key) => Array.isArray(key) && key[0] === 'scheduled-tasks');
+      return result;
+    },
+  };
 }
 
 export { ApiError, apiFetch };

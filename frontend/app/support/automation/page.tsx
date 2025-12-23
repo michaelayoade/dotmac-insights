@@ -2,17 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Filter, PlayCircle, Zap, Activity, CheckCircle, XCircle, LifeBuoy } from 'lucide-react';
+import { AlertTriangle, PlayCircle, Zap, Activity, CheckCircle, XCircle, LifeBuoy } from 'lucide-react';
 import { useSupportAutomationLogs, useSupportAutomationLogsSummary, useSupportAutomationRules } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { PageHeader, Select, StatGrid } from '@/components/ui';
+import { formatDateTime } from '@/lib/formatters';
+import { FilterCard, FilterSelect, PageHeader, Select, StatGrid } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
-
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const dt = new Date(value);
-  return dt.toLocaleString('en-NG', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 export default function SupportAutomationPage() {
   const [trigger, setTrigger] = useState('');
@@ -67,22 +62,18 @@ export default function SupportAutomationPage() {
       )}
 
       {/* Filter */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filter by trigger</span>
-        </div>
-        <select
+      <FilterCard title="Filter by trigger" contentClassName="flex flex-wrap gap-3">
+        <FilterSelect
           value={trigger}
           onChange={(e) => setTrigger(e.target.value || '')}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 min-w-[200px]"
+          className="min-w-[200px]"
         >
           <option value="">All triggers</option>
           {triggers.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Rules */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -165,7 +156,7 @@ export default function SupportAutomationPage() {
                     )}>
                       {log.success ? 'Success' : 'Failed'}
                     </span>
-                    <p className="text-slate-muted text-xs mt-1">{formatDate(log.executed_at)}</p>
+                    <p className="text-slate-muted text-xs mt-1">{formatDateTime(log.executed_at)}</p>
                   </div>
                 </div>
                 {log.ticket_id && (

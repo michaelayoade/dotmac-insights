@@ -5,42 +5,18 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFinanceCreditNotes } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { cn } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { FilterCard, FilterInput, FilterSelect, StatusPill } from '@/components/ui';
 import { AlertTriangle, Receipt } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 
-function formatCurrency(value: number, currency = 'NGN'): string {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function getStatusBadge(status: string) {
-  const statusColors: Record<string, string> = {
-    applied: 'bg-green-500/20 text-green-400 border-green-500/30',
-    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    partial: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    cancelled: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-    expired: 'bg-red-500/20 text-red-400 border-red-500/30',
-  };
-  const color = statusColors[status?.toLowerCase()] || statusColors.pending;
-  return (
-    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border', color)}>
-      {status || 'Pending'}
-    </span>
-  );
-}
+const STATUS_TONES: Record<string, StatusTone> = {
+  applied: 'success',
+  pending: 'warning',
+  partial: 'info',
+  cancelled: 'default',
+  expired: 'danger',
+};
 
 export default function CreditNotesPage() {
   const [offset, setOffset] = useState(0);
@@ -114,7 +90,12 @@ export default function CreditNotesPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (item: any) => getStatusBadge(item.status),
+      render: (item: any) => (
+        <StatusPill
+          label={formatStatusLabel(item.status)}
+          tone={STATUS_TONES[item.status?.toLowerCase()] || 'default'}
+        />
+      ),
     },
     {
       key: 'issue_date',
@@ -157,34 +138,30 @@ export default function CreditNotesPage() {
         </Link>
       </div>
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[200px] max-w-md">
-          <input
-            type="text"
-            placeholder="Search credit notes..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
-            className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          />
-        </div>
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-4 items-center">
+        <FilterInput
+          type="text"
+          placeholder="Search credit notes..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setOffset(0); }}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <FilterSelect
           value={sortBy}
           onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="issue_date">Issue date</option>
           <option value="amount">Amount</option>
           <option value="status">Status</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={sortOrder}
           onChange={(e) => { setSortOrder(e.target.value as typeof sortOrder); setOffset(0); }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         >
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

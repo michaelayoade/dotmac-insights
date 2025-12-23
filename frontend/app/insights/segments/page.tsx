@@ -13,6 +13,7 @@ import {
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { formatCurrency } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 type ViewKey = keyof CustomerSegmentsInsightsResponse;
 
@@ -74,7 +75,7 @@ export default function SegmentsPage() {
       {/* View Selector */}
       <div className="flex flex-wrap gap-2">
         {viewConfigs.map((view) => (
-          <button
+          <Button
             key={view.key}
             onClick={() => setActiveView(view.key)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -84,7 +85,7 @@ export default function SegmentsPage() {
             }`}
           >
             {view.label}
-          </button>
+          </Button>
         ))}
       </div>
 

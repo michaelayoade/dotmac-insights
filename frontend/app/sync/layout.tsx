@@ -1,7 +1,8 @@
 'use client';
 
 import { RefreshCw, Database, CreditCard, Server, MessageSquare, History, AlertTriangle } from 'lucide-react';
-import { ModuleLayout, NavSection, QuickLink } from '@/components/ModuleLayout';
+import { ModuleLayout, QuickLink } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
   {

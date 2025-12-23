@@ -6,14 +6,38 @@ import Link from "next/link";
 import { useInventoryItems } from "@/hooks/useApi";
 import { Package, Plus, Search, Loader2, AlertCircle, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button, LoadingState } from '@/components/ui';
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 export default function InventoryItemsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [hasStock, setHasStock] = useState<boolean | undefined>(undefined);
-  const { data, isLoading, error } = useInventoryItems({ search: search || undefined, has_stock: hasStock, limit: 100 });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error } = useInventoryItems(
+    { search: search || undefined, has_stock: hasStock, limit: 100 },
+    { isPaused: () => !canFetch }
+  );
 
   const items = data?.items || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view items."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -44,7 +68,7 @@ export default function InventoryItemsPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setHasStock(hasStock === true ? undefined : true)}
               className={cn(
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
@@ -54,8 +78,8 @@ export default function InventoryItemsPage() {
               )}
             >
               In Stock Only
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setHasStock(hasStock === false ? undefined : false)}
               className={cn(
                 "px-3 py-2 rounded-lg border text-sm transition-colors",
@@ -65,7 +89,7 @@ export default function InventoryItemsPage() {
               )}
             >
               Out of Stock
-            </button>
+            </Button>
           </div>
         </div>
 

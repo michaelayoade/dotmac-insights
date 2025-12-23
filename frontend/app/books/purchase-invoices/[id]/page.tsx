@@ -5,16 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, FileText, CreditCard } from 'lucide-react';
 import { useAccountingPurchaseInvoiceDetail } from '@/hooks/useApi';
-import { cn, formatCurrency } from '@/lib/utils';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '—';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 export default function PurchaseInvoiceDetailPage() {
   const params = useParams();
@@ -41,13 +34,13 @@ export default function PurchaseInvoiceDetailPage() {
       <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
         <p className="text-red-400">Failed to load purchase invoice</p>
-        <button
+        <Button
           onClick={() => router.back()}
           className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
-        </button>
+        </Button>
       </div>
     );
   }
@@ -62,13 +55,13 @@ export default function PurchaseInvoiceDetailPage() {
 
   return (
     <div className="space-y-6">
-      <button
+      <Button
         onClick={() => router.back()}
         className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
       >
         <ArrowLeft className="w-4 h-4" />
         Back
-      </button>
+      </Button>
       <Link
         href="/books/purchase-invoices"
         className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
@@ -96,14 +89,14 @@ export default function PurchaseInvoiceDetailPage() {
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-muted">Total</p>
-            <p className="text-3xl font-bold text-foreground">{formatCurrency(data.total_amount, currentCurrency)}</p>
-            <p className="text-sm text-amber-warn">Balance: {formatCurrency(balance, currentCurrency)}</p>
+            <p className="text-3xl font-bold text-foreground">{formatAccountingCurrency(data.total_amount, currentCurrency)}</p>
+            <p className="text-sm text-amber-warn">Balance: {formatAccountingCurrency(balance, currentCurrency)}</p>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-muted">
-          <div>Invoice Date: <span className="text-foreground">{formatDate(data.invoice_date)}</span></div>
-          <div>Due Date: <span className="text-foreground">{formatDate(data.due_date)}</span></div>
+          <div>Invoice Date: <span className="text-foreground">{formatAccountingDate(data.invoice_date)}</span></div>
+          <div>Due Date: <span className="text-foreground">{formatAccountingDate(data.due_date)}</span></div>
           <div>Description: <span className="text-foreground">{data.description || '—'}</span></div>
         </div>
 
@@ -115,9 +108,9 @@ export default function PurchaseInvoiceDetailPage() {
                 <div key={idx} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 text-sm">
                   <div>
                     <p className="text-foreground">{line.item || line.description || 'Line'}</p>
-                    <p className="text-slate-muted text-xs">Qty {line.quantity ?? '-'} @ {formatCurrency(line.rate || 0, currentCurrency)}</p>
+                    <p className="text-slate-muted text-xs">Qty {line.quantity ?? '-'} @ {formatAccountingCurrency(line.rate || 0, currentCurrency)}</p>
                   </div>
-                  <p className="font-mono text-foreground">{formatCurrency(line.amount || 0, currentCurrency)}</p>
+                  <p className="font-mono text-foreground">{formatAccountingCurrency(line.amount || 0, currentCurrency)}</p>
                 </div>
               ))}
             </div>
@@ -133,8 +126,8 @@ export default function PurchaseInvoiceDetailPage() {
               {data.payments.map((pay: { id: number; amount: number; payment_date?: string; method?: string; status?: string }) => (
                 <div key={pay.id} className="flex items-center justify-between bg-slate-elevated/60 border border-slate-border/60 rounded-lg px-3 py-2 text-sm">
                   <div>
-                    <p className="text-foreground font-mono">{formatCurrency(pay.amount, currentCurrency)}</p>
-                    <p className="text-slate-muted text-xs">{formatDate(pay.payment_date)}</p>
+                    <p className="text-foreground font-mono">{formatAccountingCurrency(pay.amount, currentCurrency)}</p>
+                    <p className="text-slate-muted text-xs">{formatAccountingDate(pay.payment_date)}</p>
                   </div>
                   <div className="text-right text-xs text-slate-muted">
                     <div>{pay.method || '—'}</div>

@@ -1,0 +1,12 @@
+{# Performance metrics calculated notification #}
+{% set title = "Performance Metrics Calculated" %}
+{% set icon = "calculator" %}
+{% set priority = "normal" %}
+
+Your performance metrics for {{ period_name | default('this period') }} have been calculated.
+{% if score %}
+Score: {{ score }}
+{% endif %}
+{% if rating %}
+Rating: {{ rating }}
+{% endif %}

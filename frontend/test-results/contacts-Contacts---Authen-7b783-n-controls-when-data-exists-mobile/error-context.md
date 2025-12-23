@@ -1,0 +1,167 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Back to app home" [ref=e15]:
+          - /url: /
+          - img [ref=e16]
+        - link "Dotmac Contact Hub" [ref=e19]:
+          - /url: /contacts
+          - img [ref=e21]
+          - generic [ref=e26]:
+            - generic [ref=e27]: Dotmac
+            - generic [ref=e28]: Contact Hub
+      - generic [ref=e29]:
+        - button "Search" [ref=e30] [cursor=pointer]:
+          - img [ref=e31]
+        - button "Switch to dark mode" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - button "Toggle menu" [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - link "New Contact" [ref=e42]:
+          - /url: /contacts/new
+          - img [ref=e43]
+          - generic [ref=e46]: New Contact
+        - link "New Lead" [ref=e47]:
+          - /url: /contacts/new?type=lead
+          - img [ref=e48]
+          - generic [ref=e52]: New Lead
+        - link "Import" [ref=e53]:
+          - /url: /contacts/import
+          - img [ref=e54]
+          - generic [ref=e58]: Import
+        - link "Find Duplicates" [ref=e59]:
+          - /url: /contacts/duplicates
+          - img [ref=e60]
+          - generic [ref=e64]: Find Duplicates
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - button "Dashboard Contact hub overview" [ref=e67] [cursor=pointer]:
+            - generic [ref=e68]:
+              - img [ref=e69]
+              - generic [ref=e74]:
+                - generic [ref=e75]: Dashboard
+                - text: Contact hub overview
+            - img [ref=e76]
+          - generic [ref=e78]:
+            - link "Dashboard Overview & KPIs" [ref=e79]:
+              - /url: /contacts
+              - generic [ref=e80]: Dashboard
+              - generic [ref=e81]: Overview & KPIs
+            - link "Analytics Contact insights" [ref=e82]:
+              - /url: /contacts/analytics
+              - generic [ref=e83]: Analytics
+              - generic [ref=e84]: Contact insights
+        - button "Directory Browse all contacts" [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]:
+            - img [ref=e88]
+            - generic [ref=e93]:
+              - generic [ref=e94]: Directory
+              - text: Browse all contacts
+          - img [ref=e95]
+        - button "Lifecycle Lead to customer journey" [ref=e98] [cursor=pointer]:
+          - generic [ref=e99]:
+            - img [ref=e100]
+            - generic [ref=e104]:
+              - generic [ref=e105]: Lifecycle
+              - text: Lead to customer journey
+          - img [ref=e106]
+        - button "Segments Contact segments & lists" [ref=e109] [cursor=pointer]:
+          - generic [ref=e110]:
+            - img [ref=e111]
+            - generic [ref=e113]:
+              - generic [ref=e114]: Segments
+              - text: Contact segments & lists
+          - img [ref=e115]
+        - button "Tools Bulk operations & import" [ref=e118] [cursor=pointer]:
+          - generic [ref=e119]:
+            - img [ref=e120]
+            - generic [ref=e123]:
+              - generic [ref=e124]: Tools
+              - text: Bulk operations & import
+          - img [ref=e125]
+      - generic [ref=e127]:
+        - button "Dark mode" [ref=e128] [cursor=pointer]:
+          - generic [ref=e129]: Dark mode
+          - img [ref=e130]
+        - button "Sign out" [ref=e132] [cursor=pointer]:
+          - generic [ref=e133]: Sign out
+          - img [ref=e134]
+    - generic [ref=e139]:
+      - generic [ref=e141]:
+        - img [ref=e143]
+        - generic [ref=e145]:
+          - heading "Authentication Required" [level=3] [ref=e146]
+          - paragraph [ref=e147]: Your session may have expired or you lack permission to view this data.
+          - paragraph [ref=e148]: "Error code: 401"
+          - button "Try again" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+            - text: Try again
+      - generic [ref=e156]:
+        - generic [ref=e157]:
+          - img [ref=e159]
+          - generic [ref=e164]:
+            - heading "Unified Contacts" [level=1] [ref=e165]
+            - paragraph [ref=e166]: Manage leads, prospects, customers, and contacts in one place
+        - link "Add Contact" [ref=e168]:
+          - /url: /contacts/new
+          - img [ref=e169]
+          - text: Add Contact
+      - generic [ref=e172]:
+        - generic [ref=e174]:
+          - img [ref=e175]
+          - generic [ref=e177]: Filters
+        - generic [ref=e178]:
+          - generic [ref=e180]:
+            - img [ref=e181]
+            - textbox "Search contacts..." [ref=e184]
+          - combobox [ref=e185]:
+            - option "All Types" [selected]
+            - option "Leads"
+            - option "Prospects"
+            - option "Customers"
+            - option "Churned"
+          - combobox [ref=e186]:
+            - option "All Status" [selected]
+            - option "Active"
+            - option "Inactive"
+            - option "Suspended"
+          - combobox [ref=e187]:
+            - option "All Categories" [selected]
+            - option "Residential"
+            - option "Business"
+            - option "Enterprise"
+            - option "Government"
+          - combobox [ref=e188]:
+            - option "Date Created" [selected]
+            - option "Name"
+            - option "Last Contact"
+            - option "MRR"
+            - option "Lead Score"
+      - table [ref=e191]:
+        - rowgroup [ref=e192]:
+          - row "Contact Type Status Location MRR Tags Created" [ref=e193]:
+            - columnheader "Contact" [ref=e194]
+            - columnheader "Type" [ref=e195]
+            - columnheader "Status" [ref=e196]
+            - columnheader "Location" [ref=e197]
+            - columnheader "MRR" [ref=e198]
+            - columnheader "Tags" [ref=e199]
+            - columnheader "Created" [ref=e200]
+            - columnheader [ref=e201]
+        - rowgroup
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e202]
+```

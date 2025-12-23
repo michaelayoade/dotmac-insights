@@ -6,7 +6,7 @@ from datetime import datetime, date
 from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
@@ -200,7 +200,7 @@ class TicketBaseRequest(BaseModel):
     merged_into_id: Optional[int] = None
     parent_ticket_id: Optional[int] = None
 
-    @validator("status")
+    @field_validator("status")
     def _validate_status(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
@@ -210,7 +210,7 @@ class TicketBaseRequest(BaseModel):
         except ValueError:
             raise ValueError(f"Invalid status: {value}. Allowed: {[s.value for s in TicketStatus]}")
 
-    @validator("priority")
+    @field_validator("priority")
     def _validate_priority(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value
@@ -371,7 +371,7 @@ class CustomFieldCreateRequest(BaseModel):
     show_in_create: bool = True
     is_active: bool = True
 
-    @validator("field_type")
+    @field_validator("field_type")
     def _validate_field_type(cls, value: str) -> str:
         try:
             CustomFieldType(value)
@@ -395,7 +395,7 @@ class CustomFieldUpdateRequest(BaseModel):
     show_in_create: Optional[bool] = None
     is_active: Optional[bool] = None
 
-    @validator("field_type")
+    @field_validator("field_type")
     def _validate_field_type(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return value

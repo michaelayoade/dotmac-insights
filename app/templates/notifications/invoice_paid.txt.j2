@@ -1,0 +1,12 @@
+{# Invoice paid notification #}
+{% set title = "Payment Received" %}
+{% set icon = "dollar-sign" %}
+{% set priority = "normal" %}
+
+Invoice {{ invoice_number | default('') }} has been paid.
+{% if amount %}
+Amount: {{ amount | currency }}
+{% endif %}
+{% if customer_name %}
+From: {{ customer_name }}
+{% endif %}

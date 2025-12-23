@@ -21,16 +21,8 @@ import {
 } from 'lucide-react';
 import { ErrorDisplay } from '@/components/insights/shared';
 import PageSkeleton from '@/components/PageSkeleton';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface CashFlowLineProps {
   label: string;
@@ -48,7 +40,7 @@ function CashFlowLine({ label, amount, indent = 0, bold, colorClass }: CashFlowL
       style={{ paddingLeft: `${indent * 1.5}rem` }}
     >
       <span className="text-foreground-secondary">{label}</span>
-      <span className={cn('font-mono', color)}>{formatCurrency(amount)}</span>
+      <span className={cn('font-mono', color)}>{formatAccountingCurrency(amount)}</span>
     </div>
   );
 }
@@ -67,7 +59,7 @@ function CollapsibleActivity({ title, icon: Icon, net, items, colorClass, defaul
 
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
       >
@@ -77,11 +69,11 @@ function CollapsibleActivity({ title, icon: Icon, net, items, colorClass, defaul
         </div>
         <div className="flex items-center gap-3">
           <span className={cn('font-mono font-bold', net >= 0 ? 'text-green-400' : 'text-red-400')}>
-            {formatCurrency(net)}
+            {formatAccountingCurrency(net)}
           </span>
           {isOpen ? <ChevronDown className="w-5 h-5 text-slate-muted" /> : <ChevronRight className="w-5 h-5 text-slate-muted" />}
         </div>
-      </button>
+      </Button>
       {isOpen && items.length > 0 && (
         <div className="px-4 pb-4 space-y-1">
           {items.map((item, index) => (
@@ -200,7 +192,7 @@ export default function CashFlowPage() {
             />
           </div>
           {(startDate || endDate) && (
-            <button
+            <Button
               onClick={() => {
                 setStartDate('');
                 setEndDate('');
@@ -209,7 +201,7 @@ export default function CashFlowPage() {
               className="text-slate-muted text-sm hover:text-foreground"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -221,7 +213,7 @@ export default function CashFlowPage() {
             <Wallet className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Opening Cash</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(openingCash, currency)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(openingCash, currency)}</p>
         </div>
         <div className={cn('border rounded-xl p-5', netChange >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30')}>
           <div className="flex items-center gap-2 mb-2">
@@ -233,7 +225,7 @@ export default function CashFlowPage() {
             <p className={cn('text-sm', netChange >= 0 ? 'text-green-400' : 'text-red-400')}>Net Change</p>
           </div>
           <p className={cn('text-2xl font-bold', netChange >= 0 ? 'text-green-400' : 'text-red-400')}>
-            {formatCurrency(netChange, currency)}
+            {formatAccountingCurrency(netChange, currency)}
           </p>
         </div>
         <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-5">
@@ -241,7 +233,7 @@ export default function CashFlowPage() {
             <DollarSign className="w-5 h-5 text-teal-400" />
             <p className="text-teal-400 text-sm">Closing Cash</p>
           </div>
-          <p className="text-2xl font-bold text-teal-400">{formatCurrency(closingCash, currency)}</p>
+          <p className="text-2xl font-bold text-teal-400">{formatAccountingCurrency(closingCash, currency)}</p>
         </div>
         <div
           className={cn(
@@ -254,7 +246,7 @@ export default function CashFlowPage() {
             <p className={cn('text-sm', data?.is_reconciled ? 'text-green-400' : 'text-yellow-400')}>Reconciliation</p>
           </div>
           <p className={cn('text-lg font-bold', data?.is_reconciled ? 'text-green-400' : 'text-yellow-400')}>
-            {data?.is_reconciled ? 'Reconciled' : `Diff: ${formatCurrency(data?.reconciliation_difference || 0)}`}
+            {data?.is_reconciled ? 'Reconciled' : `Diff: ${formatAccountingCurrency(data?.reconciliation_difference || 0)}`}
           </p>
         </div>
       </div>
@@ -292,35 +284,35 @@ export default function CashFlowPage() {
         <div className="space-y-3">
           <div className="flex justify-between items-center py-2 border-b border-slate-border">
             <span className="text-slate-muted">Opening Cash Balance</span>
-            <span className="font-mono text-blue-400">{formatCurrency(openingCash, currency)}</span>
+            <span className="font-mono text-blue-400">{formatAccountingCurrency(openingCash, currency)}</span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-border">
             <span className="text-slate-muted">Net Cash from Operating Activities</span>
             <span className={cn('font-mono', operating.net >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(operating.net, currency)}
+              {formatAccountingCurrency(operating.net, currency)}
             </span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-border">
             <span className="text-slate-muted">Net Cash from Investing Activities</span>
             <span className={cn('font-mono', investing.net >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(investing.net, currency)}
+              {formatAccountingCurrency(investing.net, currency)}
             </span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-border">
             <span className="text-slate-muted">Net Cash from Financing Activities</span>
             <span className={cn('font-mono', financing.net >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(financing.net, currency)}
+              {formatAccountingCurrency(financing.net, currency)}
             </span>
           </div>
           <div className="flex justify-between items-center py-2 border-b border-slate-border font-semibold">
             <span className="text-foreground">Net Change in Cash</span>
             <span className={cn('font-mono', netChange >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(netChange, currency)}
+              {formatAccountingCurrency(netChange, currency)}
             </span>
           </div>
           <div className="flex justify-between items-center py-2 font-semibold text-lg">
             <span className="text-teal-400">Closing Cash Balance</span>
-            <span className="font-mono text-teal-400">{formatCurrency(closingCash, currency)}</span>
+            <span className="font-mono text-teal-400">{formatAccountingCurrency(closingCash, currency)}</span>
           </div>
         </div>
       </div>
@@ -338,7 +330,7 @@ export default function CashFlowPage() {
                 <Banknote className="w-4 h-4 text-red-400" />
                 <span className="text-slate-muted text-sm">Interest Paid</span>
               </div>
-              <p className="font-mono text-foreground">{formatCurrency(disclosures.interest_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatAccountingCurrency(disclosures.interest_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.interest_paid || 'operating'}
               </p>
@@ -348,7 +340,7 @@ export default function CashFlowPage() {
                 <Banknote className="w-4 h-4 text-green-400" />
                 <span className="text-slate-muted text-sm">Interest Received</span>
               </div>
-              <p className="font-mono text-foreground">{formatCurrency(disclosures.interest_received, currency)}</p>
+              <p className="font-mono text-foreground">{formatAccountingCurrency(disclosures.interest_received, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.interest_received || 'operating'}
               </p>
@@ -358,7 +350,7 @@ export default function CashFlowPage() {
                 <DollarSign className="w-4 h-4 text-purple-400" />
                 <span className="text-slate-muted text-sm">Dividends Paid</span>
               </div>
-              <p className="font-mono text-foreground">{formatCurrency(disclosures.dividends_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatAccountingCurrency(disclosures.dividends_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.dividends_paid || 'financing'}
               </p>
@@ -368,7 +360,7 @@ export default function CashFlowPage() {
                 <DollarSign className="w-4 h-4 text-green-400" />
                 <span className="text-slate-muted text-sm">Dividends Received</span>
               </div>
-              <p className="font-mono text-foreground">{formatCurrency(disclosures.dividends_received, currency)}</p>
+              <p className="font-mono text-foreground">{formatAccountingCurrency(disclosures.dividends_received, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.dividends_received || 'operating'}
               </p>
@@ -378,7 +370,7 @@ export default function CashFlowPage() {
                 <Receipt className="w-4 h-4 text-amber-400" />
                 <span className="text-slate-muted text-sm">Income Taxes Paid</span>
               </div>
-              <p className="font-mono text-foreground">{formatCurrency(disclosures.income_taxes_paid, currency)}</p>
+              <p className="font-mono text-foreground">{formatAccountingCurrency(disclosures.income_taxes_paid, currency)}</p>
               <p className="text-slate-muted text-xs mt-1">
                 Classified as: {disclosures.classification_policy?.taxes_paid || 'operating'}
               </p>
@@ -413,14 +405,14 @@ export default function CashFlowPage() {
                 <ArrowUpRight className="w-4 h-4 text-green-400" />
                 <span className="text-green-400 text-sm">Total Deposits</span>
               </div>
-              <p className="font-mono text-xl text-green-400">{formatCurrency(data.bank_summary.deposits, currency)}</p>
+              <p className="font-mono text-xl text-green-400">{formatAccountingCurrency(data.bank_summary.deposits, currency)}</p>
             </div>
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
                 <ArrowDownRight className="w-4 h-4 text-red-400" />
                 <span className="text-red-400 text-sm">Total Withdrawals</span>
               </div>
-              <p className="font-mono text-xl text-red-400">{formatCurrency(data.bank_summary.withdrawals, currency)}</p>
+              <p className="font-mono text-xl text-red-400">{formatAccountingCurrency(data.bank_summary.withdrawals, currency)}</p>
             </div>
           </div>
         </div>

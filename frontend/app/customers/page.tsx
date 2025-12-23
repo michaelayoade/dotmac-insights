@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import {
-  Search,
   Mail,
   Phone,
   Calendar,
@@ -19,6 +18,7 @@ import {
 import { Card } from '@/components/Card';
 import { Badge, StatusBadge } from '@/components/Badge';
 import { DataTable, Pagination } from '@/components/DataTable';
+import { StatCard } from '@/components/StatCard';
 import {
   useCustomers,
   useCustomer,
@@ -29,6 +29,7 @@ import {
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
+import { Button, FilterInput, FilterSelect } from '@/components/ui';
 
 type StatusOption = 'all' | 'active' | 'blocked' | 'inactive' | 'new';
 
@@ -86,84 +87,13 @@ function renderRiskBadges(
   return badges;
 }
 
-function MetricCard({
-  label,
-  value,
-  subValue,
-  icon: Icon,
-  trend,
-  trendLabel,
-  variant = 'default'
-}: {
-  label: string;
-  value: string | number;
-  subValue?: string;
-  icon: React.ElementType;
-  trend?: number;
-  trendLabel?: string;
-  variant?: 'default' | 'success' | 'warning' | 'danger';
-}) {
-  const variantStyles = {
-    default: 'text-foreground',
-    success: 'text-teal-electric',
-    warning: 'text-amber-warn',
-    danger: 'text-coral-alert',
-  };
-
-  return (
-    <div className="bg-slate-card/50 backdrop-blur-sm border border-slate-border rounded-xl p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-xs uppercase tracking-wide">{label}</p>
-          <p className={cn('text-2xl font-bold font-mono mt-1', variantStyles[variant])}>
-            {value}
-          </p>
-          {subValue && (
-            <p className="text-slate-muted text-xs mt-0.5">{subValue}</p>
-          )}
-        </div>
-        <div className={cn(
-          'w-10 h-10 rounded-lg flex items-center justify-center',
-          variant === 'success' ? 'bg-teal-electric/10' :
-          variant === 'warning' ? 'bg-amber-warn/10' :
-          variant === 'danger' ? 'bg-coral-alert/10' :
-          'bg-slate-elevated'
-        )}>
-          <Icon className={cn(
-            'w-5 h-5',
-            variant === 'success' ? 'text-teal-electric' :
-            variant === 'warning' ? 'text-amber-warn' :
-            variant === 'danger' ? 'text-coral-alert' :
-            'text-slate-muted'
-          )} />
-        </div>
-      </div>
-      {trend !== undefined && (
-        <div className="flex items-center gap-1 mt-2">
-          {trend >= 0 ? (
-            <TrendingUp className="w-3 h-3 text-teal-electric" />
-          ) : (
-            <TrendingDown className="w-3 h-3 text-coral-alert" />
-          )}
-          <span className={cn(
-            'text-xs font-medium',
-            trend >= 0 ? 'text-teal-electric' : 'text-coral-alert'
-          )}>
-            {trend >= 0 ? '+' : ''}{trend.toFixed(1)}
-          </span>
-          {trendLabel && (
-            <span className="text-slate-muted text-xs">{trendLabel}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function CustomersPage() {
   // Allow either explore:read (spec) or customers:read (legacy/nav) to view the page
-  const { hasAccess: canViewCustomers, isLoading: authLoading } = useRequireScope(['explore:read', 'customers:read']);
+  const { hasAccess: canViewCustomers, isLoading: authLoading } = useRequireScope(['explorer:read', 'customers:read']);
   const { hasAccess: hasAnalytics } = useRequireScope('analytics:read');
+  const canFetchCustomers = canViewCustomers && !authLoading;
+  const canFetchDashboard = hasAnalytics && !authLoading;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusOption>('all');
@@ -179,27 +109,43 @@ export default function CustomersPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [detailTab, setDetailTab] = useState<'profile' | 'finance' | 'services' | 'network' | 'support' | 'projects' | 'crm' | 'timeline'>('profile');
 
-  const { data: dashboard, isLoading: dashboardLoading } = useCustomerDashboard(hasAnalytics);
+  const { data: dashboard, isLoading: dashboardLoading } = useCustomerDashboard(
+    canFetchDashboard,
+    { isPaused: () => !canFetchDashboard }
+  );
 
-  const { data, isLoading } = useCustomers({
-    search: search || undefined,
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    customer_type: typeFilter === 'all' ? undefined : typeFilter,
-    cohort: cohortFilter || undefined,
-    city: cityFilter || undefined,
-    base_station: baseStationFilter || undefined,
-    signup_start: signupStart || undefined,
-    signup_end: signupEnd || undefined,
-    limit,
-    offset,
-  });
+  const { data, isLoading } = useCustomers(
+    {
+      search: search || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      customer_type: typeFilter === 'all' ? undefined : typeFilter,
+      cohort: cohortFilter || undefined,
+      city: cityFilter || undefined,
+      base_station: baseStationFilter || undefined,
+      signup_start: signupStart || undefined,
+      signup_end: signupEnd || undefined,
+      limit,
+      offset,
+    },
+    { isPaused: () => !canFetchCustomers }
+  );
 
   const items = data?.items || [];
   const total = data?.total || 0;
 
-  const { data: selectedCustomer } = useCustomer(selectedCustomerId);
-  const { data: customer360, isLoading: c360Loading } = useCustomer360(selectedCustomerId);
-  const { data: usageData, isLoading: usageLoading } = useCustomerUsage(selectedCustomerId);
+  const { data: selectedCustomer } = useCustomer(
+    selectedCustomerId,
+    { isPaused: () => !canFetchCustomers }
+  );
+  const { data: customer360, isLoading: c360Loading } = useCustomer360(
+    selectedCustomerId,
+    { isPaused: () => !canFetchCustomers }
+  );
+  const { data: usageData, isLoading: usageLoading } = useCustomerUsage(
+    selectedCustomerId,
+    undefined,
+    { isPaused: () => !canFetchCustomers }
+  );
 
   // Debounce search input updates to avoid excessive fetches
   useEffect(() => {
@@ -390,94 +336,93 @@ export default function CustomersPage() {
       {/* Dashboard Metrics */}
         {hasAnalytics && dashboard && !dashboardLoading && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <MetricCard
-              label="Total Customers"
-            value={(overview.total_customers || 0).toLocaleString()}
-            subValue={`${statusByNewSpec.active.toLocaleString()} active`}
-            icon={Users}
-          />
-            <MetricCard
-              label="Active"
+            <StatCard
+              title="Total Customers"
+              value={(overview.total_customers || 0).toLocaleString()}
+              subtitle={`${statusByNewSpec.active.toLocaleString()} active`}
+              icon={Users}
+            />
+            <StatCard
+              title="Active"
               value={statusByNewSpec.active.toLocaleString()}
-              subValue={`Blocked ${statusByNewSpec.blocked.toLocaleString()} / Inactive ${statusByNewSpec.inactive.toLocaleString()}`}
+              subtitle={`Blocked ${statusByNewSpec.blocked.toLocaleString()} / Inactive ${statusByNewSpec.inactive.toLocaleString()}`}
               icon={Activity}
               variant="success"
             />
             {overview.total_mrr !== undefined && (
-              <MetricCard
-                label="Total MRR"
+              <StatCard
+                title="Total MRR"
                 value={formatCurrency(overview.total_mrr, 'NGN')}
-                subValue="All customers"
+                subtitle="All customers"
                 icon={TrendingUp}
                 variant="success"
               />
             )}
-            <MetricCard
-              label="New Customers"
+            <StatCard
+              title="New Customers"
               value={statusByNewSpec.new.toLocaleString()}
-              subValue="Currently marked as new"
+              subtitle="Currently marked as new"
               icon={TrendingUp}
-            variant="success"
-          />
-          <MetricCard
-            label="Blocked"
-            value={statusByNewSpec.blocked.toLocaleString()}
-            subValue="Customers needing review"
-            icon={AlertTriangle}
-            variant={statusByNewSpec.blocked > 0 ? 'warning' : 'default'}
-          />
-          <MetricCard
-            label="New Signups (30d)"
-            value={activity.new_signups}
-            trend={activity.net_change}
-            trendLabel="Net change"
-            icon={TrendingUp}
-            variant="success"
-          />
-          <MetricCard
-            label="Churned (30d)"
-            value={activity.churned}
-            icon={TrendingDown}
-            variant={activity.churned > 0 ? 'danger' : 'default'}
-          />
-          {hasBillingHealth && (
-            <>
-              {blockingIn3 !== undefined && blockingIn3 !== null && (
-                <MetricCard
-                  label="Blocking in 3 Days"
-                  value={blockingIn3.toLocaleString()}
-                  subValue="Accounts near suspension"
-                  icon={AlertTriangle}
-                  variant={blockingIn3 > 0 ? 'warning' : 'default'}
-                />
-              )}
-              {mrrAtRisk7 !== undefined && mrrAtRisk7 !== null && (
-                <MetricCard
-                  label="MRR at Risk (7d)"
-                  value={formatCurrency(mrrAtRisk7)}
-                  subValue={`${blockingIn7 ?? 0} customers blocking in 7d`}
-                  icon={TrendingDown}
-                  variant={mrrAtRisk7 > 0 ? 'warning' : 'default'}
-                />
-              )}
-            </>
-          )}
-          <MetricCard
-            label="Overdue Invoices"
-            value={health.with_overdue_invoices}
-            subValue="Customers with overdue balances"
-            icon={AlertTriangle}
-            variant={health.with_overdue_invoices > 0 ? 'warning' : 'default'}
-          />
-          <MetricCard
-            label="Open Tickets"
-            value={health.with_open_tickets}
-            subValue="Customers needing support"
-            icon={Ticket}
-            variant={health.with_open_tickets > 0 ? 'warning' : 'default'}
-          />
-        </div>
-      )}
+              variant="success"
+            />
+            <StatCard
+              title="Blocked"
+              value={statusByNewSpec.blocked.toLocaleString()}
+              subtitle="Customers needing review"
+              icon={AlertTriangle}
+              variant={statusByNewSpec.blocked > 0 ? 'warning' : 'default'}
+            />
+            <StatCard
+              title="New Signups (30d)"
+              value={activity.new_signups}
+              trend={{ value: activity.net_change, label: "Net change" }}
+              icon={TrendingUp}
+              variant="success"
+            />
+            <StatCard
+              title="Churned (30d)"
+              value={activity.churned}
+              icon={TrendingDown}
+              variant={activity.churned > 0 ? 'danger' : 'default'}
+            />
+            {hasBillingHealth && (
+              <>
+                {blockingIn3 !== undefined && blockingIn3 !== null && (
+                  <StatCard
+                    title="Blocking in 3 Days"
+                    value={blockingIn3.toLocaleString()}
+                    subtitle="Accounts near suspension"
+                    icon={AlertTriangle}
+                    variant={blockingIn3 > 0 ? 'warning' : 'default'}
+                  />
+                )}
+                {mrrAtRisk7 !== undefined && mrrAtRisk7 !== null && (
+                  <StatCard
+                    title="MRR at Risk (7d)"
+                    value={formatCurrency(mrrAtRisk7)}
+                    subtitle={`${blockingIn7 ?? 0} customers blocking in 7d`}
+                    icon={TrendingDown}
+                    variant={mrrAtRisk7 > 0 ? 'warning' : 'default'}
+                  />
+                )}
+              </>
+            )}
+            <StatCard
+              title="Overdue Invoices"
+              value={health.with_overdue_invoices}
+              subtitle="Customers with overdue balances"
+              icon={AlertTriangle}
+              variant={health.with_overdue_invoices > 0 ? 'warning' : 'default'}
+            />
+            <StatCard
+              title="Open Tickets"
+              value={health.with_open_tickets}
+              subtitle="Customers needing support"
+              icon={Ticket}
+              variant={health.with_open_tickets > 0 ? 'warning' : 'default'}
+            />
+          </div>
+        )}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Content */}
@@ -486,92 +431,84 @@ export default function CustomersPage() {
           <Card padding="sm">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-                <input
-                  type="text"
-                  placeholder="Search by name, email, phone..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 transition-colors"
-                />
-              </div>
+              <FilterInput
+                type="text"
+                placeholder="Search by name, email, phone..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="flex-1"
+              />
 
               {/* Status Filter */}
-              <select
+              <FilterSelect
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value as StatusOption);
                   setOffset(0);
                 }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
+                className="w-[160px]"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="blocked">Blocked</option>
                 <option value="inactive">Inactive</option>
                 <option value="new">New</option>
-              </select>
+              </FilterSelect>
 
               {/* Type Filter */}
-              <select
+              <FilterSelect
                 value={typeFilter}
                 onChange={(e) => {
                   setTypeFilter(e.target.value);
                   setOffset(0);
                 }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50 w-[160px]"
+                className="w-[160px]"
               >
                 <option value="all">All Types</option>
                 <option value="residential">Residential</option>
                 <option value="business">Business</option>
                 <option value="enterprise">Enterprise</option>
-              </select>
+              </FilterSelect>
             </div>
             {/* Advanced filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-3">
-              <input
+              <FilterInput
                 type="text"
                 value={cohortFilter}
                 onChange={(e) => { setCohortFilter(e.target.value); setOffset(0); }}
                 placeholder="Cohort (YYYY-MM)"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
-              <input
+              <FilterInput
                 type="text"
                 value={cityFilter}
                 onChange={(e) => { setCityFilter(e.target.value); setOffset(0); }}
                 placeholder="City"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
-              <input
+              <FilterInput
                 type="text"
                 value={baseStationFilter}
                 onChange={(e) => { setBaseStationFilter(e.target.value); setOffset(0); }}
                 placeholder="Base Station"
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
-              <input
+              <FilterInput
                 type="date"
                 value={signupStart}
                 onChange={(e) => { setSignupStart(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
-              <input
+              <FilterInput
                 type="date"
                 value={signupEnd}
                 onChange={(e) => { setSignupEnd(e.target.value); setOffset(0); }}
-                className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground placeholder-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50 focus:border-teal-electric/50"
               />
             </div>
 
             <div className="flex justify-between items-center pt-4">
-              <button
+              <Button
                 onClick={resetFilters}
                 className="text-sm text-slate-muted hover:text-foreground transition-colors"
               >
                 Clear all filters
-              </button>
+              </Button>
               <div className="text-xs text-slate-muted">
                 Cohorts, city, base station, and date range will reset too.
               </div>
@@ -702,13 +639,13 @@ export default function CustomersPage() {
                   <h3 className="font-display font-semibold text-foreground">Customer View</h3>
                   <p className="text-slate-muted text-xs">Full 360 payload</p>
                 </div>
-                <button
+                <Button
                   onClick={() => { setSelectedCustomerId(null); setDetailTab('profile'); }}
                   className="text-slate-muted hover:text-foreground transition-colors text-xl leading-none"
                   aria-label="Close details"
                 >
                   ×
-                </button>
+                </Button>
               </div>
 
               {/* Customer Header */}
@@ -755,7 +692,7 @@ export default function CustomersPage() {
                   { key: 'crm', label: 'CRM' },
                   { key: 'timeline', label: 'Timeline' },
                 ].map((tab) => (
-                  <button
+                  <Button
                     key={tab.key}
                     onClick={() => setDetailTab(tab.key as typeof detailTab)}
                     className={cn(
@@ -766,7 +703,7 @@ export default function CustomersPage() {
                     )}
                   >
                     {tab.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -828,17 +765,17 @@ export default function CustomersPage() {
                 {detailTab === 'finance' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <MetricCard label="MRR" value={formatCurrency(financeSummary.mrr || 0)} icon={TrendingUp} />
-                      <MetricCard
-                        label="Outstanding"
+                      <StatCard title="MRR" value={formatCurrency(financeSummary.mrr || 0)} icon={TrendingUp} />
+                      <StatCard
+                        title="Outstanding"
                         value={formatCurrency(outstandingDisplay)}
                         icon={AlertTriangle}
                         variant={outstandingDisplay > 0 ? 'warning' : 'success'}
                       />
-                      <MetricCard label="Total Invoiced" value={formatCurrency(financeSummary.totalInvoiced)} icon={TrendingUp} />
-                      <MetricCard label="Total Paid" value={formatCurrency(financeSummary.totalPaid)} icon={TrendingUp} variant="success" />
-                      <MetricCard label="Overdue Invoices" value={(financeSummary.overdueInvoices || 0).toString()} subValue={formatCurrency(financeSummary.overdueAmount || 0)} icon={AlertTriangle} variant={(financeSummary.overdueInvoices || 0) > 0 ? 'warning' : 'default'} />
-                      <MetricCard label="Credit Notes" value={(financeSummary.creditNotes || 0).toString()} subValue={formatCurrency(financeSummary.creditNoteTotal || 0)} icon={Activity} />
+                      <StatCard title="Total Invoiced" value={formatCurrency(financeSummary.totalInvoiced)} icon={TrendingUp} />
+                      <StatCard title="Total Paid" value={formatCurrency(financeSummary.totalPaid)} icon={TrendingUp} variant="success" />
+                      <StatCard title="Overdue Invoices" value={(financeSummary.overdueInvoices || 0).toString()} subtitle={formatCurrency(financeSummary.overdueAmount || 0)} icon={AlertTriangle} variant={(financeSummary.overdueInvoices || 0) > 0 ? 'warning' : 'default'} />
+                      <StatCard title="Credit Notes" value={(financeSummary.creditNotes || 0).toString()} subtitle={formatCurrency(financeSummary.creditNoteTotal || 0)} icon={Activity} />
                     </div>
 
                     {customer360?.finance?.billing_health && (
@@ -896,10 +833,19 @@ export default function CustomersPage() {
                 {detailTab === 'services' && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <MetricCard label="Total Subs" value={(customer360?.services?.summary?.total_subscriptions ?? selectedCustomer.subscriptions?.length ?? 0).toString()} icon={Activity} />
-                      <MetricCard label="Active Subs" value={(customer360?.services?.summary?.active_subscriptions ?? selectedCustomer.subscriptions?.filter((s: any) => s.status === 'active').length ?? 0).toString()} icon={TrendingUp} variant="success" />
-                      <MetricCard label="Services MRR" value={formatCurrency(customer360?.services?.summary?.total_mrr ?? selectedCustomer.mrr ?? mrrFromSubscriptions)} icon={TrendingUp} />
-                      <MetricCard label="Usage 30d" value={`${customer360?.services?.usage_30d?.total_gb ?? usageData?.totals?.total_gb ?? 0} GB`} icon={Activity} />
+                      <StatCard title="Total Subs" value={(customer360?.services?.summary?.total_subscriptions ?? selectedCustomer.subscriptions?.length ?? 0).toString()} icon={Activity} />
+                      <StatCard title="Active Subs" value={(customer360?.services?.summary?.active_subscriptions ?? selectedCustomer.subscriptions?.filter((s: any) => s.status === 'active').length ?? 0).toString()} icon={TrendingUp} variant="success" />
+                      <StatCard
+                        title="Services MRR"
+                        value={formatCurrency(
+                          customer360?.services?.summary?.total_mrr ??
+                          selectedCustomer.mrr ??
+                          mrrFromSubscriptions ??
+                          0
+                        )}
+                        icon={TrendingUp}
+                      />
+                      <StatCard title="Usage 30d" value={`${customer360?.services?.usage_30d?.total_gb ?? usageData?.totals?.total_gb ?? 0} GB`} icon={Activity} />
                     </div>
 
                     {customer360?.services?.subscriptions && customer360.services.subscriptions.length > 0 && (
@@ -943,9 +889,9 @@ export default function CustomersPage() {
                   <div className="space-y-3">
                     {customer360?.network?.summary && (
                       <div className="grid grid-cols-3 gap-3">
-                        <MetricCard label="IPs" value={(customer360.network.summary.total_ips ?? 0).toString()} icon={Activity} />
-                        <MetricCard label="Active IPs" value={(customer360.network.summary.active_ips ?? 0).toString()} icon={Activity} variant="success" />
-                        <MetricCard label="Routers" value={(customer360.network.summary.routers_count ?? 0).toString()} icon={Activity} />
+                        <StatCard title="IPs" value={(customer360.network.summary.total_ips ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Active IPs" value={(customer360.network.summary.active_ips ?? 0).toString()} icon={Activity} variant="success" />
+                        <StatCard title="Routers" value={(customer360.network.summary.routers_count ?? 0).toString()} icon={Activity} />
                       </div>
                     )}
                     {customer360?.network?.ip_addresses && customer360.network.ip_addresses.length > 0 && (
@@ -988,8 +934,8 @@ export default function CustomersPage() {
                   <div className="space-y-3">
                     {customer360?.support?.summary && (
                       <div className="grid grid-cols-2 gap-3">
-                        <MetricCard label="Total Tickets" value={(customer360.support.summary.total_tickets ?? 0).toString()} icon={Activity} />
-                        <MetricCard label="Open" value={(customer360.support.summary.open_tickets ?? 0).toString()} icon={AlertTriangle} variant={(customer360.support.summary.open_tickets ?? 0) > 0 ? 'warning' : 'default'} />
+                        <StatCard title="Total Tickets" value={(customer360.support.summary.total_tickets ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Open" value={(customer360.support.summary.open_tickets ?? 0).toString()} icon={AlertTriangle} variant={(customer360.support.summary.open_tickets ?? 0) > 0 ? 'warning' : 'default'} />
                       </div>
                     )}
                     {customer360?.support?.tickets && customer360.support.tickets.length > 0 && (
@@ -1013,9 +959,9 @@ export default function CustomersPage() {
                   <div className="space-y-3">
                     {customer360?.projects?.summary && (
                       <div className="grid grid-cols-3 gap-3">
-                        <MetricCard label="Total" value={(customer360.projects.summary.total_projects ?? 0).toString()} icon={Activity} />
-                        <MetricCard label="Active" value={(customer360.projects.summary.active_projects ?? 0).toString()} icon={Activity} />
-                        <MetricCard label="Completed" value={(customer360.projects.summary.completed_projects ?? 0).toString()} icon={TrendingUp} variant="success" />
+                        <StatCard title="Total" value={(customer360.projects.summary.total_projects ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Active" value={(customer360.projects.summary.active_projects ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Completed" value={(customer360.projects.summary.completed_projects ?? 0).toString()} icon={TrendingUp} variant="success" />
                       </div>
                     )}
                     {customer360?.projects?.projects && customer360.projects.projects.length > 0 && (
@@ -1042,8 +988,8 @@ export default function CustomersPage() {
                   <div className="space-y-3">
                     {customer360?.crm?.summary && (
                       <div className="grid grid-cols-2 gap-3">
-                        <MetricCard label="Conversations" value={(customer360.crm.summary.total_conversations ?? 0).toString()} icon={Activity} />
-                        <MetricCard label="Notes" value={(customer360.crm.summary.total_notes ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Conversations" value={(customer360.crm.summary.total_conversations ?? 0).toString()} icon={Activity} />
+                        <StatCard title="Notes" value={(customer360.crm.summary.total_notes ?? 0).toString()} icon={Activity} />
                       </div>
                     )}
                     {customer360?.crm?.conversations && customer360.crm.conversations.length > 0 && (

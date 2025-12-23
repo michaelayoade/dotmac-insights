@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTaxDashboard, useUpcomingFilings, useOverdueFilings } from '@/hooks/useApi';
-import { formatCurrency } from '@/lib/utils';
+
 import {
   BadgePercent,
   Percent,
@@ -18,15 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 export default function TaxDashboardPage() {
   const { data: dashboard, isLoading, error, mutate } = useTaxDashboard();
@@ -44,9 +36,9 @@ export default function TaxDashboardPage() {
       icon: Percent,
       color: 'text-blue-400 bg-blue-500/10',
       stats: dashboard?.vat_summary ? [
-        { label: 'Output VAT', value: formatCurrency(dashboard.vat_summary.output_vat, 'NGN') },
-        { label: 'Input VAT', value: formatCurrency(dashboard.vat_summary.input_vat, 'NGN') },
-        { label: 'Net VAT', value: formatCurrency(dashboard.vat_summary.net_vat, 'NGN'), highlight: true },
+        { label: 'Output VAT', value: formatAccountingCurrency(dashboard.vat_summary.output_vat, 'NGN') },
+        { label: 'Input VAT', value: formatAccountingCurrency(dashboard.vat_summary.input_vat, 'NGN') },
+        { label: 'Net VAT', value: formatAccountingCurrency(dashboard.vat_summary.net_vat, 'NGN'), highlight: true },
       ] : [],
     },
     {
@@ -55,8 +47,8 @@ export default function TaxDashboardPage() {
       icon: Receipt,
       color: 'text-amber-400 bg-amber-500/10',
       stats: dashboard?.wht_summary ? [
-        { label: 'Total Deducted', value: formatCurrency(dashboard.wht_summary.total_deducted, 'NGN') },
-        { label: 'Pending Remittance', value: formatCurrency(dashboard.wht_summary.pending_remittance, 'NGN'), highlight: true },
+        { label: 'Total Deducted', value: formatAccountingCurrency(dashboard.wht_summary.total_deducted, 'NGN') },
+        { label: 'Pending Remittance', value: formatAccountingCurrency(dashboard.wht_summary.pending_remittance, 'NGN'), highlight: true },
         { label: 'Transactions', value: dashboard.wht_summary.transactions_count.toString() },
       ] : [],
     },
@@ -66,7 +58,7 @@ export default function TaxDashboardPage() {
       icon: Users,
       color: 'text-emerald-400 bg-emerald-500/10',
       stats: dashboard?.paye_summary ? [
-        { label: 'Total PAYE', value: formatCurrency(dashboard.paye_summary.total_paye, 'NGN') },
+        { label: 'Total PAYE', value: formatAccountingCurrency(dashboard.paye_summary.total_paye, 'NGN') },
         { label: 'Employees', value: dashboard.paye_summary.employees_count.toString() },
         { label: 'Avg Tax Rate', value: `${(dashboard.paye_summary.avg_tax_rate * 100).toFixed(1)}%` },
       ] : [],
@@ -77,7 +69,7 @@ export default function TaxDashboardPage() {
       icon: Building2,
       color: 'text-purple-400 bg-purple-500/10',
       stats: dashboard?.cit_summary ? [
-        { label: 'Estimated Liability', value: formatCurrency(dashboard.cit_summary.estimated_liability, 'NGN'), highlight: true },
+        { label: 'Estimated Liability', value: formatAccountingCurrency(dashboard.cit_summary.estimated_liability, 'NGN'), highlight: true },
         { label: 'Year', value: dashboard.cit_summary.year.toString() },
         { label: 'Company Size', value: dashboard.cit_summary.company_size },
       ] : [],
@@ -201,7 +193,7 @@ export default function TaxDashboardPage() {
                     'text-sm font-medium',
                     filing.days_until_due <= 7 ? 'text-amber-400' : 'text-foreground'
                   )}>
-                    {formatDate(filing.deadline)}
+                    {formatAccountingDate(filing.deadline)}
                   </p>
                   <p className="text-xs text-slate-muted">
                     {filing.days_until_due === 0 ? 'Due today' : `${filing.days_until_due} days`}

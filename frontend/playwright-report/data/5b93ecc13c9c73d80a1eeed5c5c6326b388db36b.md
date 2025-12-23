@@ -1,0 +1,112 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Back to app home" [ref=e15]:
+          - /url: /
+          - img [ref=e16]
+        - link "Dotmac Administration" [ref=e19]:
+          - /url: /admin
+          - img [ref=e21]
+          - generic [ref=e26]:
+            - generic [ref=e27]: Dotmac
+            - generic [ref=e28]: Administration
+      - generic [ref=e29]:
+        - button "Search" [ref=e30] [cursor=pointer]:
+          - img [ref=e31]
+        - button "Switch to dark mode" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - button "Toggle menu" [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - button "Administration Platform and access" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - generic [ref=e48]:
+              - generic [ref=e49]: Administration
+              - text: Platform and access
+          - img [ref=e50]
+        - generic [ref=e52]:
+          - button "Settings Configuration" [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]:
+              - img [ref=e55]
+              - generic [ref=e58]:
+                - generic [ref=e59]: Settings
+                - text: Configuration
+            - img [ref=e60]
+          - generic [ref=e62]:
+            - link "Overview Settings hub" [ref=e63]:
+              - /url: /admin/settings
+              - generic [ref=e64]: Overview
+              - generic [ref=e65]: Settings hub
+            - link "Email SMTP and templates" [ref=e66]:
+              - /url: /admin/settings/email
+              - generic [ref=e67]: Email
+              - generic [ref=e68]: SMTP and templates
+            - link "Payments Gateways and billing" [ref=e69]:
+              - /url: /admin/settings/payments
+              - generic [ref=e70]: Payments
+              - generic [ref=e71]: Gateways and billing
+            - link "Webhooks Outbound integrations" [ref=e72]:
+              - /url: /admin/settings/webhooks
+              - generic [ref=e73]: Webhooks
+              - generic [ref=e74]: Outbound integrations
+            - link "SMS Messaging providers" [ref=e75]:
+              - /url: /admin/settings/sms
+              - generic [ref=e76]: SMS
+              - generic [ref=e77]: Messaging providers
+            - link "Notifications System alerts" [ref=e78]:
+              - /url: /admin/settings/notifications
+              - generic [ref=e79]: Notifications
+              - generic [ref=e80]: System alerts
+            - link "Branding Logos and themes" [ref=e81]:
+              - /url: /admin/settings/branding
+              - generic [ref=e82]: Branding
+              - generic [ref=e83]: Logos and themes
+            - link "Localization Regions and language" [ref=e84]:
+              - /url: /admin/settings/localization
+              - generic [ref=e85]: Localization
+              - generic [ref=e86]: Regions and language
+            - link "Audit Log Change history" [ref=e87]:
+              - /url: /admin/settings/audit
+              - generic [ref=e88]: Audit Log
+              - generic [ref=e89]: Change history
+        - button "Webhooks Inbound and outbound" [ref=e91] [cursor=pointer]:
+          - generic [ref=e92]:
+            - img [ref=e93]
+            - generic [ref=e97]:
+              - generic [ref=e98]: Webhooks
+              - text: Inbound and outbound
+          - img [ref=e99]
+      - generic [ref=e101]:
+        - button "Dark mode" [ref=e102] [cursor=pointer]:
+          - generic [ref=e103]: Dark mode
+          - img [ref=e104]
+        - button "Sign out" [ref=e106] [cursor=pointer]:
+          - generic [ref=e107]: Sign out
+          - img [ref=e108]
+    - banner [ref=e114]:
+      - generic [ref=e115]:
+        - link [ref=e116]:
+          - /url: /admin/settings
+          - img [ref=e117]
+        - generic [ref=e119]:
+          - heading "integrations" [level=1] [ref=e120]
+          - paragraph [ref=e121]: Configure integrations settings
+      - button "Save Changes" [ref=e123] [cursor=pointer]:
+        - img [ref=e124]
+        - text: Save Changes
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e129]
+```

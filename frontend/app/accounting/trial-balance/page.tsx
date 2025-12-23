@@ -5,93 +5,15 @@ import { useAccountingTrialBalance } from '@/hooks/useApi';
 import { DataTable } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Scale, CheckCircle2, XCircle, Calendar } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function getAccountTypeColor(type: string) {
-  const colors: Record<string, string> = {
-    asset: 'text-blue-400',
-    liability: 'text-red-400',
-    equity: 'text-green-400',
-    income: 'text-teal-400',
-    revenue: 'text-teal-400',
-    expense: 'text-orange-400',
-  };
-  return colors[type?.toLowerCase()] || 'text-slate-muted';
-}
+import { Button } from '@/components/ui';
+import { getTrialBalanceColumns } from '@/lib/config/accounting-tables';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function TrialBalancePage() {
   const [asOfDate, setAsOfDate] = useState<string>('');
   const { data, isLoading, error } = useAccountingTrialBalance({ end_date: asOfDate || undefined });
 
-  const columns = [
-    {
-      key: 'account_number',
-      header: 'Account #',
-      sortable: true,
-      render: (item: any) => (
-        <span className="font-mono text-teal-electric">{item.account_number}</span>
-      ),
-    },
-    {
-      key: 'account_name',
-      header: 'Account Name',
-      sortable: true,
-      render: (item: any) => (
-        <span className="text-foreground">{item.account_name}</span>
-      ),
-    },
-    {
-      key: 'account_type',
-      header: 'Type',
-      render: (item: any) => (
-        <span className={cn('capitalize', getAccountTypeColor(item.account_type))}>
-          {item.account_type || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'debit',
-      header: 'Debit',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn('font-mono', item.debit > 0 ? 'text-blue-400' : 'text-slate-muted')}>
-          {item.debit > 0 ? formatCurrency(item.debit) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'credit',
-      header: 'Credit',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn('font-mono', item.credit > 0 ? 'text-green-400' : 'text-slate-muted')}>
-          {item.credit > 0 ? formatCurrency(item.credit) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'balance',
-      header: 'Balance',
-      align: 'right' as const,
-      render: (item: any) => (
-        <span className={cn(
-          'font-mono font-semibold',
-          (item.balance || 0) >= 0 ? 'text-foreground' : 'text-red-400'
-        )}>
-          {formatCurrency(item.balance)}
-        </span>
-      ),
-    },
-  ];
+  const columns = getTrialBalanceColumns();
 
   const isBalanced = data?.is_balanced ?? true;
   const difference = data?.difference ?? 0;
@@ -111,14 +33,14 @@ export default function TrialBalancePage() {
             <Scale className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Debit</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(data?.total_debit)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(data?.total_debit)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <Scale className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Credit</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(data?.total_credit)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(data?.total_credit)}</p>
         </div>
         <div className={cn(
           'border rounded-xl p-5',
@@ -152,7 +74,7 @@ export default function TrialBalancePage() {
             'text-2xl font-bold',
             difference === 0 ? 'text-foreground' : 'text-yellow-400'
           )}>
-            {formatCurrency(difference)}
+            {formatAccountingCurrency(difference)}
           </p>
         </div>
       </div>
@@ -170,12 +92,12 @@ export default function TrialBalancePage() {
           className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
         />
         {asOfDate && (
-          <button
+          <Button
             onClick={() => setAsOfDate('')}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
@@ -196,11 +118,11 @@ export default function TrialBalancePage() {
             <div className="flex gap-8">
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Debit</p>
-                <p className="font-mono font-bold text-blue-400">{formatCurrency(data.total_debit)}</p>
+                <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(data.total_debit)}</p>
               </div>
               <div className="text-right">
                 <p className="text-slate-muted text-xs">Credit</p>
-                <p className="font-mono font-bold text-green-400">{formatCurrency(data.total_credit)}</p>
+                <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(data.total_credit)}</p>
               </div>
             </div>
           </div>

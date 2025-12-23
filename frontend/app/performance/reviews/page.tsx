@@ -14,29 +14,24 @@ import { useReviewQueue, usePeriodList } from '@/hooks/usePerformance';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
+import { formatDateTime } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import type { ReviewQueueItem, ScorecardStatus } from '@/lib/performance.types';
+import { StatusPill } from '@/components/ui';
 
-function getStatusColor(status: ScorecardStatus): string {
-  switch (status) {
-    case 'computed': return 'text-cyan-400 bg-cyan-400/10';
-    case 'in_review': return 'text-violet-400 bg-violet-400/10';
-    default: return 'text-slate-400 bg-slate-400/10';
-  }
-}
+const STATUS_TONES: Record<ScorecardStatus, StatusTone> = {
+  pending: 'warning',
+  computing: 'info',
+  computed: 'info',
+  in_review: 'info',
+  approved: 'success',
+  disputed: 'danger',
+  finalized: 'default',
+};
 
 function formatScore(score: number | null): string {
   if (score === null) return '-';
   return score.toFixed(1);
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export default function ReviewQueuePage() {
@@ -90,12 +85,10 @@ export default function ReviewQueuePage() {
       key: 'status',
       header: 'Status',
       render: (item: ReviewQueueItem) => (
-        <span className={cn(
-          'px-2 py-1 rounded-full text-xs font-medium capitalize',
-          getStatusColor(item.status)
-        )}>
-          {item.status.replace('_', ' ')}
-        </span>
+        <StatusPill
+          label={formatStatusLabel(item.status)}
+          tone={STATUS_TONES[item.status] || 'default'}
+        />
       ),
     },
     {
@@ -118,7 +111,7 @@ export default function ReviewQueuePage() {
       key: 'submitted',
       header: 'Submitted',
       render: (item: ReviewQueueItem) => (
-        <span className="text-slate-400 text-sm">{formatDate(item.submitted_at)}</span>
+        <span className="text-slate-400 text-sm">{formatDateTime(item.submitted_at)}</span>
       ),
     },
     {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useVATTransactions, useVATSummary, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { formatCurrency } from '@/lib/utils';
+
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
@@ -17,15 +17,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function getCurrentPeriod() {
   const now = new Date();
@@ -76,7 +69,7 @@ export default function VATPage() {
       key: 'gross_amount',
       header: 'Gross',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.gross_amount, 'NGN')}</span>,
     },
     {
       key: 'vat_amount',
@@ -84,11 +77,11 @@ export default function VATPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className={cn('font-mono', item.transaction_type === 'OUTPUT' ? 'text-blue-300' : 'text-emerald-300')}>
-          {formatCurrency(item.vat_amount, 'NGN')}
+          {formatAccountingCurrency(item.vat_amount, 'NGN')}
         </span>
       ),
     },
-    { key: 'transaction_date', header: 'Date', render: (item: any) => <span className="text-slate-muted">{formatDate(item.transaction_date)}</span> },
+    { key: 'transaction_date', header: 'Date', render: (item: any) => <span className="text-slate-muted">{formatAccountingDate(item.transaction_date)}</span> },
     {
       key: 'is_exempt',
       header: 'Status',
@@ -128,20 +121,20 @@ export default function VATPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => setShowInputForm(!showInputForm)}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
           >
             <TrendingDown className="w-4 h-4 text-emerald-400" />
             Record Input
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => setShowOutputForm(!showOutputForm)}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 text-blue-300 text-sm hover:bg-blue-500/30"
           >
             <TrendingUp className="w-4 h-4" />
             Record Output
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -150,12 +143,12 @@ export default function VATPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Output VAT</p>
-            <p className="text-xl font-semibold text-blue-300 font-mono">{formatCurrency(summary.output_vat, 'NGN')}</p>
+            <p className="text-xl font-semibold text-blue-300 font-mono">{formatAccountingCurrency(summary.output_vat, 'NGN')}</p>
             <p className="text-xs text-slate-muted mt-1">{summary.output_count} transactions</p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Input VAT</p>
-            <p className="text-xl font-semibold text-emerald-300 font-mono">{formatCurrency(summary.input_vat, 'NGN')}</p>
+            <p className="text-xl font-semibold text-emerald-300 font-mono">{formatAccountingCurrency(summary.input_vat, 'NGN')}</p>
             <p className="text-xs text-slate-muted mt-1">{summary.input_count} transactions</p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -164,13 +157,13 @@ export default function VATPage() {
               'text-xl font-semibold font-mono',
               summary.net_vat >= 0 ? 'text-amber-300' : 'text-teal-electric'
             )}>
-              {formatCurrency(summary.net_vat, 'NGN')}
+              {formatAccountingCurrency(summary.net_vat, 'NGN')}
             </p>
             <p className="text-xs text-slate-muted mt-1">{summary.net_vat >= 0 ? 'Due to FIRS' : 'Credit available'}</p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
             <p className="text-slate-muted text-xs uppercase tracking-wider mb-1">Exempt Amount</p>
-            <p className="text-xl font-semibold text-slate-200 font-mono">{formatCurrency(summary.exempt_amount, 'NGN')}</p>
+            <p className="text-xl font-semibold text-slate-200 font-mono">{formatAccountingCurrency(summary.exempt_amount, 'NGN')}</p>
             <p className="text-xs text-slate-muted mt-1">Zero-rated/exempt</p>
           </div>
         </div>
@@ -278,7 +271,7 @@ function VATOutputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
           <TrendingUp className="w-4 h-4 text-blue-400" />
           Record Output VAT
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
+        <Button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -315,14 +308,14 @@ function VATOutputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options
-      </button>
+      </Button>
 
       {showMore && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-border/50">
@@ -372,15 +365,15 @@ function VATOutputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
       <div className="flex items-center justify-between pt-4 border-t border-slate-border/50">
         <div className="text-sm">
           <span className="text-slate-muted">VAT Amount (7.5%): </span>
-          <span className="text-blue-300 font-mono font-semibold">{formatCurrency(vatAmount, 'NGN')}</span>
+          <span className="text-blue-300 font-mono font-semibold">{formatAccountingCurrency(vatAmount, 'NGN')}</span>
         </div>
-        <button
+        <Button
           type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-300 font-semibold hover:bg-blue-500/30 disabled:opacity-60"
         >
           {saving ? 'Recording...' : 'Record Output VAT'}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -422,7 +415,7 @@ function VATInputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promise
           <TrendingDown className="w-4 h-4 text-emerald-400" />
           Record Input VAT
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
+        <Button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -470,14 +463,14 @@ function VATInputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promise
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options
-      </button>
+      </Button>
 
       {showMore && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-border/50">
@@ -504,13 +497,13 @@ function VATInputForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promise
       )}
 
       <div className="flex justify-end pt-4 border-t border-slate-border/50">
-        <button
+        <Button
           type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold hover:bg-emerald-500/30 disabled:opacity-60"
         >
           {saving ? 'Recording...' : 'Record Input VAT'}
-        </button>
+        </Button>
       </div>
     </form>
   );

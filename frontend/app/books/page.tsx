@@ -27,7 +27,6 @@ import {
   Scale,
   ArrowUpRight,
   ArrowDownRight,
-  Loader2,
   BookOpen,
   Users,
   Landmark,
@@ -36,7 +35,10 @@ import {
 import { ErrorDisplay } from '@/components/insights/shared';
 import { DashboardSkeleton } from '@/components/PageSkeleton';
 import { PageHeader } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { formatCompactCurrency } from '@/lib/formatters';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 const TOOLTIP_STYLE = {
   contentStyle: {
@@ -47,16 +49,6 @@ const TOOLTIP_STYLE = {
   labelStyle: { color: CHART_COLORS.tooltip.text },
 };
 
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function formatNumber(value: number | undefined | null): string {
   if (value === undefined || value === null) return '0';
   return new Intl.NumberFormat('en-NG').format(value);
@@ -65,58 +57,6 @@ function formatNumber(value: number | undefined | null): string {
 function formatRatio(value: number | undefined | null): string {
   if (value === undefined || value === null) return '0.00';
   return value.toFixed(2);
-}
-
-function formatCompactCurrency(value: number): string {
-  if (value >= 1000000000) return `₦${(value / 1000000000).toFixed(1)}B`;
-  if (value >= 1000000) return `₦${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `₦${(value / 1000).toFixed(0)}K`;
-  return `₦${value.toFixed(0)}`;
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  loading?: boolean;
-  href?: string;
-}
-
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href }: MetricCardProps) {
-  const content = (
-    <div className={cn(
-      'bg-slate-card border border-slate-border rounded-xl p-5 transition-colors',
-      href && 'hover:border-teal-electric/50 cursor-pointer'
-    )}>
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-        </div>
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-      {href && (
-        <div className="mt-3 pt-3 border-t border-slate-border/50 flex items-center text-xs text-teal-electric">
-          <span>View details</span>
-          <ArrowRight className="w-3 h-3 ml-1" />
-        </div>
-      )}
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
 }
 
 interface RatioCardProps {
@@ -236,30 +176,30 @@ export default function AccountingDashboardPage() {
 
       {/* Key Financial Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
+        <StatCard
           title="Total Assets"
-          value={formatCurrency(balance_sheet?.total_assets)}
+          value={formatAccountingCurrency(balance_sheet?.total_assets)}
           icon={Building2}
           colorClass="text-blue-400"
           href="/books/balance-sheet"
         />
-        <MetricCard
+        <StatCard
           title="Total Liabilities"
-          value={formatCurrency(balance_sheet?.total_liabilities)}
+          value={formatAccountingCurrency(balance_sheet?.total_liabilities)}
           icon={CreditCard}
           colorClass="text-red-400"
           href="/books/balance-sheet"
         />
-        <MetricCard
+        <StatCard
           title="Total Equity"
-          value={formatCurrency(balance_sheet?.total_equity)}
+          value={formatAccountingCurrency(balance_sheet?.total_equity)}
           icon={PiggyBank}
           colorClass="text-green-400"
           href="/books/balance-sheet"
         />
-        <MetricCard
+        <StatCard
           title="Net Income (YTD)"
-          value={formatCurrency(income_statement?.net_income)}
+          value={formatAccountingCurrency(income_statement?.net_income)}
           icon={TrendingUp}
           colorClass="text-teal-electric"
           href="/books/income-statement"
@@ -268,33 +208,33 @@ export default function AccountingDashboardPage() {
 
       {/* Liquidity & Outstanding */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard
+        <StatCard
           title="Cash & Bank"
-          value={formatCurrency(cash?.total)}
+          value={formatAccountingCurrency(cash?.total)}
           subtitle={`${cash?.bank_accounts?.length || 0} bank accounts`}
           icon={Wallet}
           colorClass="text-emerald-400"
           href="/books/bank-accounts"
         />
-        <MetricCard
+        <StatCard
           title="AR Outstanding"
-          value={formatCurrency(receivables?.total)}
+          value={formatAccountingCurrency(receivables?.total)}
           subtitle="Top customers below"
           icon={ArrowUpRight}
           colorClass="text-blue-400"
-          href="/books/receivables"
+          href="/books/accounts-receivable"
         />
-        <MetricCard
+        <StatCard
           title="AP Outstanding"
-          value={formatCurrency(payables?.total)}
+          value={formatAccountingCurrency(payables?.total)}
           subtitle="Top suppliers below"
           icon={ArrowDownRight}
           colorClass="text-amber-400"
-          href="/books/payables"
+          href="/books/accounts-payable"
         />
-        <MetricCard
+        <StatCard
           title="Revenue (YTD)"
-          value={formatCurrency(income_statement?.total_income)}
+          value={formatAccountingCurrency(income_statement?.total_income)}
           subtitle={`${(ratios?.profit_margin || 0).toFixed(1)}% profit margin`}
           icon={DollarSign}
           colorClass="text-green-400"
@@ -440,7 +380,7 @@ export default function AccountingDashboardPage() {
                     <p className="text-slate-muted text-xs">{account.bank_name} •••• {account.account_number}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-foreground font-mono text-sm">{formatCurrency(account.balance, account.currency)}</p>
+                    <p className="text-foreground font-mono text-sm">{formatAccountingCurrency(account.balance, account.currency)}</p>
                   </div>
                 </Link>
               ))}
@@ -482,7 +422,7 @@ export default function AccountingDashboardPage() {
                       <p className="text-slate-muted text-xs">{customer.invoice_count} invoices</p>
                     </div>
                   </div>
-                  <p className="text-foreground font-mono text-sm">{formatCurrency(customer.outstanding)}</p>
+                  <p className="text-foreground font-mono text-sm">{formatAccountingCurrency(customer.outstanding)}</p>
                 </Link>
               ))}
             </div>
@@ -520,7 +460,7 @@ export default function AccountingDashboardPage() {
                       <p className="text-slate-muted text-xs">{supplier.bill_count} bills</p>
                     </div>
                   </div>
-                  <p className="text-foreground font-mono text-sm">{formatCurrency(supplier.outstanding)}</p>
+                  <p className="text-foreground font-mono text-sm">{formatAccountingCurrency(supplier.outstanding)}</p>
                 </Link>
               ))}
             </div>
@@ -549,7 +489,7 @@ export default function AccountingDashboardPage() {
           <p className="text-2xl font-bold text-foreground">{formatNumber(cash?.bank_accounts?.length)}</p>
           <p className="text-slate-muted text-sm">Bank Accounts</p>
         </Link>
-        <Link href="/books/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
+        <Link href="/books/settings/fiscal-years" className="bg-slate-elevated border border-slate-border rounded-lg p-4 text-center hover:border-teal-electric/50 transition-all">
           <Scale className="w-6 h-6 text-purple-400 mx-auto mb-2" />
           <p className="text-2xl font-bold text-foreground">{formatNumber(fiscal_years?.length)}</p>
           <p className="text-slate-muted text-sm">Fiscal Years</p>

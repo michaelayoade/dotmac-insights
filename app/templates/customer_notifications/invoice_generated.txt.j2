@@ -1,0 +1,16 @@
+{# Invoice generated notification #}
+{% set title = "New Invoice: #" ~ (invoice_number | default('')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+A new invoice has been generated for your account.
+
+Invoice: #{{ invoice_number }}
+Amount: {{ amount | default('₦0.00') }}
+Due Date: {{ due_date | format_date | default('Upon receipt') }}
+
+{% if description %}{{ description }}{% endif %}
+
+Please ensure payment is made by the due date to avoid any service interruptions.
+
+Thank you for your business!

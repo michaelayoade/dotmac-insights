@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePAYECalculations, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { formatCurrency } from '@/lib/utils';
+
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Users,
@@ -16,6 +16,8 @@ import {
   Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 const PAYE_TAX_BANDS = [
   { min: 0, max: 300000, rate: 7 },
@@ -25,15 +27,6 @@ const PAYE_TAX_BANDS = [
   { min: 1600000, max: 3200000, rate: 21 },
   { min: 3200000, max: Infinity, rate: 24 },
 ];
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export default function PAYEPage() {
   const [page, setPage] = useState(1);
@@ -58,25 +51,25 @@ export default function PAYEPage() {
       key: 'gross_income',
       header: 'Gross Income',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_income, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.gross_income, 'NGN')}</span>,
     },
     {
       key: 'tax_free_allowance',
       header: 'Allowances',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-slate-muted">{formatCurrency(item.tax_free_allowance, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-slate-muted">{formatAccountingCurrency(item.tax_free_allowance, 'NGN')}</span>,
     },
     {
       key: 'taxable_income',
       header: 'Taxable Income',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.taxable_income, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.taxable_income, 'NGN')}</span>,
     },
     {
       key: 'paye_amount',
       header: 'PAYE',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-emerald-300 font-semibold">{formatCurrency(item.paye_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-emerald-300 font-semibold">{formatAccountingCurrency(item.paye_amount, 'NGN')}</span>,
     },
     {
       key: 'effective_rate',
@@ -125,13 +118,13 @@ export default function PAYEPage() {
             <h1 className="text-xl font-semibold text-foreground">PAYE (Pay As You Earn)</h1>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setShowCalculator(!showCalculator)}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/20 text-emerald-300 text-sm hover:bg-emerald-500/30"
         >
           <Calculator className="w-4 h-4" />
           Calculate PAYE
-        </button>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -139,7 +132,7 @@ export default function PAYEPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Total PAYE (This Period)</p>
           <p className="text-2xl font-semibold text-emerald-400 font-mono mt-1">
-            {formatCurrency(totalPAYE, 'NGN')}
+            {formatAccountingCurrency(totalPAYE, 'NGN')}
           </p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -149,7 +142,7 @@ export default function PAYEPage() {
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
           <p className="text-slate-muted text-sm">Avg PAYE per Employee</p>
           <p className="text-2xl font-semibold text-foreground font-mono mt-1">
-            {employeeCount > 0 ? formatCurrency(totalPAYE / employeeCount, 'NGN') : '-'}
+            {employeeCount > 0 ? formatAccountingCurrency(totalPAYE / employeeCount, 'NGN') : '-'}
           </p>
         </div>
       </div>
@@ -166,15 +159,14 @@ export default function PAYEPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <input
+      <FilterCard contentClassName="flex flex-wrap gap-4 items-center">
+        <FilterInput
           type="month"
           value={period}
           onChange={(e) => { setPeriod(e.target.value); setPage(1); }}
-          className="input-field max-w-[180px]"
-          placeholder="Filter by period"
+          className="max-w-[180px]"
         />
-      </div>
+      </FilterCard>
 
       {/* Calculations Table */}
       <DataTable
@@ -206,8 +198,8 @@ export default function PAYEPage() {
               <div className="flex justify-between items-center">
                 <span className="text-slate-muted">
                   {band.max === Infinity
-                    ? `Above ${formatCurrency(band.min, 'NGN')}`
-                    : `${formatCurrency(band.min, 'NGN')} - ${formatCurrency(band.max, 'NGN')}`}
+                    ? `Above ${formatAccountingCurrency(band.min, 'NGN')}`
+                    : `${formatAccountingCurrency(band.min, 'NGN')} - ${formatAccountingCurrency(band.max, 'NGN')}`}
                 </span>
                 <span className="text-emerald-300 font-mono font-semibold">{band.rate}%</span>
               </div>
@@ -284,7 +276,7 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
           <Calculator className="w-4 h-4 text-emerald-400" />
           Calculate Employee PAYE
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
+        <Button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -321,14 +313,14 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         Deductions & allowances
-      </button>
+      </Button>
 
       {showMore && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-slate-border/50">
@@ -380,28 +372,28 @@ function PAYECalculatorForm({ onSubmit, onCancel }: { onSubmit: (data: any) => P
         <div className="text-sm space-y-1">
           <div>
             <span className="text-slate-muted">CRA (Tax-Free): </span>
-            <span className="text-foreground font-mono">{formatCurrency(cra, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatAccountingCurrency(cra, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Taxable Income: </span>
-            <span className="text-foreground font-mono">{formatCurrency(taxableIncome, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatAccountingCurrency(taxableIncome, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Annual PAYE: </span>
-            <span className="text-emerald-300 font-mono font-semibold">{formatCurrency(paye, 'NGN')}</span>
+            <span className="text-emerald-300 font-mono font-semibold">{formatAccountingCurrency(paye, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Monthly PAYE: </span>
-            <span className="text-emerald-300 font-mono">{formatCurrency(paye / 12, 'NGN')}</span>
+            <span className="text-emerald-300 font-mono">{formatAccountingCurrency(paye / 12, 'NGN')}</span>
           </div>
         </div>
-        <button
+        <Button
           type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-300 font-semibold hover:bg-emerald-500/30 disabled:opacity-60"
         >
           {saving ? 'Calculating...' : 'Save Calculation'}
-        </button>
+        </Button>
       </div>
     </form>
   );

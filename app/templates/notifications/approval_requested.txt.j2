@@ -1,0 +1,15 @@
+{# Approval request notification #}
+{% set title = "Approval Required" %}
+{% set icon = "clipboard-check" %}
+{% set priority = "high" %}
+
+A {{ doctype | default('document') }} requires your approval.
+{% if document_number %}
+Document: #{{ document_number }}
+{% endif %}
+{% if requester_name %}
+Requested by: {{ requester_name }}
+{% endif %}
+{% if amount %}
+Amount: {{ amount | currency }}
+{% endif %}

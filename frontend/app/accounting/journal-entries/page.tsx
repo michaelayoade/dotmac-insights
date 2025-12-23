@@ -5,25 +5,8 @@ import { useAccountingJournalEntries } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ClipboardList, Calendar } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 export default function JournalEntriesPage() {
   const [offset, setOffset] = useState(0);
@@ -57,7 +40,7 @@ export default function JournalEntriesPage() {
       header: 'Date',
       sortable: true,
       render: (item: any) => (
-        <span className="text-slate-muted">{formatDate(item.posting_date)}</span>
+        <span className="text-slate-muted">{formatAccountingDate(item.posting_date)}</span>
       ),
     },
     {
@@ -75,7 +58,7 @@ export default function JournalEntriesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className="font-mono text-blue-400">
-          {formatCurrency(item.debit_total || item.total_debit)}
+          {formatAccountingCurrency(item.debit_total || item.total_debit)}
         </span>
       ),
     },
@@ -85,7 +68,7 @@ export default function JournalEntriesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className="font-mono text-green-400">
-          {formatCurrency(item.credit_total || item.total_credit)}
+          {formatAccountingCurrency(item.credit_total || item.total_credit)}
         </span>
       ),
     },
@@ -116,11 +99,11 @@ export default function JournalEntriesPage() {
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
           <p className="text-blue-400 text-sm">Total Debit</p>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency((data as any)?.summary?.total_debit)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency((data as any)?.summary?.total_debit)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
           <p className="text-green-400 text-sm">Total Credit</p>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency((data as any)?.summary?.total_credit)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency((data as any)?.summary?.total_credit)}</p>
         </div>
       </div>
 
@@ -156,12 +139,12 @@ export default function JournalEntriesPage() {
           />
         </div>
         {(startDate || endDate || voucherType) && (
-          <button
+          <Button
             onClick={() => { setStartDate(''); setEndDate(''); setVoucherType(''); setOffset(0); }}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Clear filters
-          </button>
+          </Button>
         )}
       </div>
 

@@ -1,0 +1,155 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e4]
+      - generic [ref=e6]: Authentication required. Provide Bearer token (JWT or service token).
+    - button [ref=e7] [cursor=pointer]:
+      - img [ref=e8]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - link "BOS" [ref=e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=e16]
+          - generic [ref=e18]: BOS
+        - link "Dotmac Contact Hub" [ref=e20] [cursor=pointer]:
+          - /url: /contacts
+          - img [ref=e22]
+          - generic [ref=e27]:
+            - generic [ref=e28]: Dotmac
+            - generic [ref=e29]: Contact Hub
+      - generic [ref=e30]:
+        - button "Search ⌘K" [ref=e31] [cursor=pointer]:
+          - img [ref=e32]
+          - generic [ref=e35]: Search
+          - generic [ref=e36]: ⌘K
+        - button "Switch to dark mode" [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+        - generic [ref=e40]:
+          - img [ref=e42]
+          - button "Sign out" [ref=e45] [cursor=pointer]:
+            - img [ref=e46]
+    - generic [ref=e49]:
+      - complementary [ref=e50]:
+        - generic [ref=e51]:
+          - heading "Contact Hub" [level=1] [ref=e52]
+          - paragraph [ref=e53]: Unified contact management
+        - generic [ref=e54]:
+          - paragraph [ref=e55]: Workflow Phase
+          - generic [ref=e56]:
+            - generic [ref=e57]:
+              - link "Lead" [ref=e58] [cursor=pointer]:
+                - /url: /contacts
+              - img [ref=e59]
+            - generic [ref=e61]:
+              - link "Prospect" [ref=e62] [cursor=pointer]:
+                - /url: /contacts/funnel
+              - img [ref=e63]
+            - generic [ref=e65]:
+              - link "Customer" [ref=e66] [cursor=pointer]:
+                - /url: /contacts/all
+              - img [ref=e67]
+            - link "Advocate" [ref=e70] [cursor=pointer]:
+              - /url: /contacts/categories
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - button "Dashboard Contact hub overview" [ref=e73] [cursor=pointer]:
+              - generic [ref=e74]:
+                - img [ref=e75]
+                - generic [ref=e80]:
+                  - generic [ref=e81]: Dashboard
+                  - text: Contact hub overview
+              - img [ref=e82]
+            - generic [ref=e84]:
+              - link "Dashboard Overview & KPIs" [ref=e85] [cursor=pointer]:
+                - /url: /contacts
+                - generic [ref=e86]: Dashboard
+                - generic [ref=e87]: Overview & KPIs
+              - link "Analytics Contact insights" [ref=e88] [cursor=pointer]:
+                - /url: /contacts/analytics
+                - generic [ref=e89]: Analytics
+                - generic [ref=e90]: Contact insights
+          - button "Directory Browse all contacts" [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]:
+              - img [ref=e94]
+              - generic [ref=e99]:
+                - generic [ref=e100]: Directory
+                - text: Browse all contacts
+            - img [ref=e101]
+          - button "Lifecycle Lead to customer journey" [ref=e104] [cursor=pointer]:
+            - generic [ref=e105]:
+              - img [ref=e106]
+              - generic [ref=e110]:
+                - generic [ref=e111]: Lifecycle
+                - text: Lead to customer journey
+            - img [ref=e112]
+          - button "Segments Contact segments & lists" [ref=e115] [cursor=pointer]:
+            - generic [ref=e116]:
+              - img [ref=e117]
+              - generic [ref=e119]:
+                - generic [ref=e120]: Segments
+                - text: Contact segments & lists
+            - img [ref=e121]
+          - button "Tools Bulk operations & import" [ref=e124] [cursor=pointer]:
+            - generic [ref=e125]:
+              - img [ref=e126]
+              - generic [ref=e129]:
+                - generic [ref=e130]: Tools
+                - text: Bulk operations & import
+            - img [ref=e131]
+        - generic [ref=e133]:
+          - paragraph [ref=e134]: Quick Links
+          - generic [ref=e135]:
+            - link "New Contact" [ref=e136] [cursor=pointer]:
+              - /url: /contacts/new
+              - img [ref=e137]
+              - generic [ref=e140]: New Contact
+            - link "New Lead" [ref=e141] [cursor=pointer]:
+              - /url: /contacts/new?type=lead
+              - img [ref=e142]
+              - generic [ref=e146]: New Lead
+            - link "Import" [ref=e147] [cursor=pointer]:
+              - /url: /contacts/import
+              - img [ref=e148]
+              - generic [ref=e152]: Import
+            - link "Find Duplicates" [ref=e153] [cursor=pointer]:
+              - /url: /contacts/duplicates
+              - img [ref=e154]
+              - generic [ref=e158]: Find Duplicates
+        - generic [ref=e159]:
+          - paragraph [ref=e160]: Workflow
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: "1"
+              - generic [ref=e164]: Capture lead
+            - generic [ref=e165]:
+              - generic [ref=e166]: "2"
+              - generic [ref=e167]: Qualify & nurture
+            - generic [ref=e168]:
+              - generic [ref=e169]: "3"
+              - generic [ref=e170]: Convert to customer
+            - generic [ref=e171]:
+              - generic [ref=e172]: "4"
+              - generic [ref=e173]: Grow & retain
+      - generic [ref=e175]:
+        - generic [ref=e177]:
+          - img [ref=e179]
+          - generic [ref=e181]:
+            - heading "Authentication Required" [level=3] [ref=e182]
+            - paragraph [ref=e183]: Your session may have expired or you lack permission to view this data.
+            - paragraph [ref=e184]: "Error code: 401"
+            - button "Try again" [ref=e185] [cursor=pointer]:
+              - img [ref=e186]
+              - text: Try again
+        - generic [ref=e191]:
+          - img [ref=e192]
+          - paragraph [ref=e194]: Contact not found
+          - link "Back to contacts" [ref=e195] [cursor=pointer]:
+            - /url: /contacts
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e196]
+```

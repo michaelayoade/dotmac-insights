@@ -14,17 +14,26 @@ from sqlalchemy import func, case, extract, and_, or_
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
 from app.database import get_db
-from app.models.project import Project, ProjectStatus, ProjectPriority, ProjectUser
+from app.models.project import (
+    Project, ProjectStatus, ProjectPriority, ProjectUser,
+    Milestone, MilestoneStatus, ProjectComment, ProjectActivity, ProjectActivityType,
+    ProjectTemplate, TaskTemplate, MilestoneTemplate,
+)
 from app.models.task import Task, TaskStatus, TaskPriority, TaskDependency
 from app.models.expense import Expense
 from app.models.customer import Customer
 from app.models.employee import Employee
-from app.auth import Require
+from app.models.auth import User
+from app.auth import Require, get_current_user
 from app.cache import cached, CACHE_TTL
+from app.models.notification import NotificationEventType
+from app.models.accounting_ext import AuditLog, AuditAction
+from app.services.notification_service import NotificationService
+from app.services.audit_logger import AuditLogger
 
 router = APIRouter()
 
@@ -133,6 +142,48 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(TaskCreate):
     subject: Optional[str] = None  # type: ignore[assignment]  # Allow updating subject
+
+
+# =============================================================================
+# MILESTONE SCHEMAS
+# =============================================================================
+
+
+class MilestoneCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    status: Optional[MilestoneStatus] = None
+    planned_start_date: Optional[date] = None
+    planned_end_date: Optional[date] = None
+    actual_start_date: Optional[date] = None
+    actual_end_date: Optional[date] = None
+    percent_complete: Optional[Decimal] = None
+    idx: Optional[int] = None
+
+
+class MilestoneUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[MilestoneStatus] = None
+    planned_start_date: Optional[date] = None
+    planned_end_date: Optional[date] = None
+    actual_start_date: Optional[date] = None
+    actual_end_date: Optional[date] = None
+    percent_complete: Optional[Decimal] = None
+    idx: Optional[int] = None
+
+
+# =============================================================================
+# COMMENT SCHEMAS
+# =============================================================================
+
+
+class CommentCreate(BaseModel):
+    content: str
+
+
+class CommentUpdate(BaseModel):
+    content: str
 
 
 # =============================================================================
@@ -477,6 +528,311 @@ async def get_project(
 
 
 # =============================================================================
+# GANTT CHART DATA
+# =============================================================================
+
+
+@router.get("/projects/{project_id}/gantt", dependencies=[Depends(Require("explorer:read"))])
+async def get_project_gantt_data(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get all tasks with full dependency data for Gantt chart visualization.
+    Returns tasks with their dependencies in a format optimized for rendering.
+    """
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get all tasks for this project
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+
+    # Build task list with dependencies
+    task_list = []
+    min_date = None
+    max_date = None
+
+    for task in tasks:
+        # Extract dependency IDs
+        depends_on_ids = [
+            dep.dependent_task_id
+            for dep in task.depends_on
+            if dep.dependent_task_id is not None
+        ]
+
+        task_data = {
+            "id": task.id,
+            "subject": task.subject,
+            "status": task.status.value if task.status else "open",
+            "priority": task.priority.value if task.priority else "medium",
+            "progress": float(task.progress) if task.progress else 0,
+            "exp_start_date": task.exp_start_date.isoformat() if task.exp_start_date else None,
+            "exp_end_date": task.exp_end_date.isoformat() if task.exp_end_date else None,
+            "assigned_to": task.assigned_to,
+            "parent_task_id": task.parent_task_id,
+            "is_group": task.is_group,
+            "depends_on": depends_on_ids,
+        }
+        task_list.append(task_data)
+
+        # Track date range
+        if task.exp_start_date:
+            if min_date is None or task.exp_start_date < min_date:
+                min_date = task.exp_start_date
+        if task.exp_end_date:
+            if max_date is None or task.exp_end_date > max_date:
+                max_date = task.exp_end_date
+
+    return {
+        "tasks": task_list,
+        "date_range": {
+            "min_date": min_date.isoformat() if min_date else None,
+            "max_date": max_date.isoformat() if max_date else None,
+        },
+    }
+
+
+# =============================================================================
+# MILESTONES CRUD
+# =============================================================================
+
+
+def _serialize_milestone(milestone: Milestone) -> Dict[str, Any]:
+    """Serialize a milestone to a dictionary."""
+    return {
+        "id": milestone.id,
+        "project_id": milestone.project_id,
+        "name": milestone.name,
+        "description": milestone.description,
+        "status": milestone.status.value if milestone.status else None,
+        "planned_start_date": milestone.planned_start_date.isoformat() if milestone.planned_start_date else None,
+        "planned_end_date": milestone.planned_end_date.isoformat() if milestone.planned_end_date else None,
+        "actual_start_date": milestone.actual_start_date.isoformat() if milestone.actual_start_date else None,
+        "actual_end_date": milestone.actual_end_date.isoformat() if milestone.actual_end_date else None,
+        "percent_complete": float(milestone.percent_complete) if milestone.percent_complete else 0,
+        "idx": milestone.idx,
+        "is_overdue": milestone.is_overdue,
+        "task_count": len(milestone.tasks) if milestone.tasks else 0,
+        "created_by_id": milestone.created_by_id,
+        "created_at": milestone.created_at.isoformat() if milestone.created_at else None,
+        "updated_at": milestone.updated_at.isoformat() if milestone.updated_at else None,
+    }
+
+
+@router.get("/projects/{project_id}/milestones", dependencies=[Depends(Require("explorer:read"))])
+async def list_project_milestones(
+    project_id: int,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List all milestones for a project."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    query = db.query(Milestone).filter(
+        Milestone.project_id == project_id,
+        Milestone.is_deleted == False,
+    )
+
+    if status:
+        try:
+            status_enum = MilestoneStatus(status)
+            query = query.filter(Milestone.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    milestones = query.order_by(Milestone.idx, Milestone.planned_end_date).all()
+
+    return {
+        "total": len(milestones),
+        "data": [_serialize_milestone(m) for m in milestones],
+    }
+
+
+@router.post("/projects/{project_id}/milestones", dependencies=[Depends(Require("projects:write"))])
+async def create_milestone(
+    project_id: int,
+    payload: MilestoneCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Create a new milestone for a project."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get max idx for ordering
+    max_idx = db.query(func.max(Milestone.idx)).filter(
+        Milestone.project_id == project_id,
+        Milestone.is_deleted == False,
+    ).scalar() or 0
+
+    milestone = Milestone(
+        project_id=project_id,
+        name=payload.name,
+        description=payload.description,
+        status=payload.status or MilestoneStatus.PLANNED,
+        planned_start_date=payload.planned_start_date,
+        planned_end_date=payload.planned_end_date,
+        actual_start_date=payload.actual_start_date,
+        actual_end_date=payload.actual_end_date,
+        percent_complete=_decimal_or_default(payload.percent_complete),
+        idx=payload.idx if payload.idx is not None else max_idx + 1,
+        company=project.company,
+        created_by_id=current_user.id,
+    )
+
+    db.add(milestone)
+    db.commit()
+    db.refresh(milestone)
+
+    return _serialize_milestone(milestone)
+
+
+@router.get("/projects/milestones/{milestone_id}", dependencies=[Depends(Require("explorer:read"))])
+async def get_milestone(
+    milestone_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get a specific milestone with associated tasks."""
+    milestone = db.query(Milestone).filter(
+        Milestone.id == milestone_id,
+        Milestone.is_deleted == False,
+    ).first()
+
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+
+    result = _serialize_milestone(milestone)
+
+    # Include tasks linked to this milestone
+    result["tasks"] = [
+        {
+            "id": t.id,
+            "erpnext_id": t.erpnext_id,
+            "subject": t.subject,
+            "status": t.status.value if t.status else None,
+            "priority": t.priority.value if t.priority else None,
+            "assigned_to": t.assigned_to,
+            "progress": float(t.progress) if t.progress else 0,
+            "exp_start_date": t.exp_start_date.isoformat() if t.exp_start_date else None,
+            "exp_end_date": t.exp_end_date.isoformat() if t.exp_end_date else None,
+            "is_overdue": t.is_overdue,
+        }
+        for t in milestone.tasks
+    ]
+
+    return result
+
+
+@router.patch("/projects/milestones/{milestone_id}", dependencies=[Depends(Require("projects:write"))])
+async def update_milestone(
+    milestone_id: int,
+    payload: MilestoneUpdate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update a milestone."""
+    milestone = db.query(Milestone).filter(
+        Milestone.id == milestone_id,
+        Milestone.is_deleted == False,
+    ).first()
+
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+
+    if payload.name is not None:
+        milestone.name = payload.name
+    if payload.description is not None:
+        milestone.description = payload.description
+    if payload.status is not None:
+        milestone.status = payload.status
+        # If completed, set actual_end_date if not set
+        if payload.status == MilestoneStatus.COMPLETED and not milestone.actual_end_date:
+            milestone.actual_end_date = date.today()
+    if payload.planned_start_date is not None:
+        milestone.planned_start_date = payload.planned_start_date
+    if payload.planned_end_date is not None:
+        milestone.planned_end_date = payload.planned_end_date
+    if payload.actual_start_date is not None:
+        milestone.actual_start_date = payload.actual_start_date
+    if payload.actual_end_date is not None:
+        milestone.actual_end_date = payload.actual_end_date
+    if payload.percent_complete is not None:
+        milestone.percent_complete = _decimal_or_default(payload.percent_complete)
+    if payload.idx is not None:
+        milestone.idx = payload.idx
+
+    db.commit()
+    db.refresh(milestone)
+
+    return _serialize_milestone(milestone)
+
+
+@router.delete("/projects/milestones/{milestone_id}", dependencies=[Depends(Require("projects:write"))])
+async def delete_milestone(
+    milestone_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Soft-delete a milestone."""
+    milestone = db.query(Milestone).filter(
+        Milestone.id == milestone_id,
+        Milestone.is_deleted == False,
+    ).first()
+
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+
+    milestone.is_deleted = True
+    milestone.deleted_at = datetime.utcnow()
+    milestone.deleted_by_id = current_user.id
+    db.commit()
+
+    return {"message": "Milestone deleted", "id": milestone_id}
+
+
+@router.post("/tasks/{task_id}/milestone", dependencies=[Depends(Require("projects:write"))])
+async def assign_task_to_milestone(
+    task_id: int,
+    milestone_id: Optional[int] = Query(default=None, description="Milestone ID to assign, or null to unassign"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Assign or unassign a task to a milestone."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if milestone_id is not None:
+        milestone = db.query(Milestone).filter(
+            Milestone.id == milestone_id,
+            Milestone.is_deleted == False,
+        ).first()
+        if not milestone:
+            raise HTTPException(status_code=404, detail="Milestone not found")
+
+        # Verify task and milestone belong to same project
+        if task.project_id != milestone.project_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Task and milestone must belong to the same project"
+            )
+
+    task.milestone_id = milestone_id
+    db.commit()
+
+    return {
+        "message": "Task milestone updated",
+        "task_id": task_id,
+        "milestone_id": milestone_id,
+    }
+
+
+# =============================================================================
 # PROJECTS CRUD
 # =============================================================================
 
@@ -489,6 +845,7 @@ def _decimal_or_default(val: Optional[Decimal], default: Decimal = Decimal("0"))
 async def create_project(
     payload: ProjectCreate,
     db: Session = Depends(get_db),
+    user=Depends(Require("projects:write")),
 ) -> Dict[str, Any]:
     """Create a new project with optional team members."""
     project = Project(
@@ -549,6 +906,36 @@ async def create_project(
             db.add(project_user)
 
     db.commit()
+
+    # Emit project created notification
+    try:
+        notif_service = NotificationService(db)
+        # Notify project manager and assigned users
+        user_ids = []
+        if project.project_manager_id:
+            user_ids.append(project.project_manager_id)
+        for pu in project.users:
+            if pu.user:
+                pu_user = db.query(User).filter(User.email == pu.email).first()
+                if pu_user and pu_user.id not in user_ids:
+                    user_ids.append(pu_user.id)
+
+        notif_service.emit_event(
+            event_type=NotificationEventType.PROJECT_CREATED,
+            payload={
+                "project_id": project.id,
+                "project_name": project.project_name,
+                "created_by_name": user.full_name if hasattr(user, 'full_name') else user.email,
+                "expected_end_date": str(project.expected_end_date) if project.expected_end_date else None,
+            },
+            entity_type="project",
+            entity_id=project.id,
+            user_ids=user_ids if user_ids else None,
+            company=project.company,
+        )
+    except Exception:
+        pass  # Don't fail project creation if notification fails
+
     return await get_project(project.id, db)
 
 
@@ -1286,3 +1673,1330 @@ async def get_department_summary(
         })
 
     return result
+
+
+# =============================================================================
+# COMMENTS
+# =============================================================================
+
+VALID_ENTITY_TYPES = {"project", "task", "milestone"}
+
+
+def _serialize_comment(comment: ProjectComment) -> Dict[str, Any]:
+    """Serialize a comment to a dictionary."""
+    return {
+        "id": comment.id,
+        "entity_type": comment.entity_type,
+        "entity_id": comment.entity_id,
+        "content": comment.content,
+        "author_id": comment.author_id,
+        "author_name": comment.author_name,
+        "author_email": comment.author_email,
+        "is_edited": comment.is_edited,
+        "edited_at": comment.edited_at.isoformat() if comment.edited_at else None,
+        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+    }
+
+
+@router.get("/projects/{entity_type}/{entity_id}/comments", dependencies=[Depends(Require("explorer:read"))])
+async def list_entity_comments(
+    entity_type: str,
+    entity_id: int,
+    limit: int = Query(default=50, le=200),
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List all comments for an entity (project, task, or milestone)."""
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid entity type: {entity_type}")
+
+    query = db.query(ProjectComment).filter(
+        ProjectComment.entity_type == entity_type,
+        ProjectComment.entity_id == entity_id,
+        ProjectComment.is_deleted == False,
+    )
+
+    total = query.count()
+    comments = query.order_by(ProjectComment.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_comment(c) for c in comments],
+    }
+
+
+@router.post("/projects/{entity_type}/{entity_id}/comments", dependencies=[Depends(Require("projects:write"))])
+async def create_comment(
+    entity_type: str,
+    entity_id: int,
+    payload: CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Create a new comment on an entity."""
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid entity type: {entity_type}")
+
+    # Verify entity exists
+    if entity_type == "project":
+        entity = db.query(Project).filter(Project.id == entity_id, Project.is_deleted == False).first()
+        company = entity.company if entity else None
+    elif entity_type == "task":
+        entity = db.query(Task).filter(Task.id == entity_id).first()
+        company = entity.company if entity else None
+    elif entity_type == "milestone":
+        entity = db.query(Milestone).filter(Milestone.id == entity_id, Milestone.is_deleted == False).first()
+        company = entity.company if entity else None
+    else:
+        entity = None
+        company = None
+
+    if not entity:
+        raise HTTPException(status_code=404, detail=f"{entity_type.capitalize()} not found")
+
+    comment = ProjectComment(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        content=payload.content,
+        author_id=current_user.id,
+        author_name=current_user.name,
+        author_email=current_user.email,
+        company=company,
+    )
+
+    db.add(comment)
+
+    # Create activity record
+    activity = ProjectActivity(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        activity_type=ProjectActivityType.COMMENT_ADDED,
+        description=f"Comment added by {current_user.name or current_user.email}",
+        actor_id=current_user.id,
+        actor_name=current_user.name,
+        actor_email=current_user.email,
+        company=company,
+    )
+    db.add(activity)
+
+    db.commit()
+    db.refresh(comment)
+
+    return _serialize_comment(comment)
+
+
+@router.patch("/projects/comments/{comment_id}", dependencies=[Depends(Require("projects:write"))])
+async def update_comment(
+    comment_id: int,
+    payload: CommentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Update a comment (only the author can edit)."""
+    comment = db.query(ProjectComment).filter(
+        ProjectComment.id == comment_id,
+        ProjectComment.is_deleted == False,
+    ).first()
+
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    # Only author can edit
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the author can edit this comment")
+
+    comment.content = payload.content
+    comment.is_edited = True
+    comment.edited_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(comment)
+
+    return _serialize_comment(comment)
+
+
+@router.delete("/projects/comments/{comment_id}", dependencies=[Depends(Require("projects:write"))])
+async def delete_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Soft-delete a comment (author or admin can delete)."""
+    comment = db.query(ProjectComment).filter(
+        ProjectComment.id == comment_id,
+        ProjectComment.is_deleted == False,
+    ).first()
+
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    comment.is_deleted = True
+    comment.deleted_at = datetime.utcnow()
+    comment.deleted_by_id = current_user.id
+    db.commit()
+
+    return {"message": "Comment deleted", "id": comment_id}
+
+
+# =============================================================================
+# ACTIVITY FEED
+# =============================================================================
+
+
+def _serialize_activity(activity: ProjectActivity) -> Dict[str, Any]:
+    """Serialize an activity to a dictionary."""
+    return {
+        "id": activity.id,
+        "entity_type": activity.entity_type,
+        "entity_id": activity.entity_id,
+        "activity_type": activity.activity_type.value if activity.activity_type else None,
+        "description": activity.description,
+        "from_value": activity.from_value,
+        "to_value": activity.to_value,
+        "changed_fields": activity.changed_fields,
+        "actor_id": activity.actor_id,
+        "actor_name": activity.actor_name,
+        "actor_email": activity.actor_email,
+        "created_at": activity.created_at.isoformat() if activity.created_at else None,
+    }
+
+
+@router.get("/projects/{entity_type}/{entity_id}/activities", dependencies=[Depends(Require("explorer:read"))])
+async def list_entity_activities(
+    entity_type: str,
+    entity_id: int,
+    activity_type: Optional[str] = None,
+    limit: int = Query(default=50, le=200),
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List activity feed for an entity."""
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid entity type: {entity_type}")
+
+    query = db.query(ProjectActivity).filter(
+        ProjectActivity.entity_type == entity_type,
+        ProjectActivity.entity_id == entity_id,
+    )
+
+    if activity_type:
+        try:
+            activity_type_enum = ProjectActivityType(activity_type)
+            query = query.filter(ProjectActivity.activity_type == activity_type_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid activity type: {activity_type}")
+
+    total = query.count()
+    activities = query.order_by(ProjectActivity.created_at.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_activity(a) for a in activities],
+    }
+
+
+@router.get("/projects/{project_id}/activity-timeline", dependencies=[Depends(Require("explorer:read"))])
+async def get_project_activity_timeline(
+    project_id: int,
+    limit: int = Query(default=100, le=500),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get combined activity timeline for a project including its tasks and milestones."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get task IDs for this project
+    task_ids = [t.id for t in project.tasks]
+    milestone_ids = [m.id for m in project.milestones if not m.is_deleted]
+
+    # Build combined query for all activities
+    query = db.query(ProjectActivity).filter(
+        or_(
+            and_(ProjectActivity.entity_type == "project", ProjectActivity.entity_id == project_id),
+            and_(ProjectActivity.entity_type == "task", ProjectActivity.entity_id.in_(task_ids)) if task_ids else False,
+            and_(ProjectActivity.entity_type == "milestone", ProjectActivity.entity_id.in_(milestone_ids)) if milestone_ids else False,
+        )
+    )
+
+    activities = query.order_by(ProjectActivity.created_at.desc()).limit(limit).all()
+
+    return {
+        "project_id": project_id,
+        "total": len(activities),
+        "data": [_serialize_activity(a) for a in activities],
+    }
+
+
+# =============================================================================
+# ATTACHMENTS
+# =============================================================================
+
+from fastapi import UploadFile, File, Form
+import os
+import uuid
+
+from app.models.document_attachment import DocumentAttachment
+
+# Configuration
+UPLOAD_DIR = "/tmp/attachments/projects"
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".zip"}
+
+# Valid entity types for attachments
+ATTACHMENT_ENTITY_TYPES = {"project", "task", "milestone"}
+
+
+def _serialize_attachment(a: DocumentAttachment) -> Dict[str, Any]:
+    """Serialize attachment to dict."""
+    return {
+        "id": a.id,
+        "file_name": a.file_name,
+        "file_type": a.file_type,
+        "file_size": a.file_size,
+        "attachment_type": a.attachment_type,
+        "is_primary": a.is_primary,
+        "description": a.description,
+        "uploaded_at": a.uploaded_at.isoformat() if a.uploaded_at else None,
+        "uploaded_by_id": a.uploaded_by_id,
+    }
+
+
+@router.get("/projects/{entity_type}/{entity_id}/attachments", dependencies=[Depends(Require("explorer:read"))])
+async def list_entity_attachments(
+    entity_type: str,
+    entity_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List attachments for a project entity (project, task, or milestone)."""
+    if entity_type not in ATTACHMENT_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid entity type. Must be one of: {ATTACHMENT_ENTITY_TYPES}")
+
+    doctype = f"project_{entity_type}"  # e.g., "project_project", "project_task", "project_milestone"
+
+    attachments = db.query(DocumentAttachment).filter(
+        DocumentAttachment.doctype == doctype,
+        DocumentAttachment.document_id == entity_id,
+    ).order_by(DocumentAttachment.uploaded_at.desc()).all()
+
+    return {
+        "total": len(attachments),
+        "data": [_serialize_attachment(a) for a in attachments],
+    }
+
+
+@router.post("/projects/{entity_type}/{entity_id}/attachments", dependencies=[Depends(Require("projects:write"))])
+async def upload_entity_attachment(
+    entity_type: str,
+    entity_id: int,
+    file: UploadFile = File(...),
+    attachment_type: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    is_primary: bool = Form(False),
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:write")),
+) -> Dict[str, Any]:
+    """Upload an attachment for a project entity."""
+    if entity_type not in ATTACHMENT_ENTITY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid entity type. Must be one of: {ATTACHMENT_ENTITY_TYPES}")
+
+    # Verify entity exists
+    if entity_type == "project":
+        entity = db.query(Project).filter(Project.id == entity_id, Project.is_deleted == False).first()
+    elif entity_type == "task":
+        entity = db.query(Task).filter(Task.id == entity_id).first()
+    elif entity_type == "milestone":
+        entity = db.query(Milestone).filter(Milestone.id == entity_id, Milestone.is_deleted == False).first()
+    else:
+        entity = None
+
+    if not entity:
+        raise HTTPException(status_code=404, detail=f"{entity_type.capitalize()} not found")
+
+    # Validate file
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required")
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type {file_ext} not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Read file content
+    content = await file.read()
+    file_size = len(content)
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
+        )
+
+    # Generate unique filename
+    unique_id = uuid.uuid4().hex[:8]
+    safe_filename = f"{unique_id}_{file.filename}"
+
+    # Create upload directory
+    doctype = f"project_{entity_type}"
+    doc_dir = os.path.join(UPLOAD_DIR, entity_type, str(entity_id))
+    os.makedirs(doc_dir, exist_ok=True)
+
+    # Save file
+    file_path = os.path.join(doc_dir, safe_filename)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # If setting as primary, unset any existing primary
+    if is_primary:
+        db.query(DocumentAttachment).filter(
+            DocumentAttachment.doctype == doctype,
+            DocumentAttachment.document_id == entity_id,
+            DocumentAttachment.is_primary == True,
+        ).update({"is_primary": False})
+
+    # Create attachment record
+    attachment = DocumentAttachment(
+        doctype=doctype,
+        document_id=entity_id,
+        file_name=file.filename,
+        file_path=file_path,
+        file_type=file.content_type,
+        file_size=file_size,
+        attachment_type=attachment_type,
+        is_primary=is_primary,
+        description=description,
+        uploaded_by_id=user.id if hasattr(user, "id") else None,
+    )
+    db.add(attachment)
+
+    # Log activity
+    _log_activity(
+        db=db,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        activity_type=ProjectActivityType.ATTACHMENT_ADDED,
+        description=f"Attachment '{file.filename}' added",
+        actor_id=user.id if hasattr(user, "id") else None,
+        actor_name=user.name if hasattr(user, "name") else None,
+        actor_email=user.email if hasattr(user, "email") else None,
+    )
+
+    db.commit()
+    db.refresh(attachment)
+
+    return {
+        "message": "Attachment uploaded",
+        "id": attachment.id,
+        "file_name": attachment.file_name,
+        "file_size": attachment.file_size,
+    }
+
+
+@router.get("/projects/attachments/{attachment_id}", dependencies=[Depends(Require("explorer:read"))])
+async def get_attachment(
+    attachment_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get attachment details."""
+    attachment = db.query(DocumentAttachment).filter(
+        DocumentAttachment.id == attachment_id,
+        DocumentAttachment.doctype.startswith("project_"),
+    ).first()
+
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    return {
+        "id": attachment.id,
+        "doctype": attachment.doctype,
+        "document_id": attachment.document_id,
+        "file_name": attachment.file_name,
+        "file_path": attachment.file_path,
+        "file_type": attachment.file_type,
+        "file_size": attachment.file_size,
+        "attachment_type": attachment.attachment_type,
+        "is_primary": attachment.is_primary,
+        "description": attachment.description,
+        "uploaded_at": attachment.uploaded_at.isoformat() if attachment.uploaded_at else None,
+        "uploaded_by_id": attachment.uploaded_by_id,
+    }
+
+
+@router.delete("/projects/attachments/{attachment_id}", dependencies=[Depends(Require("projects:write"))])
+async def delete_attachment(
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:write")),
+) -> Dict[str, Any]:
+    """Delete an attachment."""
+    attachment = db.query(DocumentAttachment).filter(
+        DocumentAttachment.id == attachment_id,
+        DocumentAttachment.doctype.startswith("project_"),
+    ).first()
+
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    # Delete file from disk
+    if os.path.exists(attachment.file_path):
+        try:
+            os.remove(attachment.file_path)
+        except OSError:
+            pass  # File might already be deleted
+
+    # Extract entity info for activity log
+    entity_type = attachment.doctype.replace("project_", "")
+    entity_id = attachment.document_id
+    file_name = attachment.file_name
+
+    db.delete(attachment)
+    db.commit()
+
+    return {"message": "Attachment deleted", "id": attachment_id}
+
+
+@router.get("/projects/attachments/{attachment_id}/download", dependencies=[Depends(Require("explorer:read"))])
+async def download_attachment(
+    attachment_id: int,
+    db: Session = Depends(get_db),
+):
+    """Download an attachment file."""
+    from fastapi.responses import FileResponse
+
+    attachment = db.query(DocumentAttachment).filter(
+        DocumentAttachment.id == attachment_id,
+        DocumentAttachment.doctype.startswith("project_"),
+    ).first()
+
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    if not os.path.exists(attachment.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(
+        path=attachment.file_path,
+        filename=attachment.file_name,
+        media_type=attachment.file_type or "application/octet-stream",
+    )
+
+
+# =============================================================================
+# APPROVAL WORKFLOWS
+# =============================================================================
+
+from app.services.approval_engine import (
+    ApprovalEngine,
+    WorkflowNotFoundError,
+    ApprovalNotFoundError,
+    UnauthorizedApprovalError,
+    InvalidStateError,
+)
+
+
+class ApprovalSubmitPayload(BaseModel):
+    """Payload for submitting a project for approval."""
+    remarks: Optional[str] = None
+
+
+class ApprovalActionPayload(BaseModel):
+    """Payload for approve/reject actions."""
+    remarks: Optional[str] = None
+    reason: Optional[str] = None  # Required for rejection
+
+
+@router.get("/projects/{project_id}/approval-status", dependencies=[Depends(Require("explorer:read"))])
+async def get_project_approval_status(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get the approval status for a project."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    engine = ApprovalEngine(db)
+    status = engine.get_approval_status("project", project_id)
+
+    if not status:
+        return {
+            "project_id": project_id,
+            "has_approval": False,
+            "status": None,
+            "message": "No approval workflow initiated for this project",
+        }
+
+    return {
+        "project_id": project_id,
+        "has_approval": True,
+        **status,
+    }
+
+
+@router.post("/projects/{project_id}/submit-approval", dependencies=[Depends(Require("projects:write"))])
+async def submit_project_for_approval(
+    project_id: int,
+    payload: ApprovalSubmitPayload = None,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:write")),
+) -> Dict[str, Any]:
+    """Submit a project for approval."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    engine = ApprovalEngine(db)
+
+    try:
+        approval = engine.submit_document(
+            doctype="project",
+            document_id=project_id,
+            user_id=user.id,
+            amount=project.estimated_costing,
+            document_name=project.project_name,
+        )
+
+        # Log activity
+        _log_activity(
+            db=db,
+            entity_type="project",
+            entity_id=project_id,
+            activity_type=ProjectActivityType.APPROVAL_SUBMITTED,
+            description=f"Project submitted for approval",
+            actor_id=user.id,
+            actor_name=user.name if hasattr(user, "name") else None,
+            actor_email=user.email if hasattr(user, "email") else None,
+        )
+
+        db.commit()
+
+        # Emit notification for approval request
+        try:
+            notif_service = NotificationService(db)
+            # Find approvers who can approve this step
+            approver_ids = engine.get_pending_approvers(approval.id)
+            if approver_ids:
+                notif_service.emit_event(
+                    event_type=NotificationEventType.PROJECT_APPROVAL_REQUESTED,
+                    payload={
+                        "project_id": project_id,
+                        "project_name": project.project_name,
+                        "requester_name": user.name if hasattr(user, "name") else user.email,
+                        "estimated_costing": float(project.estimated_costing) if project.estimated_costing else None,
+                    },
+                    entity_type="project",
+                    entity_id=project_id,
+                    user_ids=approver_ids,
+                    company=project.company,
+                )
+        except Exception:
+            pass
+
+        return {
+            "message": "Project submitted for approval",
+            "project_id": project_id,
+            "approval_id": approval.id,
+            "status": approval.status.value,
+        }
+
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InvalidStateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/projects/{project_id}/approve", dependencies=[Depends(Require("approvals:approve"))])
+async def approve_project(
+    project_id: int,
+    payload: ApprovalActionPayload = None,
+    db: Session = Depends(get_db),
+    user=Depends(Require("approvals:approve")),
+) -> Dict[str, Any]:
+    """Approve a project at the current approval step."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    engine = ApprovalEngine(db)
+    remarks = payload.remarks if payload else None
+
+    try:
+        approval = engine.approve_document(
+            doctype="project",
+            document_id=project_id,
+            user_id=user.id,
+            remarks=remarks,
+        )
+
+        # Log activity
+        _log_activity(
+            db=db,
+            entity_type="project",
+            entity_id=project_id,
+            activity_type=ProjectActivityType.APPROVAL_APPROVED,
+            description=f"Project approved at step {approval.current_step}",
+            actor_id=user.id,
+            actor_name=user.name if hasattr(user, "name") else None,
+            actor_email=user.email if hasattr(user, "email") else None,
+        )
+
+        db.commit()
+
+        # Emit notification for approval
+        try:
+            notif_service = NotificationService(db)
+            # Notify the project submitter/manager
+            notify_ids = []
+            if approval.submitted_by_id:
+                notify_ids.append(approval.submitted_by_id)
+            if project.project_manager_id and project.project_manager_id not in notify_ids:
+                notify_ids.append(project.project_manager_id)
+
+            if notify_ids:
+                notif_service.emit_event(
+                    event_type=NotificationEventType.PROJECT_APPROVED,
+                    payload={
+                        "project_id": project_id,
+                        "project_name": project.project_name,
+                        "approver_name": user.name if hasattr(user, "name") else user.email,
+                        "remarks": remarks,
+                    },
+                    entity_type="project",
+                    entity_id=project_id,
+                    user_ids=notify_ids,
+                    company=project.company,
+                )
+        except Exception:
+            pass
+
+        return {
+            "message": "Project approved",
+            "project_id": project_id,
+            "approval_id": approval.id,
+            "status": approval.status.value,
+            "current_step": approval.current_step,
+        }
+
+    except ApprovalNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except UnauthorizedApprovalError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except InvalidStateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/projects/{project_id}/reject", dependencies=[Depends(Require("approvals:approve"))])
+async def reject_project(
+    project_id: int,
+    payload: ApprovalActionPayload,
+    db: Session = Depends(get_db),
+    user=Depends(Require("approvals:approve")),
+) -> Dict[str, Any]:
+    """Reject a project."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not payload.reason:
+        raise HTTPException(status_code=400, detail="Rejection reason is required")
+
+    engine = ApprovalEngine(db)
+
+    try:
+        approval = engine.reject_document(
+            doctype="project",
+            document_id=project_id,
+            user_id=user.id,
+            reason=payload.reason,
+        )
+
+        # Log activity
+        _log_activity(
+            db=db,
+            entity_type="project",
+            entity_id=project_id,
+            activity_type=ProjectActivityType.APPROVAL_REJECTED,
+            description=f"Project rejected: {payload.reason[:100]}",
+            actor_id=user.id,
+            actor_name=user.name if hasattr(user, "name") else None,
+            actor_email=user.email if hasattr(user, "email") else None,
+        )
+
+        db.commit()
+
+        # Emit notification for rejection
+        try:
+            notif_service = NotificationService(db)
+            # Notify the project submitter/manager
+            notify_ids = []
+            if approval.submitted_by_id:
+                notify_ids.append(approval.submitted_by_id)
+            if project.project_manager_id and project.project_manager_id not in notify_ids:
+                notify_ids.append(project.project_manager_id)
+
+            if notify_ids:
+                notif_service.emit_event(
+                    event_type=NotificationEventType.PROJECT_REJECTED,
+                    payload={
+                        "project_id": project_id,
+                        "project_name": project.project_name,
+                        "rejector_name": user.name if hasattr(user, "name") else user.email,
+                        "reason": payload.reason,
+                    },
+                    entity_type="project",
+                    entity_id=project_id,
+                    user_ids=notify_ids,
+                    company=project.company,
+                )
+        except Exception:
+            pass
+
+        return {
+            "message": "Project rejected",
+            "project_id": project_id,
+            "approval_id": approval.id,
+            "status": approval.status.value,
+            "reason": payload.reason,
+        }
+
+    except ApprovalNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except UnauthorizedApprovalError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except InvalidStateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/projects/{project_id}/can-approve", dependencies=[Depends(Require("explorer:read"))])
+async def check_can_approve_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Check if the current user can approve a project."""
+    # Verify project exists
+    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    engine = ApprovalEngine(db)
+    can_approve = engine.can_user_approve("project", project_id, user.id)
+
+    return {
+        "project_id": project_id,
+        "user_id": user.id,
+        "can_approve": can_approve,
+    }
+
+
+# =============================================================================
+# CHANGE HISTORY
+# =============================================================================
+
+
+@router.get("/projects/{entity_type}/{entity_id}/history", dependencies=[Depends(Require("explorer:read"))])
+async def get_entity_history(
+    entity_type: str,
+    entity_id: int,
+    limit: int = Query(50, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get change history for a project entity (project, task, or milestone)."""
+    if entity_type not in ("project", "task", "milestone"):
+        raise HTTPException(status_code=400, detail="Invalid entity type")
+
+    # Verify entity exists
+    if entity_type == "project":
+        entity = db.query(Project).filter(Project.id == entity_id, Project.is_deleted == False).first()
+    elif entity_type == "task":
+        entity = db.query(Task).filter(Task.id == entity_id, Task.is_deleted == False).first()
+    else:
+        entity = db.query(Milestone).filter(Milestone.id == entity_id, Milestone.is_deleted == False).first()
+
+    if not entity:
+        raise HTTPException(status_code=404, detail=f"{entity_type.capitalize()} not found")
+
+    # Get audit history
+    audit_logger = AuditLogger(db)
+    audit_entries = audit_logger.get_document_history(
+        doctype=f"project_{entity_type}" if entity_type != "project" else "project",
+        document_id=entity_id,
+        limit=limit,
+        offset=offset,
+    )
+
+    # Also get activity from ProjectActivity for a combined view
+    activities = (
+        db.query(ProjectActivity)
+        .filter(
+            ProjectActivity.entity_type == entity_type,
+            ProjectActivity.entity_id == entity_id,
+        )
+        .order_by(ProjectActivity.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    # Combine and format
+    history = []
+
+    for audit in audit_entries:
+        history.append({
+            "id": f"audit-{audit.id}",
+            "source": "audit",
+            "timestamp": audit.timestamp.isoformat() if audit.timestamp else None,
+            "action": audit.action.value if audit.action else None,
+            "actor_id": audit.user_id,
+            "actor_name": audit.user_name,
+            "actor_email": audit.user_email,
+            "changed_fields": audit.changed_fields,
+            "old_values": audit.old_values,
+            "new_values": audit.new_values,
+            "remarks": audit.remarks,
+        })
+
+    for activity in activities:
+        history.append({
+            "id": f"activity-{activity.id}",
+            "source": "activity",
+            "timestamp": activity.created_at.isoformat() if activity.created_at else None,
+            "action": activity.activity_type.value if activity.activity_type else None,
+            "actor_id": activity.actor_id,
+            "actor_name": activity.actor_name,
+            "actor_email": activity.actor_email,
+            "description": activity.description,
+            "from_value": activity.from_value,
+            "to_value": activity.to_value,
+            "changed_fields": activity.changed_fields,
+        })
+
+    # Sort by timestamp descending
+    history.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+
+    # Apply limit after merge
+    history = history[:limit]
+
+    return {
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "total": len(history),
+        "data": history,
+    }
+
+
+# =============================================================================
+# PROJECT TEMPLATES
+# =============================================================================
+
+
+class TaskTemplatePayload(BaseModel):
+    """Task template payload."""
+    subject: str
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    start_day_offset: int = 0
+    duration_days: int = 1
+    default_assigned_role: Optional[str] = None
+    is_group: bool = False
+    idx: int = 0
+
+
+class MilestoneTemplatePayload(BaseModel):
+    """Milestone template payload."""
+    name: str
+    description: Optional[str] = None
+    start_day_offset: int = 0
+    end_day_offset: int = 7
+    idx: int = 0
+
+
+class ProjectTemplateCreate(BaseModel):
+    """Create project template payload."""
+    name: str
+    description: Optional[str] = None
+    project_type: Optional[str] = None
+    default_priority: Optional[ProjectPriority] = None
+    estimated_duration_days: Optional[int] = None
+    default_notes: Optional[str] = None
+    is_active: Optional[bool] = None
+    task_templates: Optional[List[TaskTemplatePayload]] = Field(default=None, alias="tasks")
+    milestone_templates: Optional[List[MilestoneTemplatePayload]] = Field(default=None, alias="milestones")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ProjectTemplateUpdate(BaseModel):
+    """Update project template payload."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    project_type: Optional[str] = None
+    default_priority: Optional[ProjectPriority] = None
+    estimated_duration_days: Optional[int] = None
+    default_notes: Optional[str] = None
+    is_active: Optional[bool] = None
+    task_templates: Optional[List[TaskTemplatePayload]] = Field(default=None, alias="tasks")
+    milestone_templates: Optional[List[MilestoneTemplatePayload]] = Field(default=None, alias="milestones")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+def _validate_task_template_priority(priority: Optional[str]) -> Optional[str]:
+    """Validate task template priority values to avoid invalid enums later."""
+    if priority is None:
+        return None
+    try:
+        TaskPriority(priority)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid task template priority: {priority}")
+    return priority
+
+
+def _serialize_template(template: ProjectTemplate) -> Dict[str, Any]:
+    """Serialize project template to dict."""
+    task_templates = [
+        {
+            "id": t.id,
+            "subject": t.subject,
+            "description": t.description,
+            "priority": t.priority,
+            "start_day_offset": t.start_day_offset,
+            "duration_days": t.duration_days,
+            "default_assigned_role": t.default_assigned_role,
+            "is_group": t.is_group,
+            "idx": t.idx,
+        }
+        for t in sorted(template.task_templates, key=lambda x: x.idx)
+    ]
+    milestone_templates = [
+        {
+            "id": m.id,
+            "name": m.name,
+            "description": m.description,
+            "start_day_offset": m.start_day_offset,
+            "end_day_offset": m.end_day_offset,
+            "idx": m.idx,
+        }
+        for m in sorted(template.milestone_templates, key=lambda x: x.idx)
+    ]
+    return {
+        "id": template.id,
+        "name": template.name,
+        "description": template.description,
+        "project_type": template.project_type,
+        "default_priority": template.default_priority.value if template.default_priority else None,
+        "estimated_duration_days": template.estimated_duration_days,
+        "default_notes": template.default_notes,
+        "is_active": template.is_active,
+        "created_at": template.created_at.isoformat() if template.created_at else None,
+        "task_count": len(template.task_templates),
+        "milestone_count": len(template.milestone_templates),
+        "task_templates": task_templates,
+        "milestone_templates": milestone_templates,
+        "tasks": task_templates,
+        "milestones": milestone_templates,
+    }
+
+
+@router.get("/projects/templates", dependencies=[Depends(Require("explorer:read"))])
+async def list_project_templates(
+    active_only: bool = Query(default=True),
+    is_active: Optional[bool] = Query(default=None),
+    project_type: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List all project templates."""
+    query = db.query(ProjectTemplate)
+
+    if is_active is not None:
+        query = query.filter(ProjectTemplate.is_active == is_active)
+    elif active_only:
+        query = query.filter(ProjectTemplate.is_active == True)
+
+    if project_type:
+        query = query.filter(ProjectTemplate.project_type == project_type)
+
+    total = query.count()
+    templates = query.order_by(ProjectTemplate.name).offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_template(t) for t in templates],
+    }
+
+
+@router.post("/projects/templates", dependencies=[Depends(Require("projects:admin"))])
+async def create_project_template(
+    payload: ProjectTemplateCreate,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:admin")),
+) -> Dict[str, Any]:
+    """Create a new project template."""
+    template = ProjectTemplate(
+        name=payload.name,
+        description=payload.description,
+        project_type=payload.project_type,
+        default_priority=payload.default_priority,
+        estimated_duration_days=payload.estimated_duration_days,
+        default_notes=payload.default_notes,
+        is_active=payload.is_active if payload.is_active is not None else True,
+        created_by_id=user.id,
+    )
+    db.add(template)
+    db.flush()
+
+    # Add task templates
+    if payload.task_templates:
+        for idx, tt in enumerate(payload.task_templates):
+            task_template = TaskTemplate(
+                project_template_id=template.id,
+                subject=tt.subject,
+                description=tt.description,
+                priority=_validate_task_template_priority(tt.priority),
+                start_day_offset=tt.start_day_offset,
+                duration_days=tt.duration_days,
+                default_assigned_role=tt.default_assigned_role,
+                is_group=tt.is_group,
+                idx=tt.idx or idx,
+            )
+            db.add(task_template)
+
+    # Add milestone templates
+    if payload.milestone_templates:
+        for idx, mt in enumerate(payload.milestone_templates):
+            milestone_template = MilestoneTemplate(
+                project_template_id=template.id,
+                name=mt.name,
+                description=mt.description,
+                start_day_offset=mt.start_day_offset,
+                end_day_offset=mt.end_day_offset,
+                idx=mt.idx or idx,
+            )
+            db.add(milestone_template)
+
+    db.commit()
+    db.refresh(template)
+
+    return {
+        "message": "Template created",
+        "id": template.id,
+        "template": _serialize_template(template),
+    }
+
+
+@router.get("/projects/templates/{template_id}", dependencies=[Depends(Require("explorer:read"))])
+async def get_project_template(
+    template_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get a project template by ID."""
+    template = db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return _serialize_template(template)
+
+
+@router.patch("/projects/templates/{template_id}", dependencies=[Depends(Require("projects:admin"))])
+async def update_project_template(
+    template_id: int,
+    payload: ProjectTemplateUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:admin")),
+) -> Dict[str, Any]:
+    """Update a project template."""
+    template = db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    # Update fields
+    if payload.name is not None:
+        template.name = payload.name
+    if payload.description is not None:
+        template.description = payload.description
+    if payload.project_type is not None:
+        template.project_type = payload.project_type
+    if payload.default_priority is not None:
+        template.default_priority = payload.default_priority
+    if payload.estimated_duration_days is not None:
+        template.estimated_duration_days = payload.estimated_duration_days
+    if payload.default_notes is not None:
+        template.default_notes = payload.default_notes
+    if payload.is_active is not None:
+        template.is_active = payload.is_active
+    if payload.task_templates is not None:
+        template.task_templates.clear()
+        for idx, tt in enumerate(payload.task_templates):
+            task_template = TaskTemplate(
+                project_template_id=template.id,
+                subject=tt.subject,
+                description=tt.description,
+                priority=_validate_task_template_priority(tt.priority),
+                start_day_offset=tt.start_day_offset,
+                duration_days=tt.duration_days,
+                default_assigned_role=tt.default_assigned_role,
+                is_group=tt.is_group,
+                idx=tt.idx or idx,
+            )
+            db.add(task_template)
+    if payload.milestone_templates is not None:
+        template.milestone_templates.clear()
+        for idx, mt in enumerate(payload.milestone_templates):
+            milestone_template = MilestoneTemplate(
+                project_template_id=template.id,
+                name=mt.name,
+                description=mt.description,
+                start_day_offset=mt.start_day_offset,
+                end_day_offset=mt.end_day_offset,
+                idx=mt.idx or idx,
+            )
+            db.add(milestone_template)
+
+    db.commit()
+    db.refresh(template)
+
+    return {
+        "message": "Template updated",
+        "template": _serialize_template(template),
+    }
+
+
+@router.delete("/projects/templates/{template_id}", dependencies=[Depends(Require("projects:admin"))])
+async def delete_project_template(
+    template_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:admin")),
+) -> Dict[str, Any]:
+    """Delete a project template."""
+    template = db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    db.delete(template)
+    db.commit()
+
+    return {"message": "Template deleted", "id": template_id}
+
+
+class CreateFromTemplatePayload(BaseModel):
+    """Payload for creating a project from a template."""
+    project_name: str
+    expected_start_date: Optional[date] = None
+    customer_id: Optional[int] = None
+    project_manager_id: Optional[int] = None
+    notes: Optional[str] = None
+
+
+@router.post("/projects/from-template/{template_id}", dependencies=[Depends(Require("projects:write"))])
+async def create_project_from_template(
+    template_id: int,
+    payload: CreateFromTemplatePayload,
+    db: Session = Depends(get_db),
+    user=Depends(Require("projects:write")),
+) -> Dict[str, Any]:
+    """Create a new project from a template."""
+    template = db.query(ProjectTemplate).filter(
+        ProjectTemplate.id == template_id,
+        ProjectTemplate.is_active == True,
+    ).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found or inactive")
+
+    # Calculate dates
+    start_date = payload.expected_start_date or date.today()
+    end_date = None
+    if template.estimated_duration_days:
+        end_date = start_date + timedelta(days=template.estimated_duration_days)
+
+    # Create project
+    project = Project(
+        project_name=payload.project_name,
+        project_type=template.project_type,
+        priority=template.default_priority,
+        status=ProjectStatus.OPEN,
+        expected_start_date=start_date,
+        expected_end_date=end_date,
+        notes=payload.notes or template.default_notes,
+        customer_id=payload.customer_id,
+        project_manager_id=payload.project_manager_id,
+    )
+    db.add(project)
+    db.flush()
+
+    # Create milestones from template
+    milestone_map = {}  # template_id -> created_milestone
+    for mt in sorted(template.milestone_templates, key=lambda x: x.idx):
+        milestone = Milestone(
+            project_id=project.id,
+            name=mt.name,
+            description=mt.description,
+            status=MilestoneStatus.PLANNED,
+            planned_start_date=start_date + timedelta(days=mt.start_day_offset),
+            planned_end_date=start_date + timedelta(days=mt.end_day_offset),
+            idx=mt.idx,
+            created_by_id=user.id,
+        )
+        db.add(milestone)
+        db.flush()
+        milestone_map[mt.id] = milestone
+
+    # Create tasks from template
+    for tt in sorted(template.task_templates, key=lambda x: x.idx):
+        task_priority = TaskPriority.MEDIUM
+        if tt.priority:
+            try:
+                task_priority = TaskPriority(tt.priority)
+            except ValueError:
+                task_priority = TaskPriority.MEDIUM
+        task = Task(
+            project_id=project.id,
+            subject=tt.subject,
+            description=tt.description,
+            priority=task_priority,
+            status=TaskStatus.OPEN,
+            exp_start_date=start_date + timedelta(days=tt.start_day_offset),
+            exp_end_date=start_date + timedelta(days=tt.start_day_offset + tt.duration_days),
+            is_group=tt.is_group,
+            milestone_id=milestone_map.get(tt.milestone_template_id).id if tt.milestone_template_id and tt.milestone_template_id in milestone_map else None,
+        )
+        db.add(task)
+
+    # Log activity
+    _log_activity(
+        db=db,
+        entity_type="project",
+        entity_id=project.id,
+        activity_type=ProjectActivityType.CREATED,
+        description=f"Project created from template: {template.name}",
+        actor_id=user.id,
+        actor_name=user.name if hasattr(user, "name") else None,
+        actor_email=user.email if hasattr(user, "email") else None,
+    )
+
+    db.commit()
+    db.refresh(project)
+
+    return {
+        "message": "Project created from template",
+        "project_id": project.id,
+        "project_name": project.project_name,
+        "template_id": template_id,
+        "milestones_created": len(milestone_map),
+        "tasks_created": len(template.task_templates),
+    }

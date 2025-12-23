@@ -1,0 +1,11 @@
+{# Weekly performance summary notification #}
+{% set title = "Weekly Performance Summary" %}
+{% set icon = "bar-chart-2" %}
+{% set priority = "normal" %}
+
+Your team performance summary:
+- Scorecards Computed: {{ computed_count | default(0) }}
+- Pending Review: {{ pending_review | default(0) }}
+{% if avg_score %}
+- Average Score: {{ avg_score }}
+{% endif %}

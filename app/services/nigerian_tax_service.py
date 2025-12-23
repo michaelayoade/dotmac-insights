@@ -1086,13 +1086,44 @@ class NigerianTaxService:
             ]
         }
 
-        # Convert to XML string (simplified)
-        import json
-        xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">
-    <!-- FIRS BIS 3.0 E-Invoice -->
-    <!-- Full UBL structure: {json.dumps(ubl_structure)} -->
-</Invoice>"""
+        # Convert to XML string using Jinja2 template
+        from app.templates.environment import get_template_env
+        env = get_template_env()
+        xml_template = env.get_template("tax/einvoice_ubl.xml.j2")
+        xml_content = xml_template.render(
+            ubl_version=einvoice.ubl_version_id,
+            customization_id=einvoice.customization_id,
+            profile_id=einvoice.profile_id,
+            invoice_number=einvoice.invoice_number,
+            issue_date=einvoice.issue_date.isoformat() if einvoice.issue_date else "",
+            due_date=einvoice.due_date.isoformat() if einvoice.due_date else None,
+            invoice_type_code=einvoice.invoice_type_code,
+            note=einvoice.note,
+            currency_code=einvoice.document_currency_code,
+            supplier=ubl_structure.get("AccountingSupplierParty", {}).get("Party", {}),
+            customer=ubl_structure.get("AccountingCustomerParty", {}).get("Party", {}),
+            tax_amount=einvoice.tax_amount,
+            tax_subtotals=[{
+                "taxable_amount": einvoice.taxable_amount,
+                "tax_amount": einvoice.tax_amount,
+                "category_id": "S",
+                "percent": "7.5",
+                "scheme_id": "VAT",
+            }],
+            line_extension_amount=einvoice.line_extension_amount,
+            tax_exclusive_amount=einvoice.tax_exclusive_amount,
+            tax_inclusive_amount=einvoice.tax_inclusive_amount,
+            payable_amount=einvoice.payable_amount,
+            lines=[{
+                "id": line.line_id,
+                "quantity": line.quantity,
+                "unit_code": "EA",
+                "line_extension_amount": line.line_extension_amount,
+                "item_name": line.item_name,
+                "item_description": line.item_description,
+                "unit_price": line.unit_price,
+            } for line in einvoice.lines],
+        )
 
         return {
             "invoice_number": einvoice.invoice_number,

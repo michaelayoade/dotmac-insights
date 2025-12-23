@@ -4,8 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
-  Search,
-  Filter,
   MoreHorizontal,
   UserPlus,
   Phone,
@@ -19,6 +17,7 @@ import {
 import { useLeads, useLeadsSummary, useLeadMutations, useLeadSources } from '@/hooks/useApi';
 import { formatDistanceToNow } from '@/lib/date';
 import type { Lead } from '@/lib/api';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 const statusColors: Record<string, string> = {
   new: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -114,21 +113,17 @@ export default function LeadsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search leads..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-          />
-        </div>
-        <select
+      <FilterCard contentClassName="flex items-center gap-4" iconClassName="text-emerald-400">
+        <FilterInput
+          type="text"
+          placeholder="Search leads..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 max-w-md"
+        />
+        <FilterSelect
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         >
           <option value="">All Status</option>
           <option value="new">New</option>
@@ -136,8 +131,8 @@ export default function LeadsPage() {
           <option value="qualified">Qualified</option>
           <option value="unqualified">Unqualified</option>
           <option value="converted">Converted</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Leads List */}
       <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
@@ -225,7 +220,7 @@ export default function LeadsPage() {
                   <div className="flex items-center gap-2">
                     {lead.status === 'new' || lead.status === 'contacted' ? (
                       <>
-                        <button
+                        <Button
                           onClick={(e) => {
                             e.preventDefault();
                             handleQualify(lead.id);
@@ -234,8 +229,8 @@ export default function LeadsPage() {
                           title="Qualify Lead"
                         >
                           <CheckCircle className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={(e) => {
                             e.preventDefault();
                             handleDisqualify(lead.id, 'Not a fit');
@@ -244,15 +239,15 @@ export default function LeadsPage() {
                           title="Disqualify Lead"
                         >
                           <XCircle className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </>
                     ) : null}
-                    <button
+                    <Button
                       onClick={(e) => e.preventDefault()}
                       className="p-1.5 text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors"
                     >
                       <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    </Button>
                   </div>
                 </Link>
               );
@@ -267,20 +262,20 @@ export default function LeadsPage() {
               Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, leads.total)} of {leads.total}
             </div>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setPage(p => p + 1)}
                 disabled={page * 20 >= leads.total}
                 className="px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-foreground rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         )}

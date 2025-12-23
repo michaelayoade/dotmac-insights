@@ -8,6 +8,7 @@ import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import type { KPIDefinition, DataSource } from '@/lib/performance.types';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 function getDataSourceColor(source: DataSource): string {
   switch (source) {
@@ -133,10 +134,10 @@ export default function KPIsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <FilterCard contentClassName="flex gap-3 flex-wrap" iconClassName="text-violet-400">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
+          <FilterInput
             type="text"
             placeholder="Search KPIs..."
             value={search}
@@ -144,16 +145,16 @@ export default function KPIsPage() {
               setSearch(e.target.value);
               setOffset(0);
             }}
-            className="w-full pl-9 pr-3 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full pl-9 pr-3 placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500/50"
           />
         </div>
-        <select
+        <FilterSelect
           value={dataSourceFilter}
           onChange={(e) => {
             setDataSourceFilter(e.target.value as DataSource | '');
             setOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+          className="focus:ring-2 focus:ring-violet-500/50"
         >
           <option value="">All Sources</option>
           <option value="ticketing">Ticketing</option>
@@ -162,8 +163,8 @@ export default function KPIsPage() {
           <option value="project">Projects / Tasks</option>
           <option value="finance">Finance</option>
           <option value="manual">Manual</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Data Source Stats */}
       <div className="flex gap-3 flex-wrap">
@@ -176,7 +177,7 @@ export default function KPIsPage() {
         ].map((item) => {
           const count = data?.items.filter(k => k.data_source === item.source).length || 0;
           return (
-            <button
+            <Button
               key={item.source}
               onClick={() => setDataSourceFilter(item.source as DataSource)}
               className={cn(
@@ -189,7 +190,7 @@ export default function KPIsPage() {
               <item.icon className="w-3.5 h-3.5" />
               {item.label}
               <span className="ml-1 text-xs opacity-70">({count})</span>
-            </button>
+            </Button>
           );
         })}
       </div>

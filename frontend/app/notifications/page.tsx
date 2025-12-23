@@ -5,12 +5,8 @@ import Link from 'next/link';
 import { useNotifications, useNotificationPreferences, useNotificationMutations } from '@/hooks/useApi';
 import { Bell, CheckCircle2, Clock, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDateTime } from '@/lib/formatters';
 import { DashboardShell, PageHeader, Button } from '@/components/ui';
-
-function formatDate(date?: string) {
-  if (!date) return '';
-  return new Date(date).toLocaleString();
-}
 
 export default function NotificationsPage() {
   const [limit, setLimit] = useState(20);
@@ -72,16 +68,16 @@ export default function NotificationsPage() {
                 {n.message && <p className="text-slate-muted text-sm">{n.message}</p>}
                 <p className="text-xs text-slate-muted flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {formatDate(n.created_at || n.timestamp)}
+                  {formatDateTime(n.created_at || n.timestamp)}
                 </p>
               </div>
               {!n.read_at && (
-                <button
+                <Button
                   onClick={() => markRead(n.id)}
                   className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-md bg-teal-electric text-slate-950 hover:bg-teal-electric/90"
                 >
                   <CheckCircle2 className="w-4 h-4" /> Mark read
-                </button>
+                </Button>
               )}
             </div>
           ))}

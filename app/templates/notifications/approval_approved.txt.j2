@@ -1,0 +1,12 @@
+{# Approval approved notification #}
+{% set title = "Document Approved" %}
+{% set icon = "check-circle" %}
+{% set priority = "normal" %}
+
+Your {{ doctype | default('document') }} has been approved.
+{% if document_number %}
+Document: #{{ document_number }}
+{% endif %}
+{% if approved_by %}
+Approved by: {{ approved_by }}
+{% endif %}

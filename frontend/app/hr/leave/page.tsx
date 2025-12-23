@@ -26,7 +26,12 @@ import {
   useHrAnalyticsLeaveTrend,
 } from '@/hooks/useApi';
 import { cn, formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { CHART_COLORS } from '@/lib/design-tokens';
+import { Button, FilterCard, FilterInput, FilterSelect, StatusPill, LoadingState } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 import {
   CalendarClock,
   FileSpreadsheet,
@@ -42,6 +47,7 @@ import {
   TrendingUp,
   Calendar,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 function extractList<T>(response: any) {
   const items = response?.data || [];
@@ -58,35 +64,6 @@ const TOOLTIP_STYLE = {
   },
   labelStyle: { color: CHART_COLORS.tooltip.text },
 };
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'text-amber-400',
-  hint,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  tone?: string;
-  hint?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
-          {hint && <p className="text-slate-muted text-xs mt-1">{hint}</p>}
-        </div>
-        <div className={cn('p-2 rounded-lg', tone.includes('amber') ? 'bg-amber-500/10' : tone.includes('violet') ? 'bg-violet-500/10' : tone.includes('emerald') ? 'bg-emerald-500/10' : 'bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', tone)} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ChartCard({ title, subtitle, children, className }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
@@ -107,14 +84,14 @@ function CollapsibleSection({
   defaultOpen = false,
 }: {
   title: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   children: React.ReactNode;
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated/50 transition-colors rounded-xl"
       >
@@ -123,32 +100,35 @@ function CollapsibleSection({
           <span className="text-foreground font-semibold">{title}</span>
         </div>
         {isOpen ? <ChevronUp className="w-5 h-5 text-slate-muted" /> : <ChevronDown className="w-5 h-5 text-slate-muted" />}
-      </button>
+      </Button>
       {isOpen && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { bg: string; text: string; border: string; icon: React.ElementType }> = {
-    approved: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/40', icon: CheckCircle2 },
-    rejected: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/40', icon: XCircle },
-    open: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/40', icon: Clock },
-    draft: { bg: 'bg-slate-elevated', text: 'text-slate-muted', border: 'border-slate-border', icon: FileSpreadsheet },
+  const statusConfig: Record<string, { tone: StatusTone; icon: LucideIcon }> = {
+    approved: { tone: 'success', icon: CheckCircle2 },
+    rejected: { tone: 'danger', icon: XCircle },
+    open: { tone: 'warning', icon: Clock },
+    draft: { tone: 'default', icon: FileSpreadsheet },
   };
   const config = statusConfig[status.toLowerCase()] || statusConfig.draft;
-  const Icon = config.icon;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border', config.bg, config.text, config.border)}>
-      <Icon className="w-3 h-3" />
-      {status}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status || 'draft')}
+      tone={config.tone}
+      icon={config.icon}
+      className="border border-current/30"
+    />
   );
 }
 
 const SINGLE_COMPANY = '';
 
 export default function HrLeavePage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('hr:read');
   const [company, setCompany] = useState<string>(SINGLE_COMPANY);
   const [allocationStatus, setAllocationStatus] = useState('');
   const [applicationStatus, setApplicationStatus] = useState('');
@@ -157,28 +137,44 @@ export default function HrLeavePage() {
   const [appLimit, setAppLimit] = useState(20);
   const [appOffset, setAppOffset] = useState(0);
   const [leaveSearch, setLeaveSearch] = useState('');
+  const canFetch = !authLoading && !missingScope;
 
-  const { data: leaveTypes, isLoading: leaveTypesLoading } = useHrLeaveTypes({
-    search: leaveSearch || undefined,
-    limit: 100,
-  });
-  const { data: holidayLists, isLoading: holidayListsLoading } = useHrHolidayLists({
-    company: company || SINGLE_COMPANY || undefined,
-  });
-  const { data: leavePolicies, isLoading: leavePoliciesLoading } = useHrLeavePolicies();
-  const { data: leaveAllocations, isLoading: allocLoading } = useHrLeaveAllocations({
-    status: allocationStatus || undefined,
-    company: company || SINGLE_COMPANY || undefined,
-    limit: allocLimit,
-    offset: allocOffset,
-  });
-  const { data: leaveApplications, isLoading: appLoading } = useHrLeaveApplications({
-    status: applicationStatus || undefined,
-    company: company || SINGLE_COMPANY || undefined,
-    limit: appLimit,
-    offset: appOffset,
-  });
-  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 });
+  const { data: leaveTypes, isLoading: leaveTypesLoading } = useHrLeaveTypes(
+    {
+      search: leaveSearch || undefined,
+      limit: 100,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: holidayLists, isLoading: holidayListsLoading } = useHrHolidayLists(
+    {
+      company: company || SINGLE_COMPANY || undefined,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: leavePolicies, isLoading: leavePoliciesLoading } = useHrLeavePolicies(
+    undefined,
+    { isPaused: () => !canFetch }
+  );
+  const { data: leaveAllocations, isLoading: allocLoading } = useHrLeaveAllocations(
+    {
+      status: allocationStatus || undefined,
+      company: company || SINGLE_COMPANY || undefined,
+      limit: allocLimit,
+      offset: allocOffset,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: leaveApplications, isLoading: appLoading } = useHrLeaveApplications(
+    {
+      status: applicationStatus || undefined,
+      company: company || SINGLE_COMPANY || undefined,
+      limit: appLimit,
+      offset: appOffset,
+    },
+    { isPaused: () => !canFetch }
+  );
+  const { data: leaveTrend } = useHrAnalyticsLeaveTrend({ months: 6 }, { isPaused: () => !canFetch });
   const { bulkCreate } = useHrLeaveAllocationMutations();
   const leaveApplicationMutations = useHrLeaveApplicationMutations();
 
@@ -337,6 +333,20 @@ export default function HrLeavePage() {
 
   const pendingCount = applicationList.items?.filter((a: any) => a.status === 'open').length || 0;
 
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the hr:read permission to view leave management."
+        backHref="/hr"
+        backLabel="Back to HR"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with key metrics */}
@@ -354,10 +364,10 @@ export default function HrLeavePage() {
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard label="Leave Types" value={leaveTypeList.total} icon={Layers} tone="text-violet-400" />
-          <MetricCard label="Holiday Lists" value={holidayList.total} icon={Calendar} tone="text-amber-400" />
-          <MetricCard label="Active Allocations" value={allocationList.total} icon={ShieldCheck} tone="text-emerald-400" />
-          <MetricCard label="Applications" value={applicationList.total} icon={Users} tone="text-cyan-400" />
+          <StatCard title="Leave Types" value={leaveTypeList.total} icon={Layers} colorClass="text-violet-400" />
+          <StatCard title="Holiday Lists" value={holidayList.total} icon={Calendar} colorClass="text-amber-400" />
+          <StatCard title="Active Allocations" value={allocationList.total} icon={ShieldCheck} colorClass="text-emerald-400" />
+          <StatCard title="Applications" value={applicationList.total} icon={Users} colorClass="text-cyan-400" />
         </div>
       </div>
 
@@ -408,8 +418,8 @@ export default function HrLeavePage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center bg-slate-card border border-slate-border rounded-xl p-4">
-        <input
+      <FilterCard contentClassName="flex flex-wrap gap-3 items-center" iconClassName="text-amber-400">
+        <FilterInput
           type="text"
           placeholder="Filter by company"
           value={company}
@@ -418,42 +428,38 @@ export default function HrLeavePage() {
             setAllocOffset(0);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
-        <input
+        <FilterInput
           type="text"
           placeholder="Search leave types"
           value={leaveSearch}
           onChange={(e) => setLeaveSearch(e.target.value)}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         />
-        <select
+        <FilterSelect
           value={allocationStatus}
           onChange={(e) => {
             setAllocationStatus(e.target.value);
             setAllocOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Allocation Status</option>
           <option value="draft">Draft</option>
           <option value="open">Open</option>
           <option value="approved">Approved</option>
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
           value={applicationStatus}
           onChange={(e) => {
             setApplicationStatus(e.target.value);
             setAppOffset(0);
           }}
-          className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
         >
           <option value="">All Application Status</option>
           <option value="open">Open</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
-        </select>
-      </div>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Quick Actions */}
       <CollapsibleSection title="Quick Actions" icon={ShieldCheck} defaultOpen={false}>
@@ -497,12 +503,12 @@ export default function HrLeavePage() {
                 className="bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground"
               />
             </div>
-            <button
+            <Button
               onClick={handleBulkAllocate}
               className="bg-amber-500 text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-amber-400 transition-colors"
             >
               Create Allocations
-            </button>
+            </Button>
           </div>
 
           <div className="bg-slate-elevated border border-slate-border rounded-lg p-4 space-y-3">
@@ -545,12 +551,12 @@ export default function HrLeavePage() {
               onChange={(e) => setAppForm({ ...appForm, description: e.target.value })}
               className="w-full bg-slate-card border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground h-16"
             />
-            <button
+            <Button
               onClick={handleCreateApplication}
               className="bg-violet-500 text-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-violet-400 transition-colors"
             >
               Submit Application
-            </button>
+            </Button>
           </div>
         </div>
         {actionError && <p className="text-rose-400 text-sm mt-3">{actionError}</p>}
@@ -729,18 +735,18 @@ export default function HrLeavePage() {
               header: 'Actions',
               render: (item: any) => (
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <Button
                     onClick={(e) => { e.stopPropagation(); leaveApplicationMutations.approve(item.id); }}
                     className="px-2 py-1 rounded border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
                   >
                     Approve
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={(e) => { e.stopPropagation(); leaveApplicationMutations.reject(item.id); }}
                     className="px-2 py-1 rounded border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 transition-colors"
                   >
                     Reject
-                  </button>
+                  </Button>
                 </div>
               ),
             },
@@ -782,7 +788,7 @@ export default function HrLeavePage() {
               <option value="approve">Approve</option>
               <option value="reject">Reject</option>
             </select>
-            <button
+            <Button
               onClick={handleBulkAppAction}
               className={cn(
                 'px-4 py-2 rounded-lg text-sm font-semibold transition-colors',
@@ -790,7 +796,7 @@ export default function HrLeavePage() {
               )}
             >
               Run Bulk {bulkAction === 'approve' ? 'Approve' : 'Reject'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

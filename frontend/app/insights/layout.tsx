@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
-import { ModuleLayout, NavSection } from '@/components/ModuleLayout';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSection } from '@/components/ModuleLayout/types';
 
 const sections: NavSection[] = [
   {

@@ -15,11 +15,16 @@ from app.auth import (
     AUTH_COOKIE_NAME,
     Principal,
     get_or_create_user,
+    get_origin_from_websocket,
     is_token_denylisted,
+    validate_origin,
     verify_jwt,
     verify_service_token,
 )
 from app.config import settings
+import structlog
+
+ws_logger = structlog.get_logger("inbox.websocket")
 from app.database import get_db
 from app.models.omni import OmniConversation
 
@@ -369,15 +374,46 @@ async def inbox_websocket(
     Query params:
     - channel: Which channel to subscribe to (default: stats)
     - agent_id: Optional agent ID for agent-specific notifications
+
+    Security:
+    - Requires valid Origin header matching CORS allowed origins (CSWSH protection)
+    - Requires valid JWT/service token with support:read scope
     """
+    # CSWSH Protection: Validate Origin header
+    origin = get_origin_from_websocket(websocket)
+    if not validate_origin(origin, settings.cors_origins_list):
+        ws_logger.warning(
+            "websocket_origin_rejected",
+            origin=origin,
+            allowed_origins=settings.cors_origins_list,
+            channel=channel,
+        )
+        await websocket.close(code=1008, reason="Invalid origin")
+        return
+
     if channel not in manager.active_connections:
-        await websocket.close(code=1008)
+        await websocket.close(code=1008, reason="Invalid channel")
         return
 
     principal = await authenticate_inbox_websocket(websocket, db)
     if not principal or not principal.has_scope("support:read"):
-        await websocket.close(code=1008)
+        ws_logger.warning(
+            "websocket_auth_failed",
+            origin=origin,
+            channel=channel,
+            has_principal=principal is not None,
+        )
+        await websocket.close(code=1008, reason="Authentication required")
         return
+
+    ws_logger.info(
+        "websocket_connected",
+        origin=origin,
+        channel=channel,
+        principal_type=principal.type,
+        principal_id=principal.id,
+        agent_id=agent_id,
+    )
 
     user_id = f"{principal.type}_{principal.id}"
     await manager.connect(websocket, channel, user_id=user_id, agent_id=agent_id)

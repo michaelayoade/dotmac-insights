@@ -133,6 +133,10 @@ test.describe('Payroll - Authenticated', () => {
       // Select a period if needed
       const periodSelect = page.getByLabel(/period|month/i);
       await expect(periodSelect).toBeVisible();
+      const periodOptions = await periodSelect.locator('option').count();
+      if (periodOptions < 2) {
+        test.skip(true, 'No payroll periods available in this environment.');
+      }
       await periodSelect.selectOption({ index: 1 });
 
       const previewButton = page.getByRole('button', { name: /preview|calculate/i });
@@ -177,8 +181,11 @@ test.describe('Payroll - Authenticated', () => {
       }
       const periodFilter = page.locator('select').first();
       await expect(periodFilter).toBeVisible();
+      const periodOptions = await periodFilter.locator('option').count();
+      if (periodOptions < 2) {
+        test.skip(true, 'No payslip periods available in this environment.');
+      }
       await periodFilter.selectOption({ index: 1 });
-      await page.waitForTimeout(500);
     });
 
     test('view individual payslip', async ({ page }) => {

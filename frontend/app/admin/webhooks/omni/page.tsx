@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { RefreshCw, Radio, Shield } from 'lucide-react';
 import { webhooksApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 type Channel = {
   id: number;
@@ -31,13 +32,13 @@ export default function OmniWebhooksPage() {
           <h1 className="text-2xl font-bold text-foreground">Omnichannel Webhooks</h1>
           <p className="text-slate-muted">Channel delivery webhooks and secrets.</p>
         </div>
-        <button
+        <Button
           onClick={() => mutate()}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
-        </button>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

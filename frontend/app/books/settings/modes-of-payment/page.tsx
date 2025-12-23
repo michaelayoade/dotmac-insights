@@ -7,6 +7,7 @@ import { accountingApi, AccountingModeOfPayment, AccountingModeOfPaymentPayload 
 import { DataTable } from '@/components/DataTable';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { useSWRStatus } from '@/hooks/useSWRStatus';
+import { Button } from '@/components/ui';
 
 const PAYMENT_TYPES = ['Cash', 'Bank', 'General'] as const;
 
@@ -139,54 +140,19 @@ export default function ModesOfPaymentPage() {
         <div className="flex items-center justify-end gap-2">
           {editingId === item.id ? (
             <>
-              <button
-                onClick={() => handleUpdate(item.id)}
-                className="p-1.5 rounded bg-teal-electric/20 text-teal-electric hover:bg-teal-electric/30"
-                title="Save"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
-                title="Cancel"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <Button onClick={() => handleUpdate(item.id)} variant="success" size="sm" icon={Check} title="Save" />
+              <Button onClick={cancelEdit} variant="secondary" size="sm" icon={X} title="Cancel" />
             </>
           ) : deleteConfirm === item.id ? (
             <>
-              <button
-                onClick={() => handleDelete(item.id)}
-                className="p-1.5 rounded bg-coral-alert/20 text-coral-alert hover:bg-coral-alert/30"
-                title="Confirm Delete"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border"
-                title="Cancel"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <Button onClick={() => handleDelete(item.id)} variant="danger" size="sm" icon={Check} title="Confirm Delete" />
+              <Button onClick={() => setDeleteConfirm(null)} variant="secondary" size="sm" icon={X} title="Cancel" />
             </>
           ) : (
             <>
-              <button
-                onClick={() => startEdit(item)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-slate-border hover:text-foreground"
-                title="Edit"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(item.id)}
-                className="p-1.5 rounded bg-slate-elevated text-slate-muted hover:bg-coral-alert/20 hover:text-coral-alert"
-                title="Delete"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <Button onClick={() => startEdit(item)} variant="ghost" size="sm" icon={Pencil} title="Edit" />
+              <Button onClick={() => setDeleteConfirm(item.id)} variant="ghost" size="sm" icon={Trash2} title="Delete">
+              </Button>
             </>
           )}
         </div>
@@ -203,13 +169,13 @@ export default function ModesOfPaymentPage() {
             <h1 className="text-xl font-semibold text-foreground">Modes of Payment</h1>
           </div>
           {!isCreating && (
-            <button
+            <Button
               onClick={() => { setIsCreating(true); setEditingId(null); setFormData({ mode_of_payment: '' }); }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-electric/10 border border-teal-electric/30 text-teal-electric text-sm hover:bg-teal-electric/20"
             >
               <Plus className="w-4 h-4" />
               Add Mode of Payment
-            </button>
+            </Button>
           )}
         </div>
 
@@ -260,19 +226,12 @@ export default function ModesOfPaymentPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4">
-              <button
-                onClick={handleCreate}
-                disabled={!formData.mode_of_payment.trim()}
-                className="px-4 py-2 rounded-lg bg-teal-electric text-foreground text-sm font-medium hover:bg-teal-glow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <Button onClick={handleCreate} disabled={!formData.mode_of_payment.trim()} module="books">
                 Create
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="px-4 py-2 rounded-lg bg-slate-elevated text-slate-muted text-sm hover:bg-slate-border"
-              >
+              </Button>
+              <Button onClick={cancelEdit} variant="secondary">
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -6,8 +6,12 @@ import {
   BarChart3,
   FolderKanban,
   Settings,
+  FileTemplate,
 } from 'lucide-react';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 // Project Management Flow:
 // 1. PLAN: Define scope, resources, timeline
@@ -25,6 +29,15 @@ const sections: NavSection[] = [
     ],
   },
   {
+    key: 'templates',
+    label: 'Templates',
+    description: 'Reusable project structures',
+    icon: FileTemplate,
+    items: [
+      { name: 'Templates', href: '/projects/templates', description: 'Manage project templates' },
+    ],
+  },
+  {
     key: 'analytics',
     label: 'Analytics',
     description: 'Performance & progress',
@@ -37,6 +50,7 @@ const sections: NavSection[] = [
 
 const quickLinks: QuickLink[] = [
   { label: 'Projects', href: '/projects', icon: FolderKanban, color: 'amber-400' },
+  { label: 'Templates', href: '/projects/templates', icon: FileTemplate, color: 'emerald-400' },
   { label: 'Analytics', href: '/projects/analytics', icon: BarChart3, color: 'cyan-400' },
 ];
 
@@ -55,10 +69,29 @@ const workflowSteps: WorkflowStep[] = [
 function getWorkflowPhase(sectionKey: string | null): string {
   if (!sectionKey) return 'plan';
   if (sectionKey === 'portfolio') return 'execute';
+  if (sectionKey === 'templates') return 'plan';
   return 'deliver';
 }
 
 export default function ProjectsLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('projects:read');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
+
   return (
     <ModuleLayout
       moduleName="Dotmac"

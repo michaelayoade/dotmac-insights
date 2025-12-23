@@ -5,11 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Users } from 'lucide-react';
 import { useFinanceCustomerMutations } from '@/hooks/useApi';
+import { useFormErrors } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
 
 export default function SalesCustomerCreatePage() {
   const router = useRouter();
   const { createCustomer } = useFinanceCustomerMutations();
+  const { errors: fieldErrors, setErrors } = useFormErrors();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,12 +31,11 @@ export default function SalesCustomerCreatePage() {
   const [signupDate, setSignupDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Name is required';
-    setFieldErrors(errs);
+    setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
@@ -201,21 +203,21 @@ export default function SalesCustomerCreatePage() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => router.back()}
             className="px-4 py-2 rounded-md border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             disabled={submitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-md bg-teal-electric text-slate-deep font-semibold hover:bg-teal-glow disabled:opacity-60"
           >
             {submitting ? 'Saving...' : 'Save Customer'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

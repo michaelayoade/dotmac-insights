@@ -1,0 +1,16 @@
+{% extends "notifications/_base.txt.j2" %}
+{% set title = "Period Closed" %}
+{% set icon = "lock" %}
+{% set priority = "normal" %}
+
+{% block content %}
+An accounting period has been closed.
+
+Period: {{ period_name | default('Period') }}
+Start Date: {{ start_date | default('N/A') }}
+End Date: {{ end_date | default('N/A') }}
+Closed By: {{ closed_by | default('System') }}
+Closed At: {{ closed_at | default('Now') }}
+
+No further transactions can be posted to this period without reopening it.
+{% endblock %}

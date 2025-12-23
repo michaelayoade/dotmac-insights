@@ -5,8 +5,6 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import {
   ClipboardList,
-  Search,
-  Filter,
   Plus,
   MapPin,
   Calendar,
@@ -18,6 +16,7 @@ import {
 } from 'lucide-react';
 import { fieldServiceApi, FieldServiceOrder, FieldServiceOrderPriority, FieldServiceOrderStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 const statusConfig: Record<FieldServiceOrderStatus, { color: string; bg: string; label: string }> = {
   draft: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Draft' },
@@ -82,49 +81,35 @@ export default function ServiceOrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex flex-wrap gap-4">
-          {/* Search */}
-          <div className="flex-1 min-w-[250px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-              <input
-                type="text"
-                placeholder="Search orders, customers, technicians..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground placeholder-slate-muted focus:outline-none focus:border-teal-electric/50"
-              />
-            </div>
-          </div>
-
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
-          >
-            <option value="all">All Status</option>
-            {Object.entries(statusConfig).map(([value, { label }]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-
-          {/* Priority Filter */}
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-foreground focus:outline-none focus:border-teal-electric/50"
-          >
-            <option value="all">All Priority</option>
-            <option value="emergency">Emergency</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-      </div>
+      <FilterCard contentClassName="flex flex-wrap gap-4">
+        <FilterInput
+          type="text"
+          placeholder="Search orders, customers, technicians..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-[250px]"
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All Status</option>
+          {Object.entries(statusConfig).map(([value, { label }]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+        >
+          <option value="all">All Priority</option>
+          <option value="emergency">Emergency</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Orders List */}
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
@@ -250,23 +235,23 @@ export default function ServiceOrdersPage() {
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}
                 </p>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
                     className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="w-4 h-4" />
-                  </button>
+                  </Button>
                   <span className="text-sm text-foreground px-2">
                     Page {page} of {totalPages}
                   </span>
-                  <button
+                  <Button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
                     className="p-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="w-4 h-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

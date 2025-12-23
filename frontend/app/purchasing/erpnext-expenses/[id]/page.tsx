@@ -8,6 +8,8 @@ import { useERPNextExpenseDetail } from '@/hooks/useApi';
 import { purchasingApi, ERPNextExpenseClaimPayload } from '@/lib/api/domains/purchasing';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/formatters';
+import { Button } from '@/components/ui';
 import {
   ArrowLeft,
   Edit3,
@@ -26,26 +28,6 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '\u20A60';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
 
 const EXPENSE_STATUSES = ['draft', 'submitted', 'approved', 'rejected', 'paid'] as const;
 
@@ -209,20 +191,20 @@ export default function ERPNextExpenseDetailPage() {
         </div>
         {!editing && (
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={handleStartEdit}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-teal-electric/50"
             >
               <Edit3 className="w-4 h-4" />
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setDeleteConfirm(true)}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10"
             >
               <Trash2 className="w-4 h-4" />
               Delete
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -255,7 +237,7 @@ export default function ERPNextExpenseDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
                 onClick={handleDelete}
                 disabled={deleting}
                 className={cn(
@@ -265,13 +247,13 @@ export default function ERPNextExpenseDetailPage() {
               >
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                 {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setDeleteConfirm(false)}
                 className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -465,7 +447,7 @@ export default function ERPNextExpenseDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            <Button
               onClick={handleSave}
               disabled={saving}
               className={cn(
@@ -475,13 +457,13 @@ export default function ERPNextExpenseDetailPage() {
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setEditing(false)}
               className="px-4 py-2 rounded-lg border border-slate-border text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

@@ -1,0 +1,12 @@
+{# Period closing notification #}
+{% set title = "Period Closing" %}
+{% set icon = "clock" %}
+{% set priority = "normal" %}
+
+Fiscal period {{ period_name | default('') }} is closing soon.
+{% if closing_date %}
+Closing Date: {{ closing_date | format_date }}
+{% endif %}
+{% if pending_entries %}
+Pending Entries: {{ pending_entries }}
+{% endif %}

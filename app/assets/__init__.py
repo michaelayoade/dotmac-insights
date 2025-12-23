@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.database import get_db
 from app.models.asset import (
@@ -37,8 +37,7 @@ class AssetFinanceBookSchema(BaseModel):
     expected_value_after_useful_life: Decimal = Decimal("0")
     rate_of_depreciation: Decimal = Decimal("0")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetDepreciationScheduleSchema(BaseModel):
@@ -49,8 +48,7 @@ class AssetDepreciationScheduleSchema(BaseModel):
     journal_entry: Optional[str] = None
     depreciation_booked: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetCreatePayload(BaseModel):

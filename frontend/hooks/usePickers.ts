@@ -5,7 +5,7 @@
  * with caching via SWR and standardized error handling.
  */
 
-import useSWR from 'swr';
+import useSWR, { type SWRConfiguration } from 'swr';
 import { fetchApi } from '@/lib/api/core';
 
 // =============================================================================
@@ -75,7 +75,10 @@ export function useTeamOptions() {
 /**
  * Fetch all active employees for picker
  */
-export function useEmployeeOptions(filter?: { department?: string; status?: string }) {
+export function useEmployeeOptions(
+  filter?: { department?: string; status?: string },
+  config?: SWRConfiguration
+) {
   const params = new URLSearchParams();
   if (filter?.department) params.set('department', filter.department);
   if (filter?.status) params.set('status', filter.status);
@@ -90,6 +93,7 @@ export function useEmployeeOptions(filter?: { department?: string; status?: stri
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
+      ...config,
     }
   );
 

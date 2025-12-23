@@ -1,35 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { AlertTriangle, Filter, MessageCircle, Search, Globe, Users, User, Hash, FileText, FolderOpen, Copy } from 'lucide-react';
+import { AlertTriangle, MessageCircle, Globe, Users, User, Hash, FileText, FolderOpen, Copy } from 'lucide-react';
 import { useSupportCannedCategories, useSupportCannedResponses } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  colorClass?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <p className={cn('text-2xl font-bold mt-1', colorClass)}>{value}</p>
-        </div>
-        <div className="p-2 rounded-lg bg-slate-elevated">
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 
 function getScopeIcon(scope: string) {
   switch (scope?.toLowerCase()) {
@@ -118,69 +94,55 @@ export default function SupportCannedResponsesPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MetricCard label="Total Responses" value={metrics.total} icon={FileText} colorClass="text-blue-400" />
-        <MetricCard label="Global" value={metrics.global} icon={Globe} colorClass="text-emerald-400" />
-        <MetricCard label="Team" value={metrics.team} icon={Users} colorClass="text-violet-400" />
-        <MetricCard label="Personal" value={metrics.personal} icon={User} colorClass="text-amber-400" />
-        <MetricCard label="With Shortcode" value={metrics.withShortcode} icon={Hash} colorClass="text-cyan-400" />
-        <MetricCard label="Categories" value={metrics.categories} icon={FolderOpen} colorClass="text-rose-400" />
+        <StatCard title="Total Responses" value={metrics.total} icon={FileText} colorClass="text-blue-400" />
+        <StatCard title="Global" value={metrics.global} icon={Globe} colorClass="text-emerald-400" />
+        <StatCard title="Team" value={metrics.team} icon={Users} colorClass="text-violet-400" />
+        <StatCard title="Personal" value={metrics.personal} icon={User} colorClass="text-amber-400" />
+        <StatCard title="With Shortcode" value={metrics.withShortcode} icon={Hash} colorClass="text-cyan-400" />
+        <StatCard title="Categories" value={metrics.categories} icon={FolderOpen} colorClass="text-rose-400" />
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-            <input
-              type="text"
-              placeholder="Search responses..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-3 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          {/* Scope */}
-          <select
-            value={scope}
-            onChange={(e) => setScope(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+      <FilterCard
+        actions={(search || scope || category) && (
+          <Button
+            onClick={() => {
+              setSearch('');
+              setScope('');
+              setCategory('');
+            }}
+            className="px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:bg-slate-elevated transition-colors"
           >
-            <option value="">All scopes</option>
-            <option value="personal">Personal</option>
-            <option value="team">Team</option>
-            <option value="global">Global</option>
-          </select>
-          {/* Category */}
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-          >
-            <option value="">All categories</option>
-            {(categoryList ?? []).map((cat: any) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          {/* Clear filters button */}
-          {(search || scope || category) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setScope('');
-                setCategory('');
-              }}
-              className="px-3 py-2 text-sm text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:bg-slate-elevated transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </div>
+            Clear filters
+          </Button>
+        )}
+        contentClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"
+      >
+        <FilterInput
+          type="text"
+          placeholder="Search responses..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <FilterSelect
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+        >
+          <option value="">All scopes</option>
+          <option value="personal">Personal</option>
+          <option value="team">Team</option>
+          <option value="global">Global</option>
+        </FilterSelect>
+        <FilterSelect
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          <option value="">All categories</option>
+          {(categoryList ?? []).map((cat: any) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </FilterSelect>
+      </FilterCard>
 
       {/* Responses List */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-5">
@@ -211,7 +173,7 @@ export default function SupportCannedResponsesPage() {
                       <div className="flex items-center gap-2">
                         <p className="text-foreground font-semibold">{resp.name}</p>
                         {resp.shortcode && (
-                          <button
+                          <Button
                             onClick={() => copyToClipboard(resp.shortcode)}
                             className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-elevated text-xs text-cyan-400 hover:bg-slate-border transition-colors"
                             title="Copy shortcode"
@@ -219,7 +181,7 @@ export default function SupportCannedResponsesPage() {
                             <Hash className="w-3 h-3" />
                             {resp.shortcode}
                             <Copy className="w-3 h-3 ml-1" />
-                          </button>
+                          </Button>
                         )}
                       </div>
                       <p className="text-slate-muted text-sm line-clamp-3 mt-2">{resp.content}</p>

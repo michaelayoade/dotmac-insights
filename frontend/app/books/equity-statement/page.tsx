@@ -21,16 +21,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface MovementRowProps {
   label: string;
@@ -59,7 +51,7 @@ function MovementRow({ label, value, currency, isSubItem, isTotal, colorClass }:
         )}
       >
         {value >= 0 ? '' : '('}
-        {formatCurrency(Math.abs(value), currency)}
+        {formatAccountingCurrency(Math.abs(value), currency)}
         {value < 0 ? ')' : ''}
       </span>
     </div>
@@ -95,7 +87,7 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
 
   return (
     <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-      <button
+      <Button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 hover:bg-slate-elevated transition-colors"
       >
@@ -104,14 +96,14 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
           <div className="text-left">
             <h4 className="font-semibold text-foreground">{component.component}</h4>
             <p className="text-sm text-slate-muted">
-              {formatCurrency(component.opening_balance, currency)} → {formatCurrency(component.closing_balance, currency)}
+              {formatAccountingCurrency(component.opening_balance, currency)} → {formatAccountingCurrency(component.closing_balance, currency)}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
             <span className={cn('font-mono font-bold', netChange >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {netChange >= 0 ? '+' : ''}{formatCurrency(netChange, currency)}
+              {netChange >= 0 ? '+' : ''}{formatAccountingCurrency(netChange, currency)}
             </span>
           </div>
           {isOpen ? (
@@ -120,7 +112,7 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
             <ChevronRight className="w-5 h-5 text-slate-muted" />
           )}
         </div>
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="px-4 pb-4 space-y-2">
@@ -170,7 +162,7 @@ function ComponentCard({ component, currency }: ComponentCardProps) {
               {Object.entries(component.accounts).map(([account, balance]) => (
                 <div key={account} className="flex justify-between py-1 text-sm">
                   <span className="text-slate-muted">{account}</span>
-                  <span className="font-mono text-foreground">{formatCurrency(balance, currency)}</span>
+                  <span className="font-mono text-foreground">{formatAccountingCurrency(balance, currency)}</span>
                 </div>
               ))}
             </div>
@@ -247,7 +239,7 @@ export default function EquityStatementPage() {
             />
           </div>
           {(startDate || endDate) && (
-            <button
+            <Button
               onClick={() => {
                 setStartDate('');
                 setEndDate('');
@@ -255,23 +247,23 @@ export default function EquityStatementPage() {
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
           <div className="flex gap-2">
-            <button
+            <Button
               onClick={() => exportStatement('csv')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <Download className="w-4 h-4" />
               CSV
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => exportStatement('pdf')}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-border text-sm text-slate-muted hover:text-foreground hover:border-slate-border/70"
             >
               <BarChart2 className="w-4 h-4" />
               PDF
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -284,7 +276,7 @@ export default function EquityStatementPage() {
               <PiggyBank className="w-5 h-5 text-slate-muted" />
               <p className="text-slate-muted text-sm">Opening Equity</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(summary.total_opening_equity, currency)}</p>
+            <p className="text-2xl font-bold text-foreground">{formatAccountingCurrency(summary.total_opening_equity, currency)}</p>
           </div>
 
           <div className={cn(
@@ -302,12 +294,12 @@ export default function EquityStatementPage() {
               </p>
             </div>
             <p className={cn('text-2xl font-bold', summary.total_comprehensive_income >= 0 ? 'text-green-400' : 'text-red-400')}>
-              {formatCurrency(summary.total_comprehensive_income, currency)}
+              {formatAccountingCurrency(summary.total_comprehensive_income, currency)}
             </p>
             <div className="mt-2 text-xs text-slate-muted">
-              <span>Profit: {formatCurrency(summary.profit_for_period, currency)}</span>
+              <span>Profit: {formatAccountingCurrency(summary.profit_for_period, currency)}</span>
               {summary.other_comprehensive_income !== 0 && (
-                <span className="ml-2">| OCI: {formatCurrency(summary.other_comprehensive_income, currency)}</span>
+                <span className="ml-2">| OCI: {formatAccountingCurrency(summary.other_comprehensive_income, currency)}</span>
               )}
             </div>
           </div>
@@ -318,7 +310,7 @@ export default function EquityStatementPage() {
               <p className="text-purple-400 text-sm">Owner Transactions</p>
             </div>
             <p className="text-2xl font-bold text-purple-400">
-              {formatCurrency(
+              {formatAccountingCurrency(
                 (summary.transactions_with_owners?.dividends_paid || 0) +
                 (summary.transactions_with_owners?.share_issues || 0) +
                 (summary.transactions_with_owners?.treasury_share_transactions || 0),
@@ -327,10 +319,10 @@ export default function EquityStatementPage() {
             </p>
             <div className="mt-2 text-xs text-slate-muted space-y-1">
               {summary.transactions_with_owners?.dividends_paid !== 0 && (
-                <div>Dividends: {formatCurrency(summary.transactions_with_owners.dividends_paid, currency)}</div>
+                <div>Dividends: {formatAccountingCurrency(summary.transactions_with_owners.dividends_paid, currency)}</div>
               )}
               {summary.transactions_with_owners?.share_issues !== 0 && (
-                <div>Share Issues: {formatCurrency(summary.transactions_with_owners.share_issues, currency)}</div>
+                <div>Share Issues: {formatAccountingCurrency(summary.transactions_with_owners.share_issues, currency)}</div>
               )}
             </div>
           </div>
@@ -340,10 +332,10 @@ export default function EquityStatementPage() {
               <PiggyBank className="w-5 h-5 text-teal-electric" />
               <p className="text-teal-electric text-sm">Closing Equity</p>
             </div>
-            <p className="text-2xl font-bold text-teal-electric">{formatCurrency(summary.total_closing_equity, currency)}</p>
+            <p className="text-2xl font-bold text-teal-electric">{formatAccountingCurrency(summary.total_closing_equity, currency)}</p>
             <div className="mt-2 text-xs">
               <span className={cn(summary.change_in_equity >= 0 ? 'text-green-400' : 'text-red-400')}>
-                {summary.change_in_equity >= 0 ? '+' : ''}{formatCurrency(summary.change_in_equity, currency)} change
+                {summary.change_in_equity >= 0 ? '+' : ''}{formatAccountingCurrency(summary.change_in_equity, currency)} change
               </span>
             </div>
           </div>
@@ -357,20 +349,20 @@ export default function EquityStatementPage() {
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <div className="text-center">
               <p className="text-slate-muted text-xs mb-1">Opening Equity</p>
-              <p className="font-mono font-bold text-foreground">{formatCurrency(summary.total_opening_equity, currency)}</p>
+              <p className="font-mono font-bold text-foreground">{formatAccountingCurrency(summary.total_opening_equity, currency)}</p>
             </div>
             <ArrowRight className="w-5 h-5 text-slate-muted" />
             <div className="text-center">
               <p className="text-slate-muted text-xs mb-1">+ Comprehensive Income</p>
               <p className={cn('font-mono font-bold', summary.total_comprehensive_income >= 0 ? 'text-green-400' : 'text-red-400')}>
-                {summary.total_comprehensive_income >= 0 ? '+' : ''}{formatCurrency(summary.total_comprehensive_income, currency)}
+                {summary.total_comprehensive_income >= 0 ? '+' : ''}{formatAccountingCurrency(summary.total_comprehensive_income, currency)}
               </p>
             </div>
             <ArrowRight className="w-5 h-5 text-slate-muted" />
             <div className="text-center">
               <p className="text-slate-muted text-xs mb-1">+/- Owner Transactions</p>
               <p className="font-mono font-bold text-purple-400">
-                {formatCurrency(
+                {formatAccountingCurrency(
                   (summary.transactions_with_owners?.dividends_paid || 0) +
                   (summary.transactions_with_owners?.share_issues || 0) +
                   (summary.transactions_with_owners?.treasury_share_transactions || 0),
@@ -381,7 +373,7 @@ export default function EquityStatementPage() {
             <ArrowRight className="w-5 h-5 text-slate-muted" />
             <div className="text-center">
               <p className="text-slate-muted text-xs mb-1">= Closing Equity</p>
-              <p className="font-mono font-bold text-teal-electric">{formatCurrency(summary.total_closing_equity, currency)}</p>
+              <p className="font-mono font-bold text-teal-electric">{formatAccountingCurrency(summary.total_closing_equity, currency)}</p>
             </div>
           </div>
         </div>
@@ -430,49 +422,49 @@ export default function EquityStatementPage() {
           <div className="p-4 space-y-1">
             <div className="flex justify-between py-2 border-b border-slate-border/50">
               <span className="text-foreground">Opening Equity</span>
-              <span className="font-mono text-foreground">{formatCurrency(reconciliation.opening_equity, currency)}</span>
+              <span className="font-mono text-foreground">{formatAccountingCurrency(reconciliation.opening_equity, currency)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-border/50">
               <span className="text-slate-muted pl-4">Add: Profit for the period</span>
-              <span className="font-mono text-green-400">+{formatCurrency(reconciliation.add_profit_for_period, currency)}</span>
+              <span className="font-mono text-green-400">+{formatAccountingCurrency(reconciliation.add_profit_for_period, currency)}</span>
             </div>
             {reconciliation.add_other_comprehensive_income !== 0 && (
               <div className="flex justify-between py-2 border-b border-slate-border/50">
                 <span className="text-slate-muted pl-4">Add: Other Comprehensive Income</span>
                 <span className={cn('font-mono', reconciliation.add_other_comprehensive_income >= 0 ? 'text-green-400' : 'text-red-400')}>
-                  {reconciliation.add_other_comprehensive_income >= 0 ? '+' : ''}{formatCurrency(reconciliation.add_other_comprehensive_income, currency)}
+                  {reconciliation.add_other_comprehensive_income >= 0 ? '+' : ''}{formatAccountingCurrency(reconciliation.add_other_comprehensive_income, currency)}
                 </span>
               </div>
             )}
             {reconciliation.less_dividends !== 0 && (
               <div className="flex justify-between py-2 border-b border-slate-border/50">
                 <span className="text-slate-muted pl-4">Less: Dividends Paid</span>
-                <span className="font-mono text-red-400">{formatCurrency(reconciliation.less_dividends, currency)}</span>
+                <span className="font-mono text-red-400">{formatAccountingCurrency(reconciliation.less_dividends, currency)}</span>
               </div>
             )}
             {reconciliation.add_share_issues !== 0 && (
               <div className="flex justify-between py-2 border-b border-slate-border/50">
                 <span className="text-slate-muted pl-4">Add: Share Issues</span>
-                <span className="font-mono text-green-400">+{formatCurrency(reconciliation.add_share_issues, currency)}</span>
+                <span className="font-mono text-green-400">+{formatAccountingCurrency(reconciliation.add_share_issues, currency)}</span>
               </div>
             )}
             {reconciliation.less_treasury_shares !== 0 && (
               <div className="flex justify-between py-2 border-b border-slate-border/50">
                 <span className="text-slate-muted pl-4">Less: Treasury Share Transactions</span>
-                <span className="font-mono text-red-400">{formatCurrency(reconciliation.less_treasury_shares, currency)}</span>
+                <span className="font-mono text-red-400">{formatAccountingCurrency(reconciliation.less_treasury_shares, currency)}</span>
               </div>
             )}
             {reconciliation.other_movements !== 0 && (
               <div className="flex justify-between py-2 border-b border-slate-border/50">
                 <span className="text-slate-muted pl-4">Other Movements</span>
                 <span className={cn('font-mono', reconciliation.other_movements >= 0 ? 'text-green-400' : 'text-red-400')}>
-                  {reconciliation.other_movements >= 0 ? '+' : ''}{formatCurrency(reconciliation.other_movements, currency)}
+                  {reconciliation.other_movements >= 0 ? '+' : ''}{formatAccountingCurrency(reconciliation.other_movements, currency)}
                 </span>
               </div>
             )}
             <div className="flex justify-between py-3 border-t-2 border-slate-border font-bold">
               <span className="text-foreground">Closing Equity</span>
-              <span className="font-mono text-lg text-teal-electric">{formatCurrency(reconciliation.closing_equity, currency)}</span>
+              <span className="font-mono text-lg text-teal-electric">{formatAccountingCurrency(reconciliation.closing_equity, currency)}</span>
             </div>
           </div>
         </div>

@@ -1,7 +1,10 @@
 'use client';
 
 import { LayoutDashboard, ShieldCheck, Settings, Webhook } from 'lucide-react';
-import { ModuleLayout, NavSection } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection } from '@/components/ModuleLayout';
 
 const sections: NavSection[] = [
   {
@@ -46,6 +49,24 @@ const sections: NavSection[] = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { hasAccess, isLoading: authLoading } = useRequireScope('admin:read');
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
+
   return (
     <ModuleLayout
       moduleName="Dotmac"

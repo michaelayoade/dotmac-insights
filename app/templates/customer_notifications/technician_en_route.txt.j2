@@ -1,0 +1,14 @@
+{# Technician en route notification #}
+{% set title = "Technician On The Way!" %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Great news! Your technician {{ technician_name | default('') }} is on the way to your location.
+
+Order: #{{ order_number }}
+Estimated Arrival: {{ eta | default('Shortly') }}
+Address: {{ service_address }}
+
+Please ensure someone is available to provide access.
+
+You can track their progress or contact them if needed.

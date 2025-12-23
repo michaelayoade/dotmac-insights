@@ -4,16 +4,8 @@ import { useState } from 'react';
 import { useAccountingBalanceSheet } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, FileSpreadsheet, Building2, CreditCard, PiggyBank, Calendar, Loader2 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 interface AccountLineProps {
   name: string;
@@ -35,7 +27,7 @@ function AccountLine({ name, amount, indent = 0, bold, className }: AccountLineP
         'font-mono',
         amount >= 0 ? 'text-foreground' : 'text-red-400'
       )}>
-        {formatCurrency(amount)}
+        {formatAccountingCurrency(amount)}
       </span>
     </div>
   );
@@ -78,7 +70,7 @@ function Section({ title, icon: Icon, items, total, colorClass }: SectionProps) 
       <div className={cn('flex justify-between items-center pt-4 mt-4 border-t-2 border-slate-border')}>
         <span className={cn('font-bold', colorClass)}>Total {title}</span>
         <span className={cn('font-mono font-bold text-lg', colorClass)}>
-          {formatCurrency(total)}
+          {formatAccountingCurrency(total)}
         </span>
       </div>
     </div>
@@ -160,12 +152,12 @@ export default function BalanceSheetPage() {
             />
           </div>
           {asOfDate && (
-            <button
+            <Button
               onClick={() => setAsOfDate('')}
               className="text-slate-muted text-sm hover:text-foreground transition-colors"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -177,21 +169,21 @@ export default function BalanceSheetPage() {
             <Building2 className="w-5 h-5 text-blue-400" />
             <p className="text-blue-400 text-sm">Total Assets</p>
           </div>
-          <p className="text-2xl font-bold text-blue-400">{formatCurrency(assets.total)}</p>
+          <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(assets.total)}</p>
         </div>
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <CreditCard className="w-5 h-5 text-red-400" />
             <p className="text-red-400 text-sm">Total Liabilities</p>
           </div>
-          <p className="text-2xl font-bold text-red-400">{formatCurrency(liabilities.total)}</p>
+          <p className="text-2xl font-bold text-red-400">{formatAccountingCurrency(liabilities.total)}</p>
         </div>
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <PiggyBank className="w-5 h-5 text-green-400" />
             <p className="text-green-400 text-sm">Total Equity</p>
           </div>
-          <p className="text-2xl font-bold text-green-400">{formatCurrency(equity.total)}</p>
+          <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(equity.total)}</p>
         </div>
       </div>
 
@@ -228,17 +220,17 @@ export default function BalanceSheetPage() {
         <div className="flex items-center justify-center gap-4 text-lg">
           <div className="text-center">
             <p className="text-slate-muted text-sm">Assets</p>
-            <p className="font-mono font-bold text-blue-400">{formatCurrency(assets.total)}</p>
+            <p className="font-mono font-bold text-blue-400">{formatAccountingCurrency(assets.total)}</p>
           </div>
           <span className="text-slate-muted">=</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Liabilities</p>
-            <p className="font-mono font-bold text-red-400">{formatCurrency(liabilities.total)}</p>
+            <p className="font-mono font-bold text-red-400">{formatAccountingCurrency(liabilities.total)}</p>
           </div>
           <span className="text-slate-muted">+</span>
           <div className="text-center">
             <p className="text-slate-muted text-sm">Equity</p>
-            <p className="font-mono font-bold text-green-400">{formatCurrency(equity.total)}</p>
+            <p className="font-mono font-bold text-green-400">{formatAccountingCurrency(equity.total)}</p>
           </div>
         </div>
         <div className="mt-4 pt-4 border-t border-slate-border text-center">
@@ -250,7 +242,7 @@ export default function BalanceSheetPage() {
                 ? 'text-green-400'
                 : 'text-red-400'
             )}>
-              {formatCurrency(assets.total - (liabilities.total + equity.total))}
+              {formatAccountingCurrency(assets.total - (liabilities.total + equity.total))}
             </span>
           </p>
         </div>

@@ -1,0 +1,11 @@
+{# Performance scorecard rejected notification #}
+{% set title = "Scorecard Needs Revision" %}
+{% set icon = "alert-circle" %}
+{% set priority = "high" %}
+
+Your scorecard for {{ period_name | default('this period') }} requires revision.
+{% if reason %}
+Reason: {{ reason }}
+{% else %}
+Please review comments.
+{% endif %}

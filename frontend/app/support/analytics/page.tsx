@@ -28,7 +28,6 @@ import {
   Users,
   Target,
   Calendar,
-  Filter,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -47,7 +46,8 @@ import {
   useSupportRoutingQueueHealth,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { PageHeader } from '@/components/ui';
+import { FilterCard, FilterSelect, PageHeader } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
 import { CHART_COLORS } from '@/lib/design-tokens';
 
 // Chart styling constants
@@ -63,49 +63,6 @@ const TOOLTIP_STYLE = {
 // =============================================================================
 // UTILITY COMPONENTS
 // =============================================================================
-
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  colorClass = 'text-teal-electric',
-  trend,
-  loading,
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  trend?: { value: number; positive?: boolean };
-  loading?: boolean;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors">
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-slate-muted text-sm">{title}</p>
-          {loading ? (
-            <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-          ) : (
-            <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-          )}
-          {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-          {trend && (
-            <div className={cn('flex items-center gap-1 text-xs', trend.positive ? 'text-emerald-400' : 'text-rose-400')}>
-              {trend.positive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              <span>{Math.abs(trend.value).toFixed(1)}%</span>
-            </div>
-          )}
-        </div>
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ChartCard({ title, subtitle, icon: Icon, children }: { title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
   return (
@@ -237,53 +194,45 @@ export default function SupportAnalyticsPage() {
       />
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Time Range</span>
+      <FilterCard title="Time Range" contentClassName="flex flex-wrap gap-4 items-center">
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Trend Months</label>
+          <FilterSelect
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+          >
+            <option value={3}>3 months</option>
+            <option value={6}>6 months</option>
+            <option value={12}>12 months</option>
+          </FilterSelect>
         </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Trend Months</label>
-            <select
-              value={months}
-              onChange={(e) => setMonths(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            >
-              <option value={3}>3 months</option>
-              <option value={6}>6 months</option>
-              <option value={12}>12 months</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-muted mb-1 block">Breakdown Days</label>
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={60}>60 days</option>
-              <option value={90}>90 days</option>
-            </select>
-          </div>
+        <div>
+          <label className="text-xs text-slate-muted mb-1 block">Breakdown Days</label>
+          <FilterSelect
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </FilterSelect>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Key Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        <MetricCard
+        <StatCard
           title="Total Tickets"
           value={totalTickets}
           subtitle={`${days}d window`}
           icon={Activity}
           colorClass="text-blue-400"
           loading={dashboardLoading}
-          trend={volumeTrendPct ? { value: volumeTrendPct, positive: volumeTrendPct < 0 } : undefined}
+          trend={volumeTrendPct ? { value: volumeTrendPct < 0 ? 1 : -1, label: `${Math.abs(volumeTrendPct).toFixed(1)}%` } : undefined}
         />
-        <MetricCard
+        <StatCard
           title="Open"
           value={openTickets}
           subtitle={`Avg res ${avgResolutionHours.toFixed(1)}h`}
@@ -291,7 +240,7 @@ export default function SupportAnalyticsPage() {
           colorClass="text-amber-400"
           loading={dashboardLoading}
         />
-        <MetricCard
+        <StatCard
           title="Resolved"
           value={resolvedTickets}
           subtitle={`${days}d window`}
@@ -299,7 +248,7 @@ export default function SupportAnalyticsPage() {
           colorClass="text-emerald-400"
           loading={dashboardLoading}
         />
-        <MetricCard
+        <StatCard
           title="Overdue"
           value={slaBreach?.currently_overdue ?? overdueTickets}
           subtitle={`${slaBreach?.total_breaches ?? 0} breached (${days}d)`}
@@ -307,7 +256,7 @@ export default function SupportAnalyticsPage() {
           colorClass="text-rose-400"
           loading={dashboardLoading}
         />
-        <MetricCard
+        <StatCard
           title="Unassigned"
           value={unassignedTickets || queueHealth?.unassigned_tickets || 0}
           subtitle={`${summary?.agent_count ?? queueHealth?.total_agents ?? 0} agents`}

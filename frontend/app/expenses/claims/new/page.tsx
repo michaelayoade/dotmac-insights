@@ -5,6 +5,9 @@ import { useExpenseCategories, useExpenseMutations } from "@/hooks/useExpenses";
 import { useEmployees } from "@/hooks/useApi";
 import { EmployeeSearch } from "@/components/EntitySearch";
 import type { ExpenseClaimCreatePayload, ExpenseClaimLinePayload } from "@/lib/expenses.types";
+import { LoadingState, Button } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 type FundingMethod = ExpenseClaimLinePayload["funding_method"];
 
@@ -24,9 +27,12 @@ const defaultLine = (): ExpenseClaimLinePayload => ({
 });
 
 export default function NewExpenseClaimPage() {
-  const { data: categories } = useExpenseCategories({ include_inactive: false });
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:write');
+  const canFetch = !authLoading && !missingScope;
+  const { data: categories } = useExpenseCategories({ include_inactive: false }, { isPaused: () => !canFetch });
   const { createClaim } = useExpenseMutations();
-  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ limit: 200 });
+  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ limit: 200 }, { isPaused: () => !canFetch });
   const employees = useMemo(() => employeesData?.items || [], [employeesData]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +91,20 @@ export default function NewExpenseClaimPage() {
       setSubmitting(false);
     }
   };
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:write permission to create expense claims."
+        backHref="/expenses/claims"
+        backLabel="Back to Claims"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -162,12 +182,12 @@ export default function NewExpenseClaimPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-foreground">Line Items</h3>
-          <button
+          <Button
             onClick={addLine}
             className="rounded-lg border border-teal-electric/30 bg-teal-electric/10 px-3 py-1 text-sm font-medium text-teal-electric"
           >
             Add line
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-4">
@@ -260,13 +280,13 @@ export default function NewExpenseClaimPage() {
                     </label>
                   )}
                 </div>
-                <button
+                <Button
                   className="text-sm text-red-400 underline"
                   onClick={() => removeLine(idx)}
                   disabled={form.lines.length === 1}
                 >
                   Remove
-                </button>
+                </Button>
               </div>
             </div>
           ))}
@@ -274,13 +294,13 @@ export default function NewExpenseClaimPage() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={submitting}
           className="rounded-lg bg-teal-electric px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm hover:bg-teal-electric/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Saving..." : "Create Claim"}
-        </button>
+        </Button>
         {error && <span className="text-sm text-red-400">{error}</span>}
         {success && <span className="text-sm text-green-400">{success}</span>}
       </div>

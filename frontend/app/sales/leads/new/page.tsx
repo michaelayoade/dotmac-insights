@@ -16,6 +16,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { useLeadMutations, useLeadSources } from '@/hooks/useApi';
+import { Button } from '@/components/ui';
 
 interface LeadFormData {
   lead_name: string;
@@ -380,14 +381,14 @@ export default function NewLeadPage() {
           >
             Cancel
           </Link>
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting}
             className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-foreground rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isSubmitting ? 'Creating...' : 'Create Lead'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

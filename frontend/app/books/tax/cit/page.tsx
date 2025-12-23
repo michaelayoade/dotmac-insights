@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useCITAssessments, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { formatCurrency } from '@/lib/utils';
+
 import {
   Building2,
   Plus,
@@ -17,21 +17,14 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 const CIT_RATES = [
   { size: 'SMALL', label: 'Small Company', rate: 0, turnoverMax: 25000000, description: 'Turnover < ₦25M' },
   { size: 'MEDIUM', label: 'Medium Company', rate: 20, turnoverMax: 100000000, description: 'Turnover ₦25M - ₦100M' },
   { size: 'LARGE', label: 'Large Company', rate: 30, turnoverMax: Infinity, description: 'Turnover > ₦100M' },
 ];
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export default function CITPage() {
   const [page, setPage] = useState(1);
@@ -73,7 +66,7 @@ export default function CITPage() {
       key: 'turnover',
       header: 'Turnover',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.turnover, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.turnover, 'NGN')}</span>,
     },
     {
       key: 'profit_before_tax',
@@ -81,7 +74,7 @@ export default function CITPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className={cn('font-mono', item.profit_before_tax >= 0 ? 'text-emerald-400' : 'text-red-400')}>
-          {formatCurrency(item.profit_before_tax, 'NGN')}
+          {formatAccountingCurrency(item.profit_before_tax, 'NGN')}
         </span>
       ),
     },
@@ -89,7 +82,7 @@ export default function CITPage() {
       key: 'taxable_profit',
       header: 'Taxable Profit',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.taxable_profit, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.taxable_profit, 'NGN')}</span>,
     },
     {
       key: 'cit_rate',
@@ -101,7 +94,7 @@ export default function CITPage() {
       header: 'CIT Liability',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-purple-300 font-semibold">{formatCurrency(item.cit_liability, 'NGN')}</span>
+        <span className="font-mono text-purple-300 font-semibold">{formatAccountingCurrency(item.cit_liability, 'NGN')}</span>
       ),
     },
     {
@@ -147,13 +140,13 @@ export default function CITPage() {
             <h1 className="text-xl font-semibold text-foreground">Company Income Tax (CIT)</h1>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setShowAssessmentForm(!showAssessmentForm)}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 text-purple-300 text-sm hover:bg-purple-500/30"
         >
           <Plus className="w-4 h-4" />
           New Assessment
-        </button>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -165,7 +158,7 @@ export default function CITPage() {
               <p className="text-slate-muted text-sm">Turnover ({latestAssessment.year})</p>
             </div>
             <p className="text-xl font-semibold text-foreground font-mono">
-              {formatCurrency(latestAssessment.turnover, 'NGN')}
+              {formatAccountingCurrency(latestAssessment.turnover, 'NGN')}
             </p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -181,7 +174,7 @@ export default function CITPage() {
               'text-xl font-semibold font-mono',
               latestProfitBeforeTax >= 0 ? 'text-emerald-400' : 'text-red-400'
             )}>
-              {formatCurrency(latestProfitBeforeTax, 'NGN')}
+              {formatAccountingCurrency(latestProfitBeforeTax, 'NGN')}
             </p>
           </div>
           <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -194,7 +187,7 @@ export default function CITPage() {
           <div className="bg-slate-card border border-purple-500/30 rounded-xl p-4">
             <p className="text-slate-muted text-sm">CIT Liability</p>
             <p className="text-2xl font-semibold text-purple-400 font-mono mt-1">
-              {formatCurrency(latestCitLiability, 'NGN')}
+              {formatAccountingCurrency(latestCitLiability, 'NGN')}
             </p>
           </div>
         </div>
@@ -344,7 +337,7 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
           <Plus className="w-4 h-4 text-purple-400" />
           New CIT Assessment
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
+        <Button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -384,14 +377,14 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         Adjustments
-      </button>
+      </Button>
 
       {showMore && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-border/50">
@@ -446,23 +439,23 @@ function CITAssessmentForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Pr
           </div>
           <div>
             <span className="text-slate-muted">Taxable Profit: </span>
-            <span className="text-foreground font-mono">{formatCurrency(taxableProfit, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatAccountingCurrency(taxableProfit, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">CIT Liability: </span>
-            <span className="text-purple-300 font-mono font-semibold">{formatCurrency(citLiability, 'NGN')}</span>
+            <span className="text-purple-300 font-mono font-semibold">{formatAccountingCurrency(citLiability, 'NGN')}</span>
             {citLiability < minimumTax && (
-              <span className="text-xs text-amber-400 ml-2">(Min tax: {formatCurrency(minimumTax, 'NGN')})</span>
+              <span className="text-xs text-amber-400 ml-2">(Min tax: {formatAccountingCurrency(minimumTax, 'NGN')})</span>
             )}
           </div>
         </div>
-        <button
+        <Button
           type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-purple-500/20 text-purple-300 font-semibold hover:bg-purple-500/30 disabled:opacity-60"
         >
           {saving ? 'Saving...' : 'Save Assessment'}
-        </button>
+        </Button>
       </div>
     </form>
   );

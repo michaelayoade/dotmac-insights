@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import Link from 'next/link';
+import { Button, LinkButton } from '@/components/ui';
 
 export default function Error({
   error,
@@ -39,20 +39,12 @@ export default function Error({
         )}
 
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-electric text-foreground rounded-lg font-medium hover:bg-teal-glow transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
+          <Button onClick={reset} icon={RefreshCw}>
             Try again
-          </button>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-elevated text-foreground rounded-lg font-medium hover:bg-slate-border transition-colors"
-          >
-            <Home className="w-4 h-4" />
+          </Button>
+          <LinkButton href="/" variant="secondary" icon={Home}>
             Dashboard
-          </Link>
+          </LinkButton>
         </div>
       </div>
     </div>

@@ -2,23 +2,24 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { CreditCard, Plus, Search, Filter, MoreVertical, Pause, Play, XCircle } from 'lucide-react';
+import { CreditCard, Plus, MoreVertical, Pause, Play, XCircle } from 'lucide-react';
 import { useCorporateCards, useCorporateCardMutations } from '@/hooks/useExpenses';
-import { cn } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import type { CorporateCard, CorporateCardStatus } from '@/lib/expenses.types';
+import { LoadingState, Button, FilterCard, FilterSelect, StatusPill } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-const STATUS_COLORS: Record<CorporateCardStatus, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Active' },
-  suspended: { bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Suspended' },
-  cancelled: { bg: 'bg-red-500/15', text: 'text-red-300', label: 'Cancelled' },
+const STATUS_TONES: Record<CorporateCardStatus, StatusTone> = {
+  active: 'success',
+  suspended: 'warning',
+  cancelled: 'danger',
 };
 
 function StatusBadge({ status }: { status: CorporateCardStatus }) {
-  const style = STATUS_COLORS[status] || STATUS_COLORS.active;
+  const tone = STATUS_TONES[status] || STATUS_TONES.active;
   return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', style.bg, style.text)}>
-      {style.label}
-    </span>
+    <StatusPill label={formatStatusLabel(status)} tone={tone} />
   );
 }
 
@@ -47,42 +48,42 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
           <p className="text-slate-muted text-xs">Credit limit</p>
         </div>
         <div className="relative">
-          <button
+          <Button
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-border/30 rounded-lg transition-colors"
           >
             <MoreVertical className="w-4 h-4" />
-          </button>
+          </Button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-full mt-1 z-20 bg-slate-card border border-slate-border rounded-lg shadow-xl py-1 min-w-[160px]">
                 {card.status === 'active' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('suspend', card); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Pause className="w-4 h-4" />
                     Suspend card
-                  </button>
+                  </Button>
                 )}
                 {card.status === 'suspended' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('activate', card); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-muted hover:text-foreground hover:bg-slate-elevated transition-colors"
                   >
                     <Play className="w-4 h-4" />
                     Activate card
-                  </button>
+                  </Button>
                 )}
                 {card.status !== 'cancelled' && (
-                  <button
+                  <Button
                     onClick={() => { onAction('cancel', card); setMenuOpen(false); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-slate-elevated transition-colors"
                   >
                     <XCircle className="w-4 h-4" />
                     Cancel card
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -94,9 +95,13 @@ function CardRow({ card, onAction }: { card: CorporateCard; onAction: (action: s
 }
 
 export default function CorporateCardsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [includeInactive, setIncludeInactive] = useState(false);
-  const { data: cards, isLoading } = useCorporateCards({ status: statusFilter || undefined, include_inactive: includeInactive });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data: cards, isLoading } = useCorporateCards({ status: statusFilter || undefined, include_inactive: includeInactive }, { isPaused: () => !canFetch });
   const { suspendCard, activateCard, cancelCard } = useCorporateCardMutations();
 
   const handleAction = async (action: string, card: CorporateCard) => {
@@ -112,6 +117,20 @@ export default function CorporateCardsPage() {
       console.error('Action failed:', error);
     }
   };
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view corporate cards."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -133,17 +152,17 @@ export default function CorporateCardsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <select
+      <FilterCard contentClassName="flex flex-wrap gap-3" iconClassName="text-violet-300">
+        <FilterSelect
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-foreground text-sm focus:outline-none focus:border-violet-500"
+          className="focus:border-violet-500"
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="cancelled">Cancelled</option>
-        </select>
+        </FilterSelect>
         <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-elevated border border-slate-border text-sm text-slate-muted cursor-pointer hover:text-foreground transition-colors">
           <input
             type="checkbox"
@@ -153,7 +172,7 @@ export default function CorporateCardsPage() {
           />
           Include inactive
         </label>
-      </div>
+      </FilterCard>
 
       {/* Cards list */}
       <div className="space-y-3">

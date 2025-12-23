@@ -15,6 +15,7 @@ import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { cn } from '@/lib/utils';
 import type { ScorecardTemplate } from '@/lib/performance.types';
+import { Button } from '@/components/ui';
 
 export default function TemplatesPage() {
   const [offset, setOffset] = useState(0);
@@ -109,12 +110,12 @@ export default function TemplatesPage() {
       align: 'right' as const,
       render: (item: ScorecardTemplate) => (
         <div className="flex items-center gap-2 justify-end">
-          <button
+          <Button
             title="Clone template"
             className="p-1 text-slate-400 hover:text-foreground"
           >
             <Copy className="w-4 h-4" />
-          </button>
+          </Button>
           <Link
             href={`/performance/templates/${item.id}`}
             className="text-slate-400 hover:text-foreground p-1"
@@ -158,7 +159,7 @@ export default function TemplatesPage() {
 
       {/* Filters */}
       <div className="flex gap-3">
-        <button
+        <Button
           onClick={() => setActiveOnly(!activeOnly)}
           className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
@@ -169,7 +170,7 @@ export default function TemplatesPage() {
         >
           {activeOnly ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
           Active Only
-        </button>
+        </Button>
       </div>
 
       {/* Info Card */}

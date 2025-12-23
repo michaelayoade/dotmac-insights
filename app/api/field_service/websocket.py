@@ -3,11 +3,28 @@ Field Service WebSocket API
 
 Real-time updates for dispatch board and technician tracking.
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
-from typing import Dict, List, Any, Optional
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, HTTPException
+from typing import Dict, List, Any, Optional, Set
 import json
 import asyncio
 from datetime import datetime
+from sqlalchemy.orm import Session
+import structlog
+
+from app.auth import (
+    AUTH_COOKIE_NAME,
+    Principal,
+    get_or_create_user,
+    get_origin_from_websocket,
+    is_token_denylisted,
+    validate_origin,
+    verify_jwt,
+    verify_service_token,
+)
+from app.config import settings
+from app.database import get_db
+
+ws_logger = structlog.get_logger("field_service.websocket")
 
 router = APIRouter()
 
@@ -187,6 +204,79 @@ async def broadcast_location_update(
 
 
 # =============================================================================
+# WEBSOCKET AUTHENTICATION
+# =============================================================================
+
+
+async def authenticate_field_service_websocket(
+    websocket: WebSocket,
+    db: Session,
+) -> Optional[Principal]:
+    """Authenticate WebSocket via bearer token or cookie.
+
+    Returns Principal if authenticated, None otherwise.
+    """
+    token: Optional[str] = None
+
+    # Try Authorization header first
+    auth_header = websocket.headers.get("authorization")
+    if auth_header:
+        parts = auth_header.split(" ", 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1].strip()
+
+    # Fall back to cookie
+    if not token:
+        token = websocket.cookies.get(AUTH_COOKIE_NAME)
+
+    if not token:
+        return None
+
+    try:
+        # Service token (no dots)
+        if "." not in token:
+            service_token = await verify_service_token(token, db)
+            return Principal(
+                type="service_token",
+                id=service_token.id,
+                external_id=None,
+                email=None,
+                name=service_token.name,
+                is_superuser=False,
+                scopes=set(service_token.scope_list),
+            )
+
+        # JWT
+        claims = await verify_jwt(token)
+
+        if claims.jti and await is_token_denylisted(claims.jti, db):
+            return None
+
+        user = await get_or_create_user(claims, db)
+        if not user.is_active:
+            return None
+
+        principal_scopes = user.all_permissions
+        is_superuser = user.is_superuser
+        if settings.e2e_jwt_secret and settings.e2e_auth_enabled and claims.scopes is not None:
+            principal_scopes = set(claims.scopes or [])
+            is_superuser = False
+
+        return Principal(
+            type="user",
+            id=user.id,
+            external_id=user.external_id,
+            email=user.email,
+            name=user.name,
+            is_superuser=is_superuser,
+            scopes=principal_scopes,
+            raw_claims=claims.model_dump(),
+        )
+    except HTTPException:
+        return None
+
+
+# =============================================================================
 # WEBSOCKET ENDPOINTS
 # =============================================================================
 
@@ -194,8 +284,45 @@ async def broadcast_location_update(
 async def dispatch_websocket(
     websocket: WebSocket,
     team_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
 ):
-    """WebSocket endpoint for dispatch board real-time updates."""
+    """WebSocket endpoint for dispatch board real-time updates.
+
+    Security:
+    - Requires valid Origin header matching CORS allowed origins (CSWSH protection)
+    - Requires valid JWT/service token with field-service:read scope
+    """
+    # CSWSH Protection: Validate Origin header
+    origin = get_origin_from_websocket(websocket)
+    if not validate_origin(origin, settings.cors_origins_list):
+        ws_logger.warning(
+            "websocket_origin_rejected",
+            origin=origin,
+            channel="dispatch",
+        )
+        await websocket.close(code=1008, reason="Invalid origin")
+        return
+
+    principal = await authenticate_field_service_websocket(websocket, db)
+    if not principal or not principal.has_scope("field-service:read"):
+        ws_logger.warning(
+            "websocket_auth_failed",
+            origin=origin,
+            channel="dispatch",
+            has_principal=principal is not None,
+        )
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
+    ws_logger.info(
+        "websocket_connected",
+        origin=origin,
+        channel="dispatch",
+        principal_type=principal.type,
+        principal_id=principal.id,
+        team_id=team_id,
+    )
+
     await manager.connect(websocket, "dispatch", team_id=team_id)
 
     try:
@@ -231,8 +358,46 @@ async def dispatch_websocket(
 
 
 @router.websocket("/ws/orders")
-async def orders_websocket(websocket: WebSocket):
-    """WebSocket endpoint for order status updates."""
+async def orders_websocket(
+    websocket: WebSocket,
+    db: Session = Depends(get_db),
+):
+    """WebSocket endpoint for order status updates.
+
+    Security:
+    - Requires valid Origin header matching CORS allowed origins (CSWSH protection)
+    - Requires valid JWT/service token with field-service:read scope
+    """
+    # CSWSH Protection: Validate Origin header
+    origin = get_origin_from_websocket(websocket)
+    if not validate_origin(origin, settings.cors_origins_list):
+        ws_logger.warning(
+            "websocket_origin_rejected",
+            origin=origin,
+            channel="orders",
+        )
+        await websocket.close(code=1008, reason="Invalid origin")
+        return
+
+    principal = await authenticate_field_service_websocket(websocket, db)
+    if not principal or not principal.has_scope("field-service:read"):
+        ws_logger.warning(
+            "websocket_auth_failed",
+            origin=origin,
+            channel="orders",
+            has_principal=principal is not None,
+        )
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
+    ws_logger.info(
+        "websocket_connected",
+        origin=origin,
+        channel="orders",
+        principal_type=principal.type,
+        principal_id=principal.id,
+    )
+
     await manager.connect(websocket, "orders")
 
     try:
@@ -266,8 +431,48 @@ async def orders_websocket(websocket: WebSocket):
 async def tracking_websocket(
     websocket: WebSocket,
     technician_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
 ):
-    """WebSocket endpoint for technician location tracking."""
+    """WebSocket endpoint for technician location tracking.
+
+    Security:
+    - Requires valid Origin header matching CORS allowed origins (CSWSH protection)
+    - Requires valid JWT/service token with field-service:read or field-service:mobile scope
+    """
+    # CSWSH Protection: Validate Origin header
+    origin = get_origin_from_websocket(websocket)
+    if not validate_origin(origin, settings.cors_origins_list):
+        ws_logger.warning(
+            "websocket_origin_rejected",
+            origin=origin,
+            channel="tracking",
+        )
+        await websocket.close(code=1008, reason="Invalid origin")
+        return
+
+    principal = await authenticate_field_service_websocket(websocket, db)
+    # Allow either field-service:read (dispatchers) or field-service:mobile (technicians)
+    if not principal or not (
+        principal.has_scope("field-service:read") or principal.has_scope("field-service:mobile")
+    ):
+        ws_logger.warning(
+            "websocket_auth_failed",
+            origin=origin,
+            channel="tracking",
+            has_principal=principal is not None,
+        )
+        await websocket.close(code=1008, reason="Authentication required")
+        return
+
+    ws_logger.info(
+        "websocket_connected",
+        origin=origin,
+        channel="tracking",
+        principal_type=principal.type,
+        principal_id=principal.id,
+        technician_id=technician_id,
+    )
+
     user_id = f"tech_{technician_id}" if technician_id else None
     await manager.connect(websocket, "tracking", user_id=user_id)
 

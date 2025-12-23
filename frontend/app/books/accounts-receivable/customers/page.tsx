@@ -4,16 +4,7 @@ import { useState } from 'react';
 import { Users, AlertTriangle } from 'lucide-react';
 import { DataTable, Pagination } from '@/components/DataTable';
 import { useAccountingReceivablesEnhanced } from '@/hooks/useApi';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
 
 export default function FinanceCustomersPage() {
   const [offset, setOffset] = useState(0);
@@ -42,31 +33,31 @@ export default function FinanceCustomersPage() {
       key: 'total_receivable',
       header: 'Total AR',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.total_receivable)}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.total_receivable)}</span>,
     },
     {
       key: 'current',
       header: 'Current',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-green-400">{formatCurrency(item.current)}</span>,
+      render: (item: any) => <span className="font-mono text-green-400">{formatAccountingCurrency(item.current)}</span>,
     },
     {
       key: 'overdue_1_30',
       header: '1-30',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-yellow-400">{formatCurrency(item.overdue_1_30)}</span>,
+      render: (item: any) => <span className="font-mono text-yellow-400">{formatAccountingCurrency(item.overdue_1_30)}</span>,
     },
     {
       key: 'overdue_31_60',
       header: '31-60',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-orange-400">{formatCurrency(item.overdue_31_60)}</span>,
+      render: (item: any) => <span className="font-mono text-orange-400">{formatAccountingCurrency(item.overdue_31_60)}</span>,
     },
     {
       key: 'overdue_over_90',
       header: '90+',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-red-400">{formatCurrency(item.overdue_over_90)}</span>,
+      render: (item: any) => <span className="font-mono text-red-400">{formatAccountingCurrency(item.overdue_over_90)}</span>,
     },
     {
       key: 'invoice_count',

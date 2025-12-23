@@ -7,7 +7,7 @@ from sqlalchemy import func
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
 from app.auth import Require
@@ -52,8 +52,7 @@ class TemplateItemResponse(BaseModel):
     weightage: float
     idx: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TemplateResponse(BaseModel):
@@ -70,8 +69,7 @@ class TemplateResponse(BaseModel):
     items: List[TemplateItemResponse] = []
     total_weightage: float = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TemplateListResponse(BaseModel):

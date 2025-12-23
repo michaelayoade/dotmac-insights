@@ -5,22 +5,29 @@ import Link from 'next/link';
 import { Plus, Wallet2 } from 'lucide-react';
 import { useCashAdvances } from '@/hooks/useExpenses';
 import { formatDate, cn } from '@/lib/utils';
-import { PageHeader, ErrorState, EmptyState, SearchInput, Button, StatGrid } from '@/components/ui';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { LoadingState, PageHeader, ErrorState, EmptyState, SearchInput, Button, StatGrid, StatusPill } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-slate-elevated text-slate-muted',
-  pending_approval: 'bg-amber-500/20 text-amber-400',
-  approved: 'bg-emerald-500/20 text-emerald-400',
-  rejected: 'bg-rose-500/20 text-rose-400',
-  disbursed: 'bg-blue-500/20 text-blue-400',
-  settled: 'bg-teal-500/20 text-teal-400',
-  partially_settled: 'bg-violet-500/20 text-violet-400',
+const STATUS_TONES: Record<string, StatusTone> = {
+  draft: 'default',
+  pending_approval: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  disbursed: 'info',
+  settled: 'success',
+  partially_settled: 'info',
 };
 
 export default function CashAdvancesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const [search, setSearch] = useState('');
-  const { data, error, isLoading, mutate } = useCashAdvances({ limit: 50 });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, error, isLoading, mutate } = useCashAdvances({ limit: 50 }, { isPaused: () => !canFetch });
 
   const advances = data || [];
   const filteredAdvances = search
@@ -36,6 +43,20 @@ export default function CashAdvancesPage() {
   const pendingCount = advances.filter((a) => a.status === 'pending_approval').length;
   const outstandingAmount = advances.reduce((sum, a) => sum + (a.outstanding_amount || 0), 0);
   const disbursedAmount = advances.reduce((sum, a) => sum + (a.disbursed_amount || 0), 0);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view cash advances."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -108,14 +129,10 @@ export default function CashAdvancesPage() {
                     {formatDate(advance.request_date)}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex px-2 py-1 rounded-full text-xs font-medium',
-                        STATUS_COLORS[advance.status] || 'bg-slate-elevated text-slate-muted'
-                      )}
-                    >
-                      {advance.status.replace(/_/g, ' ')}
-                    </span>
+                    <StatusPill
+                      label={formatStatusLabel(advance.status)}
+                      tone={STATUS_TONES[advance.status] || 'default'}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span className="text-foreground font-medium">

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useWHTTransactions, useWHTRemittanceDue, useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { formatCurrency } from '@/lib/utils';
+
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
   Receipt,
@@ -16,6 +16,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button, FilterCard, FilterInput } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 const WHT_PAYMENT_TYPES = [
   { value: 'DIVIDEND', label: 'Dividend', rate: 10 },
@@ -28,15 +30,6 @@ const WHT_PAYMENT_TYPES = [
   { value: 'COMMISSION', label: 'Commission', rate: 10 },
   { value: 'OTHER', label: 'Other', rate: 5 },
 ];
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export default function WHTPage() {
   const [page, setPage] = useState(1);
@@ -76,7 +69,7 @@ export default function WHTPage() {
       key: 'gross_amount',
       header: 'Gross',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-foreground">{formatCurrency(item.gross_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-foreground">{formatAccountingCurrency(item.gross_amount, 'NGN')}</span>,
     },
     {
       key: 'wht_rate',
@@ -91,9 +84,9 @@ export default function WHTPage() {
       key: 'wht_amount',
       header: 'WHT Deducted',
       align: 'right' as const,
-      render: (item: any) => <span className="font-mono text-amber-300">{formatCurrency(item.wht_amount, 'NGN')}</span>,
+      render: (item: any) => <span className="font-mono text-amber-300">{formatAccountingCurrency(item.wht_amount, 'NGN')}</span>,
     },
-    { key: 'transaction_date', header: 'Date', render: (item: any) => <span className="text-slate-muted">{formatDate(item.transaction_date)}</span> },
+    { key: 'transaction_date', header: 'Date', render: (item: any) => <span className="text-slate-muted">{formatAccountingDate(item.transaction_date)}</span> },
     {
       key: 'is_remitted',
       header: 'Remitted',
@@ -132,13 +125,13 @@ export default function WHTPage() {
             <h1 className="text-xl font-semibold text-foreground">Withholding Tax (WHT)</h1>
           </div>
         </div>
-        <button
+        <Button
           onClick={() => setShowDeductForm(!showDeductForm)}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/20 text-amber-300 text-sm hover:bg-amber-500/30"
         >
           <Plus className="w-4 h-4" />
           Deduct WHT
-        </button>
+        </Button>
       </div>
 
       {/* Remittance Due Alert */}
@@ -160,9 +153,9 @@ export default function WHTPage() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xl font-semibold text-foreground font-mono">{formatCurrency(remittanceDue.total_deducted, 'NGN')}</p>
+              <p className="text-xl font-semibold text-foreground font-mono">{formatAccountingCurrency(remittanceDue.total_deducted, 'NGN')}</p>
               <p className="text-sm text-slate-muted">
-                Due: {formatDate(remittanceDue.deadline)}
+                Due: {formatAccountingDate(remittanceDue.deadline)}
                 {remittanceDue.is_overdue && (
                   <span className="text-red-400 ml-2">({Math.abs(remittanceDue.days_until_due)} days overdue)</span>
                 )}
@@ -184,15 +177,14 @@ export default function WHTPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <input
+      <FilterCard contentClassName="flex flex-wrap gap-4 items-center">
+        <FilterInput
           type="month"
           value={period}
           onChange={(e) => { setPeriod(e.target.value); setPage(1); }}
-          className="input-field max-w-[180px]"
-          placeholder="Filter by period"
+          className="max-w-[180px]"
         />
-      </div>
+      </FilterCard>
 
       {/* Transactions Table */}
       <DataTable
@@ -275,7 +267,7 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
           <Plus className="w-4 h-4 text-amber-400" />
           Deduct Withholding Tax
         </h3>
-        <button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</button>
+        <Button type="button" onClick={onCancel} className="text-slate-muted hover:text-foreground text-sm">Cancel</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -324,14 +316,14 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={() => setShowMore(!showMore)}
         className="flex items-center gap-2 text-sm text-slate-muted hover:text-foreground"
       >
         {showMore ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         More options
-      </button>
+      </Button>
 
       {showMore && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-border/50">
@@ -370,20 +362,20 @@ function WHTDeductForm({ onSubmit, onCancel }: { onSubmit: (data: any) => Promis
           </div>
           <div>
             <span className="text-slate-muted">WHT Amount: </span>
-            <span className="text-amber-300 font-mono font-semibold">{formatCurrency(whtAmount, 'NGN')}</span>
+            <span className="text-amber-300 font-mono font-semibold">{formatAccountingCurrency(whtAmount, 'NGN')}</span>
           </div>
           <div>
             <span className="text-slate-muted">Net Payment: </span>
-            <span className="text-foreground font-mono">{formatCurrency(Number(form.gross_amount || 0) - whtAmount, 'NGN')}</span>
+            <span className="text-foreground font-mono">{formatAccountingCurrency(Number(form.gross_amount || 0) - whtAmount, 'NGN')}</span>
           </div>
         </div>
-        <button
+        <Button
           type="submit"
           disabled={saving}
           className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-300 font-semibold hover:bg-amber-500/30 disabled:opacity-60"
         >
           {saving ? 'Recording...' : 'Deduct WHT'}
-        </button>
+        </Button>
       </div>
     </form>
   );

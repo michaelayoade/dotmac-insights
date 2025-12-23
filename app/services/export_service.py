@@ -14,6 +14,8 @@ from typing import Dict, Any, List, Optional, cast
 from datetime import date, datetime
 from decimal import Decimal
 
+from app.templates.environment import get_template_env
+
 # Optional PDF support - gracefully handle if WeasyPrint is not installed
 try:
     from weasyprint import HTML, CSS
@@ -30,8 +32,19 @@ class ExportError(Exception):
 class ExportService:
     """Service for exporting reports to CSV and PDF formats."""
 
+    # Template mapping for report types
+    TEMPLATE_MAP = {
+        "trial_balance": "reports/trial_balance.html.j2",
+        "balance_sheet": "reports/balance_sheet.html.j2",
+        "income_statement": "reports/income_statement.html.j2",
+        "general_ledger": "reports/general_ledger.html.j2",
+        "receivables_aging": "reports/receivables_aging.html.j2",
+        "payables_aging": "reports/payables_aging.html.j2",
+    }
+
     def __init__(self):
         self.company_name = "dotMac Limited"  # Can be made configurable
+        self.template_env = get_template_env()
 
     def export_csv(self, data: Dict[str, Any], report_type: str) -> str:
         """
@@ -248,398 +261,17 @@ class ExportService:
         writer.writerow(["TOTAL"] + summary_amounts + [self._format_number(summary.get("total", 0))])
 
     def _generate_html(self, data: Dict[str, Any], report_type: str) -> str:
-        """Generate HTML for PDF export."""
-        if report_type == "trial_balance":
-            return self._trial_balance_html(data)
-        elif report_type == "balance_sheet":
-            return self._balance_sheet_html(data)
-        elif report_type == "income_statement":
-            return self._income_statement_html(data)
-        elif report_type == "general_ledger":
-            return self._general_ledger_html(data)
-        elif report_type in ("receivables_aging", "payables_aging"):
-            return self._aging_html(data, report_type)
-        else:
+        """Generate HTML for PDF export using Jinja2 templates."""
+        template_name = self.TEMPLATE_MAP.get(report_type)
+        if not template_name:
             raise ExportError(f"Unknown report type: {report_type}")
 
-    def _trial_balance_html(self, data: Dict[str, Any]) -> str:
-        """Generate HTML for trial balance PDF."""
-        rows = ""
-        for acc in data.get("accounts", []):
-            rows += f"""
-            <tr>
-                <td>{acc.get('account_name', '')}</td>
-                <td>{acc.get('root_type', '')}</td>
-                <td class="number">{self._format_number(acc.get('debit', 0))}</td>
-                <td class="number">{self._format_number(acc.get('credit', 0))}</td>
-                <td class="number">{self._format_number(acc.get('balance', 0))}</td>
-            </tr>
-            """
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Trial Balance</title>
-        </head>
-        <body>
-            <div class="header">
-                <h1>{self.company_name}</h1>
-                <h2>Trial Balance</h2>
-                <p>As of {data.get('as_of_date', '')}</p>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Account</th>
-                        <th>Root Type</th>
-                        <th>Debit</th>
-                        <th>Credit</th>
-                        <th>Balance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows}
-                </tbody>
-                <tfoot>
-                    <tr class="total">
-                        <td colspan="2">TOTAL</td>
-                        <td class="number">{self._format_number(data.get('total_debit', 0))}</td>
-                        <td class="number">{self._format_number(data.get('total_credit', 0))}</td>
-                        <td class="number">{self._format_number(data.get('difference', 0))}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div class="footer">
-                <p>Balanced: {'Yes' if data.get('is_balanced') else 'No'}</p>
-                <p class="generated">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-    def _balance_sheet_html(self, data: Dict[str, Any]) -> str:
-        """Generate HTML for balance sheet PDF."""
-        def section_rows(section_data: Dict, section_name: str) -> str:
-            rows = f'<tr class="section-header"><td colspan="2">{section_name}</td></tr>'
-            for acc in section_data.get("accounts", []):
-                rows += f"""
-                <tr>
-                    <td class="indent">{acc.get('account', '')}</td>
-                    <td class="number">{self._format_number(acc.get('balance', 0))}</td>
-                </tr>
-                """
-            rows += f"""
-            <tr class="subtotal">
-                <td>Total {section_name}</td>
-                <td class="number">{self._format_number(section_data.get('total', 0))}</td>
-            </tr>
-            """
-            return rows
-
-        assets_rows = section_rows(data.get("assets", {}), "Assets")
-        liab_rows = section_rows(data.get("liabilities", {}), "Liabilities")
-        equity_rows = section_rows(data.get("equity", {}), "Equity")
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>Balance Sheet</title></head>
-        <body>
-            <div class="header">
-                <h1>{self.company_name}</h1>
-                <h2>Balance Sheet</h2>
-                <p>As of {data.get('as_of_date', '')}</p>
-            </div>
-            <table>
-                <tbody>
-                    {assets_rows}
-                    <tr class="spacer"><td colspan="2"></td></tr>
-                    {liab_rows}
-                    <tr class="spacer"><td colspan="2"></td></tr>
-                    {equity_rows}
-                    <tr>
-                        <td class="indent">Retained Earnings</td>
-                        <td class="number">{self._format_number(data.get('retained_earnings', 0))}</td>
-                    </tr>
-                </tbody>
-                <tfoot>
-                    <tr class="total">
-                        <td>Total Assets</td>
-                        <td class="number">{self._format_number(data.get('total_assets', 0))}</td>
-                    </tr>
-                    <tr class="total">
-                        <td>Total Liabilities + Equity</td>
-                        <td class="number">{self._format_number(data.get('total_liabilities_equity', 0))}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div class="footer">
-                <p>Balanced: {'Yes' if data.get('is_balanced') else 'No'}</p>
-                <p class="generated">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-    def _income_statement_html(self, data: Dict[str, Any]) -> str:
-        """Generate HTML for income statement PDF."""
-        period = data.get("period", {})
-
-        def section_rows(section_data: Dict, section_name: str) -> str:
-            rows = f'<tr class="section-header"><td colspan="2">{section_name}</td></tr>'
-            for acc in section_data.get("accounts", []):
-                rows += f"""
-                <tr>
-                    <td class="indent">{acc.get('account', '')}</td>
-                    <td class="number">{self._format_number(acc.get('amount', 0))}</td>
-                </tr>
-                """
-            rows += f"""
-            <tr class="subtotal">
-                <td>Total {section_name}</td>
-                <td class="number">{self._format_number(section_data.get('total', 0))}</td>
-            </tr>
-            """
-            return rows
-
-        income_rows = section_rows(data.get("income", {}), "Income")
-        expense_rows = section_rows(data.get("expenses", {}), "Expenses")
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>Income Statement</title></head>
-        <body>
-            <div class="header">
-                <h1>{self.company_name}</h1>
-                <h2>Income Statement</h2>
-                <p>Period: {period.get('start_date', '')} to {period.get('end_date', '')}</p>
-                <p>Basis: {data.get('basis', 'Accrual').title()}</p>
-            </div>
-            <table>
-                <tbody>
-                    {income_rows}
-                    <tr class="spacer"><td colspan="2"></td></tr>
-                    {expense_rows}
-                </tbody>
-                <tfoot>
-                    <tr class="total">
-                        <td>Gross Profit</td>
-                        <td class="number">{self._format_number(data.get('gross_profit', 0))}</td>
-                    </tr>
-                    <tr class="total highlight">
-                        <td>Net Income</td>
-                        <td class="number">{self._format_number(data.get('net_income', 0))}</td>
-                    </tr>
-                    <tr>
-                        <td>Profit Margin</td>
-                        <td class="number">{data.get('profit_margin', 0):.2f}%</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div class="footer">
-                <p class="generated">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-    def _general_ledger_html(self, data: Dict[str, Any]) -> str:
-        """Generate HTML for general ledger PDF."""
-        rows = ""
-        for entry in data.get("entries", [])[:500]:  # Limit for PDF
-            rows += f"""
-            <tr>
-                <td>{entry.get('posting_date', '')}</td>
-                <td>{entry.get('account', '')[:30]}</td>
-                <td>{entry.get('party', '') or ''}</td>
-                <td class="number">{self._format_number(entry.get('debit', 0))}</td>
-                <td class="number">{self._format_number(entry.get('credit', 0))}</td>
-                <td>{entry.get('voucher_no', '')}</td>
-            </tr>
-            """
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>General Ledger</title></head>
-        <body>
-            <div class="header">
-                <h1>{self.company_name}</h1>
-                <h2>General Ledger</h2>
-            </div>
-            <table class="small-text">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Account</th>
-                        <th>Party</th>
-                        <th>Debit</th>
-                        <th>Credit</th>
-                        <th>Voucher</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows}
-                </tbody>
-            </table>
-            <div class="footer">
-                <p>Total Records: {data.get('total', 0)}</p>
-                <p class="generated">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-    def _aging_html(self, data: Dict[str, Any], report_type: str) -> str:
-        """Generate HTML for aging report PDF."""
-        report_name = "Receivables" if "receivables" in report_type else "Payables"
-        buckets = data.get("buckets", ["Current", "1-30", "31-60", "61-90", "90+"])
-
-        header_cells = "".join(f"<th>{b}</th>" for b in buckets)
-
-        rows = ""
-        for row in data.get("rows", []):
-            cells = "".join(f'<td class="number">{self._format_number(row.get(b, 0))}</td>' for b in buckets)
-            rows += f"""
-            <tr>
-                <td>{row.get('party', '')}</td>
-                {cells}
-                <td class="number total-col">{self._format_number(row.get('total', 0))}</td>
-            </tr>
-            """
-
-        summary = data.get("summary", {})
-        summary_cells = "".join(f'<td class="number">{self._format_number(summary.get(b, 0))}</td>' for b in buckets)
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head><title>{report_name} Aging</title></head>
-        <body>
-            <div class="header">
-                <h1>{self.company_name}</h1>
-                <h2>{report_name} Aging Report</h2>
-                <p>As of {data.get('as_of_date', '')}</p>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Party</th>
-                        {header_cells}
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows}
-                </tbody>
-                <tfoot>
-                    <tr class="total">
-                        <td>TOTAL</td>
-                        {summary_cells}
-                        <td class="number">{self._format_number(summary.get('total', 0))}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <div class="footer">
-                <p class="generated">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-            </div>
-        </body>
-        </html>
-        """
-
-    def _get_report_css(self) -> str:
-        """Get CSS styles for PDF reports."""
-        return """
-        @page {
-            size: A4;
-            margin: 1.5cm;
-        }
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 10pt;
-            line-height: 1.4;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 10px;
-        }
-        .header h1 {
-            font-size: 18pt;
-            margin: 0 0 5px 0;
-        }
-        .header h2 {
-            font-size: 14pt;
-            margin: 0 0 5px 0;
-            color: #555;
-        }
-        .header p {
-            margin: 2px 0;
-            color: #666;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-        }
-        th, td {
-            padding: 6px 8px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-        }
-        .number {
-            text-align: right;
-            font-family: 'Courier New', monospace;
-        }
-        .indent {
-            padding-left: 20px;
-        }
-        .section-header {
-            background-color: #e8e8e8;
-            font-weight: bold;
-        }
-        .subtotal {
-            font-weight: bold;
-            background-color: #f9f9f9;
-        }
-        .total {
-            font-weight: bold;
-            background-color: #eee;
-        }
-        .highlight {
-            background-color: #d4edda;
-        }
-        .spacer td {
-            height: 10px;
-            border: none;
-        }
-        .small-text {
-            font-size: 8pt;
-        }
-        .footer {
-            margin-top: 20px;
-            border-top: 1px solid #ddd;
-            padding-top: 10px;
-        }
-        .footer p {
-            margin: 5px 0;
-        }
-        .generated {
-            color: #999;
-            font-size: 8pt;
-            text-align: right;
-        }
-        .total-col {
-            font-weight: bold;
-        }
-        """
+        template = self.template_env.get_template(template_name)
+        return template.render(
+            data=data,
+            company_name=self.company_name,
+            now=datetime.now(),
+        )
 
     def _format_number(self, value: Any) -> str:
         """Format number for display."""

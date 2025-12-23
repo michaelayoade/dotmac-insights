@@ -24,7 +24,10 @@ import {
   BadgePercent,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { ModuleLayout, NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
+import { ModuleLayout } from '@/components/ModuleLayout';
+import type { NavSectionType as NavSection, QuickLink, WorkflowPhase, WorkflowStep } from '@/components/ModuleLayout';
 import { useEntitlements } from '@/hooks/useApi';
 
 // Books & Accounting Flow:
@@ -186,7 +189,9 @@ function getWorkflowPhase(sectionKey: string | null): string {
 }
 
 export default function BooksLayout({ children }: { children: React.ReactNode }) {
-  const { data: entitlements } = useEntitlements();
+  const { hasAccess, isLoading: authLoading } = useRequireScope('books:read');
+  const canFetch = !authLoading;
+  const { data: entitlements } = useEntitlements({ isPaused: () => !canFetch });
   const nigeriaEnabled = entitlements?.feature_flags?.NIGERIA_COMPLIANCE_ENABLED ?? false;
   const sections = useMemo(() => {
     if (nigeriaEnabled) {
@@ -201,6 +206,22 @@ export default function BooksLayout({ children }: { children: React.ReactNode })
     }
     return baseSections.filter((section) => section.key !== 'tax');
   }, [nigeriaEnabled]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-deep flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-slate-deep p-8">
+        <AccessDenied />
+      </div>
+    );
+  }
 
   return (
     <ModuleLayout

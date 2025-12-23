@@ -3,27 +3,11 @@
 import { useState } from 'react';
 import { usePurchasingAging, usePurchasingSuppliers } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Calendar, DollarSign, Clock, TrendingDown, Filter, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatPercent(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0%';
-  return `${value.toFixed(1)}%`;
-}
+import { AlertTriangle, Calendar, DollarSign, Clock, TrendingDown, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Button, FilterCard, FilterInput, FilterSelect, LoadingState } from '@/components/ui';
+import { formatCurrency, formatNumber, formatPercent } from '@/lib/formatters';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 interface AgingBucket {
   bucket: string;
@@ -33,17 +17,26 @@ interface AgingBucket {
 }
 
 export default function PurchasingAPAgingPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('purchasing:read');
   const [asOfDate, setAsOfDate] = useState<string>('');
   const [currency, setCurrency] = useState<string>('NGN');
   const [supplierId, setSupplierId] = useState<string>('');
+  const canFetch = !authLoading && !missingScope;
 
-  const { data, isLoading, error } = usePurchasingAging({
-    as_of_date: asOfDate || undefined,
-    currency: currency || undefined,
-    supplier: supplierId || undefined,
-  });
+  const { data, isLoading, error } = usePurchasingAging(
+    {
+      as_of_date: asOfDate || undefined,
+      currency: currency || undefined,
+      supplier: supplierId || undefined,
+    },
+    { isPaused: () => !canFetch }
+  );
 
-  const { data: suppliersData } = usePurchasingSuppliers({ limit: 100, offset: 0 });
+  const { data: suppliersData } = usePurchasingSuppliers(
+    { limit: 100, offset: 0 },
+    { isPaused: () => !canFetch }
+  );
 
   const suppliers = suppliersData?.suppliers || [];
   const buckets: AgingBucket[] = data
@@ -62,6 +55,20 @@ export default function PurchasingAPAgingPage() {
     ...bucket,
     percentage: totalOutstanding > 0 ? (bucket.total / totalOutstanding) * 100 : 0,
   }));
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the purchasing:read permission to view AP aging."
+        backHref="/purchasing"
+        backLabel="Back to Purchasing"
+      />
+    );
+  }
 
   // Define aging bucket colors
   const getBucketColor = (index: number) => {
@@ -158,58 +165,54 @@ export default function PurchasingAPAgingPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-electric" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
-        </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-slate-muted" />
-            <input
-              type="date"
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-              placeholder="As of date"
-            />
-          </div>
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+      <FilterCard
+        actions={(asOfDate || currency !== 'NGN' || supplierId) && (
+          <Button
+            onClick={() => {
+              setAsOfDate('');
+              setCurrency('NGN');
+              setSupplierId('');
+            }}
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
-            <option value="NGN">NGN - Naira</option>
-            <option value="USD">USD - Dollar</option>
-          </select>
-          {suppliers.length > 0 && (
-            <select
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
-            >
-              <option value="">All Suppliers</option>
-              {suppliers.map((supplier: any) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name || supplier.supplier_name}
-                </option>
-              ))}
-            </select>
-          )}
-          {(asOfDate || currency !== 'NGN' || supplierId) && (
-            <button
-              onClick={() => {
-                setAsOfDate('');
-                setCurrency('NGN');
-                setSupplierId('');
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
+            Clear filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-center"
+      >
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-slate-muted" />
+          <FilterInput
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            className="px-3 py-2 focus:ring-2 focus:ring-teal-electric/50"
+            placeholder="As of date"
+          />
         </div>
-      </div>
+        <FilterSelect
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className="focus:ring-2 focus:ring-teal-electric/50"
+        >
+          <option value="NGN">NGN - Naira</option>
+          <option value="USD">USD - Dollar</option>
+        </FilterSelect>
+        {suppliers.length > 0 && (
+          <FilterSelect
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+            className="focus:ring-2 focus:ring-teal-electric/50 max-w-[200px]"
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map((supplier: any) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name || supplier.supplier_name}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
+      </FilterCard>
 
       {/* Aging Buckets Visualization */}
       <div className="bg-slate-card border border-slate-border rounded-xl p-6">

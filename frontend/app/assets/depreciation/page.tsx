@@ -8,12 +8,12 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Filter,
   Download,
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useDepreciationSchedule } from "@/hooks/useApi";
 import type { DepreciationScheduleEntry } from "@/lib/api";
+import { Button, FilterCard, FilterInput, FilterSelect } from '@/components/ui';
 
 export default function DepreciationSchedulePage() {
   const [page, setPage] = useState(1);
@@ -54,13 +54,13 @@ export default function DepreciationSchedulePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+          </Button>
           <Link
             href="/assets/depreciation/pending"
             className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm text-foreground transition-colors"
@@ -88,41 +88,9 @@ export default function DepreciationSchedulePage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <input
-            type="text"
-            placeholder="Finance book..."
-            value={financeBook}
-            onChange={(e) => { setFinanceBook(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
-          <select
-            value={bookedOnly === undefined ? "" : bookedOnly ? "booked" : "pending"}
-            onChange={(e) => {
-              const val = e.target.value;
-              setBookedOnly(val === "" ? undefined : val === "booked");
-              setPage(1);
-            }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          >
-            <option value="">All Status</option>
-            <option value="booked">Booked Only</option>
-            <option value="pending">Pending Only</option>
-          </select>
-          <button
+      <FilterCard
+        actions={(
+          <Button
             onClick={() => {
               setFinanceBook("");
               setStartDate("");
@@ -133,9 +101,40 @@ export default function DepreciationSchedulePage() {
             className="px-4 py-2 text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             Clear Filters
-          </button>
-        </div>
-      </div>
+          </Button>
+        )}
+        contentClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+        iconClassName="text-indigo-400"
+      >
+        <FilterInput
+          type="text"
+          placeholder="Finance book..."
+          value={financeBook}
+          onChange={(e) => { setFinanceBook(e.target.value); setPage(1); }}
+        />
+        <FilterInput
+          type="date"
+          value={startDate}
+          onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+        />
+        <FilterInput
+          type="date"
+          value={endDate}
+          onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+        />
+        <FilterSelect
+          value={bookedOnly === undefined ? "" : bookedOnly ? "booked" : "pending"}
+          onChange={(e) => {
+            const val = e.target.value;
+            setBookedOnly(val === "" ? undefined : val === "booked");
+            setPage(1);
+          }}
+        >
+          <option value="">All Status</option>
+          <option value="booked">Booked Only</option>
+          <option value="pending">Pending Only</option>
+        </FilterSelect>
+      </FilterCard>
 
       {/* Schedule Table */}
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
@@ -223,23 +222,23 @@ export default function DepreciationSchedulePage() {
               Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
+              </Button>
               <span className="text-sm text-slate-muted">
                 Page {page} of {totalPages}
               </span>
-              <button
+              <Button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}

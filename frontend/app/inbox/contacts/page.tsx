@@ -20,6 +20,7 @@ import {
   PageHeader,
   EmptyState,
   ErrorState,
+  FilterCard,
   SearchInput,
   Select,
   StatGrid,
@@ -169,7 +170,7 @@ export default function ContactsPage() {
       />
 
       {/* Search and filters */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <FilterCard contentClassName="flex flex-col md:flex-row gap-3">
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
@@ -188,7 +189,7 @@ export default function ContactsPage() {
           options={companyOptions}
           aria-label="Filter by company"
         />
-      </div>
+      </FilterCard>
 
       {/* Stats */}
       <StatGrid columns={4}>
@@ -292,28 +293,28 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <button
+                      <Button
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Send message"
                         aria-label={`Send message to ${contact.name}`}
                       >
                         <MessageSquare className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Edit contact"
                         aria-label={`Edit ${contact.name}`}
                       >
                         <Edit className="w-4 h-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleDeleteContact(contact)}
                         className="p-2 text-slate-muted hover:text-rose-400 hover:bg-slate-elevated rounded-lg transition-colors"
                         title="Delete contact"
                         aria-label={`Delete ${contact.name}`}
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

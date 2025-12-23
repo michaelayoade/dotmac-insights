@@ -5,6 +5,9 @@ import { useCashAdvanceMutations } from "@/hooks/useExpenses";
 import { useEmployees } from "@/hooks/useApi";
 import { EmployeeSearch } from "@/components/EntitySearch";
 import type { CashAdvanceCreatePayload } from "@/lib/expenses.types";
+import { LoadingState, Button } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const addDaysISO = (days: number) => {
@@ -14,8 +17,11 @@ const addDaysISO = (days: number) => {
 };
 
 export default function NewCashAdvancePage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:write');
   const { createAdvance } = useCashAdvanceMutations();
-  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ limit: 200 });
+  const canFetch = !authLoading && !missingScope;
+  const { data: employeesData, isLoading: employeesLoading } = useEmployees({ limit: 200 }, { isPaused: () => !canFetch });
   const employees = useMemo(() => employeesData?.items || [], [employeesData]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +64,20 @@ export default function NewCashAdvancePage() {
       setSubmitting(false);
     }
   };
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:write permission to create cash advances."
+        backHref="/expenses/advances"
+        backLabel="Back to Advances"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -164,13 +184,13 @@ export default function NewCashAdvancePage() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={submitting}
           className="rounded-lg bg-teal-electric px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm hover:bg-teal-electric/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Saving..." : "Create Advance"}
-        </button>
+        </Button>
         {error && <span className="text-sm text-red-400">{error}</span>}
         {success && <span className="text-sm text-green-400">{success}</span>}
       </div>

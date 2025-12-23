@@ -1,0 +1,14 @@
+{# Ticket created notification #}
+{% set title = "Support Ticket Created: #" ~ (ticket_id | default('')) %}
+
+Dear {{ customer_name | default('Valued Customer') }},
+
+Your support ticket has been created and our team will review it shortly.
+
+Ticket: #{{ ticket_id }}
+Subject: {{ subject | default('Support Request') }}
+Priority: {{ priority | default('Normal') }}
+
+We'll get back to you as soon as possible. You can track your ticket status in your account.
+
+Thank you for contacting us!

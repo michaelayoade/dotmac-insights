@@ -1,0 +1,40 @@
+{% extends "reports/_base.html.j2" %}
+{% from "reports/_macros.html.j2" import format_num, trial_balance_row %}
+
+{% block title %}Trial Balance{% endblock %}
+
+{% block report_title %}Trial Balance{% endblock %}
+
+{% block report_subtitle %}As of {{ data.as_of_date | default('') }}{% endblock %}
+
+{% block content %}
+<table>
+    <thead>
+        <tr>
+            <th>Account</th>
+            <th>Root Type</th>
+            <th class="number">Debit</th>
+            <th class="number">Credit</th>
+            <th class="number">Balance</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for acc in data.accounts | default([]) %}
+        {{ trial_balance_row(acc) }}
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr class="total">
+            <td colspan="2">TOTAL</td>
+            <td class="number">{{ format_num(data.total_debit) }}</td>
+            <td class="number">{{ format_num(data.total_credit) }}</td>
+            <td class="number">{{ format_num(data.difference) }}</td>
+        </tr>
+    </tfoot>
+</table>
+{% endblock %}
+
+{% block footer %}
+<p>Balanced: {{ data.is_balanced | yesno("Yes", "No") }}</p>
+<p class="generated">Generated: {{ now | format_datetime("%Y-%m-%d %H:%M") }}</p>
+{% endblock %}

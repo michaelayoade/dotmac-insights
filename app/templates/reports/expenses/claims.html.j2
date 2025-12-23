@@ -1,0 +1,87 @@
+{% extends "reports/expenses/_base.html.j2" %}
+
+{% block title %}Expense Claims Report{% endblock %}
+{% block report_title %}Expense Claims Report{% endblock %}
+
+{% block summary %}
+<div class="summary">
+    <h3>Summary</h3>
+    <table class="summary-table">
+        <tr><td>Total Claims:</td><td>{{ summary.total_claims }}</td></tr>
+        <tr><td>Total Claimed:</td><td class="number">{{ summary.total_claimed | format_number }}</td></tr>
+        <tr><td>Total Approved:</td><td class="number">{{ summary.total_approved | format_number }}</td></tr>
+    </table>
+</div>
+{% endblock %}
+
+{% block content %}
+<h3>Claims Detail</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            {% if include_lines %}
+            <th>Claim #</th>
+            <th>Title</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Category</th>
+            <th>Amount</th>
+            {% else %}
+            <th>Claim #</th>
+            <th>Title</th>
+            <th>Employee</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Claimed</th>
+            <th>Approved</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% if include_lines %}
+            {% for claim in claims %}
+                {% if claim.lines %}
+                    {% for line in claim.lines %}
+                        {% if loop.first %}
+                        <tr>
+                            <td rowspan="{{ claim.lines | length }}">{{ claim.claim_number }}</td>
+                            <td rowspan="{{ claim.lines | length }}">{{ claim.title }}</td>
+                            <td rowspan="{{ claim.lines | length }}">{{ claim.claim_date }}</td>
+                            <td rowspan="{{ claim.lines | length }}">{{ claim.status }}</td>
+                            <td>{{ line.category }}</td>
+                            <td class="number">{{ line.amount | format_number }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td>{{ line.category }}</td>
+                            <td class="number">{{ line.amount | format_number }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td>{{ claim.claim_number }}</td>
+                    <td>{{ claim.title }}</td>
+                    <td>{{ claim.claim_date }}</td>
+                    <td>{{ claim.status }}</td>
+                    <td>-</td>
+                    <td class="number">{{ claim.total_claimed | format_number }}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            {% for claim in claims %}
+            <tr>
+                <td>{{ claim.claim_number }}</td>
+                <td>{{ claim.title }}</td>
+                <td>{{ claim.employee_id }}</td>
+                <td>{{ claim.claim_date }}</td>
+                <td>{{ claim.status }}</td>
+                <td class="number">{{ claim.total_claimed | format_number }}</td>
+                <td class="number">{{ claim.approved_amount | format_number }}</td>
+            </tr>
+            {% endfor %}
+        {% endif %}
+    </tbody>
+</table>
+{% endblock %}

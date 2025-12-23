@@ -29,6 +29,10 @@ import {
   type PlatformFeatureFlag,
 } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { Button, LoadingState } from '@/components/ui';
+import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
 function StatusBadge({
   status,
@@ -62,51 +66,6 @@ function StatusBadge({
       {(status === 'unknown' || status === 'disconnected') && <AlertTriangle className="w-3.5 h-3.5" />}
       {c.label}
     </span>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  variant = 'default',
-  subtitle,
-}: {
-  label: string;
-  value: string | number | React.ReactNode;
-  icon: React.ElementType;
-  variant?: 'default' | 'success' | 'warning' | 'danger';
-  subtitle?: string;
-}) {
-  return (
-    <div className="bg-slate-card border border-slate-border rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-slate-muted text-sm">{label}</p>
-          <div className="text-2xl font-bold text-foreground mt-1">{value}</div>
-          {subtitle && <p className="text-slate-muted text-xs mt-1">{subtitle}</p>}
-        </div>
-        <div
-          className={cn(
-            'p-3 rounded-xl',
-            variant === 'success' && 'bg-emerald-500/10',
-            variant === 'warning' && 'bg-amber-500/10',
-            variant === 'danger' && 'bg-rose-500/10',
-            variant === 'default' && 'bg-slate-elevated'
-          )}
-        >
-          <Icon
-            className={cn(
-              'w-6 h-6',
-              variant === 'success' && 'text-emerald-400',
-              variant === 'warning' && 'text-amber-400',
-              variant === 'danger' && 'text-rose-400',
-              variant === 'default' && 'text-slate-400'
-            )}
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -149,14 +108,19 @@ function FeatureFlagRow({ flag }: { flag: PlatformFeatureFlag }) {
 }
 
 export default function PlatformStatusPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('admin:read');
+  const canFetch = !authLoading && !missingScope;
   const {
     data: status,
     isLoading: statusLoading,
     error: statusError,
     mutate: refetchStatus,
-  } = usePlatformStatus();
+  } = usePlatformStatus({ isPaused: () => !canFetch });
 
-  const { data: featureFlags, isLoading: flagsLoading } = usePlatformFeatureFlags();
+  const { data: featureFlags, isLoading: flagsLoading } = usePlatformFeatureFlags({
+    isPaused: () => !canFetch,
+  });
 
   const flagsByCategory = useMemo(() => {
     if (!featureFlags?.flags) return {};
@@ -172,6 +136,20 @@ export default function PlatformStatusPage() {
   const totalFlagsCount = featureFlags?.flags.length ?? 0;
 
   const isLoading = statusLoading || flagsLoading;
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the admin:read permission to view this page."
+        backHref="/"
+        backLabel="Back to Dashboard"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -189,14 +167,14 @@ export default function PlatformStatusPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
             onClick={() => refetchStatus()}
             disabled={isLoading}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
           >
             <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
             Refresh
-          </button>
+          </Button>
           <Link
             href="/admin/security"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-elevated text-foreground hover:bg-slate-border transition-colors"
@@ -243,31 +221,29 @@ export default function PlatformStatusPage() {
           </div>
         ) : status ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              label="Environment"
+            <StatCard
+              title="Environment"
               value={status.environment}
               icon={Server}
-              variant="default"
             />
-            <MetricCard
-              label="License Status"
+            <StatCard
+              title="License Status"
               value={<StatusBadge status={status.license.status} size="small" />}
               icon={Key}
               variant={status.license.status === 'valid' ? 'success' : status.license.status === 'expired' ? 'warning' : 'danger'}
               subtitle={status.license.message}
             />
-            <MetricCard
-              label="Feature Flags"
+            <StatCard
+              title="Feature Flags"
               value={`${enabledFlagsCount}/${totalFlagsCount}`}
               icon={Flag}
-              variant="default"
               subtitle={`${enabledFlagsCount} enabled`}
             />
-            <MetricCard
-              label="Telemetry"
+            <StatCard
+              title="Telemetry"
               value={status.otel_enabled ? 'Enabled' : 'Disabled'}
               icon={Activity}
-              variant={status.otel_enabled ? 'success' : 'default'}
+              variant={status.otel_enabled ? 'success' : undefined}
             />
           </div>
         ) : null}

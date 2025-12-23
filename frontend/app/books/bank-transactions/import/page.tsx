@@ -12,6 +12,7 @@ import { parseCSV, autoDetectMapping, validateMapping, mapCSVToTransactions } fr
 import type { CSVParseResult, CSVColumnMapping } from '@/lib/parsers/csv';
 import { parseOFX, validateOFXResult, mapOFXToTransactions } from '@/lib/parsers/ofx';
 import type { OFXParseResult } from '@/lib/parsers/ofx';
+import { Button, LinkButton } from '@/components/ui';
 import {
   ArrowLeft,
   ArrowRight,
@@ -210,14 +211,15 @@ export default function ImportBankTransactionsPage() {
       </div>
 
       <div className="flex justify-end">
-        <button
+        <Button
           onClick={() => setState((prev) => ({ ...prev, step: 2 }))}
           disabled={!canProceedToStep2}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60 transition-colors"
+          module="books"
+          icon={ArrowRight}
+          iconPosition="right"
         >
           Continue
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -235,21 +237,18 @@ export default function ImportBankTransactionsPage() {
       {state.fileFormat === 'ofx' && state.ofxData && <OFXPreview ofxData={state.ofxData} />}
 
       <div className="flex justify-between">
-        <button
-          onClick={() => setState((prev) => ({ ...prev, step: 1 }))}
-          className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
+        <Button onClick={() => setState((prev) => ({ ...prev, step: 1 }))} variant="secondary" icon={ArrowLeft}>
           Back
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => setState((prev) => ({ ...prev, step: 3 }))}
           disabled={!canProceedToStep3()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60 transition-colors"
+          module="books"
+          icon={ArrowRight}
+          iconPosition="right"
         >
           Continue
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -307,31 +306,12 @@ export default function ImportBankTransactionsPage() {
         )}
 
         <div className="flex justify-between">
-          <button
-            onClick={() => setState((prev) => ({ ...prev, step: 2 }))}
-            disabled={state.isImporting}
-            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors disabled:opacity-60"
-          >
-            <ArrowLeft className="w-4 h-4" />
+          <Button onClick={() => setState((prev) => ({ ...prev, step: 2 }))} disabled={state.isImporting} variant="secondary" icon={ArrowLeft}>
             Back
-          </button>
-          <button
-            onClick={handleImport}
-            disabled={state.isImporting}
-            className="inline-flex items-center gap-2 px-6 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 disabled:opacity-60 transition-colors"
-          >
-            {state.isImporting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Importing...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4" />
-                Import Transactions
-              </>
-            )}
-          </button>
+          </Button>
+          <Button onClick={handleImport} disabled={state.isImporting} loading={state.isImporting} module="books" icon={Upload}>
+            {state.isImporting ? 'Importing...' : 'Import Transactions'}
+          </Button>
         </div>
       </div>
     );
@@ -398,7 +378,7 @@ export default function ImportBankTransactionsPage() {
         )}
 
         <div className="flex justify-between">
-          <button
+          <Button
             onClick={() =>
               setState({
                 step: 1,
@@ -414,18 +394,14 @@ export default function ImportBankTransactionsPage() {
                 error: null,
               })
             }
-            className="inline-flex items-center gap-2 px-4 py-2 text-slate-muted hover:text-foreground border border-slate-border rounded-lg hover:border-slate-muted transition-colors"
+            variant="secondary"
+            icon={Upload}
           >
-            <Upload className="w-4 h-4" />
             Import Another
-          </button>
-          <Link
-            href="/books/bank-transactions"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-electric text-slate-950 font-semibold hover:bg-teal-electric/90 transition-colors"
-          >
+          </Button>
+          <LinkButton href="/books/bank-transactions" module="books" icon={ArrowRight} iconPosition="right">
             View Transactions
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          </LinkButton>
         </div>
       </div>
     );
@@ -455,7 +431,7 @@ export default function ImportBankTransactionsPage() {
               className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
                 state.step === step
-                  ? 'bg-teal-electric text-slate-950'
+                  ? 'bg-teal-electric text-foreground'
                   : state.step > step
                     ? 'bg-green-500 text-foreground'
                     : 'bg-slate-elevated text-slate-muted'

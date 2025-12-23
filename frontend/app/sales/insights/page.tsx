@@ -1,15 +1,7 @@
 'use client';
 
 import { useFinanceForecasts, useFinancePaymentBehavior } from '@/hooks/useApi';
-
-function formatCurrency(value: number, currency = 'NGN') {
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
+import { formatCurrency } from '@/lib/formatters';
 
 export default function SalesInsightsPage() {
   const currency = 'NGN';
@@ -77,7 +69,9 @@ export default function SalesInsightsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="p-4 bg-slate-elevated rounded-lg border border-slate-border">
               <p className="text-slate-muted">Baseline MRR</p>
-              <p className="text-2xl font-bold text-foreground mt-1">{formatCurrency(forecasts.baseline_mrr, currency)}</p>
+              <p className="text-2xl font-bold text-foreground mt-1">
+                {formatCurrency(forecasts.baseline_mrr ?? 0, currency)}
+              </p>
             </div>
             <div className="p-4 bg-slate-elevated rounded-lg border border-slate-border">
               <p className="text-slate-muted">Next Period</p>
@@ -86,7 +80,7 @@ export default function SalesInsightsPage() {
               </p>
               {forecasts.projection?.[0] && (
                 <p className="text-slate-muted text-xs mt-1">
-                  {formatCurrency(forecasts.projection[0].mrr, currency)}
+                  {formatCurrency(forecasts.projection[0].mrr ?? 0, currency)}
                 </p>
               )}
             </div>

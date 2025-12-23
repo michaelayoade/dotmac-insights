@@ -406,6 +406,19 @@ export interface PurchasingSupplierGroupsResponse {
   groups: Array<{ name: string; count: number; outstanding: number }>;
 }
 
+export interface PurchasingSupplierPayload {
+  supplier_name: string;
+  supplier_group?: string | null;
+  supplier_type?: string | null;
+  country?: string | null;
+  default_currency?: string | null;
+  email_id?: string | null;
+  mobile_no?: string | null;
+  tax_id?: string | null;
+  payment_terms?: string | null;
+  disabled?: boolean;
+}
+
 export interface PurchasingSupplierListParams {
   search?: string;
   supplier_group?: string;
@@ -783,6 +796,23 @@ export const purchasingApi = {
 
   getSupplierDetail: (id: number) =>
     fetchApi<PurchasingSupplierDetail>(`/v1/purchasing/suppliers/${id}`),
+
+  createSupplier: (body: PurchasingSupplierPayload) =>
+    fetchApi<PurchasingSupplierDetail>('/v1/purchasing/suppliers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateSupplier: (id: number, body: Partial<PurchasingSupplierPayload>) =>
+    fetchApi<PurchasingSupplierDetail>(`/v1/purchasing/suppliers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteSupplier: (id: number, soft = true) =>
+    fetchApi<void>(`/v1/purchasing/suppliers/${id}?soft=${soft ? 'true' : 'false'}`, {
+      method: 'DELETE',
+    }),
 
   // Expenses
   getExpenses: (params?: PurchasingExpenseListParams) => {

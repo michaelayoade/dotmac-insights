@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useTaxMutations } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { formatCurrency } from '@/lib/utils';
+
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
 import {
@@ -22,6 +22,8 @@ import {
 import { cn } from '@/lib/utils';
 import useSWR from 'swr';
 import { accountingApi } from '@/lib/api';
+import { Button } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 // Local hook for e-invoices (may need to add to useApi.ts)
 function useEInvoices(params?: { status?: string; page?: number; page_size?: number }) {
@@ -42,15 +44,6 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; icon: any }> = {
   REJECTED: { bg: 'bg-red-500/10', text: 'text-red-400', icon: XCircle },
   CANCELLED: { bg: 'bg-slate-border/30', text: 'text-slate-muted', icon: XCircle },
 };
-
-function formatDate(date: string | null | undefined) {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export default function EInvoicePage() {
   const [filters, setFilters] = usePersistentState<{
@@ -119,7 +112,7 @@ export default function EInvoicePage() {
       header: 'Total',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-foreground">{formatCurrency(item.total, item.currency || 'NGN')}</span>
+        <span className="font-mono text-foreground">{formatAccountingCurrency(item.total, item.currency || 'NGN')}</span>
       ),
     },
     {
@@ -127,13 +120,13 @@ export default function EInvoicePage() {
       header: 'VAT',
       align: 'right' as const,
       render: (item: any) => (
-        <span className="font-mono text-blue-400">{formatCurrency(item.vat_amount, item.currency || 'NGN')}</span>
+        <span className="font-mono text-blue-400">{formatAccountingCurrency(item.vat_amount, item.currency || 'NGN')}</span>
       ),
     },
     {
       key: 'invoice_date',
       header: 'Date',
-      render: (item: any) => <span className="text-slate-muted">{formatDate(item.invoice_date)}</span>,
+      render: (item: any) => <span className="text-slate-muted">{formatAccountingDate(item.invoice_date)}</span>,
     },
     {
       key: 'status',
@@ -155,22 +148,22 @@ export default function EInvoicePage() {
       render: (item: any) => (
         <div className="flex items-center gap-2">
           {(item.status === 'DRAFT' || item.status === 'PENDING') && (
-            <button
+            <Button
               onClick={() => handleValidate(item.id)}
               className="p-1.5 rounded hover:bg-slate-border/30 text-blue-400 hover:text-blue-300"
               title="Submit to FIRS"
             >
               <Send className="w-4 h-4" />
-            </button>
+            </Button>
           )}
           {item.status === 'REJECTED' && (
-            <button
+            <Button
               onClick={() => handleValidate(item.id)}
               className="p-1.5 rounded hover:bg-slate-border/30 text-amber-400 hover:text-amber-300"
               title="Resubmit"
             >
               <RefreshCw className="w-4 h-4" />
-            </button>
+            </Button>
           )}
           {item.firs_reference && (
             <span
@@ -282,12 +275,12 @@ export default function EInvoicePage() {
           <option value="REJECTED">Rejected</option>
         </select>
         {(search || statusFilter) && (
-          <button
+          <Button
             onClick={() => setFilters((prev) => ({ ...prev, search: '', statusFilter: '', page: 1 }))}
             className="text-slate-muted text-sm hover:text-foreground transition-colors"
           >
             Reset
-          </button>
+          </Button>
         )}
       </div>
 

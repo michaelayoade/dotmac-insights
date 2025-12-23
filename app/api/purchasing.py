@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, extract
 from typing import Dict, Any, Optional, List, TypedDict, cast
@@ -54,7 +54,7 @@ class PurchaseInvoiceCreateRequest(BaseModel):
     fiscal_period_id: Optional[int] = None
     journal_entry_id: Optional[int] = None
 
-    @validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", pre=True)
+    @field_validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
 
@@ -81,7 +81,7 @@ class PurchaseInvoiceUpdateRequest(BaseModel):
     fiscal_period_id: Optional[int] = None
     journal_entry_id: Optional[int] = None
 
-    @validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", pre=True)
+    @field_validator("grand_total", "outstanding_amount", "paid_amount", "tax_amount", mode="before")
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
 
@@ -120,14 +120,14 @@ class ExpenseCreateRequest(BaseModel):
     expense_date: Optional[datetime] = None
     posting_date: Optional[datetime] = None
 
-    @validator(
+    @field_validator(
         "total_claimed_amount",
         "total_sanctioned_amount",
         "total_amount_reimbursed",
         "total_advance_amount",
         "amount",
         "total_taxes_and_charges",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else Decimal("0")
@@ -167,14 +167,14 @@ class ExpenseUpdateRequest(BaseModel):
     expense_date: Optional[datetime] = None
     posting_date: Optional[datetime] = None
 
-    @validator(
+    @field_validator(
         "total_claimed_amount",
         "total_sanctioned_amount",
         "total_amount_reimbursed",
         "total_advance_amount",
         "amount",
         "total_taxes_and_charges",
-        pre=True,
+        mode="before",
     )
     def _to_decimal(cls, value):
         return Decimal(str(value)) if value is not None else None
@@ -977,6 +977,144 @@ async def get_supplier_detail(
             for b in bills[:10]
         ],
     }
+
+
+class SupplierCreate(BaseModel):
+    """Payload for creating a supplier."""
+    supplier_name: str
+    supplier_group: Optional[str] = None
+    supplier_type: Optional[str] = None
+    country: Optional[str] = None
+    default_currency: Optional[str] = "NGN"
+    email_id: Optional[str] = None
+    mobile_no: Optional[str] = None
+    tax_id: Optional[str] = None
+    payment_terms: Optional[str] = None
+
+
+class SupplierUpdate(BaseModel):
+    """Payload for updating a supplier."""
+    supplier_name: Optional[str] = None
+    supplier_group: Optional[str] = None
+    supplier_type: Optional[str] = None
+    country: Optional[str] = None
+    default_currency: Optional[str] = None
+    email_id: Optional[str] = None
+    mobile_no: Optional[str] = None
+    tax_id: Optional[str] = None
+    payment_terms: Optional[str] = None
+    disabled: Optional[bool] = None
+
+
+@router.post("/suppliers", dependencies=[Depends(Require("purchasing:write"))])
+async def create_supplier(
+    payload: SupplierCreate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create a new supplier."""
+    # Check for duplicate supplier name
+    existing = db.query(Supplier).filter(
+        Supplier.supplier_name == payload.supplier_name,
+        Supplier.disabled == False,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Supplier with this name already exists")
+
+    supplier = Supplier(
+        supplier_name=payload.supplier_name,
+        supplier_group=payload.supplier_group,
+        supplier_type=payload.supplier_type,
+        country=payload.country,
+        default_currency=payload.default_currency or "NGN",
+        email_id=payload.email_id,
+        mobile_no=payload.mobile_no,
+        tax_id=payload.tax_id,
+        payment_terms=payload.payment_terms,
+        disabled=False,
+    )
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+
+    return {
+        "id": supplier.id,
+        "name": supplier.supplier_name,
+        "supplier_name": supplier.supplier_name,
+        "group": supplier.supplier_group,
+        "type": supplier.supplier_type,
+        "country": supplier.country,
+        "currency": supplier.default_currency,
+        "email": supplier.email_id,
+        "mobile": supplier.mobile_no,
+        "tax_id": supplier.tax_id,
+        "payment_terms": supplier.payment_terms,
+    }
+
+
+@router.patch("/suppliers/{supplier_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def update_supplier(
+    supplier_id: int,
+    payload: SupplierUpdate,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update an existing supplier."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+
+    # Check for duplicate name if updating name
+    if "supplier_name" in update_data and update_data["supplier_name"] != supplier.supplier_name:
+        existing = db.query(Supplier).filter(
+            Supplier.supplier_name == update_data["supplier_name"],
+            Supplier.id != supplier_id,
+            Supplier.disabled == False,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Supplier with this name already exists")
+
+    for key, value in update_data.items():
+        setattr(supplier, key, value)
+
+    db.commit()
+    db.refresh(supplier)
+
+    return {
+        "id": supplier.id,
+        "name": supplier.supplier_name,
+        "supplier_name": supplier.supplier_name,
+        "group": supplier.supplier_group,
+        "type": supplier.supplier_type,
+        "country": supplier.country,
+        "currency": supplier.default_currency,
+        "email": supplier.email_id,
+        "mobile": supplier.mobile_no,
+        "tax_id": supplier.tax_id,
+        "payment_terms": supplier.payment_terms,
+        "disabled": supplier.disabled,
+    }
+
+
+@router.delete("/suppliers/{supplier_id}", dependencies=[Depends(Require("purchasing:write"))])
+async def delete_supplier(
+    supplier_id: int,
+    soft: bool = Query(default=True),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Delete a supplier (soft delete by default)."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    if soft:
+        supplier.disabled = True
+        db.commit()
+        return {"status": "soft_deleted", "id": supplier_id}
+    else:
+        db.delete(supplier)
+        db.commit()
+        return {"status": "deleted", "id": supplier_id}
 
 
 # ============= EXPENSES =============

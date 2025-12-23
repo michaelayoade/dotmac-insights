@@ -1,0 +1,96 @@
+/* Expense Reports PDF Stylesheet */
+@page {
+    size: A4 landscape;
+    margin: 1.5cm;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    font-size: 9pt;
+    line-height: 1.4;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 8px;
+}
+
+.header h1 {
+    font-size: 16pt;
+    margin: 0 0 3px 0;
+    color: #1a365d;
+}
+
+.header h2 {
+    font-size: 12pt;
+    margin: 0 0 3px 0;
+    color: #555;
+}
+
+.header p {
+    margin: 2px 0;
+    color: #666;
+    font-size: 9pt;
+}
+
+.summary {
+    margin: 15px 0;
+}
+
+.summary h3 {
+    font-size: 11pt;
+    margin-bottom: 8px;
+    color: #1a365d;
+}
+
+.summary-table {
+    width: auto;
+    border-collapse: collapse;
+}
+
+.summary-table td {
+    padding: 3px 15px 3px 0;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.data-table th,
+.data-table td {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 8pt;
+}
+
+.data-table th {
+    background-color: #1a365d;
+    color: white;
+    font-weight: bold;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.number {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+}
+
+.footer {
+    margin-top: 15px;
+    border-top: 1px solid #ddd;
+    padding-top: 8px;
+}
+
+.generated {
+    color: #999;
+    font-size: 7pt;
+    text-align: right;
+}

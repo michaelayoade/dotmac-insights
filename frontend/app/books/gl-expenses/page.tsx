@@ -3,31 +3,13 @@
 import { useState } from 'react';
 import { usePurchasingExpenses } from '@/hooks/useApi';
 import { DataTable, Pagination } from '@/components/DataTable';
-import { AlertTriangle, Receipt, Calendar, DollarSign, Building2, Filter, Briefcase, Tag, TrendingDown, Search, BookOpen } from 'lucide-react';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+import { AlertTriangle, Receipt, Calendar, DollarSign, Building2, Briefcase, Tag, TrendingDown, BookOpen } from 'lucide-react';
+import { Button, FilterCard, FilterInput } from '@/components/ui';
+import { formatAccountingCurrency, formatAccountingDate } from '@/lib/formatters/accounting';
 
 function formatNumber(value: number | undefined | null): string {
   if (value === undefined || value === null) return '0';
   return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
 }
 
 export default function GLExpensesPage() {
@@ -112,7 +94,7 @@ export default function GLExpensesPage() {
         <div className="flex items-center gap-1 text-sm">
           <Calendar className="w-3 h-3 text-slate-muted" />
           <span className="text-foreground-secondary">
-            {formatDate(item.posting_date)}
+            {formatAccountingDate(item.posting_date)}
           </span>
         </div>
       ),
@@ -135,7 +117,7 @@ export default function GLExpensesPage() {
       align: 'right' as const,
       render: (item: any) => (
         <span className="font-mono text-foreground font-medium">
-          {formatCurrency(item.amount)}
+          {formatAccountingCurrency(item.amount)}
         </span>
       ),
     },
@@ -179,7 +161,7 @@ export default function GLExpensesPage() {
             <p className="text-red-400 text-sm">Total Expenses</p>
           </div>
           <p className="text-xl font-bold text-red-400">
-            {formatCurrency(summary.total_amount || summary.total_spent || 0)}
+            {formatAccountingCurrency(summary.total_amount || summary.total_spent || 0)}
           </p>
         </div>
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
@@ -188,7 +170,7 @@ export default function GLExpensesPage() {
             <p className="text-blue-400 text-sm">Average Entry</p>
           </div>
           <p className="text-xl font-bold text-blue-400">
-            {formatCurrency(avgAmount)}
+            {formatAccountingCurrency(avgAmount)}
           </p>
         </div>
         <div className="bg-slate-card border border-slate-border rounded-xl p-4">
@@ -197,82 +179,70 @@ export default function GLExpensesPage() {
             <p className="text-slate-muted text-sm">Period</p>
           </div>
           <p className="text-sm font-medium text-foreground">
-            {startDate && endDate ? `${formatDate(startDate)} - ${formatDate(endDate)}` : 'All time'}
+            {startDate && endDate ? `${formatAccountingDate(startDate)} - ${formatAccountingDate(endDate)}` : 'All time'}
           </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-teal-400" />
-          <span className="text-foreground text-sm font-medium">Filters</span>
+      <FilterCard
+        actions={(search || costCenter || startDate || endDate) && (
+          <Button
+            onClick={() => {
+              setSearch('');
+              setCostCenter('');
+              setStartDate('');
+              setEndDate('');
+              setPage(1);
+            }}
+            className="text-slate-muted text-sm hover:text-foreground transition-colors"
+          >
+            Clear filters
+          </Button>
+        )}
+        contentClassName="flex flex-wrap gap-4 items-center"
+        iconClassName="text-teal-400"
+      >
+        <FilterInput
+          type="text"
+          placeholder="Search entries..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <FilterInput
+          type="text"
+          placeholder="Filter by cost center"
+          value={costCenter}
+          onChange={(e) => {
+            setCostCenter(e.target.value);
+            setPage(1);
+          }}
+          className="flex-1 min-w-[200px] max-w-md"
+        />
+        <div className="flex items-center gap-2">
+          <FilterInput
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setPage(1);
+            }}
+          />
+          <span className="text-slate-muted">to</span>
+          <FilterInput
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex-1 min-w-[200px] max-w-md relative">
-            <Search className="w-4 h-4 text-slate-muted absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search entries..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            />
-          </div>
-          <div className="flex-1 min-w-[200px] max-w-md">
-            <input
-              type="text"
-              placeholder="Filter by cost center"
-              value={costCenter}
-              onChange={(e) => {
-                setCostCenter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              placeholder="Start date"
-            />
-            <span className="text-slate-muted">to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setPage(1);
-              }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              placeholder="End date"
-            />
-          </div>
-          {(search || costCenter || startDate || endDate) && (
-            <button
-              onClick={() => {
-                setSearch('');
-                setCostCenter('');
-                setStartDate('');
-                setEndDate('');
-                setPage(1);
-              }}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      </div>
+      </FilterCard>
 
       {/* Table */}
       <DataTable

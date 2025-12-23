@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -142,8 +142,7 @@ class HRSettingsResponse(BaseModel):
     notify_contract_expiry_days: int
     notify_document_expiry_days: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HRSettingsUpdate(BaseModel):
@@ -275,8 +274,7 @@ class HolidayResponse(BaseModel):
     is_recurring: bool
     description: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HolidayCalendarCreate(BaseModel):
@@ -298,8 +296,7 @@ class HolidayCalendarResponse(BaseModel):
     is_active: bool
     holidays: List[HolidayResponse]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Salary Band Schemas
@@ -332,8 +329,7 @@ class SalaryBandResponse(BaseModel):
     mid_salary: Optional[Decimal]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Leave Encashment Policy Schemas
@@ -361,8 +357,7 @@ class LeaveEncashmentPolicyResponse(BaseModel):
     taxable: bool
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Document Checklist Template Schemas
@@ -386,8 +381,7 @@ class ChecklistTemplateResponse(BaseModel):
     items: List[dict]
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================

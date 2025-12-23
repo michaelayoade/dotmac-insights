@@ -1043,7 +1043,7 @@ async def get_support_dashboard(
 # FIELD SERVICE DASHBOARD - Consolidated (2 calls → 1)
 # =============================================================================
 
-@router.get("/field-service", dependencies=[Depends(Require("field_service:read"))])
+@router.get("/field-service", dependencies=[Depends(Require("field-service:read"))])
 @cached("dashboard-field-service", ttl=CACHE_TTL["short"])
 async def get_field_service_dashboard(
     db: Session = Depends(get_db),

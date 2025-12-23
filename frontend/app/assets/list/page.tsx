@@ -4,8 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Search,
-  Filter,
   Building2,
   MapPin,
   Calendar,
@@ -23,8 +21,10 @@ import {
   User,
 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatStatusLabel, type StatusTone } from "@/lib/status-pill";
 import { useAssets, useAssetMutations } from "@/hooks/useApi";
 import type { Asset } from "@/lib/api";
+import { Button, FilterCard, FilterInput, FilterSelect, StatusPill } from '@/components/ui';
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Statuses" },
@@ -38,15 +38,15 @@ const STATUS_OPTIONS = [
   { value: "out_of_order", label: "Out of Order" },
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-slate-500/20 text-slate-400",
-  submitted: "bg-blue-500/20 text-blue-400",
-  partially_depreciated: "bg-amber-500/20 text-amber-400",
-  fully_depreciated: "bg-emerald-500/20 text-emerald-400",
-  sold: "bg-purple-500/20 text-purple-400",
-  scrapped: "bg-coral-alert/20 text-coral-alert",
-  in_maintenance: "bg-orange-500/20 text-orange-400",
-  out_of_order: "bg-red-500/20 text-red-400",
+const STATUS_TONES: Record<string, StatusTone> = {
+  draft: "default",
+  submitted: "info",
+  partially_depreciated: "warning",
+  fully_depreciated: "success",
+  sold: "info",
+  scrapped: "danger",
+  in_maintenance: "warning",
+  out_of_order: "danger",
 };
 
 export default function AssetsListPage() {
@@ -106,13 +106,13 @@ export default function AssetsListPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => mutate()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-2 bg-slate-elevated hover:bg-slate-border/50 rounded-lg text-sm text-slate-muted hover:text-foreground transition-colors"
           >
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
-          </button>
+          </Button>
           <Link
             href="/assets/list/new"
             className="flex items-center gap-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-sm text-foreground transition-colors"
@@ -124,43 +124,34 @@ export default function AssetsListPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-            <input
-              type="text"
-              placeholder="Search assets..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Category..."
-            value={categoryFilter}
-            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
-          <input
-            type="text"
-            placeholder="Location..."
-            value={locationFilter}
-            onChange={(e) => { setLocationFilter(e.target.value); setPage(1); }}
-            className="w-full px-4 py-2 bg-slate-elevated border border-slate-border rounded-lg text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-          />
-        </div>
-      </div>
+      <FilterCard contentClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" iconClassName="text-indigo-400">
+        <FilterInput
+          type="text"
+          placeholder="Search assets..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </FilterSelect>
+        <FilterInput
+          type="text"
+          placeholder="Category..."
+          value={categoryFilter}
+          onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+        />
+        <FilterInput
+          type="text"
+          placeholder="Location..."
+          value={locationFilter}
+          onChange={(e) => { setLocationFilter(e.target.value); setPage(1); }}
+        />
+      </FilterCard>
 
       {/* Assets Table */}
       <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
@@ -245,12 +236,10 @@ export default function AssetsListPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn(
-                        "px-2 py-1 text-xs font-medium rounded-full capitalize",
-                        STATUS_COLORS[asset.status ?? 'draft'] ?? "bg-slate-500/20 text-slate-400"
-                      )}>
-                        {asset.status?.replace(/_/g, " ")}
-                      </span>
+                      <StatusPill
+                        label={formatStatusLabel(asset.status)}
+                        tone={STATUS_TONES[asset.status ?? "draft"] || "default"}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -262,22 +251,22 @@ export default function AssetsListPage() {
                           <Eye className="w-4 h-4" />
                         </Link>
                         {asset.status === "draft" && (
-                          <button
+                          <Button
                             onClick={() => handleSubmit(asset.id)}
                             className="p-2 text-slate-muted hover:text-emerald-400 hover:bg-slate-elevated rounded-lg transition-colors"
                             title="Submit"
                           >
                             <CheckCircle className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
                         {asset.status && ["submitted", "partially_depreciated", "in_maintenance"].includes(asset.status) && (
-                          <button
+                          <Button
                             onClick={() => handleScrap(asset.id)}
                             className="p-2 text-slate-muted hover:text-coral-alert hover:bg-slate-elevated rounded-lg transition-colors"
                             title="Scrap"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -295,23 +284,23 @@ export default function AssetsListPage() {
               Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
+              </Button>
               <span className="text-sm text-slate-muted">
                 Page {page} of {totalPages}
               </span>
-              <button
+              <Button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className="p-2 text-slate-muted hover:text-foreground hover:bg-slate-elevated rounded-lg transition-colors disabled:opacity-50"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}

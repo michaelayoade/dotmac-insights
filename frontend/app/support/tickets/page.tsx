@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   LifeBuoy,
   Plus,
-  Filter,
   AlertTriangle,
   Tag,
   Clock,
@@ -18,84 +17,19 @@ import {
   Users,
   Target,
   ChevronRight,
-  Search,
 } from 'lucide-react';
 import { DataTable, Pagination } from '@/components/DataTable';
+import { SelectableStatCard } from '@/components/StatCard';
 import { useConsolidatedSupportDashboard, useSupportTickets, useSupportSlaBreachesSummary, useSupportTeams } from '@/hooks/useApi';
 import { cn } from '@/lib/utils';
+import { formatDate, formatRelativeTime } from '@/lib/formatters';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { ErrorDisplay, LoadingState } from '@/components/insights/shared';
+import { ErrorDisplay } from '@/components/insights/shared';
+import { Button, FilterCard, FilterInput, FilterSelect, LoadingState, StatusPill } from '@/components/ui';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-function formatDate(dateStr: string | null | undefined) {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function formatTimeAgo(dateStr: string | null | undefined) {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) return `${diffDays}d ago`;
-  if (diffHours > 0) return `${diffHours}h ago`;
-  return 'Just now';
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  variant,
-  onClick,
-  active,
-}: {
-  label: string;
-  value: number | string;
-  icon?: React.ElementType;
-  variant?: 'default' | 'warning' | 'success' | 'info';
-  onClick?: () => void;
-  active?: boolean;
-}) {
-  const variants = {
-    default: 'bg-slate-card border-slate-border',
-    warning: 'bg-rose-500/10 border-rose-500/30',
-    success: 'bg-emerald-500/10 border-emerald-500/30',
-    info: 'bg-blue-500/10 border-blue-500/30',
-  };
-  const textVariants = {
-    default: 'text-foreground',
-    warning: 'text-rose-400',
-    success: 'text-emerald-400',
-    info: 'text-blue-400',
-  };
-  const v = variant || 'default';
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'rounded-xl p-4 border text-left transition-all',
-        variants[v],
-        onClick && 'hover:border-opacity-80 cursor-pointer',
-        active && 'ring-2 ring-teal-electric ring-offset-2 ring-offset-slate-950'
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <p className={cn('text-sm', v === 'default' ? 'text-slate-muted' : textVariants[v])}>{label}</p>
-        {Icon && <Icon className={cn('w-4 h-4', textVariants[v])} />}
-      </div>
-      <p className={cn('text-2xl font-bold mt-1', textVariants[v])}>{value}</p>
-    </button>
-  );
-}
 
 function PriorityBadge({ priority }: { priority: string }) {
   const colors: Record<string, string> = {
@@ -115,25 +49,27 @@ function PriorityBadge({ priority }: { priority: string }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    open: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-    in_progress: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-    pending: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-    resolved: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    closed: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
-    replied: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
-    on_hold: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+  const tones: Record<string, StatusTone> = {
+    open: 'info',
+    in_progress: 'warning',
+    pending: 'warning',
+    resolved: 'success',
+    closed: 'default',
+    replied: 'info',
+    on_hold: 'warning',
   };
-  const color = colors[status] || colors.open;
 
   return (
-    <span className={cn('px-2 py-1 rounded-full text-xs font-medium border capitalize', color)}>
-      {status.replace(/_/g, ' ')}
-    </span>
+    <StatusPill
+      label={formatStatusLabel(status)}
+      tone={tones[status] || 'default'}
+    />
   );
 }
 
 export default function SupportTicketsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('support:read');
   const router = useRouter();
   const [filters, setFilters] = usePersistentState<{
     page: number;
@@ -159,9 +95,10 @@ export default function SupportTicketsPage() {
     quickFilter: '',
   });
   const { page, pageSize, priority, status, ticketType, agent, teamId, startDate, endDate, quickFilter } = filters;
+  const canFetch = !authLoading && !missingScope;
 
   // Fetch teams for filter dropdown
-  const { data: teamsData } = useSupportTeams();
+  const { data: teamsData } = useSupportTeams({ isPaused: () => !canFetch });
   const teams = teamsData?.teams || [];
   const offset = (page - 1) * pageSize;
 
@@ -175,10 +112,10 @@ export default function SupportTicketsPage() {
     end: endDate || undefined,
     limit: pageSize,
     offset,
-  });
+  }, { isPaused: () => !canFetch });
 
-  const { data: supportDashboard } = useConsolidatedSupportDashboard();
-  const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 });
+  const { data: supportDashboard } = useConsolidatedSupportDashboard(undefined, { isPaused: () => !canFetch });
+  const { data: slaBreach } = useSupportSlaBreachesSummary({ days: 30 }, { isPaused: () => !canFetch });
   const openTickets = supportDashboard?.summary?.open_tickets ?? 0;
   const resolvedTickets = supportDashboard?.summary?.resolved_tickets ?? 0;
   const totalTickets = openTickets + resolvedTickets;
@@ -286,11 +223,25 @@ export default function SupportTicketsPage() {
       render: (item: any) => (
         <div className="text-slate-200 text-sm">
           <div>{formatDate(item.created_at)}</div>
-          <div className="text-xs text-slate-muted">{formatTimeAgo(item.created_at)}</div>
+          <div className="text-xs text-slate-muted">{formatRelativeTime(item.created_at)}</div>
         </div>
       ),
     },
   ];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the support:read permission to view tickets."
+        backHref="/support"
+        backLabel="Back to Support"
+      />
+    );
+  }
 
   if (isLoading) {
     return <LoadingState />;
@@ -328,40 +279,40 @@ export default function SupportTicketsPage() {
       {/* Quick Stats */}
       {supportDashboard && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <StatCard
-            label="Total"
+          <SelectableStatCard
+            title="Total"
             value={totalTickets}
             icon={Inbox}
           />
-          <StatCard
-            label="Open"
+          <SelectableStatCard
+            title="Open"
             value={openTickets}
             icon={AlertTriangle}
             variant="info"
             onClick={() => handleQuickFilter('open')}
             active={quickFilter === 'open'}
           />
-          <StatCard
-            label="Resolved"
+          <SelectableStatCard
+            title="Resolved"
             value={resolvedTickets}
             icon={CheckCircle}
             variant="success"
             onClick={() => handleQuickFilter('resolved')}
             active={quickFilter === 'resolved'}
           />
-          <StatCard
-            label="SLA Attainment"
+          <SelectableStatCard
+            title="SLA Attainment"
             value={`${slaAttainment.toFixed(0)}%`}
             icon={Target}
           />
-          <StatCard
-            label="Overdue"
+          <SelectableStatCard
+            title="Overdue"
             value={slaBreach?.currently_overdue ?? supportDashboard.summary.overdue_tickets}
             icon={XCircle}
-            variant="warning"
+            variant="danger"
           />
-          <StatCard
-            label="Unassigned"
+          <SelectableStatCard
+            title="Unassigned"
             value={supportDashboard.summary.unassigned_tickets}
             icon={Users}
           />
@@ -369,41 +320,31 @@ export default function SupportTicketsPage() {
       )}
 
       {/* Filters */}
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-teal-electric" />
-            <span className="text-foreground text-sm font-medium">Filters</span>
-          </div>
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <XCircle className="w-3 h-3" />
-              Clear all
-            </button>
-          )}
-        </div>
-
+      <FilterCard
+        actions={hasActiveFilters && (
+          <Button
+            onClick={clearFilters}
+            className="text-slate-muted text-sm hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            <XCircle className="w-3 h-3" />
+            Clear all
+          </Button>
+        )}
+        contentClassName="space-y-4"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-muted" />
-            <input
-              value={agent}
-              onChange={(e) => {
-                setFilters((prev) => ({ ...prev, agent: e.target.value, page: 1 }));
-              }}
-              placeholder="Search agent/email..."
-              className="w-full bg-slate-elevated border border-slate-border rounded-lg pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
-            />
-          </div>
-          <select
+          <FilterInput
+            value={agent}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, agent: e.target.value, page: 1 }));
+            }}
+            placeholder="Search agent/email..."
+          />
+          <FilterSelect
             value={teamId}
             onChange={(e) => {
               setFilters((prev) => ({ ...prev, teamId: e.target.value, page: 1 }));
             }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Teams</option>
             {teams.map((team: any) => (
@@ -411,34 +352,31 @@ export default function SupportTicketsPage() {
                 {team.team_name}
               </option>
             ))}
-          </select>
-          <input
-          value={ticketType}
-          onChange={(e) => {
-            setFilters((prev) => ({ ...prev, ticketType: e.target.value, page: 1 }));
-          }}
-          placeholder="Ticket type..."
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-slate-muted focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          </FilterSelect>
+          <FilterInput
+            value={ticketType}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, ticketType: e.target.value, page: 1 }));
+            }}
+            placeholder="Ticket type..."
           />
-          <select
-          value={priority}
-          onChange={(e) => {
-            setFilters((prev) => ({ ...prev, priority: e.target.value, quickFilter: '', page: 1 }));
-          }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          <FilterSelect
+            value={priority}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, priority: e.target.value, quickFilter: '', page: 1 }));
+            }}
           >
             <option value="">All Priorities</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
             <option value="urgent">Urgent</option>
-          </select>
-          <select
-          value={status}
-          onChange={(e) => {
-            setFilters((prev) => ({ ...prev, status: e.target.value, quickFilter: '', page: 1 }));
-          }}
-            className="bg-slate-elevated border border-slate-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+          </FilterSelect>
+          <FilterSelect
+            value={status}
+            onChange={(e) => {
+              setFilters((prev) => ({ ...prev, status: e.target.value, quickFilter: '', page: 1 }));
+            }}
           >
             <option value="">All Statuses</option>
             <option value="open">Open</option>
@@ -448,32 +386,32 @@ export default function SupportTicketsPage() {
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
             <option value="on_hold">On Hold</option>
-          </select>
+          </FilterSelect>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-slate-muted text-xs">Date range:</span>
           <div className="flex items-center gap-2">
-            <input
+            <FilterInput
               type="date"
               value={startDate}
               onChange={(e) => {
                 setFilters((prev) => ({ ...prev, startDate: e.target.value, page: 1 }));
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="max-w-[170px]"
             />
             <ChevronRight className="w-4 h-4 text-slate-muted" />
-            <input
+            <FilterInput
               type="date"
               value={endDate}
               onChange={(e) => {
                 setFilters((prev) => ({ ...prev, endDate: e.target.value, page: 1 }));
               }}
-              className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
+              className="max-w-[170px]"
             />
           </div>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Results Info */}
       <div className="flex items-center justify-between text-sm">

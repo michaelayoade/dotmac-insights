@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useInventoryStockEntries } from "@/hooks/useApi";
 import { ClipboardList, Plus, Loader2, AlertCircle, ArrowRightLeft, ArrowDownToLine, ArrowUpFromLine, Calendar } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { formatStatusLabel, type StatusTone } from "@/lib/status-pill";
+import { FilterCard, FilterSelect, StatusPill, LoadingState } from "@/components/ui";
+import { useRequireScope } from "@/lib/auth-context";
+import { AccessDenied } from "@/components/AccessDenied";
 
 const ENTRY_TYPES = [
   { value: "", label: "All Types" },
@@ -32,26 +35,47 @@ function getEntryIcon(entryType: string) {
 function getStatusBadge(docstatus: number | undefined) {
   switch (docstatus) {
     case 0:
-      return { label: "Draft", className: "bg-slate-500/20 text-foreground-secondary" };
+      return { label: "Draft", tone: "default" as StatusTone };
     case 1:
-      return { label: "Submitted", className: "bg-emerald-500/20 text-emerald-300" };
+      return { label: "Submitted", tone: "success" as StatusTone };
     case 2:
-      return { label: "Cancelled", className: "bg-red-500/20 text-red-300" };
+      return { label: "Cancelled", tone: "danger" as StatusTone };
     default:
-      return { label: "Unknown", className: "bg-slate-500/20 text-foreground-secondary" };
+      return { label: "Unknown", tone: "default" as StatusTone };
   }
 }
 
 export default function StockEntriesPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope("inventory:read");
   const [entryType, setEntryType] = useState("");
   const [docstatus, setDocstatus] = useState<number | undefined>(undefined);
-  const { data, isLoading, error } = useInventoryStockEntries({
-    stock_entry_type: entryType || undefined,
-    docstatus,
-    limit: 100,
-  });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, isLoading, error } = useInventoryStockEntries(
+    {
+      stock_entry_type: entryType || undefined,
+      docstatus,
+      limit: 100,
+    },
+    { isPaused: () => !canFetch }
+  );
 
   const entries = data?.entries || [];
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the inventory:read permission to view stock entries."
+        backHref="/inventory"
+        backLabel="Back to Inventory"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -69,30 +93,30 @@ export default function StockEntriesPage() {
         </Link>
       </div>
 
-      <div className="bg-slate-card border border-slate-border rounded-xl p-4 space-y-4">
+      <FilterCard contentClassName="space-y-4" iconClassName="text-amber-400">
         <div className="flex flex-col md:flex-row gap-4">
-          <select
+          <FilterSelect
             value={entryType}
             onChange={(e) => setEntryType(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="focus:ring-2 focus:ring-amber-500/50"
           >
             {ENTRY_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
                 {type.label}
               </option>
             ))}
-          </select>
-          <select
+          </FilterSelect>
+          <FilterSelect
             value={docstatus ?? ""}
             onChange={(e) => setDocstatus(e.target.value === "" ? undefined : Number(e.target.value))}
-            className="px-3 py-2 rounded-lg border border-slate-border bg-slate-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            className="focus:ring-2 focus:ring-amber-500/50"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.label} value={opt.value ?? ""}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </FilterSelect>
         </div>
 
         {isLoading && (
@@ -174,9 +198,11 @@ export default function StockEntriesPage() {
                         {(entry.total_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-3">
-                        <span className={cn("px-2 py-0.5 rounded-full text-xs", status.className)}>
-                          {status.label}
-                        </span>
+                        <StatusPill
+                          label={formatStatusLabel(status.label)}
+                          tone={status.tone}
+                          className="border border-current/30"
+                        />
                       </td>
                     </tr>
                   );
@@ -191,7 +217,7 @@ export default function StockEntriesPage() {
             Showing {entries.length} of {data.total} entries
           </div>
         )}
-      </div>
+      </FilterCard>
     </div>
   );
 }

@@ -4,23 +4,30 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Plus, ClipboardList, Search } from 'lucide-react';
 import { useExpenseClaims } from '@/hooks/useExpenses';
-import { formatDate, cn } from '@/lib/utils';
-import { PageHeader, ErrorState, EmptyState, SearchInput, Button, StatGrid } from '@/components/ui';
+import { formatDate } from '@/lib/utils';
+import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
+import { LoadingState, PageHeader, ErrorState, EmptyState, SearchInput, Button, StatGrid, StatusPill } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
+import { useRequireScope } from '@/lib/auth-context';
+import { AccessDenied } from '@/components/AccessDenied';
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-slate-elevated text-slate-muted',
-  pending_approval: 'bg-amber-500/20 text-amber-400',
-  approved: 'bg-emerald-500/20 text-emerald-400',
-  rejected: 'bg-rose-500/20 text-rose-400',
-  returned: 'bg-orange-500/20 text-orange-400',
-  recalled: 'bg-violet-500/20 text-violet-400',
-  posted: 'bg-blue-500/20 text-blue-400',
+const STATUS_TONES: Record<string, StatusTone> = {
+  draft: 'default',
+  pending_approval: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  returned: 'warning',
+  recalled: 'info',
+  posted: 'info',
 };
 
 export default function ExpenseClaimsPage() {
+  // All hooks must be called unconditionally at the top
+  const { isLoading: authLoading, missingScope } = useRequireScope('expenses:read');
   const [search, setSearch] = useState('');
-  const { data, error, isLoading, mutate } = useExpenseClaims({ limit: 50 });
+  const canFetch = !authLoading && !missingScope;
+
+  const { data, error, isLoading, mutate } = useExpenseClaims({ limit: 50 }, { isPaused: () => !canFetch });
 
   const claims = data || [];
   const filteredClaims = search
@@ -36,6 +43,20 @@ export default function ExpenseClaimsPage() {
   const pendingCount = claims.filter((c) => c.status === 'pending_approval').length;
   const approvedCount = claims.filter((c) => c.status === 'approved').length;
   const totalAmount = claims.reduce((sum, c) => sum + (c.total_claimed_amount || 0), 0);
+
+  // Permission guard - after all hooks
+  if (authLoading) {
+    return <LoadingState message="Checking permissions..." />;
+  }
+  if (missingScope) {
+    return (
+      <AccessDenied
+        message="You need the expenses:read permission to view expense claims."
+        backHref="/expenses"
+        backLabel="Back to Expenses"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -107,14 +128,10 @@ export default function ExpenseClaimsPage() {
                     {formatDate(claim.claim_date)}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        'inline-flex px-2 py-1 rounded-full text-xs font-medium',
-                        STATUS_COLORS[claim.status] || 'bg-slate-elevated text-slate-muted'
-                      )}
-                    >
-                      {claim.status.replace(/_/g, ' ')}
-                    </span>
+                    <StatusPill
+                      label={formatStatusLabel(claim.status)}
+                      tone={STATUS_TONES[claim.status] || 'default'}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span className="text-foreground font-medium">

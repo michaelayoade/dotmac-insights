@@ -1,10 +1,10 @@
 'use client';
 
 import { useConsolidatedAccountingDashboard } from '@/hooks/useApi';
-import { cn } from '@/lib/utils';
 import { DashboardShell } from '@/components/ui/DashboardShell';
 import { ErrorDisplay } from '@/components/insights/shared';
 import { DashboardSkeleton } from '@/components/PageSkeleton';
+import { StatCard, StatCardGrid, RatioCard } from '@/components/StatCard';
 import {
   DollarSign,
   TrendingUp,
@@ -21,117 +21,10 @@ import {
   Users,
   Landmark,
   FileText,
-  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
-
-function formatCurrency(value: number | undefined | null, currency = 'NGN'): string {
-  if (value === undefined || value === null) return '₦0';
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatNumber(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0';
-  return new Intl.NumberFormat('en-NG').format(value);
-}
-
-function formatRatio(value: number | undefined | null): string {
-  if (value === undefined || value === null) return '0.00';
-  return value.toFixed(2);
-}
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass?: string;
-  loading?: boolean;
-  href?: string;
-  onClick?: () => void;
-}
-
-function MetricCard({ title, value, subtitle, icon: Icon, colorClass = 'text-teal-electric', loading, href, onClick }: MetricCardProps) {
-  const isClickable = Boolean(href || onClick);
-
-  const content = (
-    <div className="flex items-start justify-between">
-      <div className="space-y-1">
-        <p className="text-slate-muted text-sm">{title}</p>
-        {loading ? (
-          <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
-        ) : (
-          <p className={cn('text-2xl font-bold', colorClass)}>{value}</p>
-        )}
-        {subtitle && <p className="text-slate-muted text-xs">{subtitle}</p>}
-      </div>
-      <div className="flex items-center gap-2">
-        <div className={cn('p-2 rounded-lg bg-slate-elevated')}>
-          <Icon className={cn('w-5 h-5', colorClass)} />
-        </div>
-        {isClickable && (
-          <ChevronRight className="w-5 h-5 text-slate-muted group-hover:text-teal-electric group-hover:translate-x-0.5 transition-all duration-200" />
-        )}
-      </div>
-    </div>
-  );
-
-  const cardClasses = cn(
-    'bg-slate-card border border-slate-border rounded-xl p-5 hover:border-slate-border/80 transition-colors group',
-    isClickable && 'cursor-pointer hover:bg-slate-card/80'
-  );
-
-  if (href) {
-    return (
-      <Link href={href} className={cn(cardClasses, 'block')}>
-        {content}
-      </Link>
-    );
-  }
-
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={cn(cardClasses, 'w-full text-left')}>
-        {content}
-      </button>
-    );
-  }
-
-  return <div className={cardClasses}>{content}</div>;
-}
-
-interface RatioCardProps {
-  title: string;
-  value: string;
-  description: string;
-  status: 'good' | 'warning' | 'bad';
-}
-
-function RatioCard({ title, value, description, status }: RatioCardProps) {
-  const statusColors = {
-    good: 'border-green-500/30 bg-green-500/10',
-    warning: 'border-yellow-500/30 bg-yellow-500/10',
-    bad: 'border-red-500/30 bg-red-500/10',
-  };
-  const valueColors = {
-    good: 'text-green-400',
-    warning: 'text-yellow-400',
-    bad: 'text-red-400',
-  };
-
-  return (
-    <div className={cn('rounded-xl p-4 border', statusColors[status])}>
-      <p className="text-slate-muted text-sm mb-1">{title}</p>
-      <p className={cn('text-xl font-bold', valueColors[status])}>{value}</p>
-      <p className="text-slate-muted text-xs mt-1">{description}</p>
-    </div>
-  );
-}
+import { formatAccountingCurrency } from '@/lib/formatters/accounting';
+import { formatNumber, formatRatio } from '@/lib/formatters';
 
 export default function AccountingDashboardPage() {
   const currency = 'NGN';
@@ -189,33 +82,33 @@ export default function AccountingDashboardPage() {
         )}
         {/* Key Financial Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
+          <StatCard
             title="Total Assets"
-            value={formatCurrency(totalAssets)}
+            value={formatAccountingCurrency(totalAssets)}
             icon={Building2}
             colorClass="text-blue-400"
             loading={loading}
             href="/books/chart-of-accounts?type=asset"
           />
-          <MetricCard
+          <StatCard
             title="Total Liabilities"
-            value={formatCurrency(totalLiabilities)}
+            value={formatAccountingCurrency(totalLiabilities)}
             icon={CreditCard}
             colorClass="text-red-400"
             loading={loading}
             href="/books/chart-of-accounts?type=liability"
           />
-          <MetricCard
+          <StatCard
             title="Total Equity"
-            value={formatCurrency(totalEquity)}
+            value={formatAccountingCurrency(totalEquity)}
             icon={PiggyBank}
             colorClass="text-green-400"
             loading={loading}
             href="/books/chart-of-accounts?type=equity"
           />
-          <MetricCard
+          <StatCard
             title="Net Income (YTD)"
-            value={formatCurrency(netIncome)}
+            value={formatAccountingCurrency(netIncome)}
             icon={TrendingUp}
             colorClass="text-teal-electric"
             loading={loading}
@@ -225,25 +118,25 @@ export default function AccountingDashboardPage() {
 
       {/* Cash & Receivables */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
+        <StatCard
           title="Cash & Bank"
-          value={formatCurrency(cashBalance)}
+          value={formatAccountingCurrency(cashBalance)}
           subtitle={`${bankAccountCount} bank accounts`}
           icon={Wallet}
           colorClass="text-emerald-400"
           href="/books/bank-accounts"
         />
-        <MetricCard
+        <StatCard
           title="Accounts Receivable"
-          value={formatCurrency(accountsReceivable)}
+          value={formatAccountingCurrency(accountsReceivable)}
           subtitle="Outstanding AR"
           icon={ArrowUpRight}
           colorClass="text-blue-400"
           href="/books/invoices?status=unpaid"
         />
-        <MetricCard
+        <StatCard
           title="Revenue (YTD)"
-          value={formatCurrency(totalRevenue)}
+          value={formatAccountingCurrency(totalRevenue)}
           subtitle={`${profitMargin.toFixed(1)}% profit margin`}
           icon={DollarSign}
           colorClass="text-green-400"
@@ -291,7 +184,7 @@ export default function AccountingDashboardPage() {
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
           ) : (
             <>
-              <p className="text-3xl font-bold text-green-400">{formatCurrency(totalRevenue)}</p>
+              <p className="text-3xl font-bold text-green-400">{formatAccountingCurrency(totalRevenue)}</p>
               <p className="text-slate-muted text-sm mt-2">Total revenue for current year</p>
             </>
           )}
@@ -305,7 +198,7 @@ export default function AccountingDashboardPage() {
             <Loader2 className="w-6 h-6 animate-spin text-slate-muted" />
           ) : (
             <>
-              <p className="text-3xl font-bold text-red-400">{formatCurrency(totalExpenses)}</p>
+              <p className="text-3xl font-bold text-red-400">{formatAccountingCurrency(totalExpenses)}</p>
               <p className="text-slate-muted text-sm mt-2">Total expenses for current year</p>
             </>
           )}
@@ -349,21 +242,21 @@ export default function AccountingDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <p className="text-slate-muted text-sm mb-2">Assets</p>
-              <p className="text-2xl font-bold text-blue-400">{formatCurrency(totalAssets)}</p>
+              <p className="text-2xl font-bold text-blue-400">{formatAccountingCurrency(totalAssets)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-2">Liabilities</p>
-              <p className="text-2xl font-bold text-red-400">{formatCurrency(totalLiabilities)}</p>
+              <p className="text-2xl font-bold text-red-400">{formatAccountingCurrency(totalLiabilities)}</p>
             </div>
             <div>
               <p className="text-slate-muted text-sm mb-2">Net Worth</p>
-              <p className="text-2xl font-bold text-green-400">{formatCurrency(netWorth)}</p>
+              <p className="text-2xl font-bold text-green-400">{formatAccountingCurrency(netWorth)}</p>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-slate-border">
             <div className="flex items-center justify-between">
               <span className="text-slate-muted">Equity</span>
-              <span className="text-foreground font-medium">{formatCurrency(totalEquity)}</span>
+              <span className="text-foreground font-medium">{formatAccountingCurrency(totalEquity)}</span>
             </div>
           </div>
         </div>

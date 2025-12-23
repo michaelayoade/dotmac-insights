@@ -1,7 +1,7 @@
 """
 Unified Contact API Schemas
 """
-from pydantic import BaseModel, Field, EmailStr, computed_field, validator
+from pydantic import BaseModel, Field, EmailStr, computed_field, validator, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -350,8 +350,7 @@ class UnifiedContactResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UnifiedContactSummary(BaseModel):
@@ -387,8 +386,7 @@ class UnifiedContactSummary(BaseModel):
     tags: Optional[List[str]]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UnifiedContactListResponse(BaseModel):
@@ -438,8 +436,7 @@ class PersonContactResponse(BaseModel):
     is_billing_contact: bool
     is_decision_maker: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # =============================================================================
