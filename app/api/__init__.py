@@ -1,14 +1,14 @@
 from fastapi import APIRouter
 from app.api import (
     sync,
-    customers,
+    # customers,  # DEPRECATED: ISP-specific, use /crm/contacts for customer management
     analytics,
     data_explorer,
     admin,
     insights,
     finance,
     hr,
-    sales,
+    sales,  # TODO: Migrate remaining endpoints to /crm/sales and /accounting
     support,
     network,
     zoho_import,
@@ -31,7 +31,8 @@ from app.api.asset_settings import router as asset_settings_router
 from app.api.crm import router as crm_router
 from app.api.field_service import router as field_service_router
 from app.api.inbox import router as inbox_router
-from app.api.contacts import router as contacts_router
+# Contacts are now handled by CRM module - deprecated import kept for transition
+# from app.api.contacts import router as contacts_router
 from app.api.performance import router as performance_router
 from app.api.omni import public_router as public_omni_router
 from app.api.platform import router as platform_router
@@ -40,11 +41,14 @@ from app.api.tax_core import router as tax_core_router
 from app.api.vehicles import router as vehicles_router
 from app.api.dashboards import router as dashboards_router
 from app.api.workflow_tasks import router as workflow_tasks_router
+from app.api.migration import router as migration_router
+from app.api.admin_sync import router as admin_sync_router
 
 api_router = APIRouter()
 
 # Domain routers (new structure)
-api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
+# DEPRECATED: customers module (ISP-specific) - use /crm/contacts instead
+# api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(sales.router, tags=["sales"])
 api_router.include_router(accounting.router, prefix="/accounting", tags=["accounting"])
@@ -59,7 +63,8 @@ api_router.include_router(expenses.router, tags=["expenses"])
 api_router.include_router(sales.router, prefix="/v1", tags=["sales"])
 api_router.include_router(accounting.router, prefix="/v1/accounting", tags=["accounting"])
 api_router.include_router(purchasing.router, prefix="/v1/purchasing", tags=["purchasing"])
-api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])
+# DEPRECATED: customers module - use /crm/contacts instead
+# api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/v1/finance", tags=["finance"])
 api_router.include_router(tax_router, prefix="/v1/tax", tags=["tax"])
 api_router.include_router(books_settings.router, prefix="/v1", tags=["books-settings"])
@@ -72,9 +77,9 @@ api_router.include_router(network.router, prefix="/v1/network", tags=["network"]
 api_router.include_router(inventory.router, prefix="/v1", tags=["inventory"])
 api_router.include_router(assets_router, prefix="/v1", tags=["assets"])
 api_router.include_router(asset_settings_router, prefix="/v1", tags=["asset-settings"])
-api_router.include_router(crm_router, prefix="/v1", tags=["crm"])
+api_router.include_router(crm_router, prefix="/v1", tags=["crm"])  # CRM includes contacts, leads, opportunities, activities
 api_router.include_router(inbox_router, prefix="/v1", tags=["inbox"])
-api_router.include_router(contacts_router, prefix="/v1")
+# contacts_router removed - now handled by CRM module at /crm/contacts
 api_router.include_router(performance_router, prefix="/v1")
 api_router.include_router(analytics.router, prefix="/v1/analytics", tags=["analytics"])
 api_router.include_router(insights.router, prefix="/v1/insights", tags=["insights"])
@@ -85,6 +90,7 @@ api_router.include_router(field_service_router, prefix="/v1")
 api_router.include_router(integrations_router, prefix="/v1")
 api_router.include_router(sync.router, prefix="/v1/sync", tags=["sync"])
 api_router.include_router(admin.router, prefix="/v1")
+api_router.include_router(admin_sync_router, prefix="/v1", tags=["admin-sync"])
 api_router.include_router(platform_router, prefix="/v1")
 api_router.include_router(entitlements.router, prefix="/v1")
 api_router.include_router(payroll_config_router, prefix="/v1")
@@ -98,9 +104,9 @@ api_router.include_router(network.router, prefix="/network", tags=["network"])
 api_router.include_router(inventory.router, tags=["inventory"])
 api_router.include_router(assets_router, tags=["assets"])
 api_router.include_router(asset_settings_router, tags=["asset-settings"])
-api_router.include_router(crm_router, tags=["crm"])  # CRM: leads, opportunities, activities
+api_router.include_router(crm_router, tags=["crm"])  # CRM: contacts, leads, opportunities, activities, pipeline
 api_router.include_router(inbox_router, tags=["inbox"])  # Omnichannel inbox
-api_router.include_router(contacts_router)  # Unified contacts (replaces CRM contacts)
+# contacts_router removed - now part of CRM module at /crm/contacts
 api_router.include_router(performance_router)  # Performance management module
 
 # Legacy routers (to be deprecated)
@@ -123,6 +129,7 @@ api_router.include_router(integrations_router)  # Already has /integrations pref
 # System routers
 api_router.include_router(sync.router, prefix="/sync", tags=["sync"])
 api_router.include_router(admin.router)  # Already has /admin prefix
+api_router.include_router(admin_sync_router, tags=["admin-sync"])  # Already has /admin/sync prefix
 api_router.include_router(platform_router)  # Already has /platform prefix
 api_router.include_router(entitlements.router)
 api_router.include_router(payroll_config_router)  # Generic payroll configuration
@@ -133,6 +140,7 @@ api_router.include_router(workflow_tasks_router, tags=["workflow-tasks"])  # Uni
 
 # Import routers
 api_router.include_router(zoho_import.router)  # Already has /zoho-import prefix
+api_router.include_router(migration_router)  # Already has /migration prefix
 
 # Public (unauthenticated) routers
 public_api_router = APIRouter()

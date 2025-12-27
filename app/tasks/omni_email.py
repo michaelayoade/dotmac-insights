@@ -183,6 +183,7 @@ def _persist_message(
 def poll_email_channel(self, channel_id: int):
     """Poll an IMAP inbox for new messages for a given channel."""
     db: Session = SessionLocal()
+    imap: Optional[imaplib.IMAP4] = None
     try:
         channel = db.query(OmniChannel).filter(OmniChannel.id == channel_id, OmniChannel.is_active == True).first()
         if not channel:
@@ -198,7 +199,6 @@ def poll_email_channel(self, channel_id: int):
         if not host or not username or not password:
             return
 
-        imap: imaplib.IMAP4
         if use_ssl:
             imap = imaplib.IMAP4_SSL(host, port)
         else:
@@ -209,9 +209,9 @@ def poll_email_channel(self, channel_id: int):
         # Fetch unseen emails
         status, data = imap.search(None, "UNSEEN")
         if status != "OK":
-            imap.logout()
             return
 
+        seen_nums: List[bytes] = []
         for num in data[0].split():
             status, msg_data = imap.fetch(num, "(RFC822)")
             if status != "OK":
@@ -232,13 +232,19 @@ def poll_email_channel(self, channel_id: int):
             conv = _get_or_create_conversation(db, channel, thread_id, payload.get("subject"))
             _persist_message(db, conv, participant, channel, payload)
 
-            # mark as seen
-            imap.store(num, "+FLAGS", "\\Seen")
+            seen_nums.append(num)
 
-        imap.logout()
         db.commit()
+
+        for num in seen_nums:
+            imap.store(num, "+FLAGS", "\\Seen")
     except Exception as exc:
         db.rollback()
         raise self.retry(exc=exc)
     finally:
+        if imap is not None:
+            try:
+                imap.logout()
+            except Exception:
+                pass
         db.close()

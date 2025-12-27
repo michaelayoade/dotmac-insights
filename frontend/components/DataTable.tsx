@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 
-interface Column<T = any> {
+export interface Column<T = any> {
   key: string;
-  header: string;
+  header: React.ReactNode;
   render?: (item: T) => React.ReactNode;
   sortable?: boolean;
   align?: 'left' | 'center' | 'right';

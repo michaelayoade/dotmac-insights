@@ -105,7 +105,8 @@ export function GanttChart({
       const timer = setTimeout(handleScrollToToday, 100);
       return () => clearTimeout(timer);
     }
-  }, [layout?.totalDays]); // Only on initial layout calculation
+    return undefined;
+  }, [handleScrollToToday, layout]);
 
   // Loading state
   if (isLoading) {

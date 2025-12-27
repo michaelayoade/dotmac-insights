@@ -490,6 +490,30 @@ async def get_current_principal(
     Raises:
         HTTPException: If no valid authentication provided
     """
+    if settings.auth_disabled:
+        claims = JWTClaims(
+            sub="auth-disabled",
+            email="auth-disabled@local",
+            name="Auth Disabled",
+            scopes=["*"],
+        )
+        user = await get_or_create_user(claims, db)
+        if not user.is_active or not user.is_superuser:
+            user.is_active = True
+            user.is_superuser = True
+            db.commit()
+            db.refresh(user)
+        return Principal(
+            type="user",
+            id=user.id,
+            external_id=user.external_id,
+            email=user.email,
+            name=user.name,
+            is_superuser=True,
+            scopes={"*"},
+            raw_claims={"auth_disabled": True},
+        )
+
     token = None
     if credentials and credentials.credentials:
         token = credentials.credentials
@@ -566,6 +590,39 @@ async def get_optional_principal(
         return await get_current_principal(request, credentials, db)
     except HTTPException:
         return None
+
+
+async def get_principal(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Alias for get_current_principal to preserve legacy imports."""
+    return await get_current_principal(request, credentials, db)
+
+
+def require_auth(principal: Optional[Principal]) -> None:
+    """Ensure a principal is present, raising a 401 if not."""
+    if not principal:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Provide Bearer token (JWT or service token).",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+async def get_current_user(
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+) -> User:
+    """Get the current authenticated user."""
+    if principal.type != "user":
+        raise HTTPException(status_code=403, detail="User authentication required")
+
+    user = db.query(User).filter(User.id == principal.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 # ============================================================================

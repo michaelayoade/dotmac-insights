@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # Test-only JWT secret for E2E runs (HS256)
     e2e_jwt_secret: Optional[str] = None
     e2e_auth_enabled: bool = False
+    # Development-only auth bypass
+    auth_disabled: bool = False
 
     # Service token settings
     service_token_hash_rounds: int = 12  # bcrypt rounds for hashing service tokens
@@ -176,6 +178,8 @@ if settings.is_production and not settings.jwks_url:
     raise ValueError("JWKS_URL must be set in production environment for JWT authentication")
 if settings.is_production and (settings.e2e_jwt_secret or settings.e2e_auth_enabled):
     raise ValueError("E2E auth must not be enabled in production")
+if settings.is_production and settings.auth_disabled:
+    raise ValueError("AUTH_DISABLED must not be enabled in production")
 
 # Production safety checks
 if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):

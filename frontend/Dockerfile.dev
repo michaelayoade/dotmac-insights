@@ -1,0 +1,25 @@
+# Development Dockerfile for Next.js with hot-reload
+FROM node:20-alpine
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Copy package files and local dependencies
+COPY package.json package-lock.json* ./
+COPY deps ./deps
+
+# Install dependencies
+RUN npm ci
+
+# Don't copy source - it will be mounted as a volume
+# Source code is mounted for hot-reload
+
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["npm", "run", "dev"]

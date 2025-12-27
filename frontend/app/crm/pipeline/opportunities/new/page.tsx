@@ -16,7 +16,7 @@ import {
 import { useOpportunityMutations, usePipelineStages, useCustomers, useLeads } from '@/hooks/useApi';
 import type { PipelineStage, Lead } from '@/lib/api';
 import { Button, LoadingState } from '@/components/ui';
-import { useRequireScope, hasScope, useAuth } from '@/lib/auth-context';
+import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 
 interface OpportunityFormData {

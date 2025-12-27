@@ -13,7 +13,8 @@ from app.database import get_db
 from app.auth import Require
 from app.models.sales import ERPNextLead, ERPNextLeadStatus
 from app.models.customer import Customer, CustomerStatus, CustomerType
-from app.models.crm import Opportunity, OpportunityStatus, Contact
+from app.models.crm import Opportunity, OpportunityStatus
+from app.models.contact import Contact, ContactType, ContactCategory
 
 router = APIRouter(prefix="/leads", tags=["crm-leads"])
 
@@ -365,16 +366,15 @@ async def convert_lead(lead_id: int, payload: LeadConvertRequest, db: Session = 
     db.add(customer)
     db.flush()
 
-    # Create primary contact
+    # Create primary contact person linked to customer
     contact = Contact(
-        customer_id=customer.id,
-        first_name=lead.lead_name.split()[0] if lead.lead_name else "Contact",
-        last_name=" ".join(lead.lead_name.split()[1:]) if lead.lead_name and len(lead.lead_name.split()) > 1 else None,
-        full_name=lead.lead_name,
+        name=lead.lead_name or "Primary Contact",
+        contact_type=ContactType.PERSON,
+        category=ContactCategory.BUSINESS if customer_type == CustomerType.COMPANY else ContactCategory.RESIDENTIAL,
         email=lead.email_id,
-        phone=lead.phone,
-        mobile=lead.mobile_no,
+        phone=lead.phone or lead.mobile_no,
         is_primary=True,
+        legacy_customer_id=customer.id,
     )
     db.add(contact)
 

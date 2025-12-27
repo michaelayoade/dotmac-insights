@@ -98,6 +98,7 @@ from app.models.auth import (
     TokenDenylist,
 )
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
+from app.models.sync_schedule import SyncSchedule
 from app.models.gateway_transaction import (
     GatewayTransaction,
     GatewayProvider,
@@ -217,16 +218,15 @@ from app.models.crm import (
     Activity,
     ActivityType,
     ActivityStatus,
-    Contact,
     LeadSource,
     Campaign,
 )
-from app.models.unified_contact import (
-    UnifiedContact,
+from app.models.contact import (
+    Contact,
     ContactType,
     ContactCategory,
     ContactStatus,
-    BillingType as UnifiedBillingType,
+    BillingType,
     LeadQualification,
 )
 from app.models.contact_list import ContactList
@@ -340,6 +340,16 @@ from app.models.scheduled_task import (
     ScheduledTask,
     ScheduledTaskStatus,
 )
+from app.models.migration import (
+    MigrationJob,
+    MigrationRecord,
+    MigrationRollbackLog,
+    MigrationStatus,
+    SourceType,
+    DedupStrategy,
+    RecordAction,
+    EntityType,
+)
 
 __all__ = [
     "Customer",
@@ -436,6 +446,7 @@ __all__ = [
     # Sync infrastructure
     "SyncCursor",
     "FailedSyncRecord",
+    "SyncSchedule",
     # Payment integration models
     "GatewayTransaction",
     "GatewayProvider",
@@ -526,7 +537,6 @@ __all__ = [
     "Activity",
     "ActivityType",
     "ActivityStatus",
-    "Contact",
     "LeadSource",
     "Campaign",
     # Field Service models
@@ -552,12 +562,12 @@ __all__ = [
     "CustomerNotificationPreference",
     "TimeEntryType",
     "PhotoType",
-    # Unified Contact models
-    "UnifiedContact",
+    # Contact model (replaces UnifiedContact)
+    "Contact",
     "ContactType",
     "ContactCategory",
     "ContactStatus",
-    "UnifiedBillingType",
+    "BillingType",
     "LeadQualification",
     # Performance models
     "EvaluationPeriod",
@@ -661,4 +671,13 @@ __all__ = [
     # Scheduled task models
     "ScheduledTask",
     "ScheduledTaskStatus",
+    # Migration models
+    "MigrationJob",
+    "MigrationRecord",
+    "MigrationRollbackLog",
+    "MigrationStatus",
+    "SourceType",
+    "DedupStrategy",
+    "RecordAction",
+    "EntityType",
 ]

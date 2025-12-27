@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 import useSWR, { type SWRConfiguration } from 'swr';
-import { api } from '@/lib/api';
+import { projectsApi } from '@/lib/api/domains';
 import type {
   GanttTask,
   GanttDependency,
@@ -57,7 +57,7 @@ export function useGanttData(
   // Fetch data from API
   const { data, isLoading, error, mutate } = useSWR(
     projectId ? (['project-gantt', projectId] as const) : null,
-    ([, id]) => api.getProjectGanttData(id),
+    ([, id]) => projectsApi.getProjectGanttData(id),
     {
       revalidateOnFocus: false,
       ...config,
@@ -124,7 +124,7 @@ export function useGanttDataFallback(
     projectId ? (['project-gantt-fallback', projectId] as const) : null,
     async ([, id]) => {
       // Fetch all tasks for the project
-      const response = await api.getProjectTasks({
+      const response = await projectsApi.getProjectTasks({
         project_id: id,
         limit: 500, // Get all tasks
       });

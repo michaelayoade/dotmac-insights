@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { STATUS_PILL_TONES, type StatusTone } from '@/lib/status-pill';
-import { LucideIcon, AlertTriangle, RefreshCw, Inbox, Filter } from 'lucide-react';
+import { LucideIcon, AlertTriangle, RefreshCw, Inbox, Filter, X } from 'lucide-react';
 import Link from 'next/link';
 
 // =============================================================================
@@ -772,6 +773,77 @@ export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// =============================================================================
+// MODAL
+// =============================================================================
+
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  children: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  showClose?: boolean;
+}
+
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  className,
+  contentClassName,
+  showClose = true,
+}: ModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={cn('fixed inset-0 z-50 flex items-center justify-center px-4', className)}>
+      <div
+        className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={cn(
+          'relative w-full max-w-xl rounded-2xl border border-slate-border bg-slate-card shadow-xl',
+          contentClassName
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Modal'}
+      >
+        {(title || showClose) && (
+          <div className="flex items-center justify-between border-b border-slate-border px-5 py-4">
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            {showClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md p-1.5 text-slate-muted hover:text-foreground hover:bg-slate-elevated"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="px-5 py-4">{children}</div>
+      </div>
     </div>
   );
 }

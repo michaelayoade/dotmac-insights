@@ -138,7 +138,8 @@ class WorkflowTask(Base):
         comment="accounting, support, expenses, performance, inbox, hr, projects"
     )
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(
+    task_metadata: Mapped[Optional[dict]] = mapped_column(
+        "metadata",
         JSONB,
         nullable=True,
         comment="Additional context data"

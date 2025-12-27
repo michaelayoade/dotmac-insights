@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status, Header, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import get_current_principal, Require
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 async def paystack_webhook(
     request: Request,
     x_paystack_signature: str = Header(..., alias="x-paystack-signature"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Handle Paystack webhooks.
@@ -73,7 +73,7 @@ async def paystack_webhook(
 async def flutterwave_webhook(
     request: Request,
     verif_hash: str = Header(None, alias="verif-hash"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Handle Flutterwave webhooks.
@@ -112,42 +112,38 @@ async def flutterwave_webhook(
 
 
 @router.get("/events", dependencies=[Depends(Require("admin:read"))])
-async def list_webhook_events(
+def list_webhook_events(
     provider: Optional[str] = Query(None, description="Filter by provider"),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
     processed: Optional[bool] = Query(None, description="Filter by processed status"),
     has_error: Optional[bool] = Query(None, description="Filter by error presence"),
     limit: int = Query(50, ge=1, le=200, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     List webhook events for debugging and monitoring.
 
     Requires admin:read permission.
     """
-    from sqlalchemy import select
     from app.models.webhook_event import WebhookEvent
 
-    query = select(WebhookEvent)
+    query = db.query(WebhookEvent)
 
     if provider:
-        query = query.where(WebhookEvent.provider == provider)
+        query = query.filter(WebhookEvent.provider == provider)
     if event_type:
-        query = query.where(WebhookEvent.event_type == event_type)
+        query = query.filter(WebhookEvent.event_type == event_type)
     if processed is not None:
-        query = query.where(WebhookEvent.processed == processed)
+        query = query.filter(WebhookEvent.processed == processed)
     if has_error is not None:
         if has_error:
-            query = query.where(WebhookEvent.error.isnot(None))
+            query = query.filter(WebhookEvent.error.isnot(None))
         else:
-            query = query.where(WebhookEvent.error.is_(None))
+            query = query.filter(WebhookEvent.error.is_(None))
 
     query = query.order_by(WebhookEvent.created_at.desc())
-    query = query.offset(offset).limit(limit)
-
-    result = await db.execute(query)
-    events = result.scalars().all()
+    events = query.offset(offset).limit(limit).all()
 
     return {
         "items": [
@@ -172,23 +168,19 @@ async def list_webhook_events(
 
 
 @router.get("/events/{event_id}", dependencies=[Depends(Require("admin:read"))])
-async def get_webhook_event(
+def get_webhook_event(
     event_id: int,
     include_payload: bool = Query(False, description="Include full payload (sensitive)"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Get webhook event details.
 
     Requires admin:read permission. Payload is only included if explicitly requested.
     """
-    from sqlalchemy import select
     from app.models.webhook_event import WebhookEvent
 
-    result = await db.execute(
-        select(WebhookEvent).where(WebhookEvent.id == event_id)
-    )
-    event = result.scalar_one_or_none()
+    event = db.query(WebhookEvent).filter(WebhookEvent.id == event_id).first()
 
     if not event:
         raise HTTPException(
@@ -221,8 +213,8 @@ async def get_webhook_event(
 
 
 @router.get("/providers", dependencies=[Depends(Require("admin:read"))])
-async def list_webhook_providers(
-    db: AsyncSession = Depends(get_db),
+def list_webhook_providers(
+    db: Session = Depends(get_db),
 ):
     """
     List configured webhook providers with their status.
@@ -230,23 +222,23 @@ async def list_webhook_providers(
     Shows whether each provider has webhook secrets configured
     and basic stats about received webhooks.
     """
-    from sqlalchemy import select, func
+    from sqlalchemy import func, case
     from app.models.webhook_event import WebhookEvent
     from app.integrations.payments.config import get_payment_settings
 
     settings = get_payment_settings()
 
     # Get stats per provider
-    stats_query = select(
+    stats_query = db.query(
         WebhookEvent.provider,
         func.count(WebhookEvent.id).label("total_events"),
-        func.count(WebhookEvent.id).filter(WebhookEvent.processed == True).label("processed_count"),
-        func.count(WebhookEvent.id).filter(WebhookEvent.error.isnot(None)).label("error_count"),
+        func.sum(case((WebhookEvent.processed == True, 1), else_=0)).label("processed_count"),
+        func.sum(case((WebhookEvent.error.isnot(None), 1), else_=0)).label("error_count"),
         func.max(WebhookEvent.received_at).label("last_received"),
     ).group_by(WebhookEvent.provider)
 
-    result = await db.execute(stats_query)
-    stats_by_provider = {row.provider: row for row in result.all()}
+    result = stats_query.all()
+    stats_by_provider = {row.provider: row for row in result}
 
     providers = [
         {
@@ -321,17 +313,17 @@ def _format_provider_stats(row) -> dict:
 
 
 @router.get("/providers/{provider_name}/stats", dependencies=[Depends(Require("admin:read"))])
-async def get_provider_stats(
+def get_provider_stats(
     provider_name: str,
     days: int = Query(7, ge=1, le=90, description="Number of days to aggregate"),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Get detailed webhook statistics for a specific provider.
 
     Includes daily breakdown and event type distribution.
     """
-    from sqlalchemy import select, func, cast, Date
+    from sqlalchemy import func, cast, Date, case
     from datetime import datetime, timedelta
     from app.models.webhook_event import WebhookEvent
 
@@ -345,63 +337,58 @@ async def get_provider_stats(
     cutoff = datetime.utcnow() - timedelta(days=days)
 
     # Overall stats
-    overall_query = select(
+    overall = db.query(
         func.count(WebhookEvent.id).label("total"),
-        func.count(WebhookEvent.id).filter(WebhookEvent.processed == True).label("processed"),
-        func.count(WebhookEvent.id).filter(WebhookEvent.error.isnot(None)).label("errors"),
-    ).where(
+        func.sum(case((WebhookEvent.processed == True, 1), else_=0)).label("processed"),
+        func.sum(case((WebhookEvent.error.isnot(None), 1), else_=0)).label("errors"),
+    ).filter(
         WebhookEvent.provider == provider_name,
         WebhookEvent.received_at >= cutoff,
-    )
-    overall_result = await db.execute(overall_query)
-    overall = overall_result.one()
+    ).first()
 
     # Daily breakdown
-    daily_query = select(
+    daily_result = db.query(
         cast(WebhookEvent.received_at, Date).label("date"),
         func.count(WebhookEvent.id).label("count"),
-        func.count(WebhookEvent.id).filter(WebhookEvent.error.isnot(None)).label("errors"),
-    ).where(
+        func.sum(case((WebhookEvent.error.isnot(None), 1), else_=0)).label("errors"),
+    ).filter(
         WebhookEvent.provider == provider_name,
         WebhookEvent.received_at >= cutoff,
     ).group_by(
         cast(WebhookEvent.received_at, Date)
     ).order_by(
         cast(WebhookEvent.received_at, Date)
-    )
-    daily_result = await db.execute(daily_query)
+    ).all()
     daily_data = [
         {"date": str(row.date), "count": row.count, "errors": row.errors}
-        for row in daily_result.all()
+        for row in daily_result
     ]
 
     # Event type distribution
-    event_type_query = select(
+    event_type_result = db.query(
         WebhookEvent.event_type,
         func.count(WebhookEvent.id).label("count"),
-    ).where(
+    ).filter(
         WebhookEvent.provider == provider_name,
         WebhookEvent.received_at >= cutoff,
     ).group_by(
         WebhookEvent.event_type
     ).order_by(
         func.count(WebhookEvent.id).desc()
-    )
-    event_type_result = await db.execute(event_type_query)
+    ).all()
     event_types = [
         {"event_type": row.event_type, "count": row.count}
-        for row in event_type_result.all()
+        for row in event_type_result
     ]
 
     # Recent errors
-    errors_query = select(WebhookEvent).where(
+    recent_errors_result = db.query(WebhookEvent).filter(
         WebhookEvent.provider == provider_name,
         WebhookEvent.error.isnot(None),
         WebhookEvent.received_at >= cutoff,
     ).order_by(
         WebhookEvent.received_at.desc()
-    ).limit(10)
-    errors_result = await db.execute(errors_query)
+    ).limit(10).all()
     recent_errors = [
         {
             "id": e.id,
@@ -409,7 +396,7 @@ async def get_provider_stats(
             "error": e.error[:200] if e.error else None,
             "received_at": e.received_at.isoformat() if e.received_at else None,
         }
-        for e in errors_result.scalars().all()
+        for e in recent_errors_result
     ]
 
     return {
@@ -430,7 +417,7 @@ async def get_provider_stats(
 @router.post("/events/{event_id}/replay", dependencies=[Depends(Require("admin:write"))])
 async def replay_webhook_event(
     event_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Replay/reprocess a webhook event.
@@ -438,15 +425,11 @@ async def replay_webhook_event(
     This will re-run the event processing logic as if the webhook was just received.
     Useful for recovering from transient failures or after fixing bugs.
     """
-    from sqlalchemy import select
     from datetime import datetime
     from app.models.webhook_event import WebhookEvent
     from app.integrations.payments.enums import PaymentProvider
 
-    result = await db.execute(
-        select(WebhookEvent).where(WebhookEvent.id == event_id)
-    )
-    event = result.scalar_one_or_none()
+    event = db.query(WebhookEvent).filter(WebhookEvent.id == event_id).first()
 
     if not event:
         raise HTTPException(
@@ -492,7 +475,7 @@ async def replay_webhook_event(
         event.processed_at = datetime.utcnow()
         event.retry_count += 1
         event.last_retry_at = datetime.utcnow()
-        await db.commit()
+        db.commit()
 
         logger.info(f"Webhook event replayed successfully: {event_id}")
 
@@ -516,7 +499,7 @@ async def replay_webhook_event(
         event.error = str(e)[:1000]
         event.retry_count += 1
         event.last_retry_at = datetime.utcnow()
-        await db.commit()
+        db.commit()
 
         logger.error(f"Webhook event replay failed: {event_id} - {e}")
 

@@ -25,30 +25,36 @@ export function AttachmentUpload({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const validateFile = (file: File): string | null => {
-    const maxBytes = maxSize * 1024 * 1024;
-    if (file.size > maxBytes) {
-      return `File too large. Maximum size is ${maxSize}MB`;
-    }
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      const maxBytes = maxSize * 1024 * 1024;
+      if (file.size > maxBytes) {
+        return `File too large. Maximum size is ${maxSize}MB`;
+      }
 
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    const allowedExts = accept.split(',').map((e) => e.trim().toLowerCase());
-    if (!allowedExts.some((allowed) => ext === allowed || allowed === '*')) {
-      return `File type not allowed. Allowed: ${accept}`;
-    }
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+      const allowedExts = accept.split(',').map((e) => e.trim().toLowerCase());
+      if (!allowedExts.some((allowed) => ext === allowed || allowed === '*')) {
+        return `File type not allowed. Allowed: ${accept}`;
+      }
 
-    return null;
-  };
+      return null;
+    },
+    [accept, maxSize]
+  );
 
-  const handleFile = (file: File) => {
-    setError(null);
-    const validationError = validateFile(file);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    setSelectedFile(file);
-  };
+  const handleFile = useCallback(
+    (file: File) => {
+      setError(null);
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      setSelectedFile(file);
+    },
+    [validateFile]
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -59,7 +65,7 @@ export function AttachmentUpload({
       const file = e.dataTransfer.files[0];
       if (file) handleFile(file);
     },
-    [disabled]
+    [disabled, handleFile]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

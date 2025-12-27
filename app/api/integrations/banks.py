@@ -51,13 +51,23 @@ class ResolveAccountResponse(BaseModel):
 # =============================================================================
 
 def get_client(provider: Optional[str] = None):
-    """Get payment client."""
+    """Get payment client.
+
+    Raises:
+        HTTPException: If the payment provider is not configured.
+    """
     settings = get_payment_settings()
     provider = provider or settings.default_payment_provider
 
-    if provider == "flutterwave":
-        return FlutterwaveClient()
-    return PaystackClient()
+    try:
+        if provider == "flutterwave":
+            return FlutterwaveClient()
+        return PaystackClient()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Payment provider not configured: {str(e)}"
+        )
 
 
 # =============================================================================

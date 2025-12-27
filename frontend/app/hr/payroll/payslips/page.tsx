@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { DataTable, Pagination } from '@/components/DataTable';
-import { FilterCard } from '@/components/FilterCard';
+import { DataTable, Pagination, type Column } from '@/components/DataTable';
 import { StatCard } from '@/components/StatCard';
 import { useHrSalarySlips, useHrSalarySlipMutations, useHrDepartments } from '@/hooks/useApi';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
-import { Button, StatusPill, LoadingState, BackButton } from '@/components/ui';
+import { Button, StatusPill, LoadingState, BackButton, FilterCard } from '@/components/ui';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import {
@@ -24,7 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { HrSalarySlip } from '@/lib/api';
+import type { HrDepartment, HrSalarySlip } from '@/lib/api';
 
 function extractList<T>(response: any): { items: T[]; total: number } {
   const items = response?.data || [];
@@ -83,7 +82,7 @@ export default function PayslipsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const { items: slips, total } = extractList<HrSalarySlip>(slipsData);
-  const departments = deptData?.items || [];
+  const departments: HrDepartment[] = deptData?.items || [];
 
   // Filter by search locally
   const filteredSlips = useMemo(() => {
@@ -113,7 +112,7 @@ export default function PayslipsPage() {
     setBulkLoading(true);
     setError(null);
     try {
-      for (const id of selectedSlips) {
+      for (const id of Array.from(selectedSlips)) {
         await markPaid(id, {});
       }
       setSelectedSlips(new Set());
@@ -176,8 +175,9 @@ export default function PayslipsPage() {
     );
   }
 
-  const columns = [
+  const columns: Column<HrSalarySlip>[] = [
     {
+      key: 'select',
       header: (
         <input
           type="checkbox"
@@ -186,7 +186,7 @@ export default function PayslipsPage() {
           className="rounded border-slate-border"
         />
       ),
-      accessor: (row: HrSalarySlip) => (
+      render: (row: HrSalarySlip) => (
         <input
           type="checkbox"
           checked={selectedSlips.has(row.id!)}
@@ -194,11 +194,12 @@ export default function PayslipsPage() {
           className="rounded border-slate-border"
         />
       ),
-      className: 'w-10',
+      width: '40px',
     },
     {
+      key: 'id',
       header: 'Slip ID',
-      accessor: (row: HrSalarySlip) => (
+      render: (row: HrSalarySlip) => (
         <Link
           href={`/hr/payroll/payslips/${row.id}`}
           className="text-teal-electric hover:underline font-medium"
@@ -208,8 +209,9 @@ export default function PayslipsPage() {
       ),
     },
     {
+      key: 'employee',
       header: 'Employee',
-      accessor: (row: HrSalarySlip) => (
+      render: (row: HrSalarySlip) => (
         <div>
           <div className="font-medium text-foreground">{row.employee_name || row.employee}</div>
           {row.department && <div className="text-xs text-slate-muted">{row.department}</div>}
@@ -217,32 +219,37 @@ export default function PayslipsPage() {
       ),
     },
     {
+      key: 'pay-period',
       header: 'Pay Period',
-      accessor: (row: HrSalarySlip) =>
+      render: (row: HrSalarySlip) =>
         `${formatDate(row.start_date)} - ${formatDate(row.end_date)}`,
     },
     {
+      key: 'gross-pay',
       header: 'Gross Pay',
-      accessor: (row: HrSalarySlip) => formatCurrency(row.gross_pay || 0, row.currency || 'NGN'),
-      className: 'text-right',
+      render: (row: HrSalarySlip) => formatCurrency(row.gross_pay || 0, row.currency || 'NGN'),
+      align: 'right',
     },
     {
+      key: 'deductions',
       header: 'Deductions',
-      accessor: (row: HrSalarySlip) => formatCurrency(row.total_deduction || 0, row.currency || 'NGN'),
-      className: 'text-right',
+      render: (row: HrSalarySlip) => formatCurrency(row.total_deduction || 0, row.currency || 'NGN'),
+      align: 'right',
     },
     {
+      key: 'net-pay',
       header: 'Net Pay',
-      accessor: (row: HrSalarySlip) => (
+      render: (row: HrSalarySlip) => (
         <span className="font-semibold text-green-400">
           {formatCurrency(row.net_pay || 0, row.currency || 'NGN')}
         </span>
       ),
-      className: 'text-right',
+      align: 'right',
     },
     {
+      key: 'status',
       header: 'Status',
-      accessor: (row: HrSalarySlip) => <StatusBadge status={row.status || 'draft'} />,
+      render: (row: HrSalarySlip) => <StatusBadge status={row.status || 'draft'} />,
     },
   ];
 
@@ -278,37 +285,37 @@ export default function PayslipsPage() {
           title="Total Slips"
           value={stats.total}
           icon={FileText}
-          iconColor="text-violet-400"
+          colorClass="text-violet-400"
         />
         <StatCard
           title="Draft"
           value={stats.draft}
           icon={Clock}
-          iconColor="text-yellow-400"
+          colorClass="text-yellow-400"
         />
         <StatCard
           title="Submitted"
           value={stats.submitted}
           icon={Send}
-          iconColor="text-blue-400"
+          colorClass="text-blue-400"
         />
         <StatCard
           title="Paid"
           value={stats.paid}
           icon={CheckCircle2}
-          iconColor="text-green-400"
+          colorClass="text-green-400"
         />
         <StatCard
           title="Total Gross"
           value={formatCurrency(stats.totalGross, 'NGN')}
           icon={DollarSign}
-          iconColor="text-teal-electric"
+          colorClass="text-teal-electric"
         />
         <StatCard
           title="Total Net"
           value={formatCurrency(stats.totalNet, 'NGN')}
           icon={Wallet2}
-          iconColor="text-green-400"
+          colorClass="text-green-400"
         />
       </div>
 
@@ -347,7 +354,7 @@ export default function PayslipsPage() {
             className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
           >
             <option value="">All Departments</option>
-            {departments.map((d) => (
+            {departments.map((d: HrDepartment) => (
               <option key={d.id} value={d.name || d.department_name}>
                 {d.name || d.department_name}
               </option>
@@ -427,17 +434,14 @@ export default function PayslipsPage() {
       ) : (
         <>
           <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-            <DataTable columns={columns} data={filteredSlips} />
+            <DataTable columns={columns} data={filteredSlips} keyField="id" />
           </div>
           <Pagination
             total={total}
             limit={limit}
             offset={offset}
-            onOffsetChange={setOffset}
-            onLimitChange={(newLimit) => {
-              setLimit(newLimit);
-              setOffset(0);
-            }}
+            onPageChange={setOffset}
+            onLimitChange={(newLimit) => setLimit(newLimit)}
           />
         </>
       )}

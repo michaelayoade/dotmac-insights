@@ -12,8 +12,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import Require
@@ -90,13 +89,23 @@ class PaymentListItem(BaseModel):
 # =============================================================================
 
 def get_payment_client(provider: Optional[str] = None):
-    """Get appropriate payment gateway client."""
+    """Get appropriate payment gateway client.
+
+    Raises:
+        HTTPException: If the payment provider is not configured.
+    """
     settings = get_payment_settings()
     provider = provider or settings.default_payment_provider
 
-    if provider == "flutterwave":
-        return FlutterwaveClient()
-    return PaystackClient()  # Default
+    try:
+        if provider == "flutterwave":
+            return FlutterwaveClient()
+        return PaystackClient()  # Default
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Payment provider not configured: {str(e)}"
+        )
 
 
 def generate_reference() -> str:
@@ -111,7 +120,7 @@ def generate_reference() -> str:
 @router.post("/initialize", response_model=InitializePaymentResponse, dependencies=[Depends(Require("payments:write"))])
 async def initialize_payment(
     request: InitializePaymentSchema,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Initialize a payment transaction.
@@ -121,10 +130,10 @@ async def initialize_payment(
     reference = request.reference or generate_reference()
 
     # Check for duplicate reference
-    existing = await db.execute(
-        select(GatewayTransaction).where(GatewayTransaction.reference == reference)
-    )
-    if existing.scalar_one_or_none():
+    existing = db.query(GatewayTransaction).filter(
+        GatewayTransaction.reference == reference
+    ).first()
+    if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Payment reference already exists",
@@ -172,7 +181,7 @@ async def initialize_payment(
             extra_data=request.metadata,
         )
         db.add(transaction)
-        await db.commit()
+        db.commit()
 
         return InitializePaymentResponse(
             authorization_url=result.authorization_url,
@@ -193,7 +202,7 @@ async def initialize_payment(
 @router.get("/verify/{reference}", response_model=VerifyPaymentResponse, dependencies=[Depends(Require("payments:read"))])
 async def verify_payment(
     reference: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Verify a payment by reference.
@@ -201,10 +210,9 @@ async def verify_payment(
     Checks the payment status with the provider and updates local record.
     """
     # Get transaction
-    result = await db.execute(
-        select(GatewayTransaction).where(GatewayTransaction.reference == reference)
-    )
-    transaction = result.scalar_one_or_none()
+    transaction = db.query(GatewayTransaction).filter(
+        GatewayTransaction.reference == reference
+    ).first()
 
     if not transaction:
         raise HTTPException(
@@ -237,7 +245,7 @@ async def verify_payment(
             transaction.extra_data = transaction.extra_data or {}
             transaction.extra_data["authorization"] = verification.authorization
 
-        await db.commit()
+        db.commit()
 
         return VerifyPaymentResponse(
             reference=verification.reference,
@@ -261,15 +269,14 @@ async def verify_payment(
 
 
 @router.get("/{reference}", dependencies=[Depends(Require("payments:read"))])
-async def get_payment(
+def get_payment(
     reference: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get payment details by reference."""
-    result = await db.execute(
-        select(GatewayTransaction).where(GatewayTransaction.reference == reference)
-    )
-    transaction = result.scalar_one_or_none()
+    transaction = db.query(GatewayTransaction).filter(
+        GatewayTransaction.reference == reference
+    ).first()
 
     if not transaction:
         raise HTTPException(
@@ -294,16 +301,16 @@ async def get_payment(
 
 
 @router.get("/", dependencies=[Depends(Require("payments:read"))])
-async def list_payments(
+def list_payments(
     status_filter: Optional[str] = Query(None, alias="status"),
     provider_filter: Optional[str] = Query(None, alias="provider"),
     customer_id: Optional[int] = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List payment transactions with optional filters."""
-    query = select(GatewayTransaction).where(
+    query = db.query(GatewayTransaction).filter(
         GatewayTransaction.transaction_type == GatewayTransactionType.PAYMENT
     )
 
@@ -315,7 +322,7 @@ async def list_payments(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status filter",
             )
-        query = query.where(GatewayTransaction.status == status_enum)
+        query = query.filter(GatewayTransaction.status == status_enum)
     if provider_filter:
         try:
             provider_enum = GatewayProvider(provider_filter)
@@ -324,15 +331,12 @@ async def list_payments(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid provider filter",
             )
-        query = query.where(GatewayTransaction.provider == provider_enum)
+        query = query.filter(GatewayTransaction.provider == provider_enum)
     if customer_id:
-        query = query.where(GatewayTransaction.customer_id == customer_id)
+        query = query.filter(GatewayTransaction.customer_id == customer_id)
 
     query = query.order_by(GatewayTransaction.created_at.desc())
-    query = query.offset(offset).limit(limit)
-
-    result = await db.execute(query)
-    transactions = result.scalars().all()
+    transactions = query.offset(offset).limit(limit).all()
 
     return {
         "items": [
@@ -357,17 +361,16 @@ async def list_payments(
 async def refund_payment(
     reference: str,
     amount: Optional[Decimal] = None,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Refund a payment (full or partial).
 
     If amount is not provided, full refund is processed.
     """
-    result = await db.execute(
-        select(GatewayTransaction).where(GatewayTransaction.reference == reference)
-    )
-    transaction = result.scalar_one_or_none()
+    transaction = db.query(GatewayTransaction).filter(
+        GatewayTransaction.reference == reference
+    ).first()
 
     if not transaction:
         raise HTTPException(
@@ -391,7 +394,7 @@ async def refund_payment(
         transaction.extra_data = transaction.extra_data or {}
         transaction.extra_data["refund"] = refund_result
 
-        await db.commit()
+        db.commit()
 
         return {
             "status": "success",

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { History, ChevronDown, Loader2 } from 'lucide-react';
 import { useEntityHistory } from '@/hooks/useApi';
 import { ChangeHistoryItem } from './ChangeHistoryItem';
-import type { EntityType } from '@/lib/api/domains/projects';
+import type { ChangeHistoryItem as ChangeHistoryItemType, EntityType } from '@/lib/api/domains/projects';
 
 interface ChangeHistoryProps {
   entityType: EntityType;
@@ -22,7 +22,7 @@ export function ChangeHistory({
   const [limit, setLimit] = useState(20);
   const { data, isLoading, error } = useEntityHistory(entityType, entityId, { limit });
 
-  const items = data?.data || [];
+  const items: ChangeHistoryItemType[] = data?.data || [];
   const hasMore = data?.total && data.total > items.length;
 
   if (isLoading) {
@@ -61,7 +61,7 @@ export function ChangeHistory({
           </div>
         ) : (
           <div className="space-y-0">
-            {items.map((item) => (
+            {items.map((item: ChangeHistoryItemType) => (
               <ChangeHistoryItem key={item.id} item={item} />
             ))}
           </div>

@@ -12,6 +12,7 @@ from app.models.payment_allocation import PaymentAllocation, AllocationType
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
+    from app.models.contact import Contact
     from app.models.payment import Payment
     from app.models.credit_note import CreditNote
 
@@ -46,8 +47,11 @@ class Invoice(SoftDeleteMixin, Base):
     # Source system
     source: Mapped[InvoiceSource] = mapped_column(Enum(InvoiceSource), nullable=False, index=True)
 
-    # Customer link
+    # Customer link (legacy - use contact_id)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+
+    # Contact link (primary - replaces customer_id)
+    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
 
     # Invoice details
     invoice_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
@@ -110,6 +114,7 @@ class Invoice(SoftDeleteMixin, Base):
 
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="invoices")
+    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     payments: Mapped[List[Payment]] = relationship(back_populates="invoice")
     credit_notes: Mapped[List[CreditNote]] = relationship(back_populates="invoice")
     lines: Mapped[List[InvoiceLine]] = relationship(

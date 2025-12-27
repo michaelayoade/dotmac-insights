@@ -15,6 +15,7 @@ from app.models.invoice import Invoice
 from app.models.accounting import PurchaseInvoice
 from app.models.credit_note import CreditNote
 from app.models.books_settings import DebitNote
+from app.models.contact import Contact
 
 
 @dataclass
@@ -373,7 +374,7 @@ class PaymentAllocationService:
 
     def get_outstanding_documents(
         self,
-        party_type: Literal["customer", "supplier"],
+        party_type: Literal["customer", "supplier", "contact"],
         party_id: int,
         currency: Optional[str] = None,
     ) -> List[OutstandingDocument]:
@@ -381,8 +382,8 @@ class PaymentAllocationService:
         Get outstanding documents for a party.
 
         Args:
-            party_type: "customer" or "supplier"
-            party_id: ID of the customer or supplier
+            party_type: "customer", "supplier", or "contact" (CRM contact)
+            party_id: ID of the customer, supplier, or contact
             currency: Filter by currency (optional)
 
         Returns:
@@ -390,8 +391,36 @@ class PaymentAllocationService:
         """
         docs = []
 
-        if party_type == "customer":
-            # Get outstanding invoices
+        if party_type == "contact":
+            # Get outstanding invoices by contact_id (CRM contact)
+            query = self.db.query(Invoice).filter(
+                Invoice.contact_id == party_id,
+                Invoice.status.notin_(["paid", "cancelled", "refunded"]),
+            )
+            if currency:
+                query = query.filter(Invoice.currency == currency)
+
+            # Get contact name for display
+            contact = self.db.query(Contact).filter(Contact.id == party_id).first()
+            contact_name = contact.display_name if contact else None
+
+            for inv in query.order_by(Invoice.invoice_date).all():
+                outstanding = inv.balance if inv.balance else (inv.total_amount - inv.amount_paid)
+                if outstanding > 0:
+                    docs.append(OutstandingDocument(
+                        document_type="invoice",
+                        document_id=inv.id,
+                        document_number=inv.invoice_number or "",
+                        document_date=inv.invoice_date.isoformat() if inv.invoice_date else "",
+                        due_date=inv.due_date.isoformat() if inv.due_date else None,
+                        currency=inv.currency,
+                        total_amount=inv.total_amount,
+                        outstanding_amount=outstanding,
+                        party_name=contact_name,
+                    ))
+
+        elif party_type == "customer":
+            # Get outstanding invoices by customer_id (legacy)
             query = self.db.query(Invoice).filter(
                 Invoice.customer_id == party_id,
                 Invoice.status.notin_(["paid", "cancelled", "refunded"]),

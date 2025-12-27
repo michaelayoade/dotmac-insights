@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { ApiError, clearAuthToken, fetchApi, onAuthError } from './api';
 
+const AUTH_DISABLED = process.env.NEXT_PUBLIC_AUTH_DISABLED === 'true';
+
 // Scope definitions - maps to backend RBAC scopes
 // Keep in sync with backend scopes from Require() calls in app/api/
 export type Scope =
@@ -266,14 +268,34 @@ interface MeResponse {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    isAuthenticated: false,
-    isLoading: true,
-    scopes: [],
-    error: null,
+  const [state, setState] = useState<AuthState>(() => {
+    if (AUTH_DISABLED) {
+      return {
+        isAuthenticated: true,
+        isLoading: false,
+        scopes: ['*' as Scope],
+        error: null,
+      };
+    }
+    return {
+      isAuthenticated: false,
+      isLoading: true,
+      scopes: [],
+      error: null,
+    };
   });
 
   const checkAuth = useCallback(async () => {
+    if (AUTH_DISABLED) {
+      setState({
+        isAuthenticated: true,
+        isLoading: false,
+        scopes: ['*' as Scope],
+        error: null,
+      });
+      return;
+    }
+
     if (typeof window === 'undefined') {
       setState(prev => ({ ...prev, isLoading: false }));
       return;
@@ -327,6 +349,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (AUTH_DISABLED) {
+      setState({
+        isAuthenticated: true,
+        isLoading: false,
+        scopes: ['*' as Scope],
+        error: null,
+      });
+      return;
+    }
+
     await clearAuthToken();
     setState({
       isAuthenticated: false,
@@ -369,6 +401,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for auth errors
   useEffect(() => {
+    if (AUTH_DISABLED) {
+      return;
+    }
     const unsubscribe = onAuthError((event) => {
       if (event === 'unauthorized' || event === 'token_expired') {
         void logout();
@@ -403,6 +438,15 @@ export function useAuth() {
 // Hook for protecting routes/components by scope
 export function useRequireScope(scope: Scope | Scope[]) {
   const { isAuthenticated, isLoading, scopes, hasScope, hasAnyScope } = useAuth();
+  if (AUTH_DISABLED) {
+    return {
+      isLoading: false,
+      isAuthenticated: true,
+      hasAccess: true,
+      missingScope: false,
+      hasScope,
+    };
+  }
 
   const requiredScopes = Array.isArray(scope) ? scope : [scope];
 
@@ -420,5 +464,6 @@ export function useRequireScope(scope: Scope | Scope[]) {
     isAuthenticated,
     hasAccess,
     missingScope: !isLoading && !hasAccess,
+    hasScope,
   };
 }

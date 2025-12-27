@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
-from app.utils.datetime_utils import utc_now
+from app.utils.datetime_utils import utc_now, ensure_utc
 
 if TYPE_CHECKING:
     from app.models.unified_contact import UnifiedContact
@@ -397,14 +397,18 @@ class UnifiedTicket(Base):
         """Check if response SLA is breached."""
         if self.first_response_at or not self.response_by:
             return False
-        return utc_now() > self.response_by
+        # Ensure both datetimes are timezone-aware for comparison
+        response_by_utc = ensure_utc(self.response_by)
+        return utc_now() > response_by_utc if response_by_utc else False
 
     @property
     def is_overdue_resolution(self) -> bool:
         """Check if resolution SLA is breached."""
         if self.resolved_at or not self.resolution_by:
             return False
-        return utc_now() > self.resolution_by
+        # Ensure both datetimes are timezone-aware for comparison
+        resolution_by_utc = ensure_utc(self.resolution_by)
+        return utc_now() > resolution_by_utc if resolution_by_utc else False
 
     @property
     def first_response_time_hours(self) -> Optional[float]:

@@ -1,6 +1,9 @@
 /**
  * Sales Domain API
- * Includes: Customer Groups, Territories, Sales Persons, Sales Transactions
+ * Includes: Customer Groups, Territories, Sales Persons
+ *
+ * NOTE: These endpoints now live under /crm/config/ in the backend.
+ * This module provides backward compatibility - prefer using crmApi.config.* instead.
  */
 
 import { fetchApi } from '../core';
@@ -99,89 +102,89 @@ export interface SalesPersonPayload {
 
 export const salesApi = {
   // =========================================================================
-  // CUSTOMER GROUPS
+  // CUSTOMER GROUPS (now at /crm/customer-groups)
   // =========================================================================
 
   getCustomerGroups: (params?: { limit?: number; offset?: number; search?: string }) =>
-    fetchApi<CustomerGroupListResponse>('/v1/sales/customer-groups', {
+    fetchApi<CustomerGroupListResponse>('/crm/customer-groups', {
       params: params as Record<string, unknown>,
     }),
 
   getCustomerGroup: (id: number | string) =>
-    fetchApi<CustomerGroup>(`/v1/sales/customer-groups/${id}`),
+    fetchApi<CustomerGroup>(`/crm/customer-groups/${id}`),
 
   createCustomerGroup: (payload: CustomerGroupPayload) =>
-    fetchApi<CustomerGroup>('/v1/sales/customer-groups', {
+    fetchApi<CustomerGroup>('/crm/customer-groups', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
   updateCustomerGroup: (id: number | string, payload: Partial<CustomerGroupPayload>) =>
-    fetchApi<CustomerGroup>(`/v1/sales/customer-groups/${id}`, {
+    fetchApi<CustomerGroup>(`/crm/customer-groups/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 
   deleteCustomerGroup: (id: number | string) =>
-    fetchApi<void>(`/v1/sales/customer-groups/${id}`, {
+    fetchApi<void>(`/crm/customer-groups/${id}`, {
       method: 'DELETE',
     }),
 
   // =========================================================================
-  // TERRITORIES
+  // TERRITORIES (now at /crm/territories)
   // =========================================================================
 
   getTerritories: (params?: { limit?: number; offset?: number; search?: string }) =>
-    fetchApi<TerritoryListResponse>('/v1/sales/territories', {
+    fetchApi<TerritoryListResponse>('/crm/territories', {
       params: params as Record<string, unknown>,
     }),
 
   getTerritory: (id: number | string) =>
-    fetchApi<Territory>(`/v1/sales/territories/${id}`),
+    fetchApi<Territory>(`/crm/territories/${id}`),
 
   createTerritory: (payload: TerritoryPayload) =>
-    fetchApi<Territory>('/v1/sales/territories', {
+    fetchApi<Territory>('/crm/territories', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
   updateTerritory: (id: number | string, payload: Partial<TerritoryPayload>) =>
-    fetchApi<Territory>(`/v1/sales/territories/${id}`, {
+    fetchApi<Territory>(`/crm/territories/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 
   deleteTerritory: (id: number | string) =>
-    fetchApi<void>(`/v1/sales/territories/${id}`, {
+    fetchApi<void>(`/crm/territories/${id}`, {
       method: 'DELETE',
     }),
 
   // =========================================================================
-  // SALES PERSONS
+  // SALES PERSONS (now at /crm/sales-persons)
   // =========================================================================
 
   getSalesPersons: (params?: { limit?: number; offset?: number; search?: string; enabled?: boolean }) =>
-    fetchApi<SalesPersonListResponse>('/v1/sales/sales-persons', {
+    fetchApi<SalesPersonListResponse>('/crm/sales-persons', {
       params: params as Record<string, unknown>,
     }),
 
   getSalesPerson: (id: number | string) =>
-    fetchApi<SalesPerson>(`/v1/sales/sales-persons/${id}`),
+    fetchApi<SalesPerson>(`/crm/sales-persons/${id}`),
 
   createSalesPerson: (payload: SalesPersonPayload) =>
-    fetchApi<SalesPerson>('/v1/sales/sales-persons', {
+    fetchApi<SalesPerson>('/crm/sales-persons', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
   updateSalesPerson: (id: number | string, payload: Partial<SalesPersonPayload>) =>
-    fetchApi<SalesPerson>(`/v1/sales/sales-persons/${id}`, {
+    fetchApi<SalesPerson>(`/crm/sales-persons/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 
   deleteSalesPerson: (id: number | string) =>
-    fetchApi<void>(`/v1/sales/sales-persons/${id}`, {
+    fetchApi<void>(`/crm/sales-persons/${id}`, {
       method: 'DELETE',
     }),
 };

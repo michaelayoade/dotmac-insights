@@ -10,6 +10,7 @@ from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
+    from app.models.contact import Contact
     from app.models.invoice import Invoice
     from app.models.payment_allocation import PaymentAllocation
 
@@ -53,8 +54,9 @@ class Payment(SoftDeleteMixin, Base):
     # Source system
     source: Mapped[PaymentSource] = mapped_column(Enum(PaymentSource), nullable=False, index=True)
 
-    # Links
+    # Links (legacy customer_id - use contact_id)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Payment details
@@ -102,6 +104,7 @@ class Payment(SoftDeleteMixin, Base):
 
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
+    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
     allocations: Mapped[List["PaymentAllocation"]] = relationship(
         back_populates="payment",

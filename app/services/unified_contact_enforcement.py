@@ -356,12 +356,10 @@ class UnifiedContactEnforcement:
         Use this for batch backfill before enforcing NOT NULL.
         """
         from app.models.customer import Customer
-        from app.models.crm import Contact as CRMContact
         from app.models.omni import InboxContact
 
         results = {
             "customers_updated": 0,
-            "contacts_updated": 0,
             "inbox_contacts_updated": 0,
         }
 
@@ -389,33 +387,6 @@ class UnifiedContactEnforcement:
             )
             customer.unified_contact_id = unified_id
             results["customers_updated"] += 1
-
-        # Backfill CRM contacts
-        orphaned_contacts = self.db.execute(
-            select(CRMContact).where(CRMContact.unified_contact_id.is_(None))
-        ).scalars().all()
-
-        for contact in orphaned_contacts:
-            unified_id = self.ensure_unified_contact_for_crm_contact(
-                contact.id,
-                {
-                    "full_name": contact.full_name,
-                    "first_name": contact.first_name,
-                    "last_name": contact.last_name,
-                    "email": contact.email,
-                    "phone": contact.phone,
-                    "mobile": contact.mobile,
-                    "is_active": contact.is_active,
-                    "is_primary": contact.is_primary,
-                    "is_billing_contact": contact.is_billing_contact,
-                    "is_decision_maker": contact.is_decision_maker,
-                    "designation": contact.designation,
-                    "department": contact.department,
-                },
-                parent_customer_id=contact.customer_id,
-            )
-            contact.unified_contact_id = unified_id
-            results["contacts_updated"] += 1
 
         # Backfill inbox contacts
         orphaned_inbox = self.db.execute(

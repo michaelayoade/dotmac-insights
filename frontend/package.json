@@ -12,6 +12,7 @@
   "dependencies": {
     "@dotmac/core": "file:./deps/dotmac-core-1.0.0.tgz",
     "@dotmac/design-tokens": "file:./deps/dotmac-design-tokens-1.0.0.tgz",
+    "@tanstack/react-query": "^5.90.12",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.303.0",

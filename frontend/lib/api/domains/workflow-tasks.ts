@@ -116,7 +116,7 @@ export const workflowTasksApi = {
   snoozeTask: (taskId: number, snoozeUntil: string) =>
     fetchApi<WorkflowTask>(`/v1/workflow-tasks/${taskId}/snooze`, {
       method: 'POST',
-      body: { snooze_until: snoozeUntil },
+      body: JSON.stringify({ snooze_until: snoozeUntil }),
     }),
 
   /**
@@ -125,7 +125,7 @@ export const workflowTasksApi = {
   updateTaskStatus: (taskId: number, status: string) =>
     fetchApi<WorkflowTask>(`/v1/workflow-tasks/${taskId}/status`, {
       method: 'PATCH',
-      body: { status },
+      body: JSON.stringify({ status }),
     }),
 
   /**
@@ -134,7 +134,7 @@ export const workflowTasksApi = {
   scheduleReminder: (payload: ScheduleReminderPayload) =>
     fetchApi<ScheduledTask>('/v1/workflow-tasks/schedule-reminder', {
       method: 'POST',
-      body: payload,
+      body: JSON.stringify(payload),
     }),
 
   /**

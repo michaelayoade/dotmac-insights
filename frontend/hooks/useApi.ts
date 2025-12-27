@@ -780,11 +780,12 @@ export function useCommentMutations() {
 export function useEntityActivities(
   entityType: import('@/lib/api').EntityType | null,
   entityId: number | null,
+  params?: { activity_type?: import('@/lib/api').ProjectActivityType; limit?: number; offset?: number },
   config?: SWRConfiguration
 ) {
   return useSWR(
-    entityType && entityId ? ['entity-activities', entityType, entityId] as const : null,
-    ([, type, id]) => api.getEntityActivities(type, id),
+    entityType && entityId ? ['entity-activities', entityType, entityId, params] as const : null,
+    ([, type, id, query]) => api.getEntityActivities(type, id, query),
     config
   );
 }
@@ -3180,6 +3181,20 @@ export function useEmployees(
   return useSWR(['employees', params], () => api.getEmployees(params), config);
 }
 
+export function useHrEmployees(
+  params?: { search?: string; department?: string; status?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['hr-employees', params], () => api.getEmployees(params), config);
+}
+
+export function useHrDepartments(
+  params?: { search?: string; company?: string; limit?: number; offset?: number },
+  config?: SWRConfiguration
+) {
+  return useSWR(['hr-departments', params], () => api.getDepartments(params), config);
+}
+
 // HR Domain
 export function useHrLeaveTypes(
   params?: { search?: string; is_lwp?: boolean; is_carry_forward?: boolean; limit?: number; offset?: number },
@@ -3663,11 +3678,16 @@ export function useHrPayrollEntryMutations() {
       await mutate((key) => Array.isArray(key) && (key[0] === 'hr-payroll-entries' || key[0] === 'hr-salary-slips'));
       await mutate(['hr-payroll-entry-detail', id]);
     },
+    submitEntry: async (id: number | string) => {
+      await api.submitHrPayrollEntry(id);
+      await mutate((key) => Array.isArray(key) && (key[0] === 'hr-payroll-entries' || key[0] === 'hr-salary-slips'));
+      await mutate(['hr-payroll-entry-detail', id]);
+    },
   };
 }
 
 export function useHrSalarySlips(
-  params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; limit?: number; offset?: number },
+  params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; department?: string; limit?: number; offset?: number },
   config?: SWRConfiguration
 ) {
   return useSWR(['hr-salary-slips', params], () => api.getHrSalarySlips(params), config);
@@ -3704,7 +3724,7 @@ export function useHrSalarySlipMutations() {
       await mutate((key) => Array.isArray(key) && key[0] === 'hr-salary-slips');
       return res;
     },
-    exportRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string }) => {
+    exportRegister: async (params?: { employee_id?: number; status?: string; start_date?: string; end_date?: string; company?: string; payroll_entry?: string; department?: string }) => {
       return api.exportHrSalarySlipRegister(params);
     },
   };

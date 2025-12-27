@@ -12,8 +12,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.transfer import Transfer, TransferStatus, TransferType
@@ -118,21 +117,21 @@ def generate_transfer_reference() -> str:
 # =============================================================================
 
 @router.get("/", response_model=TransferListResponse)
-async def list_transfers(
+def list_transfers(
     status_filter: Optional[str] = None,
     provider: Optional[str] = None,
     transfer_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List transfers with optional filters."""
-    query = select(Transfer)
+    query = db.query(Transfer)
 
     if status_filter:
         try:
             status_enum = TransferStatus(status_filter)
-            query = query.where(Transfer.status == status_enum)
+            query = query.filter(Transfer.status == status_enum)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -141,7 +140,7 @@ async def list_transfers(
     if provider:
         try:
             provider_enum = GatewayProvider(provider)
-            query = query.where(Transfer.provider == provider_enum)
+            query = query.filter(Transfer.provider == provider_enum)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -150,19 +149,16 @@ async def list_transfers(
     if transfer_type:
         try:
             type_enum = TransferType(transfer_type)
-            query = query.where(Transfer.transfer_type == type_enum)
+            query = query.filter(Transfer.transfer_type == type_enum)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid transfer type filter",
             )
 
-    total_result = await db.execute(query)
-    total = len(total_result.scalars().all())
+    total = query.count()
 
-    query = query.order_by(Transfer.created_at.desc()).offset(offset).limit(limit)
-    result = await db.execute(query)
-    transfers = result.scalars().all()
+    transfers = query.order_by(Transfer.created_at.desc()).offset(offset).limit(limit).all()
 
     return {
         "items": [
@@ -194,7 +190,7 @@ async def list_transfers(
 @router.post("/initiate", response_model=TransferResponse)
 async def initiate_transfer(
     request: InitiateTransferSchema,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Initiate a bank transfer (payout).
@@ -315,7 +311,7 @@ async def initiate_transfer(
 @router.post("/payroll/payout")
 async def pay_pending_payroll_transfers(
     request: PayrollPayoutRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Initiate payouts for pending payroll transfers (created from HR handoff).
@@ -419,7 +415,7 @@ async def pay_pending_payroll_transfers(
 @router.post("/bulk", response_model=list[TransferResponse])
 async def initiate_bulk_transfers(
     request: BulkTransferSchema,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Initiate multiple transfers in one batch.
@@ -557,7 +553,7 @@ async def initiate_bulk_transfers(
 @router.get("/verify/{reference}")
 async def verify_transfer(
     reference: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Verify a transfer status."""
     result = await db.execute(
@@ -612,7 +608,7 @@ async def verify_transfer(
 @router.get("/{reference}")
 async def get_transfer(
     reference: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get transfer details by reference."""
     result = await db.execute(
@@ -652,7 +648,7 @@ async def list_transfers_basic(
     transfer_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List transfers with optional filters."""
     query = select(Transfer)

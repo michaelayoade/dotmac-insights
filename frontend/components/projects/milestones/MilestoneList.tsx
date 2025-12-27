@@ -43,7 +43,7 @@ export function MilestoneList({ projectId, onTaskClick }: MilestoneListProps) {
   );
   const { createMilestone, updateMilestone, deleteMilestone } = useMilestoneMutations();
 
-  const milestones = data?.data || [];
+  const milestones: Milestone[] = data?.data || [];
 
   // Calculate stats
   const stats = {

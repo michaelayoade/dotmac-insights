@@ -182,11 +182,10 @@ class Activity(Base):
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     opportunity_id: Mapped[Optional[int]] = mapped_column(ForeignKey("opportunities.id"), nullable=True, index=True)
-    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
 
-    # Link to unified contact (replaces lead_id/customer_id/contact_id after migration)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Link to Contact
+    contact_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("contacts.id"),
         nullable=True,
         index=True
     )
@@ -221,84 +220,12 @@ class Activity(Base):
     lead: Mapped[Optional["ERPNextLead"]] = relationship()
     customer: Mapped[Optional["Customer"]] = relationship()
     opportunity: Mapped[Optional["Opportunity"]] = relationship(back_populates="activities")
-    contact: Mapped[Optional["Contact"]] = relationship(back_populates="activities")
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     owner: Mapped[Optional["Employee"]] = relationship(foreign_keys=[owner_id])
     assigned_to: Mapped[Optional["Employee"]] = relationship(foreign_keys=[assigned_to_id])
 
     def __repr__(self) -> str:
         return f"<Activity {self.activity_type.value}: {self.subject}>"
-
-
-# ============= CONTACT =============
-class Contact(Base):
-    """
-    Contacts - multiple contacts per customer/lead.
-
-    DEPRECATED: This model will be replaced by UnifiedContact with contact_type=PERSON.
-    Use unified_contact_id to link to the new UnifiedContact model.
-    """
-
-    __tablename__ = "contacts"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-
-    # Linked to customer or lead (legacy)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
-    lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
-
-    # Link to unified contact (migration target)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
-        nullable=True,
-        index=True
-    )
-
-    # Contact info
-    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-
-    # Contact details
-    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
-    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    mobile: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-
-    # Role/Position
-    designation: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # e.g., "CEO", "IT Manager"
-    department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-
-    # Flags
-    is_primary: Mapped[bool] = mapped_column(default=False, index=True)
-    is_billing_contact: Mapped[bool] = mapped_column(default=False)
-    is_decision_maker: Mapped[bool] = mapped_column(default=False)
-
-    # Status
-    is_active: Mapped[bool] = mapped_column(default=True)
-    unsubscribed: Mapped[bool] = mapped_column(default=False)  # Email opt-out
-
-    # Social
-    linkedin_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-
-    # Notes
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-    # ERPNext sync
-    erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
-    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    customer: Mapped[Optional["Customer"]] = relationship()
-    lead: Mapped[Optional["ERPNextLead"]] = relationship()
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
-    activities: Mapped[List["Activity"]] = relationship(back_populates="contact")
-
-    def __repr__(self) -> str:
-        return f"<Contact {self.full_name}>"
 
 
 # ============= LEAD SOURCE =============

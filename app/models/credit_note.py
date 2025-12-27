@@ -10,6 +10,7 @@ from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
+    from app.models.contact import Contact
     from app.models.invoice import Invoice
     from app.models.document_lines import CreditNoteLine
 
@@ -32,8 +33,9 @@ class CreditNote(SoftDeleteMixin, Base):
     splynx_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
-    # Links
+    # Links (legacy customer_id - use contact_id)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), index=True, nullable=True)
+    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id"), index=True, nullable=True)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True, nullable=True)
 
     # Details
@@ -77,6 +79,7 @@ class CreditNote(SoftDeleteMixin, Base):
 
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="credit_notes")
+    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="credit_notes")
     lines: Mapped[List["CreditNoteLine"]] = relationship(
         back_populates="credit_note",

@@ -47,7 +47,7 @@ export function ApprovalHistory({ projectId }: ApprovalHistoryProps) {
     );
   }
 
-  const history = approvalStatus.history || [];
+  const history: ApprovalHistoryItem[] = approvalStatus.history || [];
 
   if (history.length === 0) {
     return (
@@ -66,7 +66,7 @@ export function ApprovalHistory({ projectId }: ApprovalHistoryProps) {
       </div>
 
       <div className="relative">
-        {history.map((item, index) => {
+        {history.map((item: ApprovalHistoryItem, index: number) => {
           const config = actionConfig[item.action] || actionConfig.submit;
           const Icon = config.icon;
 

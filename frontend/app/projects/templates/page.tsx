@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  FileTemplate,
+  FileText,
   Plus,
   Clock,
   CheckCircle,
@@ -131,7 +131,7 @@ function TemplateCard({ template, onDelete }: { template: ProjectTemplate; onDel
 export default function ProjectTemplatesPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const { data, isLoading, error } = useProjectTemplates(
-    filter === 'all' ? { active_only: false } : { is_active: filter === 'active' }
+    filter === 'all' ? undefined : { is_active: filter === 'active' }
   );
   const mutations = useTemplateMutations();
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -141,7 +141,7 @@ export default function ProjectTemplatesPage() {
     setDeleting(id);
     try {
       await mutations.delete(id);
-      mutate(['project-templates', filter === 'all' ? { active_only: false } : { is_active: filter === 'active' }]);
+      mutate(['project-templates', filter === 'all' ? undefined : { is_active: filter === 'active' }]);
     } catch (err) {
       console.error('Failed to delete template:', err);
       alert('Failed to delete template');
@@ -150,7 +150,7 @@ export default function ProjectTemplatesPage() {
     }
   };
 
-  const templates = data?.data || [];
+  const templates: ProjectTemplate[] = data?.data || [];
 
   return (
     <div className="space-y-6">
@@ -199,7 +199,7 @@ export default function ProjectTemplatesPage() {
         </div>
       ) : templates.length === 0 ? (
         <div className="text-center py-20 bg-slate-800/30 rounded-lg border border-slate-700/50">
-          <FileTemplate className="w-12 h-12 mx-auto text-slate-600 mb-4" />
+          <FileText className="w-12 h-12 mx-auto text-slate-600 mb-4" />
           <h3 className="text-lg font-medium text-slate-300 mb-2">No templates found</h3>
           <p className="text-slate-500 mb-6">
             {filter === 'all'
@@ -217,7 +217,7 @@ export default function ProjectTemplatesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map((template) => (
+          {templates.map((template: ProjectTemplate) => (
             <TemplateCard key={template.id} template={template} onDelete={handleDelete} />
           ))}
         </div>

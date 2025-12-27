@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -487,7 +487,7 @@ async def get_support_dashboard(
 
     # Average resolution time (last 30 days)
     from datetime import timedelta
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     avg_resolution = db.query(
         func.avg(func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600)
     ).filter(
@@ -767,7 +767,7 @@ def create_ticket(
         write_back_status="pending",
         created_by_id=getattr(principal, "id", None),
         updated_by_id=getattr(principal, "id", None),
-        opening_date=datetime.utcnow(),
+        opening_date=datetime.now(timezone.utc),
     )
 
     db.add(ticket)
@@ -828,7 +828,7 @@ def update_ticket(
         ticket.priority = priority
 
     ticket.updated_by_id = getattr(principal, "id", None)
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(ticket)
@@ -848,9 +848,9 @@ def delete_ticket(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     ticket.is_deleted = True
-    ticket.deleted_at = datetime.utcnow()
+    ticket.deleted_at = datetime.now(timezone.utc)
     ticket.deleted_by_id = getattr(principal, "id", None)
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     return Response(status_code=204)
 
@@ -878,7 +878,7 @@ def add_ticket_comment(
         commented_by=payload.commented_by,
         commented_by_name=payload.commented_by_name,
         is_public=payload.is_public,
-        comment_date=payload.comment_date or datetime.utcnow(),
+        comment_date=payload.comment_date or datetime.now(timezone.utc),
         idx=idx,
     )
     db.add(comment)
@@ -957,7 +957,7 @@ def add_ticket_activity(
         owner=payload.owner,
         from_status=payload.from_status,
         to_status=payload.to_status,
-        activity_date=payload.activity_date or datetime.utcnow(),
+        activity_date=payload.activity_date or datetime.now(timezone.utc),
         idx=idx,
     )
     db.add(activity)
@@ -1128,7 +1128,7 @@ def add_ticket_communication(
         sent_or_received=payload.sent_or_received,
         read_receipt=payload.read_receipt,
         delivery_status=payload.delivery_status,
-        communication_date=payload.communication_date or datetime.utcnow(),
+        communication_date=payload.communication_date or datetime.now(timezone.utc),
     )
     db.add(comm)
     db.commit()
@@ -1238,7 +1238,7 @@ def assign_ticket(
     if team:
         ticket.resolution_team = team.name
 
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
     return {
@@ -1270,7 +1270,7 @@ def update_ticket_sla(
         note = f"[SLA override] {payload.reason}"
         ticket.resolution_details = (existing + "\n" + note).strip() if existing else note
 
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
     return {
@@ -1383,7 +1383,7 @@ def update_tag(
         if value is not None:
             setattr(tag, field, value)
 
-    tag.updated_at = datetime.utcnow()
+    tag.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(tag)
     return _serialize_tag(tag)
@@ -1530,7 +1530,7 @@ def update_custom_field(
     if payload.options is not None:
         field.options = cast(Any, [{"value": o.value, "label": o.label} for o in payload.options])
 
-    field.updated_at = datetime.utcnow()
+    field.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(field)
     return _serialize_custom_field(field)
@@ -1578,7 +1578,7 @@ def add_ticket_tags(
                 tag.usage_count = (tag.usage_count or 0) + 1
 
     ticket.tags = new_tags
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
 
@@ -1606,7 +1606,7 @@ def remove_ticket_tag(
         tag.usage_count = tag.usage_count - 1
 
     ticket.tags = [t for t in current_tags if t != tag_name]
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
 
@@ -1634,7 +1634,7 @@ def add_ticket_watchers(
     new_watchers = list(dict.fromkeys(current_watchers + validated_watchers))
 
     ticket.watchers = new_watchers
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
 
@@ -1657,7 +1657,7 @@ def remove_ticket_watcher(
         raise HTTPException(status_code=404, detail="Watcher not found on this ticket")
 
     ticket.watchers = [w for w in current_watchers if w != user_id]
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
 
@@ -1724,7 +1724,7 @@ def merge_tickets(
         if payload.close_source_tickets:
             source.status = TicketStatus.CLOSED
             source.resolution = f"Merged into ticket #{target.ticket_number}"
-            source.resolution_date = datetime.utcnow()
+            source.resolution_date = datetime.now(timezone.utc)
 
         merged_ids.append(source_id)
         merged_count += 1
@@ -1735,13 +1735,13 @@ def merge_tickets(
             activity_type="merge",
             activity=f"Merged ticket #{source.ticket_number} into this ticket",
             owner=getattr(principal, "email", None),
-            activity_date=datetime.utcnow(),
+            activity_date=datetime.now(timezone.utc),
             idx=len(target.activities),
         )
         db.add(activity)
 
     target.merged_tickets = merged_ids
-    target.updated_at = datetime.utcnow()
+    target.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(target)
 
@@ -1785,7 +1785,7 @@ def split_ticket(
         write_back_status="pending",
         created_by_id=getattr(principal, "id", None),
         updated_by_id=getattr(principal, "id", None),
-        opening_date=datetime.utcnow(),
+        opening_date=datetime.now(timezone.utc),
     )
 
     if payload.copy_tags and parent.tags:
@@ -1802,12 +1802,12 @@ def split_ticket(
         activity_type="split",
         activity=f"Created sub-ticket: {payload.subject}",
         owner=getattr(principal, "email", None),
-        activity_date=datetime.utcnow(),
+        activity_date=datetime.now(timezone.utc),
         idx=len(parent.activities),
     )
     db.add(activity)
 
-    parent.updated_at = datetime.utcnow()
+    parent.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(child)
 

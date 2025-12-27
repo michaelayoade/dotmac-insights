@@ -166,7 +166,14 @@ class Project(Base):
     def is_overdue(self) -> bool:
         """Check if project is overdue."""
         if self.expected_end_date and self.status == ProjectStatus.OPEN:
-            return utc_now() > self.expected_end_date
+            now = utc_now()
+            end_date = self.expected_end_date
+            # Handle timezone-naive dates by comparing without timezone
+            if end_date.tzinfo is None and now.tzinfo is not None:
+                now = now.replace(tzinfo=None)
+            elif end_date.tzinfo is not None and now.tzinfo is None:
+                end_date = end_date.replace(tzinfo=None)
+            return now > end_date
         return False
 
 

@@ -278,11 +278,12 @@ export default function PayrollSettingsPage() {
   }
 
   const componentColumns = [
-    { header: 'Component', accessor: (row: HrSalaryComponent) => row.salary_component },
-    { header: 'Abbr', accessor: (row: HrSalaryComponent) => row.abbr || '-' },
+    { key: 'component', header: 'Component', render: (row: HrSalaryComponent) => row.salary_component },
+    { key: 'abbr', header: 'Abbr', render: (row: HrSalaryComponent) => row.abbr || '-' },
     {
+      key: 'type',
       header: 'Type',
-      accessor: (row: HrSalaryComponent) => (
+      render: (row: HrSalaryComponent) => (
         <span className={cn(
           'px-2 py-0.5 rounded text-xs font-medium',
           row.type === 'Earning' ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'
@@ -292,33 +293,35 @@ export default function PayrollSettingsPage() {
         </span>
       ),
     },
-    { header: 'Company', accessor: (row: HrSalaryComponent) => row.company || '-' },
+    { key: 'company', header: 'Company', render: (row: HrSalaryComponent) => row.company || '-' },
   ];
 
   const structureColumns = [
-    { header: 'Name', accessor: (row: HrSalaryStructure) => row.name },
-    { header: 'Company', accessor: (row: HrSalaryStructure) => row.company || '-' },
-    { header: 'Currency', accessor: (row: HrSalaryStructure) => row.currency || 'NGN' },
+    { key: 'name', header: 'Name', render: (row: HrSalaryStructure) => row.name },
+    { key: 'company', header: 'Company', render: (row: HrSalaryStructure) => row.company || '-' },
+    { key: 'currency', header: 'Currency', render: (row: HrSalaryStructure) => row.currency || 'NGN' },
     {
+      key: 'status',
       header: 'Status',
-      accessor: (row: HrSalaryStructure) => (
+      render: (row: HrSalaryStructure) => (
         <StatusPill
           label={row.is_active ? 'Active' : 'Inactive'}
-          tone={row.is_active ? 'success' : 'muted'}
+          tone={row.is_active ? 'success' : 'default'}
         />
       ),
     },
-    { header: 'Earnings', accessor: (row: HrSalaryStructure) => row.earnings?.length || 0 },
-    { header: 'Deductions', accessor: (row: HrSalaryStructure) => row.deductions?.length || 0 },
+    { key: 'earnings', header: 'Earnings', render: (row: HrSalaryStructure) => row.earnings?.length || 0 },
+    { key: 'deductions', header: 'Deductions', render: (row: HrSalaryStructure) => row.deductions?.length || 0 },
   ];
 
   const ruleColumns = [
-    { header: 'Name', accessor: (row: DeductionRule) => row.name },
-    { header: 'Type', accessor: (row: DeductionRule) => <RuleTypeLabel type={row.rule_type} /> },
-    { header: 'Method', accessor: (row: DeductionRule) => <CalcMethodLabel method={row.calculation_method} /> },
+    { key: 'name', header: 'Name', render: (row: DeductionRule) => row.name },
+    { key: 'type', header: 'Type', render: (row: DeductionRule) => <RuleTypeLabel type={row.rule_type} /> },
+    { key: 'method', header: 'Method', render: (row: DeductionRule) => <CalcMethodLabel method={row.calculation_method} /> },
     {
+      key: 'rate',
       header: 'Rate/Amount',
-      accessor: (row: DeductionRule) => {
+      render: (row: DeductionRule) => {
         if (row.calculation_method === 'FLAT') {
           return formatCurrency(row.flat_amount || 0, 'NGN');
         } else if (row.calculation_method === 'PERCENTAGE') {
@@ -328,16 +331,18 @@ export default function PayrollSettingsPage() {
       },
     },
     {
+      key: 'status',
       header: 'Status',
-      accessor: (row: DeductionRule) => (
-        <StatusPill label={row.is_active ? 'Active' : 'Inactive'} tone={row.is_active ? 'success' : 'muted'} />
+      render: (row: DeductionRule) => (
+        <StatusPill label={row.is_active ? 'Active' : 'Inactive'} tone={row.is_active ? 'success' : 'default'} />
       ),
     },
     ...(canWrite
       ? [
           {
+            key: 'actions',
             header: 'Actions',
-            accessor: (row: DeductionRule) => (
+            render: (row: DeductionRule) => (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => handleOpenRuleModal(row)}>
                   <Edit className="w-4 h-4" />
@@ -353,14 +358,15 @@ export default function PayrollSettingsPage() {
   ];
 
   const regionColumns = [
-    { header: 'Country', accessor: (row: PayrollRegion) => row.country_code },
-    { header: 'Currency', accessor: (row: PayrollRegion) => row.currency },
-    { header: 'Linked Rules', accessor: (row: PayrollRegion) => row.deduction_rules?.length || 0 },
+    { key: 'country', header: 'Country', render: (row: PayrollRegion) => row.country_code },
+    { key: 'currency', header: 'Currency', render: (row: PayrollRegion) => row.currency },
+    { key: 'rules', header: 'Linked Rules', render: (row: PayrollRegion) => row.deduction_rules?.length || 0 },
     ...(canWrite
       ? [
           {
+            key: 'actions',
             header: 'Actions',
-            accessor: (row: PayrollRegion) => (
+            render: (row: PayrollRegion) => (
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => handleOpenRegionModal(row)}>
                   <Edit className="w-4 h-4" />
@@ -448,7 +454,7 @@ export default function PayrollSettingsPage() {
             </div>
           ) : (
             <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-              <DataTable columns={componentColumns} data={components} />
+              <DataTable columns={componentColumns} data={components} keyField="id" />
             </div>
           )}
         </div>
@@ -471,7 +477,7 @@ export default function PayrollSettingsPage() {
             </div>
           ) : (
             <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-              <DataTable columns={structureColumns} data={structures} />
+              <DataTable columns={structureColumns} data={structures} keyField="id" />
             </div>
           )}
         </div>
@@ -506,7 +512,7 @@ export default function PayrollSettingsPage() {
             </div>
           ) : (
             <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-              <DataTable columns={ruleColumns} data={rules} />
+              <DataTable columns={ruleColumns} data={rules} keyField="id" />
             </div>
           )}
         </div>
@@ -541,7 +547,7 @@ export default function PayrollSettingsPage() {
             </div>
           ) : (
             <div className="bg-slate-card border border-slate-border rounded-xl overflow-hidden">
-              <DataTable columns={regionColumns} data={regions} />
+              <DataTable columns={regionColumns} data={regions} keyField="id" />
             </div>
           )}
         </div>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useHrSalarySlipDetail, useHrSalarySlipMutations } from '@/hooks/useApi';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
-import { Button, StatusPill, LoadingState, BackButton, Modal } from '@/components/ui';
+import { Button, StatusPill, LoadingState, BackButton } from '@/components/ui';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import {
@@ -27,6 +27,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { HrSalaryStructureLine } from '@/lib/api';
 
 function StatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { tone: StatusTone; icon: LucideIcon }> = {
@@ -125,10 +126,16 @@ export default function PayslipDetailPage() {
     );
   }
 
-  const earnings = slip.earnings || [];
-  const deductions = slip.deductions || [];
-  const totalEarnings = earnings.reduce((sum, e) => sum + (e.amount || e.default_amount || 0), 0);
-  const totalDeductions = deductions.reduce((sum, d) => sum + (d.amount || d.default_amount || 0), 0);
+  const earnings: HrSalaryStructureLine[] = slip.earnings || [];
+  const deductions: HrSalaryStructureLine[] = slip.deductions || [];
+  const totalEarnings = earnings.reduce<number>(
+    (sum, e) => sum + (e.amount || e.default_amount || 0),
+    0
+  );
+  const totalDeductions = deductions.reduce<number>(
+    (sum, d) => sum + (d.amount || d.default_amount || 0),
+    0
+  );
   const currency = slip.currency || 'NGN';
   const isDraft = slip.status?.toLowerCase() === 'draft';
   const isSubmitted = slip.status?.toLowerCase() === 'submitted';

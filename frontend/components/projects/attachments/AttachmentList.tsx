@@ -31,7 +31,7 @@ export function AttachmentList({
   const { uploadAttachment, deleteAttachment, getDownloadUrl } = useAttachmentMutations();
   const [deleteConfirm, setDeleteConfirm] = useState<ProjectAttachment | null>(null);
 
-  const attachments = data?.data || [];
+  const attachments: ProjectAttachment[] = data?.data || [];
 
   const handleUpload = async (file: File, options?: { description?: string }) => {
     await uploadAttachment(entityType, entityId, file, options);
@@ -82,7 +82,7 @@ export function AttachmentList({
       {/* Attachments List */}
       {attachments.length > 0 ? (
         <div className="space-y-2">
-          {attachments.map((attachment) => (
+          {attachments.map((attachment: ProjectAttachment) => (
             <AttachmentItem
               key={attachment.id}
               attachment={attachment}

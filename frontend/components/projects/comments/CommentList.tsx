@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import type { EntityType, ProjectComment } from '@/lib/api/domains/projects';
 import { useEntityComments, useCommentMutations } from '@/hooks/useApi';
-import { useAuth } from '@/lib/auth-context';
 import { CommentItem } from './CommentItem';
 import { CommentForm } from './CommentForm';
 import { Button } from '@/components/ui';
@@ -24,12 +23,11 @@ export function CommentList({
   entityId,
   title = 'Comments',
 }: CommentListProps) {
-  const { user } = useAuth();
   const { data, isLoading, error, mutate } = useEntityComments(entityType, entityId);
   const { createComment, updateComment, deleteComment } = useCommentMutations();
   const [deleteConfirm, setDeleteConfirm] = useState<ProjectComment | null>(null);
 
-  const comments = data?.data || [];
+  const comments: ProjectComment[] = data?.data || [];
 
   const handleCreate = async (content: string) => {
     await createComment(entityType, entityId, { content });
@@ -80,11 +78,10 @@ export function CommentList({
       {/* Comments List */}
       {comments.length > 0 ? (
         <div className="space-y-4 pt-4 border-t border-slate-border">
-          {comments.map((comment) => (
+          {comments.map((comment: ProjectComment) => (
             <CommentItem
               key={comment.id}
               comment={comment}
-              currentUserId={user?.id}
               onEdit={handleEdit}
               onDelete={setDeleteConfirm}
             />

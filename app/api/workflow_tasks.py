@@ -41,7 +41,11 @@ class WorkflowTaskResponse(BaseModel):
     completed_at: Optional[datetime] = None
     module: str
     company: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        validation_alias="task_metadata",
+        serialization_alias="metadata",
+    )
     is_overdue: bool = False
     created_at: datetime
     updated_at: datetime

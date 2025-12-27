@@ -6,7 +6,7 @@ import {
   BarChart3,
   FolderKanban,
   Settings,
-  FileTemplate,
+  FileText,
 } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -32,7 +32,7 @@ const sections: NavSection[] = [
     key: 'templates',
     label: 'Templates',
     description: 'Reusable project structures',
-    icon: FileTemplate,
+    icon: FileText,
     items: [
       { name: 'Templates', href: '/projects/templates', description: 'Manage project templates' },
     ],
@@ -50,7 +50,7 @@ const sections: NavSection[] = [
 
 const quickLinks: QuickLink[] = [
   { label: 'Projects', href: '/projects', icon: FolderKanban, color: 'amber-400' },
-  { label: 'Templates', href: '/projects/templates', icon: FileTemplate, color: 'emerald-400' },
+  { label: 'Templates', href: '/projects/templates', icon: FileText, color: 'emerald-400' },
   { label: 'Analytics', href: '/projects/analytics', icon: BarChart3, color: 'cyan-400' },
 ];
 

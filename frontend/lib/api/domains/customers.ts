@@ -1,6 +1,10 @@
 /**
  * Customers Domain API
  * Includes: Customers, Customer 360, Analytics, Insights, Segments, Health
+ *
+ * @deprecated This module is ISP-specific and will be removed.
+ * Use crmApi.getContacts() from './crm' for generic customer/contact management.
+ * The /customers/* endpoints are no longer maintained.
  */
 
 import { fetchApi } from '../core';

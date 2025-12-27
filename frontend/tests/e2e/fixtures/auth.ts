@@ -202,14 +202,16 @@ export async function setupAuth(page: Page, scopes: Scope[] = ALL_SCOPES): Promi
     'access-control-allow-methods': 'GET, POST, OPTIONS',
   };
 
+  // Extract domain from apiBase URL for cookie
+  const apiUrl = new URL(apiBase);
   await page.context().addCookies([{
     name: 'dotmac_access_token',
     value: token,
-    url: apiBase,
-    httpOnly: true,
-    sameSite: 'Lax',
-    secure: apiBase.startsWith('https'),
+    domain: apiUrl.hostname,
     path: '/',
+    httpOnly: true,
+    sameSite: 'Lax' as const,
+    secure: apiBase.startsWith('https'),
   }]);
 
   // Mock the /api/admin/me endpoint to return the test user's permissions

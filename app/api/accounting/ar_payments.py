@@ -43,7 +43,8 @@ class AllocationCreate(BaseModel):
 
 class CustomerPaymentCreate(BaseModel):
     """Schema for creating a customer payment."""
-    customer_id: int
+    contact_id: Optional[int] = None  # CRM contact (preferred)
+    customer_id: Optional[int] = None  # legacy customer
     payment_date: str
     amount: float
     currency: str = "NGN"
@@ -72,6 +73,7 @@ class CustomerPaymentUpdate(BaseModel):
 
 @router.get("/ar-payments", dependencies=[Depends(Require("accounting:read"))])
 def list_ar_payments(
+    contact_id: Optional[int] = None,
     customer_id: Optional[int] = None,
     status: Optional[str] = None,
     start_date: Optional[str] = None,
@@ -83,7 +85,9 @@ def list_ar_payments(
     """List customer payments with filters."""
     query = db.query(Payment)
 
-    if customer_id:
+    if contact_id:
+        query = query.filter(Payment.contact_id == contact_id)
+    elif customer_id:
         query = query.filter(Payment.customer_id == customer_id)
 
     if status:
@@ -110,7 +114,8 @@ def list_ar_payments(
             {
                 "id": p.id,
                 "receipt_number": p.receipt_number,
-                "customer_id": p.customer_id,
+                "contact_id": p.contact_id,
+                "customer_id": p.customer_id,  # legacy
                 "payment_date": p.payment_date.isoformat() if p.payment_date else None,
                 "amount": float(p.amount),
                 "currency": p.currency,
@@ -141,7 +146,8 @@ def get_ar_payment(
     return {
         "id": payment.id,
         "receipt_number": payment.receipt_number,
-        "customer_id": payment.customer_id,
+        "contact_id": payment.contact_id,
+        "customer_id": payment.customer_id,  # legacy
         "invoice_id": payment.invoice_id,
         "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
         "amount": float(payment.amount),
@@ -185,6 +191,10 @@ def create_ar_payment(
     user=Depends(Require("books:write")),
 ) -> Dict[str, Any]:
     """Create a new customer payment."""
+    # Require at least one of contact_id or customer_id
+    if not data.contact_id and not data.customer_id:
+        raise HTTPException(status_code=400, detail="Either contact_id or customer_id is required")
+
     # Parse payment method
     try:
         method_enum = PaymentMethod(data.payment_method.lower())
@@ -198,6 +208,7 @@ def create_ar_payment(
         raise HTTPException(status_code=400, detail="Invalid date format")
 
     payment = Payment(
+        contact_id=data.contact_id,
         customer_id=data.customer_id,
         payment_date=payment_date,
         amount=Decimal(str(data.amount)),
@@ -492,13 +503,21 @@ def approve_ar_payment(
 
 @router.get("/ar-payments/outstanding-invoices", dependencies=[Depends(Require("accounting:read"))])
 def get_outstanding_invoices(
-    customer_id: int,
+    contact_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
     currency: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get outstanding invoices available for payment."""
+    if not contact_id and not customer_id:
+        raise HTTPException(status_code=400, detail="Either contact_id or customer_id is required")
+
     alloc_service = PaymentAllocationService(db)
-    docs = alloc_service.get_outstanding_documents("customer", customer_id, currency)
+    # Use contact_id if provided, else fall back to customer_id
+    if contact_id:
+        docs = alloc_service.get_outstanding_documents("contact", contact_id, currency)
+    else:
+        docs = alloc_service.get_outstanding_documents("customer", customer_id, currency)
 
     return {
         "total": len(docs),

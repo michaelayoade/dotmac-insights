@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from app.utils.datetime_utils import utc_now
+from app.utils.datetime_utils import utc_now, ensure_utc
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
@@ -200,7 +200,9 @@ class Ticket(SoftDeleteMixin, Base):
     def is_overdue(self) -> bool:
         """Check if ticket is overdue based on resolution_by SLA."""
         if self.resolution_by and self.status not in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
-            return utc_now() > self.resolution_by
+            # Ensure both datetimes are timezone-aware for comparison
+            resolution_by_utc = ensure_utc(self.resolution_by)
+            return utc_now() > resolution_by_utc if resolution_by_utc else False
         return False
 
     @property

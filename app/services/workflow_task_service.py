@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.workflow_task import (
@@ -97,7 +97,7 @@ class WorkflowTaskService:
             due_at=due_at,
             module=module,
             company=company,
-            metadata=metadata,
+            task_metadata=metadata,
         )
 
         self.db.add(task)
@@ -254,7 +254,7 @@ class WorkflowTaskService:
         # Order by: urgent first, then by due date (soonest first), then by created
         query = query.order_by(
             # Priority order: urgent=1, high=2, medium=3, low=4
-            func.case(
+            case(
                 (WorkflowTask.priority == "urgent", 1),
                 (WorkflowTask.priority == "high", 2),
                 (WorkflowTask.priority == "medium", 3),

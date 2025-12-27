@@ -42,6 +42,17 @@ export type {
   ProjectListParams,
   ProjectTaskParams,
   ProjectTaskUpdatePayload,
+  MilestoneStatus,
+  Milestone,
+  MilestoneCreatePayload,
+  MilestoneUpdatePayload,
+  EntityType,
+  CommentCreatePayload,
+  CommentUpdatePayload,
+  ProjectTemplate,
+  ProjectTemplateCreatePayload,
+  ProjectTemplateUpdatePayload,
+  ProjectActivityType,
 } from './projects';
 
 // CRM Domain (Leads, Opportunities, Activities, Contacts, Pipeline)
@@ -127,7 +138,8 @@ export {
   seedDefaultPipelineStages,
 } from './crm';
 
-// Customers Domain
+// Customers Domain (DEPRECATED - use crmApi.getContacts() instead)
+// @deprecated ISP-specific module, will be removed
 export { customersApi } from './customers';
 export type {
   CustomerDashboard,
@@ -700,6 +712,7 @@ export { inboxApi } from './inbox';
 export * from './inbox';
 
 // Sales Domain (Customer Groups, Territories, Sales Persons)
+// NOTE: These now live under /crm/config/* endpoints - salesApi is kept for backward compatibility
 export { salesApi } from './sales';
 export type {
   CustomerGroup,
@@ -750,3 +763,27 @@ export type {
   ScheduledTask,
   ScheduleReminderPayload,
 } from './workflow-tasks';
+
+// Migration Domain (Data Import, Mapping, Validation, Execution)
+export { migrationApi } from './migration';
+export type {
+  MigrationStatus,
+  DedupStrategy,
+  RecordAction,
+  EntityInfo,
+  FieldInfo,
+  EntitySchemaResponse,
+  MigrationJob,
+  MigrationJobDetail,
+  MigrationJobListResponse,
+  CreateJobPayload,
+  SaveMappingPayload,
+  ValidationIssue as MigrationValidationIssue,
+  ValidationResult as MigrationValidationResult,
+  PreviewRow,
+  ProgressResponse,
+  MigrationRecord,
+  MigrationRecordListResponse,
+  DuplicateReport,
+  JobListParams,
+} from './migration';

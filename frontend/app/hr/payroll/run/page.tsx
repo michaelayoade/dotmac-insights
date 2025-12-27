@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { DataTable, Pagination } from '@/components/DataTable';
+import { DataTable, Pagination, type Column } from '@/components/DataTable';
 import {
   useHrPayrollEntries,
   useHrPayrollEntryMutations,
@@ -15,7 +15,7 @@ import { hrApi } from '@/lib/api/domains/hr';
 import { useSWRConfig } from 'swr';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import { formatStatusLabel, type StatusTone } from '@/lib/status-pill';
-import { Button, StatusPill, LoadingState, BackButton, Modal } from '@/components/ui';
+import { Button, StatusPill, LoadingState, BackButton } from '@/components/ui';
 import { StatCard } from '@/components/StatCard';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
@@ -38,7 +38,7 @@ import {
   Send,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { HrPayrollEntry, HrEmployee, HrSalarySlip } from '@/lib/api';
+import type { HrPayrollEntry, HrEmployee, HrSalarySlip, HrDepartment } from '@/lib/api';
 
 function extractList<T>(response: any): { items: T[]; total: number } {
   const items = response?.data || response?.items || [];
@@ -146,7 +146,7 @@ export default function PayrollRunPage() {
 
   const { items: employees } = extractList<HrEmployee>(employeesData);
   const { items: slips } = extractList<HrSalarySlip>(slipsData);
-  const departments = deptData?.items || [];
+  const departments: HrDepartment[] = deptData?.items || [];
 
   const { generateSlips, submitEntry } = useHrPayrollEntryMutations();
 
@@ -282,8 +282,9 @@ export default function PayrollRunPage() {
     );
   }
 
-  const employeeColumns = [
+  const employeeColumns: Column<HrEmployee>[] = [
     {
+      key: 'select',
       header: (
         <input
           type="checkbox"
@@ -292,7 +293,7 @@ export default function PayrollRunPage() {
           className="rounded border-slate-border"
         />
       ),
-      accessor: (row: HrEmployee) => (
+      render: (row: HrEmployee) => (
         <input
           type="checkbox"
           checked={selectedEmployees.has(row.id)}
@@ -300,37 +301,40 @@ export default function PayrollRunPage() {
           className="rounded border-slate-border"
         />
       ),
-      className: 'w-10',
+      width: '40px',
     },
-    { header: 'Employee', accessor: (row: HrEmployee) => row.name },
-    { header: 'ID', accessor: (row: HrEmployee) => row.employee_number || '-' },
-    { header: 'Department', accessor: (row: HrEmployee) => row.department || '-' },
-    { header: 'Designation', accessor: (row: HrEmployee) => row.designation || '-' },
+    { key: 'employee', header: 'Employee', render: (row: HrEmployee) => row.name },
+    { key: 'employee-number', header: 'ID', render: (row: HrEmployee) => row.employee_number || '-' },
+    { key: 'department', header: 'Department', render: (row: HrEmployee) => row.department || '-' },
+    { key: 'designation', header: 'Designation', render: (row: HrEmployee) => row.designation || '-' },
   ];
 
-  const slipColumns = [
-    { header: 'Employee', accessor: (row: HrSalarySlip) => row.employee_name || row.employee },
-    { header: 'Department', accessor: (row: HrSalarySlip) => row.department || '-' },
+  const slipColumns: Column<HrSalarySlip>[] = [
+    { key: 'employee', header: 'Employee', render: (row: HrSalarySlip) => row.employee_name || row.employee },
+    { key: 'department', header: 'Department', render: (row: HrSalarySlip) => row.department || '-' },
     {
+      key: 'gross-pay',
       header: 'Gross Pay',
-      accessor: (row: HrSalarySlip) => formatCurrency(row.gross_pay || 0, row.currency || 'NGN'),
-      className: 'text-right',
+      render: (row: HrSalarySlip) => formatCurrency(row.gross_pay || 0, row.currency || 'NGN'),
+      align: 'right',
     },
     {
+      key: 'deductions',
       header: 'Deductions',
-      accessor: (row: HrSalarySlip) => formatCurrency(row.total_deduction || 0, row.currency || 'NGN'),
-      className: 'text-right',
+      render: (row: HrSalarySlip) => formatCurrency(row.total_deduction || 0, row.currency || 'NGN'),
+      align: 'right',
     },
     {
+      key: 'net-pay',
       header: 'Net Pay',
-      accessor: (row: HrSalarySlip) => (
+      render: (row: HrSalarySlip) => (
         <span className="font-semibold text-green-400">
           {formatCurrency(row.net_pay || 0, row.currency || 'NGN')}
         </span>
       ),
-      className: 'text-right',
+      align: 'right',
     },
-    { header: 'Status', accessor: (row: HrSalarySlip) => <StatusBadge status={row.status || 'draft'} /> },
+    { key: 'status', header: 'Status', render: (row: HrSalarySlip) => <StatusBadge status={row.status || 'draft'} /> },
   ];
 
   return (
@@ -464,7 +468,7 @@ export default function PayrollRunPage() {
                 className="bg-slate-elevated border border-slate-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-teal-electric/50"
               >
                 <option value="">All Departments</option>
-                {departments.map((d) => (
+                {departments.map((d: HrDepartment) => (
                   <option key={d.id} value={d.name || d.department_name}>
                     {d.name || d.department_name}
                   </option>
@@ -480,7 +484,7 @@ export default function PayrollRunPage() {
               </div>
             ) : (
               <div className="bg-slate-elevated rounded-lg overflow-hidden">
-                <DataTable columns={employeeColumns} data={filteredEmployees} />
+                <DataTable columns={employeeColumns} data={filteredEmployees} keyField="id" />
               </div>
             )}
           </div>
@@ -559,25 +563,25 @@ export default function PayrollRunPage() {
               title="Slips Generated"
               value={slipStats.count}
               icon={FileSpreadsheet}
-              iconColor="text-violet-400"
+              colorClass="text-violet-400"
             />
             <StatCard
               title="Total Gross"
               value={formatCurrency(slipStats.totalGross, 'NGN')}
               icon={DollarSign}
-              iconColor="text-teal-electric"
+              colorClass="text-teal-electric"
             />
             <StatCard
               title="Total Deductions"
               value={formatCurrency(slipStats.totalDeductions, 'NGN')}
               icon={DollarSign}
-              iconColor="text-red-400"
+              colorClass="text-red-400"
             />
             <StatCard
               title="Total Net Pay"
               value={formatCurrency(slipStats.totalNet, 'NGN')}
               icon={Wallet2}
-              iconColor="text-green-400"
+              colorClass="text-green-400"
             />
           </div>
 
@@ -596,7 +600,7 @@ export default function PayrollRunPage() {
                 <p className="text-slate-muted">No salary slips generated yet.</p>
               </div>
             ) : (
-              <DataTable columns={slipColumns} data={slips} />
+              <DataTable columns={slipColumns} data={slips} keyField="id" />
             )}
           </div>
 

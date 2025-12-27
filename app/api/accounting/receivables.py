@@ -12,7 +12,17 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import Require
 from app.database import get_db
 from app.models.customer import Customer
+from app.models.contact import Contact
 from app.models.invoice import Invoice, InvoiceStatus
+
+# Helper to get contact or customer name
+def _get_contact_or_customer_name(inv) -> str:
+    """Get name from contact (preferred) or customer (legacy)."""
+    if inv.contact:
+        return inv.contact.display_name or inv.contact.name or "Unknown"
+    if inv.customer:
+        return inv.customer.name
+    return "Unknown"
 
 from .helpers import parse_date, resolve_currency_or_raise
 from app.cache import cached
@@ -34,6 +44,7 @@ class AgingBucket(TypedDict):
 def get_accounts_receivable(
     as_of_date: Optional[str] = None,
     customer_id: Optional[int] = None,
+    contact_id: Optional[int] = None,
     currency: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -43,7 +54,8 @@ def get_accounts_receivable(
 
     Args:
         as_of_date: Calculate aging as of this date (default: today)
-        customer_id: Filter by customer
+        customer_id: Filter by legacy customer (deprecated)
+        contact_id: Filter by CRM contact (preferred)
         currency: Currency filter
 
     Returns:
@@ -53,12 +65,15 @@ def get_accounts_receivable(
     currency = resolve_currency_or_raise(db, Invoice.currency, currency)
 
     query = db.query(Invoice).options(
-        joinedload(Invoice.customer)
+        joinedload(Invoice.customer),
+        joinedload(Invoice.contact),
     ).filter(
         Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
     )
 
-    if customer_id:
+    if contact_id:
+        query = query.filter(Invoice.contact_id == contact_id)
+    elif customer_id:
         query = query.filter(Invoice.customer_id == customer_id)
 
     if currency:
@@ -99,8 +114,10 @@ def get_accounts_receivable(
         buckets[bucket]["invoices"].append({
             "id": inv.id,
             "invoice_no": inv.invoice_number,
-            "customer_id": inv.customer_id,
-            "customer_name": inv.customer.name if inv.customer else None,
+            "contact_id": inv.contact_id,
+            "contact_name": _get_contact_or_customer_name(inv),
+            "customer_id": inv.customer_id,  # legacy
+            "customer_name": inv.customer.name if inv.customer else None,  # legacy
             "invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
             "due_date": inv.due_date.isoformat() if inv.due_date else None,
             "total_amount": float(inv.total_amount),
@@ -127,11 +144,12 @@ def get_accounts_receivable(
 def get_receivables_aging(
     as_of_date: Optional[str] = None,
     customer_id: Optional[int] = None,
+    contact_id: Optional[int] = None,
     currency: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Alias for /accounts-receivable - AR aging report."""
-    return get_accounts_receivable(as_of_date, customer_id, currency, db)
+    return get_accounts_receivable(as_of_date, customer_id, contact_id, currency, db)
 
 
 # =============================================================================
@@ -144,14 +162,14 @@ def get_receivables_outstanding(
     top: int = Query(default=5, le=25),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Outstanding customer receivables with top customers.
+    """Outstanding receivables with top contacts/customers.
 
     Args:
         currency: Currency filter
-        top: Number of top customers to return
+        top: Number of top contacts to return
 
     Returns:
-        Outstanding receivables summary with top customers
+        Outstanding receivables summary with top contacts
     """
     as_of = date.today()
     currency = resolve_currency_or_raise(db, Invoice.currency, currency)
@@ -168,6 +186,29 @@ def get_receivables_outstanding(
     total_outstanding = float(inv_totals.outstanding or 0) if inv_totals else 0.0
     total_invoices = int(inv_totals.invoice_count or 0) if inv_totals else 0
 
+    # Query by contact (preferred) with fallback to customer (legacy)
+    inv_by_contact_query = (
+        db.query(
+            Invoice.contact_id,
+            Contact.name.label("contact_name"),
+            func.sum(Invoice.total_amount - (Invoice.amount_paid or 0)).label("outstanding"),
+        )
+        .outerjoin(Contact, Contact.id == Invoice.contact_id)
+        .filter(
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+            Invoice.contact_id.isnot(None),
+        )
+    )
+    if currency:
+        inv_by_contact_query = inv_by_contact_query.filter(Invoice.currency == currency)
+    inv_by_contact = (
+        inv_by_contact_query.group_by(Invoice.contact_id, Contact.name)
+        .order_by(func.sum(Invoice.total_amount - (Invoice.amount_paid or 0)).desc())
+        .limit(top)
+        .all()
+    )
+
+    # Also get legacy customer data for invoices without contact_id
     inv_by_customer_query = (
         db.query(
             Invoice.customer_id,
@@ -175,7 +216,10 @@ def get_receivables_outstanding(
             func.sum(Invoice.total_amount - (Invoice.amount_paid or 0)).label("outstanding"),
         )
         .outerjoin(Customer, Customer.id == Invoice.customer_id)
-        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
+        .filter(
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+            Invoice.contact_id.is_(None),
+        )
     )
     if currency:
         inv_by_customer_query = inv_by_customer_query.filter(Invoice.currency == currency)
@@ -186,19 +230,36 @@ def get_receivables_outstanding(
         .all()
     )
 
+    # Combine and return top contacts/customers
+    top_entities = []
+    for row in inv_by_contact:
+        top_entities.append({
+            "contact_id": row.contact_id,
+            "contact_name": row.contact_name,
+            "customer_id": None,
+            "customer_name": None,
+            "outstanding": float(row.outstanding),
+        })
+    for row in inv_by_customer:
+        top_entities.append({
+            "contact_id": None,
+            "contact_name": None,
+            "customer_id": row.customer_id,
+            "customer_name": row.customer_name,
+            "outstanding": float(row.outstanding),
+        })
+
+    # Sort combined and take top N
+    top_entities.sort(key=lambda x: x["outstanding"], reverse=True)
+    top_entities = top_entities[:top]
+
     return {
         "as_of_date": as_of.isoformat(),
         "currency": currency,
         "total_outstanding": total_outstanding,
         "total_invoices": total_invoices,
-        "top_customers": [
-            {
-                "customer_id": row.customer_id,
-                "customer_name": row.customer_name,
-                "outstanding": float(row.outstanding),
-            }
-            for row in inv_by_customer
-        ],
+        "top_contacts": top_entities,
+        "top_customers": top_entities,  # legacy alias
     }
 
 
@@ -208,17 +269,17 @@ async def get_receivables_aging_enhanced(
     limit: int = Query(20, ge=1, le=200),
     offset: int = Query(0, ge=0),
     min_amount: Optional[float] = Query(None, description="Minimum outstanding amount"),
-    search: Optional[str] = Query(None, description="Search by customer name"),
+    search: Optional[str] = Query(None, description="Search by contact/customer name"),
     currency: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Enhanced receivables aging grouped by customer (matches frontend expectations)."""
+    """Enhanced receivables aging grouped by contact/customer (matches frontend expectations)."""
     cutoff = date.today()
     currency = resolve_currency_or_raise(db, Invoice.currency, currency)
 
     query = (
         db.query(Invoice)
-        .options(joinedload(Invoice.customer))
+        .options(joinedload(Invoice.customer), joinedload(Invoice.contact))
         .filter(
             and_(
                 Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
@@ -241,7 +302,8 @@ async def get_receivables_aging_enhanced(
         "61_90": Decimal("0"),
         "over_90": Decimal("0"),
     }
-    customers: Dict[int, Dict[str, Any]] = {}
+    # Use composite key: (contact_id, customer_id) to handle both new and legacy data
+    entities: Dict[tuple, Dict[str, Any]] = {}
 
     for inv in invoices:
         outstanding = Decimal(inv.balance or (inv.total_amount - (inv.amount_paid or 0)))
@@ -261,13 +323,19 @@ async def get_receivables_aging_enhanced(
         else:
             bucket = "over_90"
 
-        cust_id = inv.customer_id or 0
-        cust_name = inv.customer.name if inv.customer else "Unknown"
+        # Prefer contact_id, fallback to customer_id
+        contact_id = inv.contact_id
+        customer_id = inv.customer_id or 0
+        entity_key = (contact_id, customer_id if not contact_id else None)
+        entity_name = _get_contact_or_customer_name(inv)
 
-        if cust_id not in customers:
-            customers[cust_id] = {
-                "customer_id": cust_id,
-                "customer_name": cust_name,
+        if entity_key not in entities:
+            entities[entity_key] = {
+                "contact_id": contact_id,
+                "contact_name": inv.contact.display_name if inv.contact else None,
+                "customer_id": customer_id if not contact_id else None,
+                "customer_name": inv.customer.name if inv.customer and not contact_id else None,
+                "name": entity_name,  # unified name field
                 "total_receivable": Decimal("0"),
                 "current": Decimal("0"),
                 "overdue_1_30": Decimal("0"),
@@ -278,35 +346,39 @@ async def get_receivables_aging_enhanced(
                 "oldest_invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
             }
 
-        cust = customers[cust_id]
-        cust["total_receivable"] += outstanding
-        cust["invoice_count"] += 1
-        if cust["oldest_invoice_date"] is None and inv.invoice_date:
-            cust["oldest_invoice_date"] = inv.invoice_date.isoformat()
+        ent = entities[entity_key]
+        ent["total_receivable"] += outstanding
+        ent["invoice_count"] += 1
+        if ent["oldest_invoice_date"] is None and inv.invoice_date:
+            ent["oldest_invoice_date"] = inv.invoice_date.isoformat()
         if bucket == "current":
-            cust["current"] += outstanding
+            ent["current"] += outstanding
         elif bucket == "1_30":
-            cust["overdue_1_30"] += outstanding
+            ent["overdue_1_30"] += outstanding
         elif bucket == "31_60":
-            cust["overdue_31_60"] += outstanding
+            ent["overdue_31_60"] += outstanding
         elif bucket == "61_90":
-            cust["overdue_61_90"] += outstanding
+            ent["overdue_61_90"] += outstanding
         else:
-            cust["overdue_over_90"] += outstanding
+            ent["overdue_over_90"] += outstanding
 
         totals[bucket] += outstanding
 
-    customer_list = list(customers.values())
+    entity_list = list(entities.values())
 
-    # Apply search/min_amount filters
+    # Apply search/min_amount filters (search both contact and customer names)
     if search:
-        customer_list = [c for c in customer_list if search.lower() in (c["customer_name"] or "").lower()]
+        search_lower = search.lower()
+        entity_list = [
+            e for e in entity_list
+            if search_lower in (e["name"] or "").lower()
+        ]
     if min_amount:
-        customer_list = [c for c in customer_list if float(c["total_receivable"]) >= min_amount]
+        entity_list = [e for e in entity_list if float(e["total_receivable"]) >= min_amount]
 
-    customer_list.sort(key=lambda c: c["total_receivable"], reverse=True)
-    total_count = len(customer_list)
-    paged = customer_list[offset : offset + limit]
+    entity_list.sort(key=lambda e: e["total_receivable"], reverse=True)
+    total_count = len(entity_list)
+    paged = entity_list[offset : offset + limit]
 
     # Convert Decimals to float for response
     def to_float(val: Decimal) -> float:
@@ -314,15 +386,15 @@ async def get_receivables_aging_enhanced(
 
     paged = [
         {
-            **c,
-            "total_receivable": to_float(c["total_receivable"]),
-            "current": to_float(c["current"]),
-            "overdue_1_30": to_float(c["overdue_1_30"]),
-            "overdue_31_60": to_float(c["overdue_31_60"]),
-            "overdue_61_90": to_float(c["overdue_61_90"]),
-            "overdue_over_90": to_float(c["overdue_over_90"]),
+            **e,
+            "total_receivable": to_float(e["total_receivable"]),
+            "current": to_float(e["current"]),
+            "overdue_1_30": to_float(e["overdue_1_30"]),
+            "overdue_31_60": to_float(e["overdue_31_60"]),
+            "overdue_61_90": to_float(e["overdue_61_90"]),
+            "overdue_over_90": to_float(e["overdue_over_90"]),
         }
-        for c in paged
+        for e in paged
     ]
 
     return {
@@ -337,5 +409,6 @@ async def get_receivables_aging_enhanced(
             "61_90": to_float(totals["61_90"]),
             "over_90": to_float(totals["over_90"]),
         },
-        "customers": paged,
+        "contacts": paged,
+        "customers": paged,  # legacy alias
     }

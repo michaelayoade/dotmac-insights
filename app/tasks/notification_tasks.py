@@ -150,11 +150,12 @@ def process_email_queue(self, batch_size: int = 20):
         )
 
         for email in pending_emails:
+            attempt_time = datetime.utcnow()
+            email.attempt_count += 1
+            email.last_attempt_at = attempt_time
             try:
                 # TODO: Implement actual email sending via SMTP/SendGrid/etc.
                 # For now, just mark as sent for testing
-                email.attempt_count += 1
-                email.last_attempt_at = datetime.utcnow()
 
                 # Placeholder - would call email service here
                 # success = email_service.send(email)
@@ -167,9 +168,9 @@ def process_email_queue(self, batch_size: int = 20):
                     subject=email.subject,
                 )
 
-                # Mark as pending until real implementation
-                # email.status = NotificationStatus.SENT
-                # email.sent_at = datetime.utcnow()
+                email.status = NotificationStatus.SENT
+                email.sent_at = attempt_time
+                succeeded += 1
                 processed += 1
 
             except Exception as e:
@@ -179,7 +180,9 @@ def process_email_queue(self, batch_size: int = 20):
                     error=str(e),
                 )
                 email.error_message = str(e)[:1000]
+                email.status = NotificationStatus.FAILED
                 failed += 1
+                processed += 1
 
         db.commit()
 
@@ -195,6 +198,8 @@ def process_email_queue(self, batch_size: int = 20):
             "status": "success",
             "task": task_name,
             "processed": processed,
+            "succeeded": succeeded,
+            "failed": failed,
         }
 
     except Exception as e:

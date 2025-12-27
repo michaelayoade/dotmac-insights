@@ -19,6 +19,8 @@ import type {
   MilestoneTemplatePayload,
   TaskTemplatePayload,
   ProjectPriority,
+  MilestoneTemplateItem,
+  TaskTemplateItem,
 } from '@/lib/api/domains/projects';
 
 const priorities: { value: ProjectPriority; label: string }[] = [
@@ -72,7 +74,7 @@ export default function NewTemplatePage() {
 
       if (sourceTemplate.milestone_templates) {
         setMilestones(
-          sourceTemplate.milestone_templates.map((m, idx) => ({
+          sourceTemplate.milestone_templates.map((m: MilestoneTemplateItem, idx: number) => ({
             _tempId: `m-${idx}`,
             name: m.name,
             description: m.description,
@@ -85,7 +87,7 @@ export default function NewTemplatePage() {
 
       if (sourceTemplate.task_templates) {
         setTasks(
-          sourceTemplate.task_templates.map((t, idx) => ({
+          sourceTemplate.task_templates.map((t: TaskTemplateItem, idx: number) => ({
             _tempId: `t-${idx}`,
             subject: t.subject,
             description: t.description,
@@ -179,7 +181,7 @@ export default function NewTemplatePage() {
       };
 
       await mutations.create(payload);
-      mutate(['project-templates', { active_only: false }]);
+      mutate((key) => Array.isArray(key) && key[0] === 'project-templates');
       router.push('/projects/templates');
     } catch (err) {
       console.error('Failed to create template:', err);

@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, ShieldCheck, Settings, Webhook } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Settings, Webhook, Database, RefreshCw } from 'lucide-react';
 import { useRequireScope } from '@/lib/auth-context';
 import { AccessDenied } from '@/components/AccessDenied';
 import { ModuleLayout } from '@/components/ModuleLayout';
@@ -16,6 +16,28 @@ const sections: NavSection[] = [
       { name: 'Platform', href: '/admin/platform', description: 'System overview' },
       { name: 'Security', href: '/admin/security', description: 'Policies and sessions' },
       { name: 'Roles', href: '/admin/roles', description: 'Permissions and access' },
+    ],
+  },
+  {
+    key: 'data',
+    label: 'Data',
+    description: 'Import and migration',
+    icon: Database,
+    items: [
+      { name: 'Migration', href: '/admin/migration', description: 'Import external data' },
+    ],
+  },
+  {
+    key: 'sync',
+    label: 'Sync',
+    description: 'Data synchronization',
+    icon: RefreshCw,
+    items: [
+      { name: 'Dashboard', href: '/admin/sync', description: 'Sync overview' },
+      { name: 'Failed Records', href: '/admin/sync/dlq', description: 'Dead letter queue' },
+      { name: 'Cursors', href: '/admin/sync/cursors', description: 'Sync markers' },
+      { name: 'Outbound', href: '/admin/sync/outbound', description: 'Outbound sync logs' },
+      { name: 'Schedules', href: '/admin/sync/schedules', description: 'Sync scheduling' },
     ],
   },
   {

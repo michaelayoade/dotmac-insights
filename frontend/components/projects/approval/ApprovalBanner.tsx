@@ -124,7 +124,7 @@ export function ApprovalBanner({ projectId, onApprovalChange }: ApprovalBannerPr
     );
   }
 
-  const status = approvalStatus.status || 'draft';
+  const status: ApprovalStatusType = approvalStatus.status || 'draft';
   const config = statusConfig[status] || statusConfig.draft;
   const Icon = config.icon;
   const canApprove = canApproveData?.can_approve && status === 'pending';

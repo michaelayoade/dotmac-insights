@@ -13,8 +13,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.auth import Require
@@ -229,17 +228,17 @@ async def link_account(
 
 
 @router.get("/accounts", response_model=List[LinkedAccountResponse], dependencies=[Depends(Require("openbanking:read"))])
-async def list_linked_accounts(
+def list_linked_accounts(
     customer_id: Optional[int] = None,
     provider: Optional[str] = None,
     connection_status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """List linked bank accounts."""
-    query = select(OpenBankingConnection)
+    query = db.query(OpenBankingConnection)
 
     if customer_id:
-        query = query.where(OpenBankingConnection.customer_id == customer_id)
+        query = query.filter(OpenBankingConnection.customer_id == customer_id)
     if provider:
         try:
             provider_enum = OBProvider(provider)
@@ -248,7 +247,7 @@ async def list_linked_accounts(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid provider filter",
             )
-        query = query.where(OpenBankingConnection.provider == provider_enum)
+        query = query.filter(OpenBankingConnection.provider == provider_enum)
     if connection_status:
         try:
             status_enum = ConnectionStatus(connection_status)
@@ -257,12 +256,9 @@ async def list_linked_accounts(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid status filter",
             )
-        query = query.where(OpenBankingConnection.status == status_enum)
+        query = query.filter(OpenBankingConnection.status == status_enum)
 
-    query = query.order_by(OpenBankingConnection.created_at.desc())
-
-    result = await db.execute(query)
-    connections = result.scalars().all()
+    connections = query.order_by(OpenBankingConnection.created_at.desc()).all()
 
     return [
         LinkedAccountResponse(
