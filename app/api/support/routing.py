@@ -1,7 +1,7 @@
 """Routing configuration and auto-assignment endpoints."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, cast
 from enum import Enum
 
@@ -409,7 +409,7 @@ def auto_assign(
     team = db.query(Team).filter(Team.id == team_id).first()
     if team:
         ticket.resolution_team = team.name
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
@@ -742,7 +742,7 @@ def rebalance_tickets(
 
                 # Move ticket
                 ticket.assigned_to = str(target_data["name"])
-                ticket.updated_at = datetime.utcnow()
+                ticket.updated_at = datetime.now(timezone.utc)
                 target_data["load"] = int(target_data["load"]) + 1
                 target_data["utilization"] = int(target_data["load"]) / int(target_data["capacity"])
                 data["load"] = int(data["load"]) - 1

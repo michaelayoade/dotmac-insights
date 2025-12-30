@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.transaction_category import TransactionCategory
@@ -39,7 +39,7 @@ async def sync_transaction_categories(sync_client, client, full_sync: bool):
                 existing.is_system = is_system
                 existing.parent_id = cat_data.get("parent_id")
                 existing.sort_order = cat_data.get("sort_order") or 0
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 category = TransactionCategory(
@@ -54,7 +54,7 @@ async def sync_transaction_categories(sync_client, client, full_sync: bool):
                     is_system=is_system,
                     parent_id=cat_data.get("parent_id"),
                     sort_order=cat_data.get("sort_order") or 0,
-                    last_synced_at=datetime.utcnow(),
+                    last_synced_at=datetime.now(timezone.utc),
                 )
                 sync_client.db.add(category)
                 sync_client.increment_created()

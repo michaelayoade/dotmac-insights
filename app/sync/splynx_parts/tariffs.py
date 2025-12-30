@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import structlog
 
@@ -94,7 +94,7 @@ def _upsert_tariff(sync_client, tariff_data: dict, tariff_type: TariffType) -> t
         existing.available_for_services = available_for_services
         existing.show_on_customer_portal = show_on_portal
         existing.enabled = enabled and not deleted
-        existing.last_synced_at = datetime.utcnow()
+        existing.last_synced_at = datetime.now(timezone.utc)
         sync_client.increment_updated()
         return (0, 1)
     else:

@@ -12,7 +12,7 @@ from typing import Sequence, Union
 
 from alembic import op, context
 import sqlalchemy as sa
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 revision: str = "20251222_add_fleet_rbac_scopes"
@@ -45,7 +45,7 @@ def upgrade() -> None:
     connection = op.get_bind()
     if connection is None:
         return
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     def fetchall_safe(statement: str, params: dict | None = None):
         """Run a query defensively; return [] if the connection is a mock/offline handle."""

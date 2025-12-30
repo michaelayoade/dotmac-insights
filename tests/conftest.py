@@ -12,6 +12,28 @@ import pytest
 import sqlalchemy as sa
 from fastapi.testclient import TestClient
 
+
+# =============================================================================
+# PYTEST CONFIGURATION
+# =============================================================================
+
+
+def pytest_configure(config):
+    """Register custom markers for test categorization."""
+    config.addinivalue_line("markers", "critical: Critical path tests that must pass on every commit")
+    config.addinivalue_line("markers", "slow: Tests that take longer than 10 seconds")
+    config.addinivalue_line("markers", "integration: Integration tests requiring external services")
+    config.addinivalue_line("markers", "e2e: End-to-end tests requiring full stack")
+    config.addinivalue_line("markers", "accounting: Accounting module tests")
+    config.addinivalue_line("markers", "crm: CRM module tests")
+    config.addinivalue_line("markers", "hr: HR module tests")
+    config.addinivalue_line("markers", "projects: Projects module tests")
+    config.addinivalue_line("markers", "support: Support module tests")
+    config.addinivalue_line("markers", "field_service: Field service module tests")
+    config.addinivalue_line("markers", "inbox: Inbox/conversations module tests")
+    config.addinivalue_line("markers", "inventory: Inventory module tests")
+    config.addinivalue_line("markers", "expenses: Expenses module tests")
+
 # Force SQLite for tests (use per-session temp DB unless overridden)
 if "TEST_DATABASE_URL" not in os.environ:
     temp_dir = tempfile.mkdtemp(prefix="dotmac-tests-")

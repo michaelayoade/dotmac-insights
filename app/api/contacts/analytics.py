@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import csv
 import io
 
@@ -33,7 +33,7 @@ def get_contacts_dashboard(
     """
     Unified contacts dashboard with key metrics.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     period_start = now - timedelta(days=period_days)
     prev_period_start = period_start - timedelta(days=period_days)
 
@@ -136,7 +136,7 @@ def get_sales_funnel(
     """
     Sales funnel analysis showing lead → prospect → customer conversion.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     period_start = now - timedelta(days=period_days)
 
     base_query = db.query(UnifiedContact)
@@ -282,7 +282,7 @@ def get_contacts_by_source(
     """
     Lead source effectiveness analysis.
     """
-    period_start = datetime.utcnow() - timedelta(days=period_days)
+    period_start = datetime.now(timezone.utc) - timedelta(days=period_days)
 
     results = db.query(
         UnifiedContact.source,
@@ -361,7 +361,7 @@ def get_lifecycle_analytics(
     """
     Contact lifecycle duration analytics.
     """
-    period_start = datetime.utcnow() - timedelta(days=period_days)
+    period_start = datetime.now(timezone.utc) - timedelta(days=period_days)
 
     # Average time from lead to prospect (qualified_date - created_at)
     avg_lead_to_prospect = db.query(
@@ -428,7 +428,7 @@ def get_churn_analytics(
     """
     Churn analysis and reasons breakdown.
     """
-    period_start = datetime.utcnow() - timedelta(days=period_days)
+    period_start = datetime.now(timezone.utc) - timedelta(days=period_days)
 
     # Total churned in period
     churned_count = db.query(func.count(UnifiedContact.id)).filter(
@@ -763,7 +763,7 @@ def export_contacts(
         return StreamingResponse(
             io.StringIO(content),
             media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.utcnow().strftime('%Y%m%d')}.json"}
+            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"}
         )
     else:
         # CSV export
@@ -777,5 +777,5 @@ def export_contacts(
         return StreamingResponse(
             output,
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.utcnow().strftime('%Y%m%d')}.csv"}
+            headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"}
         )

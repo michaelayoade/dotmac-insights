@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.ticket_message import TicketMessage
@@ -127,7 +127,7 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
                     existing.created_at = parse_datetime(f"{date_str} {time_str}") or existing.created_at
                 elif date_str:
                     existing.created_at = parse_datetime(date_str) or existing.created_at
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 message = TicketMessage(
@@ -147,8 +147,8 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
                     attachments_count=attachments_count,
                     is_internal=msg_data.get("internal") in (1, "1", True) or msg_data.get("hide_for_customer") in (1, "1", True),
                     is_read=msg_data.get("is_read") in (1, "1", True),
-                    created_at=parse_datetime(f"{msg_data.get('date')} {msg_data.get('time')}") if msg_data.get("date") and msg_data.get("time") else parse_datetime(msg_data.get("date")) or datetime.utcnow(),
-                    last_synced_at=datetime.utcnow(),
+                    created_at=parse_datetime(f"{msg_data.get('date')} {msg_data.get('time')}") if msg_data.get("date") and msg_data.get("time") else parse_datetime(msg_data.get("date")) or datetime.now(timezone.utc),
+                    last_synced_at=datetime.now(timezone.utc),
                 )
                 sync_client.db.add(message)
                 sync_client.increment_created()

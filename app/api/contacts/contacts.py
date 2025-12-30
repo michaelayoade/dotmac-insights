@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func, text
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models.unified_contact import (
@@ -577,7 +577,7 @@ async def create_contact(payload: UnifiedContactCreate, db: Session = Depends(ge
         tags=payload.tags,
         custom_fields=payload.custom_fields,
         notes=payload.notes,
-        first_contact_date=datetime.utcnow(),
+        first_contact_date=datetime.now(timezone.utc),
     )
 
     # If primary contact, unmark other primary contacts for same parent
@@ -654,7 +654,7 @@ async def update_contact(contact_id: int, payload: UnifiedContactUpdate, db: Ses
     for key, value in update_data.items():
         setattr(contact, key, value)
 
-    contact.updated_at = datetime.utcnow()
+    contact.updated_at = datetime.now(timezone.utc)
 
     # Dual-write to legacy Customer table if enabled
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:

@@ -1,7 +1,7 @@
 """SLA policies and business calendar endpoints."""
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
 
@@ -615,7 +615,7 @@ def list_breaches(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List SLA breaches."""
-    start_dt = datetime.utcnow() - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
 
     query = db.query(SLABreachLog).filter(SLABreachLog.breached_at >= start_dt)
 
@@ -655,7 +655,7 @@ async def breach_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get SLA breach summary statistics."""
-    start_dt = datetime.utcnow() - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
 
     # Total breaches
     total_breaches = db.query(func.count(SLABreachLog.id)).filter(

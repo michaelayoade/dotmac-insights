@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import hmac
 import hashlib
 import json
@@ -169,7 +169,7 @@ def _persist_message(
         channel_id=channel.id if channel else None,
         agent_id=agent.id if agent else None,
         meta=metadata,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(msg)
     db.flush()
@@ -185,7 +185,7 @@ def _persist_message(
         )
         db.add(attachment)
 
-    conversation.last_message_at = datetime.utcnow()
+    conversation.last_message_at = datetime.now(timezone.utc)
     return msg
 
 
@@ -647,7 +647,7 @@ async def get_channel_stats(
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Overall stats
     total = db.query(func.count(OmniWebhookEvent.id)).filter(
@@ -793,7 +793,7 @@ async def send_message(
                 body=payload["body"],
             )
             msg.delivery_status = "sent"
-            msg.sent_at = datetime.utcnow()
+            msg.sent_at = datetime.now(timezone.utc)
         except HTTPException:
             raise
         except Exception as exc:

@@ -15,7 +15,7 @@ Usage:
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 
 from sqlalchemy.orm import Session
@@ -104,7 +104,7 @@ class TicketOutboundSyncService:
 
             # Update ticket with sync status
             ticket.splynx_sync_hash = payload_hash
-            ticket.last_synced_to_splynx = datetime.utcnow()
+            ticket.last_synced_to_splynx = datetime.now(timezone.utc)
             if external_id and not ticket.splynx_id:
                 ticket.splynx_id = int(external_id)
 
@@ -166,7 +166,7 @@ class TicketOutboundSyncService:
 
             # Update ticket with sync status
             ticket.erpnext_sync_hash = payload_hash
-            ticket.last_synced_to_erpnext = datetime.utcnow()
+            ticket.last_synced_to_erpnext = datetime.now(timezone.utc)
             if external_id and not ticket.erpnext_id:
                 ticket.erpnext_id = external_id
 
@@ -235,7 +235,7 @@ class TicketOutboundSyncService:
 
             # Update ticket with sync status
             ticket.chatwoot_sync_hash = payload_hash
-            ticket.last_synced_to_chatwoot = datetime.utcnow()
+            ticket.last_synced_to_chatwoot = datetime.now(timezone.utc)
             if external_id and not ticket.chatwoot_conversation_id:
                 ticket.chatwoot_conversation_id = int(external_id)
 
@@ -300,7 +300,7 @@ class TicketOutboundSyncService:
             ]
 
         logs = []
-        timestamp = datetime.utcnow().timestamp()
+        timestamp = datetime.now(timezone.utc).timestamp()
 
         for system in target_systems:
             idempotency_key = f"{system}:unified_ticket:{entity_id}:{timestamp}"
@@ -622,8 +622,8 @@ class TicketOutboundSyncService:
             operation=SyncOperation.UPDATE.value,
             status=SyncStatus.SKIPPED.value,
             error_message=reason,
-            created_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
         )
         self.db.add(log)
         return log

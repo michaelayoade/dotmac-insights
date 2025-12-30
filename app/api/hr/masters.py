@@ -1,7 +1,7 @@
 """HR master data endpoints: employees, departments, designations, users, teams."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -274,7 +274,7 @@ def delete_employee(
         raise HTTPException(status_code=404, detail="Employee not found")
 
     employee.is_deleted = True
-    employee.deleted_at = datetime.utcnow()
+    employee.deleted_at = datetime.now(timezone.utc)
     employee.deleted_by_id = principal.id
     db.commit()
     return {"status": "disabled", "employee_id": employee_id}

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import List, Optional, Any, cast
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -426,7 +426,7 @@ async def pay_claim_now(
             account_info = await client.resolve_account(payload.account_number, payload.bank_code)
             account_name = account_info.account_name
 
-        reference = f"EXP-{claim.id}-{int(datetime.utcnow().timestamp())}"
+        reference = f"EXP-{claim.id}-{int(datetime.now(timezone.utc).timestamp())}"
         recipient = TransferRecipient(
             account_number=payload.account_number,
             bank_code=payload.bank_code,
@@ -551,7 +551,7 @@ async def verify_claim_transfer(
         new_paid = already_paid + transfer.amount
         claim.amount_paid = new_paid
         claim.payment_reference = transfer.reference
-        claim.payment_date = datetime.utcnow()
+        claim.payment_date = datetime.now(timezone.utc)
         claim.mode_of_payment = provider_enum.value
         if new_paid >= payable and payable > 0:
             claim.payment_status = "paid"

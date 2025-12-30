@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.customer_note import CustomerNote
@@ -77,7 +77,7 @@ async def sync_customer_notes(sync_client, client, full_sync: bool):
                 existing.pinned_date = pinned_date
                 existing.scheduled_send_time = scheduled_send_time
                 existing.note_datetime = note_datetime
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 note = CustomerNote(

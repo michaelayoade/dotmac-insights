@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, inspect, and_, or_
 from sqlalchemy.types import DateTime, Date
 from typing import Dict, Any, List, Optional, cast
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import csv
 import io
@@ -772,7 +772,7 @@ async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     report["summary"] = {
         "total_records": total_records,
-        "last_sync_check": datetime.utcnow().isoformat(),
+        "last_sync_check": datetime.now(timezone.utc).isoformat(),
     }
 
     return report

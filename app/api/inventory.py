@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, desc
 from typing import Dict, Any, Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 import structlog
 
@@ -331,7 +331,7 @@ async def create_item(
         valuation_rate=_to_decimal(request.valuation_rate, "valuation_rate"),
         standard_rate=_to_decimal(request.standard_selling_rate, "standard_selling_rate"),
         disabled=request.status == "inactive",
-        last_synced_at=datetime.utcnow(),
+        last_synced_at=datetime.now(timezone.utc),
         origin_system="local",
         write_back_status="pending",
         created_by_id=principal.id,
@@ -446,7 +446,7 @@ async def create_warehouse(
         company=request.company,
         is_group=request.is_group,
         disabled=request.status == "inactive",
-        last_synced_at=datetime.utcnow(),
+        last_synced_at=datetime.now(timezone.utc),
         origin_system="local",
         write_back_status="pending",
         created_by_id=principal.id,
@@ -524,7 +524,7 @@ async def delete_warehouse(
     if soft or wh.erpnext_id:
         wh.disabled = True
         wh.is_deleted = True
-        wh.deleted_at = datetime.utcnow()
+        wh.deleted_at = datetime.now(timezone.utc)
         wh.deleted_by_id = principal.id
         wh.write_back_status = "pending"
         db.commit()
@@ -555,7 +555,7 @@ async def create_stock_entry(
         docstatus=0,
         from_warehouse=None,
         to_warehouse=None,
-        last_synced_at=datetime.utcnow(),
+        last_synced_at=datetime.now(timezone.utc),
         origin_system="local",
         write_back_status="pending",
         created_by_id=principal.id,
@@ -665,7 +665,7 @@ async def update_stock_entry(
         entry.docstatus = request.docstatus
         if request.docstatus == 2:
             entry.is_deleted = True
-            entry.deleted_at = datetime.utcnow()
+            entry.deleted_at = datetime.now(timezone.utc)
             entry.deleted_by_id = principal.id
 
     entry.updated_by_id = principal.id
@@ -697,7 +697,7 @@ async def delete_stock_entry(
     if soft or entry.erpnext_id:
         entry.is_deleted = True
         entry.docstatus = 2
-        entry.deleted_at = datetime.utcnow()
+        entry.deleted_at = datetime.now(timezone.utc)
         entry.deleted_by_id = principal.id
         entry.write_back_status = "pending"
         db.commit()
@@ -2166,7 +2166,7 @@ async def approve_transfer_request(
 
     transfer.status = TransferStatus.APPROVED
     transfer.approved_by_id = principal.id
-    transfer.approved_at = datetime.utcnow()
+    transfer.approved_at = datetime.now(timezone.utc)
     transfer.updated_by_id = principal.id
     db.commit()
 
@@ -2227,7 +2227,7 @@ async def execute_transfer_request(
     # Create outbound stock entry (from source warehouse)
     outbound_entry = StockEntry(
         stock_entry_type="Material Transfer",
-        posting_date=datetime.utcnow(),
+        posting_date=datetime.now(timezone.utc),
         from_warehouse=transfer.from_warehouse,
         to_warehouse=transfer.to_warehouse,
         total_outgoing_value=transfer.total_value,
@@ -2260,7 +2260,7 @@ async def execute_transfer_request(
         db.add(detail)
 
     transfer.status = TransferStatus.COMPLETED
-    transfer.transfer_date = datetime.utcnow()
+    transfer.transfer_date = datetime.now(timezone.utc)
     transfer.outbound_stock_entry_id = outbound_entry.id
     transfer.updated_by_id = principal.id
     db.commit()

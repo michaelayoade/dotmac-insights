@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import Dict, Any, Optional, List, cast
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -516,7 +516,7 @@ async def bulk_assign_orders(
             try:
                 notification_service.notify_technician_assigned(order)
                 order.customer_notified = True
-                order.last_notification_at = datetime.utcnow()
+                order.last_notification_at = datetime.now(timezone.utc)
             except Exception as e:
                 errors.append({
                     "order_id": order.id,

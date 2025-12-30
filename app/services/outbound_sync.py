@@ -14,7 +14,7 @@ Usage:
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 
 from sqlalchemy.orm import Session
@@ -102,7 +102,7 @@ class OutboundSyncService:
 
             # Update contact with sync status
             contact.splynx_sync_hash = payload_hash
-            contact.last_synced_to_splynx = datetime.utcnow()
+            contact.last_synced_to_splynx = datetime.now(timezone.utc)
             if external_id and not contact.splynx_id:
                 contact.splynx_id = int(external_id)
 
@@ -164,7 +164,7 @@ class OutboundSyncService:
 
             # Update contact with sync status
             contact.erpnext_sync_hash = payload_hash
-            contact.last_synced_to_erpnext = datetime.utcnow()
+            contact.last_synced_to_erpnext = datetime.now(timezone.utc)
             if external_id and not contact.erpnext_id:
                 contact.erpnext_id = external_id
 
@@ -224,7 +224,7 @@ class OutboundSyncService:
             target_systems = [TargetSystem.SPLYNX.value, TargetSystem.ERPNEXT.value]
 
         logs = []
-        timestamp = datetime.utcnow().timestamp()
+        timestamp = datetime.now(timezone.utc).timestamp()
 
         for system in target_systems:
             idempotency_key = f"{system}:{entity_type}:{entity_id}:{timestamp}"
@@ -264,7 +264,7 @@ class OutboundSyncService:
             try:
                 external_id = self._push_to_splynx(contact, payload)
                 contact.splynx_sync_hash = payload_hash
-                contact.last_synced_to_splynx = datetime.utcnow()
+                contact.last_synced_to_splynx = datetime.now(timezone.utc)
                 if external_id and not contact.splynx_id:
                     contact.splynx_id = int(external_id)
                 log.mark_success(external_id=str(external_id) if external_id else None)
@@ -283,7 +283,7 @@ class OutboundSyncService:
             try:
                 erpnext_external_id = self._push_to_erpnext(contact, payload)
                 contact.erpnext_sync_hash = payload_hash
-                contact.last_synced_to_erpnext = datetime.utcnow()
+                contact.last_synced_to_erpnext = datetime.now(timezone.utc)
                 if erpnext_external_id and not contact.erpnext_id:
                     contact.erpnext_id = erpnext_external_id
                 log.mark_success(external_id=erpnext_external_id)
@@ -507,8 +507,8 @@ class OutboundSyncService:
             operation=SyncOperation.UPDATE.value,
             status=SyncStatus.SKIPPED.value,
             error_message=reason,
-            created_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
         )
         self.db.add(log)
         return log

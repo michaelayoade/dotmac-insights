@@ -7,7 +7,7 @@ This module handles syncing of:
 """
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -121,7 +121,7 @@ async def sync_asset_categories(
             if existing:
                 existing.asset_category_name = cat_data.get("asset_category_name") or existing.asset_category_name
                 existing.enable_cwip_accounting = _coerce_bool(cat_data.get("enable_cwip_accounting"))
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
                 category = existing
             else:
@@ -247,7 +247,7 @@ async def sync_assets(
                 existing.asset_owner = asset_data.get("asset_owner")
                 existing.asset_owner_company = asset_data.get("asset_owner_company")
                 existing.serial_no = asset_data.get("serial_no")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
                 asset = existing
             else:
@@ -430,7 +430,7 @@ async def sync_vehicles(
                 existing.location = vehicle_data.get("location")
                 existing.docstatus = docstatus
                 existing.is_active = is_active
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 vehicle = Vehicle(

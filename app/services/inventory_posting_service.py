@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy.orm import Session
@@ -95,7 +95,7 @@ class InventoryPostingService:
 
             journal_entry = JournalEntry(
                 voucher_type=JournalEntryType.JOURNAL_ENTRY,
-                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                posting_date=stock_entry.posting_date or datetime.now(timezone.utc),
                 company=stock_entry.company,
                 total_debit=amount,
                 total_credit=amount,
@@ -146,7 +146,7 @@ class InventoryPostingService:
 
             journal_entry = JournalEntry(
                 voucher_type=JournalEntryType.JOURNAL_ENTRY,
-                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                posting_date=stock_entry.posting_date or datetime.now(timezone.utc),
                 company=stock_entry.company,
                 total_debit=amount,
                 total_credit=amount,
@@ -204,7 +204,7 @@ class InventoryPostingService:
 
             journal_entry = JournalEntry(
                 voucher_type=JournalEntryType.JOURNAL_ENTRY,
-                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                posting_date=stock_entry.posting_date or datetime.now(timezone.utc),
                 company=stock_entry.company,
                 total_debit=amount,
                 total_credit=amount,
@@ -280,7 +280,7 @@ class InventoryPostingService:
         with transactional_session(self.db):
             journal_entry = JournalEntry(
                 voucher_type=JournalEntryType.JOURNAL_ENTRY,
-                posting_date=stock_entry.posting_date or datetime.utcnow(),
+                posting_date=stock_entry.posting_date or datetime.now(timezone.utc),
                 company=stock_entry.company,
                 total_debit=amount,
                 total_credit=amount,
@@ -348,6 +348,9 @@ class InventoryPostingService:
             account=account,
             debit=debit,
             credit=credit,
+            debit_in_account_currency=debit,
+            credit_in_account_currency=credit,
+            exchange_rate=Decimal("1"),
             reference_type=reference_type,
             reference_name=reference_name,
         )
@@ -370,7 +373,7 @@ class InventoryPostingService:
         with transactional_session(self.db):
             reversal = JournalEntry(
                 voucher_type=JournalEntryType.JOURNAL_ENTRY,
-                posting_date=datetime.utcnow(),
+                posting_date=datetime.now(timezone.utc),
                 company=journal_entry.company,
                 total_debit=journal_entry.total_credit,
                 total_credit=journal_entry.total_debit,
@@ -425,7 +428,7 @@ class StockReceiptPostingService(InventoryPostingService):
 
         stock_entry = StockEntry(
             stock_entry_type="Material Receipt",
-            posting_date=datetime.utcnow(),
+            posting_date=datetime.now(timezone.utc),
             to_warehouse=warehouse,
             total_incoming_value=total_value,
             total_amount=total_value,
@@ -486,7 +489,7 @@ class StockIssuePostingService(InventoryPostingService):
 
         stock_entry = StockEntry(
             stock_entry_type="Material Issue",
-            posting_date=datetime.utcnow(),
+            posting_date=datetime.now(timezone.utc),
             from_warehouse=warehouse,
             total_outgoing_value=total_value,
             total_amount=total_value,

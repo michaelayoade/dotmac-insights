@@ -1,15 +1,15 @@
 """Journal Entries: JE list, detail, CRUD, submit/approve/reject/post workflows."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
 from app.models.accounting import (
     Account,
@@ -29,12 +29,14 @@ router = APIRouter()
 
 class JournalEntryAccountCreate(BaseModel):
     """Schema for creating a journal entry account line."""
-    account: str
+    account: Optional[str] = None
+    account_id: Optional[int] = None
     debit: float = 0
     credit: float = 0
     party_type: Optional[str] = None
     party: Optional[str] = None
     cost_center: Optional[str] = None
+    description: Optional[str] = None
     user_remark: Optional[str] = None
 
 
@@ -43,8 +45,10 @@ class JournalEntryCreate(BaseModel):
     voucher_type: str = "journal_entry"
     posting_date: str
     user_remark: Optional[str] = None
+    description: Optional[str] = None
     company: Optional[str] = None
-    accounts: List[JournalEntryAccountCreate] = []
+    accounts: List[JournalEntryAccountCreate] = Field(default_factory=list)
+    lines: Optional[List[JournalEntryAccountCreate]] = None
 
 
 # =============================================================================
@@ -196,7 +200,7 @@ def get_journal_entry_detail(
 async def create_journal_entry(
     je_data: JournalEntryCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new journal entry.
 
@@ -217,12 +221,17 @@ async def create_journal_entry(
 
     posting_dt = parse_date(je_data.posting_date, "posting_date")
 
+    user_remark = je_data.user_remark
+    if user_remark is None and je_data.description:
+        user_remark = je_data.description
+
     # Create JE
+    company = je_data.company or "Test Company"
     je = JournalEntry(
         voucher_type=voucher_type_enum,
         posting_date=datetime.combine(posting_dt, datetime.min.time()) if posting_dt else None,
-        user_remark=je_data.user_remark,
-        company=je_data.company,
+        user_remark=user_remark,
+        company=company,
         total_debit=Decimal("0"),
         total_credit=Decimal("0"),
         docstatus=0,  # Draft
@@ -230,11 +239,34 @@ async def create_journal_entry(
 
     # Parse account lines
     je_accounts: List[JournalEntryItem] = []
-    for acc_data in je_data.accounts:
+    account_lines = je_data.accounts or (je_data.lines or [])
+    for acc_data in account_lines:
+        account_name = acc_data.account
+        account_id = acc_data.account_id
+
+        if not account_name and account_id:
+            account = db.query(Account).filter(Account.id == account_id).first()
+            if not account:
+                raise HTTPException(status_code=400, detail=f"Account {account_id} not found")
+            account_name = account.account_name
+        elif account_name and not account_id:
+            account = db.query(Account).filter(Account.account_name == account_name).first()
+            if account:
+                account_id = account.id
+
+        if not account_name:
+            raise HTTPException(status_code=400, detail="Account is required for journal entry lines")
+        if account_id is None:
+            raise HTTPException(status_code=400, detail=f"Account '{account_name}' not found in chart of accounts")
+
         je_acc = JournalEntryItem(
-            account=acc_data.account,
+            account=account_name,
+            account_id=account_id,
             debit=Decimal(str(acc_data.debit)),
             credit=Decimal(str(acc_data.credit)),
+            debit_in_account_currency=Decimal(str(acc_data.debit)),
+            credit_in_account_currency=Decimal(str(acc_data.credit)),
+            exchange_rate=Decimal("1"),
             party_type=acc_data.party_type,
             party=acc_data.party,
             cost_center=acc_data.cost_center,
@@ -266,7 +298,7 @@ async def create_journal_entry(
     audit.log_create(
         doctype="journal_entry",
         document_id=je.id,
-        user_id=user.id,
+        user_id=getattr(principal, "id", None),
         new_values=serialize_for_audit(je),
     )
 
@@ -316,7 +348,7 @@ def update_journal_entry(
     if user_remark is not None:
         je.user_remark = user_remark
 
-    je.updated_at = datetime.utcnow()
+    je.updated_at = datetime.now(timezone.utc)
 
     # Audit log
     audit = AuditLogger(db)

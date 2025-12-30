@@ -197,7 +197,7 @@ def _parse_date_only(value: Optional[date]) -> Optional[date]:
 
 def _generate_local_external_id() -> int:
     """Generate a synthetic external integer ID for locally created records."""
-    return -1 * int(datetime.utcnow().timestamp() * 1000)
+    return -1 * int(datetime.now(timezone.utc).timestamp() * 1000)
 
 
 
@@ -626,6 +626,7 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
 
     return {
         "id": invoice.id,
+        "customer_id": invoice.customer_id,
         "invoice_number": invoice.invoice_number,
         "description": invoice.description,
         "amount": float(invoice.amount),
@@ -1120,7 +1121,7 @@ async def delete_invoice(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     invoice.is_deleted = True
-    invoice.deleted_at = datetime.utcnow()
+    invoice.deleted_at = datetime.now(timezone.utc)
     invoice.deleted_by_id = principal.id
     db.commit()
     return {"status": "disabled", "invoice_id": invoice_id}
@@ -1377,7 +1378,7 @@ async def delete_payment(
         raise HTTPException(status_code=404, detail="Payment not found")
 
     payment.is_deleted = True
-    payment.deleted_at = datetime.utcnow()
+    payment.deleted_at = datetime.now(timezone.utc)
     payment.deleted_by_id = principal.id
     db.commit()
     return {"status": "disabled", "payment_id": payment_id}
@@ -1887,7 +1888,7 @@ async def delete_quotation(
         raise HTTPException(status_code=404, detail="Quotation not found")
 
     quote.is_deleted = True
-    quote.deleted_at = datetime.utcnow()
+    quote.deleted_at = datetime.now(timezone.utc)
     quote.deleted_by_id = principal.id
     if hasattr(quote, "write_back_status"):
         setattr(quote, "write_back_status", "pending")
@@ -2154,7 +2155,7 @@ async def delete_credit_note(
         raise HTTPException(status_code=404, detail="Credit note not found")
 
     note.is_deleted = True
-    note.deleted_at = datetime.utcnow()
+    note.deleted_at = datetime.now(timezone.utc)
     note.deleted_by_id = principal.id
     if hasattr(note, "write_back_status"):
         setattr(note, "write_back_status", "pending")
@@ -2231,7 +2232,7 @@ async def delete_sales_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     customer.is_deleted = True
-    customer.deleted_at = datetime.utcnow()
+    customer.deleted_at = datetime.now(timezone.utc)
     customer.deleted_by_id = principal.id
     db.commit()
     return {"status": "disabled", "customer_id": customer_id}

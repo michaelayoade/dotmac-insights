@@ -14,7 +14,7 @@ The reconciliation job should be scheduled via Celery Beat to run periodically
 (e.g., every hour or daily) depending on sync frequency requirements.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 from enum import Enum
 from dataclasses import dataclass, field
@@ -143,7 +143,7 @@ class TicketsReconciliationService:
         except Exception as e:
             logger.error(f"Ticket table reconciliation failed: {e}")
             reports["ticket_legacy"] = TicketReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_tickets=0,
                 tickets_with_drift=0,
                 drift_percentage=0,
@@ -157,7 +157,7 @@ class TicketsReconciliationService:
         except Exception as e:
             logger.error(f"Conversation table reconciliation failed: {e}")
             reports["conversation_legacy"] = TicketReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_tickets=0,
                 tickets_with_drift=0,
                 drift_percentage=0,
@@ -176,7 +176,7 @@ class TicketsReconciliationService:
         except Exception as e:
             logger.error(f"Splynx ticket reconciliation failed: {e}")
             reports["splynx"] = TicketReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_tickets=0,
                 tickets_with_drift=0,
                 drift_percentage=0,
@@ -194,7 +194,7 @@ class TicketsReconciliationService:
         except Exception as e:
             logger.error(f"ERPNext ticket reconciliation failed: {e}")
             reports["erpnext"] = TicketReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_tickets=0,
                 tickets_with_drift=0,
                 drift_percentage=0,
@@ -212,7 +212,7 @@ class TicketsReconciliationService:
         except Exception as e:
             logger.error(f"Chatwoot ticket reconciliation failed: {e}")
             reports["chatwoot"] = TicketReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_tickets=0,
                 tickets_with_drift=0,
                 drift_percentage=0,
@@ -286,7 +286,7 @@ class TicketsReconciliationService:
         drift_pct = (drift_count / total * 100) if total > 0 else 0
 
         report = TicketReconciliationReport(
-            run_at=datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
             total_tickets=total,
             tickets_with_drift=drift_count,
             drift_percentage=drift_pct,
@@ -365,7 +365,7 @@ class TicketsReconciliationService:
         drift_pct = (drift_count / total * 100) if total > 0 else 0
 
         report = TicketReconciliationReport(
-            run_at=datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
             total_tickets=total,
             tickets_with_drift=drift_count,
             drift_percentage=drift_pct,
@@ -450,7 +450,7 @@ class TicketsReconciliationService:
         drift_pct = (drift_count / total * 100) if total > 0 else 0
 
         report = TicketReconciliationReport(
-            run_at=datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
             total_tickets=total,
             tickets_with_drift=drift_count,
             drift_percentage=drift_pct,

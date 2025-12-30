@@ -1,7 +1,7 @@
 """Exports: Report exports (CSV/PDF), cache metadata, export status."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -61,7 +61,7 @@ async def get_accounting_cache_metadata() -> Dict[str, Any]:
     client = await get_redis_client()
 
     return {
-        "as_of": datetime.utcnow().isoformat() + "Z",
+        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
         "presets": CACHE_TTL,
         "cache_available": client is not None,
         "keys": cache_keys,
@@ -78,7 +78,7 @@ def get_export_status() -> Dict[str, Any]:
     from app.services.export_service import WEASYPRINT_AVAILABLE
 
     return {
-        "as_of": datetime.utcnow().isoformat() + "Z",
+        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
         "services": {
             "csv": {"available": True},
             "pdf": {

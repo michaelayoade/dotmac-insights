@@ -1,7 +1,7 @@
 """Canned Responses (Macros) API endpoints."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -284,7 +284,7 @@ def render_canned_response(
 
     # Update usage stats
     response.usage_count += 1
-    response.last_used_at = datetime.utcnow()
+    response.last_used_at = datetime.now(timezone.utc)
     db.commit()
 
     rendered = response.render(context)

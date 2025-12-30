@@ -18,7 +18,7 @@ from sqlalchemy import (
     Float, Numeric, Index, JSON, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from datetime import datetime, date
 from app.utils.datetime_utils import utc_now
 from decimal import Decimal
@@ -317,6 +317,12 @@ class Contact(Base):
     # NPS/Satisfaction
     nps_score: Mapped[Optional[int]] = mapped_column(nullable=True)  # -100 to 100
     satisfaction_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 0-5
+
+    # ==========================================================================
+    # FULL-TEXT SEARCH
+    # ==========================================================================
+
+    search_vector: Mapped[Optional[str]] = mapped_column(TSVECTOR, nullable=True)
 
     # ==========================================================================
     # SYNC & AUDIT

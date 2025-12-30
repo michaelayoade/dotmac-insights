@@ -192,7 +192,7 @@ class ChatwootSync(BaseSyncClient):
 
                 if employee:
                     employee.chatwoot_agent_id = chatwoot_agent_id
-                    employee.last_synced_at = datetime.utcnow()
+                    employee.last_synced_at = datetime.now(timezone.utc)
                     self.increment_updated()
                     logger.debug(
                         "chatwoot_agent_linked",
@@ -254,7 +254,7 @@ class ChatwootSync(BaseSyncClient):
 
                 if customer:
                     customer.chatwoot_contact_id = chatwoot_id
-                    customer.last_synced_at = datetime.utcnow()
+                    customer.last_synced_at = datetime.now(timezone.utc)
                     self.increment_updated()
                     logger.debug("chatwoot_contact_linked", customer_id=customer.id, chatwoot_id=chatwoot_id)
 
@@ -352,7 +352,7 @@ class ChatwootSync(BaseSyncClient):
                     try:
                         created_at = datetime.fromtimestamp(conv_data["created_at"])
                     except (ValueError, TypeError):
-                        created_at = datetime.utcnow()
+                        created_at = datetime.now(timezone.utc)
 
                 # Track the latest activity timestamp for cursor (use last_activity_at from API)
                 conv_last_activity = conv_data.get("last_activity_at")
@@ -402,8 +402,8 @@ class ChatwootSync(BaseSyncClient):
                     existing.employee_id = employee.id if employee else None
                     existing.message_count = conv_data.get("messages_count", 0)
                     existing.labels = labels_str
-                    existing.last_activity_at = datetime.utcnow()
-                    existing.last_synced_at = datetime.utcnow()
+                    existing.last_activity_at = datetime.now(timezone.utc)
+                    existing.last_synced_at = datetime.now(timezone.utc)
 
                     if first_response_time:
                         existing.first_response_time_seconds = int(first_response_time)
@@ -415,7 +415,7 @@ class ChatwootSync(BaseSyncClient):
                         existing.resolution_time_seconds = int(resolution_time)
 
                     if status == ConversationStatus.RESOLVED and not existing.resolved_at:
-                        existing.resolved_at = datetime.utcnow()
+                        existing.resolved_at = datetime.now(timezone.utc)
 
                     self.increment_updated()
                 else:
@@ -431,7 +431,7 @@ class ChatwootSync(BaseSyncClient):
                         employee_id=employee.id if employee else None,
                         message_count=conv_data.get("messages_count", 0),
                         labels=labels_str,
-                        created_at=created_at or datetime.utcnow(),
+                        created_at=created_at or datetime.now(timezone.utc),
                     )
 
                     if first_response_time:
@@ -444,7 +444,7 @@ class ChatwootSync(BaseSyncClient):
                         conversation.resolution_time_seconds = int(resolution_time)
 
                     if status == ConversationStatus.RESOLVED:
-                        conversation.resolved_at = datetime.utcnow()
+                        conversation.resolved_at = datetime.now(timezone.utc)
 
                     self.db.add(conversation)
                     self.increment_created()
@@ -542,7 +542,7 @@ class ChatwootSync(BaseSyncClient):
                     try:
                         created_at = datetime.fromtimestamp(msg_data["created_at"])
                     except (ValueError, TypeError):
-                        created_at = datetime.utcnow()
+                        created_at = datetime.now(timezone.utc)
 
                 sender = msg_data.get("sender", {})
 
@@ -555,7 +555,7 @@ class ChatwootSync(BaseSyncClient):
                     sender_type=sender.get("type"),
                     sender_id=sender.get("id"),
                     sender_name=sender.get("name"),
-                    created_at=created_at or datetime.utcnow(),
+                    created_at=created_at or datetime.now(timezone.utc),
                 )
                 self.db.add(message)
                 new_messages_count += 1

@@ -6,7 +6,7 @@ Manages quotations/proposals within the CRM module.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
@@ -288,7 +288,7 @@ async def convert_to_order(quotation_id: int, db: Session = Depends(get_db)) -> 
         contact_id=quote.contact_id,
         customer_id=quote.customer_id,
         customer_name=quote.customer_name,
-        transaction_date=datetime.utcnow(),
+        transaction_date=datetime.now(timezone.utc),
         currency=quote.currency,
         total=quote.total,
         total_taxes_and_charges=quote.total_taxes_and_charges,

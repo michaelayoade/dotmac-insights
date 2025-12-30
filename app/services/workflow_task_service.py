@@ -1,7 +1,7 @@
 """Service for managing unified workflow tasks."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -147,7 +147,7 @@ class WorkflowTaskService:
             return None
 
         task.status = WorkflowTaskStatus.COMPLETED.value
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
         task.completed_by_id = completed_by_id
 
         logger.info(
@@ -187,7 +187,7 @@ class WorkflowTaskService:
             .update(
                 {
                     "status": WorkflowTaskStatus.CANCELLED.value,
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": datetime.now(timezone.utc),
                 }
             )
         )
@@ -315,7 +315,7 @@ class WorkflowTaskService:
         if overdue_only:
             query = query.filter(
                 WorkflowTask.due_at.isnot(None),
-                WorkflowTask.due_at < datetime.utcnow(),
+                WorkflowTask.due_at < datetime.now(timezone.utc),
                 WorkflowTask.status == WorkflowTaskStatus.PENDING.value,
             )
 
@@ -328,7 +328,7 @@ class WorkflowTaskService:
         Returns:
             Dictionary with counts by status and module
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Total pending
         pending_count = (
@@ -426,7 +426,7 @@ class WorkflowTaskService:
         query = self.db.query(WorkflowTask).filter(
             WorkflowTask.status == WorkflowTaskStatus.PENDING.value,
             WorkflowTask.due_at.isnot(None),
-            WorkflowTask.due_at < datetime.utcnow(),
+            WorkflowTask.due_at < datetime.now(timezone.utc),
         )
 
         if user_id:
@@ -447,10 +447,10 @@ class WorkflowTaskService:
 
         old_status = task.status
         task.status = status
-        task.updated_at = datetime.utcnow()
+        task.updated_at = datetime.now(timezone.utc)
 
         if status == WorkflowTaskStatus.COMPLETED.value:
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             task.completed_by_id = user_id
 
         logger.info(
@@ -476,7 +476,7 @@ class WorkflowTaskService:
 
         old_due = task.due_at
         task.due_at = new_due_at
-        task.updated_at = datetime.utcnow()
+        task.updated_at = datetime.now(timezone.utc)
 
         logger.info(
             "workflow_task_snoozed",

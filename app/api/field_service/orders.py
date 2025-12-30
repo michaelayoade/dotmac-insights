@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_
 from typing import Dict, Any, Optional, List
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from decimal import Decimal
 from pydantic import BaseModel, Field
 import uuid
@@ -223,7 +223,7 @@ class BulkDeleteRequest(BaseModel):
 
 def generate_order_number() -> str:
     """Generate unique order number."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return f"SO-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
 
@@ -787,7 +787,7 @@ async def schedule_order(
     notification_service.notify_service_scheduled(order)
 
     order.customer_notified = True
-    order.last_notification_at = datetime.utcnow()
+    order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -926,7 +926,7 @@ async def dispatch_order(
         notification_service = get_notification_service(db)
         notification_service.notify_technician_assigned(order)
         order.customer_notified = True
-        order.last_notification_at = datetime.utcnow()
+        order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -967,7 +967,7 @@ async def mark_en_route(
     if order.status != ServiceOrderStatus.DISPATCHED:
         raise HTTPException(400, f"Cannot start travel from {order.status.value} status")
 
-    order.travel_start_time = datetime.utcnow()
+    order.travel_start_time = datetime.now(timezone.utc)
     record_status_change(
         db, order, ServiceOrderStatus.EN_ROUTE,
         notes=request.notes,
@@ -979,7 +979,7 @@ async def mark_en_route(
     notification_service = get_notification_service(db)
     notification_service.notify_technician_en_route(order, eta="30 minutes")
     order.customer_notified = True
-    order.last_notification_at = datetime.utcnow()
+    order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -1001,7 +1001,7 @@ async def mark_arrived(
     if order.status != ServiceOrderStatus.EN_ROUTE:
         raise HTTPException(400, f"Cannot arrive from {order.status.value} status")
 
-    order.arrival_time = datetime.utcnow()
+    order.arrival_time = datetime.now(timezone.utc)
     record_status_change(
         db, order, ServiceOrderStatus.ON_SITE,
         notes=request.notes,
@@ -1013,7 +1013,7 @@ async def mark_arrived(
     notification_service = get_notification_service(db)
     notification_service.notify_technician_arrived(order)
     order.customer_notified = True
-    order.last_notification_at = datetime.utcnow()
+    order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -1035,7 +1035,7 @@ async def start_work(
     if order.status not in [ServiceOrderStatus.ON_SITE, ServiceOrderStatus.DISPATCHED]:
         raise HTTPException(400, f"Cannot start work from {order.status.value} status")
 
-    order.actual_start_time = datetime.utcnow()
+    order.actual_start_time = datetime.now(timezone.utc)
     record_status_change(
         db, order, ServiceOrderStatus.IN_PROGRESS,
         notes=request.notes,
@@ -1049,7 +1049,7 @@ async def start_work(
             service_order_id=order.id,
             employee_id=order.assigned_technician_id,
             entry_type=TimeEntryType.WORK,
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
             is_billable=order.is_billable,
             start_latitude=request.latitude,
             start_longitude=request.longitude,
@@ -1060,7 +1060,7 @@ async def start_work(
     notification_service = get_notification_service(db)
     notification_service.notify_service_started(order)
     order.customer_notified = True
-    order.last_notification_at = datetime.utcnow()
+    order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -1093,7 +1093,7 @@ async def complete_order(
             f"Cannot complete: {len(incomplete_required)} required checklist items incomplete"
         )
 
-    order.actual_end_time = datetime.utcnow()
+    order.actual_end_time = datetime.now(timezone.utc)
     if request.notes:
         order.resolution_notes = request.notes
 
@@ -1107,7 +1107,7 @@ async def complete_order(
     # Close any open time entries
     for entry in order.time_entries:
         if entry.end_time is None:
-            entry.end_time = datetime.utcnow()
+            entry.end_time = datetime.now(timezone.utc)
             delta = entry.end_time - entry.start_time
             entry.duration_hours = Decimal(str(delta.total_seconds() / 3600))
             entry.end_latitude = request.latitude
@@ -1117,7 +1117,7 @@ async def complete_order(
     notification_service = get_notification_service(db)
     notification_service.notify_service_completed(order)
     order.customer_notified = True
-    order.last_notification_at = datetime.utcnow()
+    order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -1156,7 +1156,7 @@ async def reschedule_order(
         notification_service = get_notification_service(db)
         notification_service.notify_service_rescheduled(order, request.reason)
         order.customer_notified = True
-        order.last_notification_at = datetime.utcnow()
+        order.last_notification_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(order)
@@ -1186,7 +1186,7 @@ async def update_checklist_item(
 
     item.is_completed = update.is_completed
     if update.is_completed:
-        item.completed_at = datetime.utcnow()
+        item.completed_at = datetime.now(timezone.utc)
     else:
         item.completed_at = None
 
@@ -1320,7 +1320,7 @@ async def capture_signature(
 
     order.customer_signature = signature.signature_data
     order.customer_signature_name = signature.signer_name
-    order.customer_signed_at = datetime.utcnow()
+    order.customer_signed_at = datetime.now(timezone.utc)
 
     if signature.rating:
         order.customer_rating = signature.rating
@@ -1387,7 +1387,7 @@ async def upload_photo(
 
     # Generate unique filename
     unique_id = uuid.uuid4().hex[:8]
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     new_filename = f"{photo_type}_{timestamp}_{unique_id}{ext}"
     file_path = order_dir / new_filename
 
@@ -1406,8 +1406,8 @@ async def upload_photo(
         caption=caption,
         latitude=Decimal(str(latitude)) if latitude else None,
         longitude=Decimal(str(longitude)) if longitude else None,
-        captured_at=datetime.utcnow(),
-        uploaded_at=datetime.utcnow(),
+        captured_at=datetime.now(timezone.utc),
+        uploaded_at=datetime.now(timezone.utc),
     )
 
     db.add(photo)
@@ -1519,7 +1519,7 @@ async def bulk_reschedule_orders(
                 try:
                     notification_service.notify_service_rescheduled(order, request.reason)
                     order.customer_notified = True
-                    order.last_notification_at = datetime.utcnow()
+                    order.last_notification_at = datetime.now(timezone.utc)
                 except Exception as e:
                     errors.append({
                         "order_id": order.id,
@@ -1586,7 +1586,7 @@ async def bulk_cancel_orders(
                 try:
                     notification_service.notify_service_cancelled(order, request.reason)
                     order.customer_notified = True
-                    order.last_notification_at = datetime.utcnow()
+                    order.last_notification_at = datetime.now(timezone.utc)
                 except Exception as e:
                     errors.append({
                         "order_id": order.id,

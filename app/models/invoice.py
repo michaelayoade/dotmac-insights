@@ -155,8 +155,14 @@ class Invoice(SoftDeleteMixin, Base):
         if not self.due_date or self.status == InvoiceStatus.PAID:
             return 0
         now = datetime.now(timezone.utc)
-        if now > self.due_date:
-            return (now - self.due_date).days
+        due = self.due_date
+        # Handle timezone-naive vs timezone-aware comparison
+        if due.tzinfo is None and now.tzinfo is not None:
+            now = now.replace(tzinfo=None)
+        elif due.tzinfo is not None and now.tzinfo is None:
+            due = due.replace(tzinfo=None)
+        if now > due:
+            return (now - due).days
         return 0
 
     @property

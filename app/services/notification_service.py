@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
 
@@ -449,7 +449,7 @@ class NotificationService:
             return False
 
         delivery.attempt_count += 1
-        delivery.last_attempt_at = datetime.utcnow()
+        delivery.last_attempt_at = datetime.now(timezone.utc)
 
         try:
             # Prepare headers
@@ -457,7 +457,7 @@ class NotificationService:
                 "Content-Type": "application/json",
                 "X-Webhook-Event": delivery.event_type,
                 "X-Webhook-ID": delivery.event_id,
-                "X-Webhook-Timestamp": str(int(datetime.utcnow().timestamp())),
+                "X-Webhook-Timestamp": str(int(datetime.now(timezone.utc).timestamp())),
             }
 
             # Add custom headers
@@ -495,14 +495,14 @@ class NotificationService:
                 headers["X-Webhook-Signature"] = f"sha256={signature}"
 
             # Make request
-            start_time = datetime.utcnow()
+            start_time = datetime.now(timezone.utc)
             response = self.http_client.request(
                 method=webhook.method,
                 url=webhook.url,
                 headers=headers,
                 content=payload_json,
             )
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
 
             delivery.response_status_code = response.status_code
             delivery.response_body = response.text[:2000] if response.text else None
@@ -510,9 +510,9 @@ class NotificationService:
 
             if 200 <= response.status_code < 300:
                 delivery.status = NotificationStatus.DELIVERED
-                delivery.delivered_at = datetime.utcnow()
+                delivery.delivered_at = datetime.now(timezone.utc)
                 webhook.success_count += 1
-                webhook.last_triggered_at = datetime.utcnow()
+                webhook.last_triggered_at = datetime.now(timezone.utc)
 
                 logger.info(
                     "webhook_delivered",
@@ -532,7 +532,7 @@ class NotificationService:
             # Schedule retry if attempts remaining
             if delivery.attempt_count < webhook.max_retries:
                 delivery.status = NotificationStatus.PENDING
-                delivery.next_retry_at = datetime.utcnow() + timedelta(
+                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(
                     seconds=webhook.retry_delay_seconds * delivery.attempt_count
                 )
             else:
@@ -551,7 +551,7 @@ class NotificationService:
 
     def get_pending_deliveries(self, limit: int = 100) -> List[WebhookDelivery]:
         """Get webhook deliveries ready for (re)delivery."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return self.db.query(WebhookDelivery).filter(
             and_(
                 WebhookDelivery.status == NotificationStatus.PENDING,
@@ -572,7 +572,7 @@ class NotificationService:
             return False
 
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        notification.read_at = datetime.now(timezone.utc)
         self.db.commit()
         return True
 

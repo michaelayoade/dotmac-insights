@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models.unified_contact import (
@@ -58,15 +58,15 @@ async def qualify_lead(contact_id: int, payload: QualifyLeadRequest, db: Session
     # Auto-promote to prospect if fully qualified
     if payload.qualification.value == "qualified" and contact.contact_type == ContactType.LEAD:
         contact.contact_type = ContactType.PROSPECT
-        contact.qualified_date = datetime.utcnow()
+        contact.qualified_date = datetime.now(timezone.utc)
 
     if payload.notes:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Qualified: {payload.notes}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Qualified: {payload.notes}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Qualified: {payload.notes}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Qualified: {payload.notes}"
 
-    contact.last_contact_date = datetime.utcnow()
+    contact.last_contact_date = datetime.now(timezone.utc)
     db.commit()
     db.refresh(contact)
 
@@ -92,8 +92,8 @@ async def convert_to_prospect(contact_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Only leads can be converted to prospects")
 
     contact.contact_type = ContactType.PROSPECT
-    contact.qualified_date = datetime.utcnow()
-    contact.last_contact_date = datetime.utcnow()
+    contact.qualified_date = datetime.now(timezone.utc)
+    contact.last_contact_date = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(contact)
@@ -122,9 +122,9 @@ async def convert_to_customer(contact_id: int, payload: ConvertToCustomerRequest
 
     # Update type
     contact.contact_type = ContactType.CUSTOMER
-    contact.conversion_date = datetime.utcnow()
-    contact.signup_date = datetime.utcnow()
-    contact.last_contact_date = datetime.utcnow()
+    contact.conversion_date = datetime.now(timezone.utc)
+    contact.signup_date = datetime.now(timezone.utc)
+    contact.last_contact_date = datetime.now(timezone.utc)
 
     # Update customer-specific fields
     if payload.account_number:
@@ -150,9 +150,9 @@ async def convert_to_customer(contact_id: int, payload: ConvertToCustomerRequest
 
     if payload.notes:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Converted to customer: {payload.notes}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Converted to customer: {payload.notes}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Converted to customer: {payload.notes}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Converted to customer: {payload.notes}"
 
     # Dual-write: create/sync to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
@@ -193,12 +193,12 @@ async def reactivate_churned_customer(contact_id: int, db: Session = Depends(get
     contact.status = ContactStatus.ACTIVE
     contact.cancellation_date = None
     contact.churn_reason = None
-    contact.last_contact_date = datetime.utcnow()
+    contact.last_contact_date = datetime.now(timezone.utc)
 
     if contact.notes:
-        contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Reactivated"
+        contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Reactivated"
     else:
-        contact.notes = f"[{datetime.utcnow().isoformat()}] Reactivated"
+        contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Reactivated"
 
     # Dual-write: sync status change to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
@@ -237,14 +237,14 @@ async def mark_churned(contact_id: int, payload: MarkChurnedRequest, db: Session
 
     contact.contact_type = ContactType.CHURNED
     contact.status = ContactStatus.INACTIVE
-    contact.cancellation_date = datetime.utcnow()
+    contact.cancellation_date = datetime.now(timezone.utc)
     contact.churn_reason = payload.reason
 
     if payload.notes:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Churned: {payload.reason}. {payload.notes}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Churned: {payload.reason}. {payload.notes}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Churned: {payload.reason}. {payload.notes}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Churned: {payload.reason}. {payload.notes}"
 
     # Dual-write: sync churned status to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
@@ -281,13 +281,13 @@ async def assign_owner(contact_id: int, payload: AssignOwnerRequest, db: Session
         raise HTTPException(status_code=404, detail="Contact not found")
 
     contact.owner_id = payload.owner_id
-    contact.last_contact_date = datetime.utcnow()
+    contact.last_contact_date = datetime.now(timezone.utc)
 
     if payload.notes:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Assigned to owner {payload.owner_id}: {payload.notes}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Assigned to owner {payload.owner_id}: {payload.notes}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Assigned to owner {payload.owner_id}: {payload.notes}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Assigned to owner {payload.owner_id}: {payload.notes}"
 
     db.commit()
     db.refresh(contact)
@@ -336,9 +336,9 @@ async def suspend_contact(contact_id: int, reason: Optional[str] = None, db: Ses
 
     if reason:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Suspended: {reason}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Suspended: {reason}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Suspended: {reason}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Suspended: {reason}"
 
     # Dual-write: sync suspended status to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
@@ -372,12 +372,12 @@ async def activate_contact(contact_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Contact not found")
 
     contact.status = ContactStatus.ACTIVE
-    contact.activation_date = datetime.utcnow()
+    contact.activation_date = datetime.now(timezone.utc)
 
     if contact.notes:
-        contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Activated"
+        contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Activated"
     else:
-        contact.notes = f"[{datetime.utcnow().isoformat()}] Activated"
+        contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Activated"
 
     # Dual-write: sync activated status to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED:
@@ -420,9 +420,9 @@ async def mark_do_not_contact(contact_id: int, reason: Optional[str] = None, db:
 
     if reason:
         if contact.notes:
-            contact.notes = f"{contact.notes}\n\n[{datetime.utcnow().isoformat()}] Marked do-not-contact: {reason}"
+            contact.notes = f"{contact.notes}\n\n[{datetime.now(timezone.utc).isoformat()}] Marked do-not-contact: {reason}"
         else:
-            contact.notes = f"[{datetime.utcnow().isoformat()}] Marked do-not-contact: {reason}"
+            contact.notes = f"[{datetime.now(timezone.utc).isoformat()}] Marked do-not-contact: {reason}"
 
     # Dual-write: sync status/opt-ins to Customer table
     if feature_flags.CONTACTS_DUAL_WRITE_ENABLED and contact.contact_type in (ContactType.CUSTOMER, ContactType.CHURNED):

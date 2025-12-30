@@ -241,6 +241,13 @@ class LeaveAllocation(Base):
     def __repr__(self) -> str:
         return f"<LeaveAllocation {self.employee} - {self.leave_type}: {self.total_leaves_allocated}>"
 
+    @property
+    def used_days(self) -> Decimal:
+        """Days used from the allocation (derived from total and unused)."""
+        total = self.total_leaves_allocated or Decimal("0")
+        unused = self.unused_leaves or Decimal("0")
+        return total - unused
+
 
 # ============= LEAVE APPLICATION =============
 class LeaveApplication(Base):

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
@@ -361,7 +361,7 @@ async def convert_lead(lead_id: int, payload: LeadConvertRequest, db: Session = 
         customer_type=customer_type,
         status=CustomerStatus.ACTIVE,
         notes=lead.notes,
-        conversion_date=datetime.utcnow(),
+        conversion_date=datetime.now(timezone.utc),
     )
     db.add(customer)
     db.flush()
@@ -370,10 +370,10 @@ async def convert_lead(lead_id: int, payload: LeadConvertRequest, db: Session = 
     contact = Contact(
         name=lead.lead_name or "Primary Contact",
         contact_type=ContactType.PERSON,
-        category=ContactCategory.BUSINESS if customer_type == CustomerType.COMPANY else ContactCategory.RESIDENTIAL,
+        category=ContactCategory.BUSINESS if customer_type in (CustomerType.BUSINESS, CustomerType.ENTERPRISE) else ContactCategory.RESIDENTIAL,
         email=lead.email_id,
         phone=lead.phone or lead.mobile_no,
-        is_primary=True,
+        is_primary_contact=True,
         legacy_customer_id=customer.id,
     )
     db.add(contact)

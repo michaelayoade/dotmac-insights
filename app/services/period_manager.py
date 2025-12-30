@@ -8,7 +8,7 @@ Handles fiscal period operations including:
 - Period status management
 """
 from typing import Optional, List, Tuple
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -216,9 +216,9 @@ class PeriodManager:
             FiscalPeriodStatus.SOFT_CLOSED if soft_close
             else FiscalPeriodStatus.HARD_CLOSED
         )
-        period.closed_at = datetime.utcnow()
+        period.closed_at = datetime.now(timezone.utc)
         period.closed_by_id = user_id
-        period.updated_at = datetime.utcnow()
+        period.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
 
@@ -275,9 +275,9 @@ class PeriodManager:
 
         # Reopen the period
         period.status = FiscalPeriodStatus.OPEN
-        period.reopened_at = datetime.utcnow()
+        period.reopened_at = datetime.now(timezone.utc)
         period.reopened_by_id = user_id
-        period.updated_at = datetime.utcnow()
+        period.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
 
@@ -470,6 +470,9 @@ class PeriodManager:
                     account=balance["account_name"],
                     debit=balance["total_credit"] - balance["total_debit"],
                     credit=Decimal("0"),
+                    debit_in_account_currency=balance["total_credit"] - balance["total_debit"],
+                    credit_in_account_currency=Decimal("0"),
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 total_je_debit += je_line.debit
@@ -480,6 +483,9 @@ class PeriodManager:
                     account=balance["account_name"],
                     debit=Decimal("0"),
                     credit=balance["total_debit"] - balance["total_credit"],
+                    debit_in_account_currency=Decimal("0"),
+                    credit_in_account_currency=balance["total_debit"] - balance["total_credit"],
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 total_je_credit += je_line.credit
@@ -495,6 +501,9 @@ class PeriodManager:
                 account=re_account,
                 debit=Decimal("0"),
                 credit=net_income,
+                debit_in_account_currency=Decimal("0"),
+                credit_in_account_currency=net_income,
+                exchange_rate=Decimal("1"),
                 idx=idx,
             )
             total_je_credit += net_income
@@ -505,6 +514,9 @@ class PeriodManager:
                 account=re_account,
                 debit=abs(net_income),
                 credit=Decimal("0"),
+                debit_in_account_currency=abs(net_income),
+                credit_in_account_currency=Decimal("0"),
+                exchange_rate=Decimal("1"),
                 idx=idx,
             )
             total_je_debit += abs(net_income)
@@ -517,7 +529,7 @@ class PeriodManager:
 
         # Link closing entry to period
         period.closing_journal_entry_id = je.id
-        period.updated_at = datetime.utcnow()
+        period.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
 

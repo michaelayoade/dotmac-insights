@@ -17,7 +17,7 @@ from typing import Sequence, Union
 
 from alembic import op, context
 import sqlalchemy as sa
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 revision: str = "20251220_add_support_rbac"

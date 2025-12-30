@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 import httpx
 
@@ -52,7 +52,7 @@ async def sync_payment_methods(sync_client, client: httpx.AsyncClient, full_sync
                     existing.einvoicing_payment_methods_id = method_data.get(
                         "einvoicing_payment_methods_id"
                     )
-                    existing.last_synced_at = datetime.utcnow()
+                    existing.last_synced_at = datetime.now(timezone.utc)
                     sync_client.increment_updated()
                 else:
                     payment_method = PaymentMethod(
@@ -70,7 +70,7 @@ async def sync_payment_methods(sync_client, client: httpx.AsyncClient, full_sync
                         einvoicing_payment_methods_id=method_data.get(
                             "einvoicing_payment_methods_id"
                         ),
-                        last_synced_at=datetime.utcnow(),
+                        last_synced_at=datetime.now(timezone.utc),
                     )
                     sync_client.db.add(payment_method)
                     sync_client.increment_created()

@@ -49,9 +49,12 @@ Edit `.env` with your credentials:
 DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/dotmac_insights
 
 # API Security (required in prod)
-API_KEY=replace_me_in_prod
 ENVIRONMENT=development  # development, staging, production
 CORS_ORIGINS=http://localhost:3000
+JWKS_URL=https://auth.example.com/.well-known/jwks.json
+JWT_ISSUER=https://auth.example.com  # optional
+JWT_AUDIENCE=dotmac-insights        # optional
+DEFAULT_COMPANY=dotmac
 
 # Splynx API (Basic auth recommended: base64 of "key:secret")
 SPLYNX_API_URL=https://your-splynx.com/api/2.0
@@ -107,9 +110,9 @@ poetry run uvicorn app.main:app --reload
 
 Access the API at: http://localhost:8000
 API Documentation: http://localhost:8000/docs
-Auth: click **Authorize** in Swagger UI and enter your API key in `X-API-Key` (or pass `api_key` as a query param).
+Auth: click **Authorize** in Swagger UI and enter a Bearer token (JWT or service token).
 
-> Production requirements: set `ENVIRONMENT=production`, `DATABASE_URL` (PostgreSQL), `CORS_ORIGINS` (no wildcards), `JWKS_URL`/`JWT_ISSUER`/`JWT_AUDIENCE`, `REDIS_URL`, and run migrations before starting the API. The app will refuse to start without the required values.
+> Production requirements: set `ENVIRONMENT=production`, `DATABASE_URL` (PostgreSQL), `CORS_ORIGINS` (no wildcards), `JWKS_URL`, and `DEFAULT_COMPANY`, then run migrations before starting the API. `JWT_ISSUER`/`JWT_AUDIENCE` are optional; `REDIS_URL` is required only if you want Celery tasks.
 
 ### Production docker-compose
 
@@ -151,12 +154,12 @@ Create `frontend/.env.local`:
 # Backend API URL
 NEXT_PUBLIC_API_URL=http://localhost:8000
 
-# Service token for development (grants all scopes)
-# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
-NEXT_PUBLIC_SERVICE_TOKEN=your_service_token_here
+# Service token for server-side calls
+# Create via Admin API: POST /api/admin/tokens (requires JWT)
+INTERNAL_SERVICE_TOKEN=your_service_token_here
 ```
 
-> **Note**: The service token must match the `SERVICE_TOKEN` in your backend `.env` file.
+> **Note**: Generate a service token via the Admin API and use it only for server-side calls. It should never be exposed to the browser.
 
 ### 10. Install and Run Frontend
 
@@ -206,11 +209,11 @@ poetry run uvicorn app.main:app --reload --host 0.0.0.0
 
 # Terminal 2: Celery Worker (optional, for background sync)
 cd dotmac-insights
-poetry run celery -A app.celery_app worker --loglevel=info
+poetry run celery -A app.worker:celery_app worker --loglevel=info
 
 # Terminal 3: Celery Beat (optional, for scheduled sync)
 cd dotmac-insights
-poetry run celery -A app.celery_app beat --loglevel=info
+poetry run celery -A app.worker:celery_app beat --loglevel=info
 
 # Terminal 4: Frontend
 cd dotmac-insights/frontend

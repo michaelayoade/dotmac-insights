@@ -13,7 +13,7 @@ from sqlalchemy.sql.sqltypes import Date
 from sqlalchemy.sql import label
 from typing import Dict, Any, List, Optional
 from itertools import groupby
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.database import get_db
@@ -442,7 +442,7 @@ async def get_customer_health(
         func.count(Ticket.id).label("ticket_count")
     ).filter(
         Ticket.customer_id.isnot(None),
-        Ticket.created_at >= datetime.utcnow() - timedelta(days=30)
+        Ticket.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).group_by(Ticket.customer_id).subquery()
 
     ticket_intensity = db.query(
@@ -458,7 +458,7 @@ async def get_customer_health(
         func.count(Conversation.id).label("convo_count")
     ).filter(
         Conversation.customer_id.isnot(None),
-        Conversation.created_at >= datetime.utcnow() - timedelta(days=30)
+        Conversation.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).group_by(Conversation.customer_id).subquery()
 
     convo_intensity = db.query(
@@ -469,7 +469,7 @@ async def get_customer_health(
     # Churn indicators
     recently_cancelled = db.query(Customer).filter(
         Customer.status == CustomerStatus.INACTIVE,
-        Customer.cancellation_date >= datetime.utcnow() - timedelta(days=30)
+        Customer.cancellation_date >= datetime.now(timezone.utc) - timedelta(days=30)
     ).count()
 
     recently_suspended = db.query(Customer).filter(
@@ -478,7 +478,7 @@ async def get_customer_health(
 
     # Inactive customers (no recent activity)
     customers_with_recent_payment = db.query(distinct(Payment.customer_id)).filter(
-        Payment.payment_date >= datetime.utcnow() - timedelta(days=60)
+        Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=60)
     ).count()
 
     return {
@@ -531,7 +531,7 @@ async def get_churn_risk(
     ).count()
     recently_cancelled = db.query(Customer).filter(
         Customer.status == CustomerStatus.INACTIVE,
-        Customer.cancellation_date >= datetime.utcnow() - timedelta(days=30)
+        Customer.cancellation_date >= datetime.now(timezone.utc) - timedelta(days=30)
     ).count()
     suspended = db.query(Customer).filter(Customer.status == CustomerStatus.SUSPENDED).count()
     high_ticket_customers = db.query(func.count(Customer.id)).join(
@@ -556,7 +556,7 @@ async def get_plan_changes(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Plan change insights (upgrade/downgrade/lateral) over the past N months."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     subs = (
@@ -855,7 +855,7 @@ async def get_financial_insights(
         ).filter(
             Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
             Payment.payment_date.isnot(None),
-            Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30)
+            Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=months * 30)
         ).group_by(
             extract('year', Payment.payment_date),
             extract('month', Payment.payment_date)
@@ -918,7 +918,7 @@ async def get_operational_insights(
     Operational metrics including support performance, network utilization, and employee productivity.
     """
     _apply_statement_timeout(db)
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Ticket analysis
     ticket_stats = db.query(
@@ -1098,7 +1098,7 @@ async def detect_anomalies(
     ).outerjoin(
         Invoice, and_(
             Invoice.customer_id == Customer.id,
-            Invoice.invoice_date >= datetime.utcnow() - timedelta(days=90)
+            Invoice.invoice_date >= datetime.now(timezone.utc) - timedelta(days=90)
         )
     ).filter(Invoice.id.is_(None)).count()
 
@@ -1189,7 +1189,7 @@ async def detect_anomalies(
     # Very old unresolved tickets
     old_tickets = db.query(Ticket).filter(
         Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
-        Ticket.created_at < datetime.utcnow() - timedelta(days=30)
+        Ticket.created_at < datetime.now(timezone.utc) - timedelta(days=30)
     ).count()
 
     if old_tickets > 0:

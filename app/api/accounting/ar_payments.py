@@ -1,7 +1,7 @@
 """AR Payments: Customer payment CRUD and workflow."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -188,7 +188,7 @@ def get_ar_payment(
 def create_ar_payment(
     data: CustomerPaymentCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new customer payment."""
     # Require at least one of contact_id or customer_id
@@ -221,12 +221,15 @@ def create_ar_payment(
         bank_account_id=data.bank_account_id,
         source=PaymentSource.INTERNAL,
         status=PaymentStatus.PENDING,
-        created_by_id=user.id,
+        workflow_status="pending",
+        write_back_status="pending",
+        created_by_id=principal.id,
+        origin_system="local",
     )
 
     # Calculate base amount
-    payment.base_amount = payment.amount * payment.conversion_rate
     payment.base_currency = "NGN"  # TODO: Get from company settings
+    payment.base_amount = payment.amount * payment.conversion_rate
     payment.unallocated_amount = payment.amount
     payment.total_allocated = Decimal("0")
 
@@ -254,7 +257,7 @@ def create_ar_payment(
             alloc_service.allocate_payment(
                 payment_id=payment.id,
                 allocations=alloc_requests,
-                user_id=user.id,
+                user_id=principal.id,
                 is_supplier_payment=False,
             )
         except PaymentAllocationError as e:
@@ -276,7 +279,6 @@ def update_ar_payment(
     payment_id: int,
     data: CustomerPaymentUpdate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
 ) -> Dict[str, Any]:
     """Update a customer payment."""
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -341,7 +343,7 @@ def delete_ar_payment(
     ).delete()
 
     payment.is_deleted = True
-    payment.deleted_at = datetime.utcnow()
+    payment.deleted_at = datetime.now(timezone.utc)
     payment.deleted_by_id = principal.id
     db.commit()
 
@@ -357,7 +359,7 @@ def add_payment_allocations(
     payment_id: int,
     allocations: List[AllocationCreate],
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Add allocations to a customer payment."""
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -384,7 +386,7 @@ def add_payment_allocations(
         created = alloc_service.allocate_payment(
             payment_id=payment_id,
             allocations=alloc_requests,
-            user_id=user.id,
+            user_id=principal.id,
             is_supplier_payment=False,
         )
         db.commit()
@@ -401,7 +403,7 @@ def remove_payment_allocation(
     payment_id: int,
     allocation_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Remove an allocation from a customer payment."""
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
@@ -413,7 +415,7 @@ def remove_payment_allocation(
 
     alloc_service = PaymentAllocationService(db)
     try:
-        alloc_service.remove_allocation(allocation_id, user.id)
+        alloc_service.remove_allocation(allocation_id, principal.id)
         db.commit()
         return {"message": "Allocation removed"}
     except PaymentAllocationError as e:
@@ -428,7 +430,7 @@ def remove_payment_allocation(
 async def post_ar_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Post AR payment to GL - creates bank debit, AR credit."""
     from app.services.document_posting import DocumentPostingService, PostingError
@@ -446,7 +448,7 @@ async def post_ar_payment(
     posting_service = DocumentPostingService(db)
     try:
         # post_payment requires (payment_id, user_id, posting_date=None)
-        je = posting_service.post_payment(payment_id, user.id)
+        je = posting_service.post_payment(payment_id, principal.id)
         payment.status = PaymentStatus.POSTED
         payment.workflow_status = "posted"
         db.commit()
@@ -476,7 +478,6 @@ async def post_ar_payment(
 def approve_ar_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
 ) -> Dict[str, Any]:
     """Approve a pending AR payment for posting."""
     payment = db.query(Payment).filter(Payment.id == payment_id).first()

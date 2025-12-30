@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -248,7 +248,7 @@ def list_responses(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List CSAT responses."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     query = db.query(CSATResponse).filter(CSATResponse.responded_at >= start_dt)
 
@@ -348,7 +348,7 @@ def submit_response(
     response.rating = payload.rating
     response.answers = payload.answers
     response.feedback_text = payload.feedback_text
-    response.responded_at = datetime.utcnow()
+    response.responded_at = datetime.now(timezone.utc)
     response.response_channel = "web"
 
     db.commit()
@@ -367,7 +367,7 @@ async def csat_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get CSAT summary metrics."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Overall stats
     stats = db.query(
@@ -419,7 +419,7 @@ async def csat_by_agent(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get CSAT scores by agent."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     from app.models.agent import Agent
 
@@ -461,7 +461,7 @@ async def csat_trends(
     """Get CSAT trends over time."""
     from sqlalchemy import extract
 
-    start_dt = datetime.utcnow() - timedelta(days=months * 30)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
     trends = db.query(
         extract("year", CSATResponse.responded_at).label("year"),
@@ -526,7 +526,7 @@ def queue_survey_for_ticket(
         ticket_id=ticket_id,
         customer_id=ticket.customer_id,
         response_token=token,
-        sent_at=datetime.utcnow(),
+        sent_at=datetime.now(timezone.utc),
     )
 
     # Try to get agent from ticket

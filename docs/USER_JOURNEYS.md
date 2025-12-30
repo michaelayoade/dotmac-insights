@@ -85,13 +85,13 @@ This document describes end-to-end user journeys in the Dotmac Business Operatin
 
 1. **Lead Capture**
    - Page: `/crm/contacts/new`
-   - API: `POST /api/contacts`
+   - API: `POST /api/crm/contacts`
    - Fields: Name, email, phone, source, company, contact_type=lead
    - Triggers: Lead scoring automation
 
 2. **Lead Qualification**
    - Page: `/crm/contacts/[id]`
-   - API: `PATCH /api/contacts/{id}`
+   - API: `POST /api/crm/contacts/{id}/qualify`
    - Actions: Update status, add notes, schedule follow-up
    - Scoring: Automatic lead score calculation
 
@@ -103,7 +103,7 @@ This document describes end-to-end user journeys in the Dotmac Business Operatin
 
 4. **Pipeline Management**
    - Page: `/crm/pipeline`
-   - API: `GET /api/crm/pipeline`
+   - API: `GET /api/crm/pipeline/kanban`
    - Kanban board: Drag-and-drop stage progression
    - Stages: Prospecting → Qualification → Proposal → Negotiation → Closed
 
@@ -114,7 +114,7 @@ This document describes end-to-end user journeys in the Dotmac Business Operatin
    - Actions: Send to customer, track opens
 
 6. **Customer Conversion**
-   - API: `POST /api/contacts`
+   - API: `POST /api/crm/contacts/{id}/convert-to-customer`
    - Creates unified contact record
    - Status: Lead → Customer
    - Triggers: Welcome email, account setup
@@ -170,22 +170,22 @@ This document describes end-to-end user journeys in the Dotmac Business Operatin
 
 4. **Invoice Generation**
    - Page: `/sales/invoices/new`
-   - API: `POST /api/accounting/invoices`
+   - API: `POST /api/sales/invoices`
    - Auto-populated from sales order
    - Status: Draft → Posted
 
 5. **Invoice Posting**
-   - API: `POST /api/accounting/invoices/{id}/post`
+   - API: `POST /api/sales/invoices/{id}/post`
    - Creates GL entries (Debit: Receivables, Credit: Revenue)
    - Creates tax entries (VAT, WHT)
 
 6. **Payment Receipt**
    - Page: `/sales/payments/new`
-   - API: `POST /api/accounting/payments/incoming`
+   - API: `POST /api/accounting/ar-payments`
    - Methods: Bank transfer, card, cash, gateway
 
 7. **Payment Allocation**
-   - API: `POST /api/accounting/allocations`
+   - API: `POST /api/accounting/ar-payments/{payment_id}/allocations`
    - Links payment to invoice(s)
    - Reduces receivables balance
 
@@ -212,25 +212,20 @@ Payment Receipt:
 
 1. **Credit Limit Setup**
    - Page: `/books/accounts-receivable/credit`
-   - API: `PATCH /api/contacts/{id}`
+   - API: `PATCH /api/crm/contacts/{id}`
    - Fields: Credit limit, payment terms, credit hold threshold
 
 2. **Credit Utilization Monitoring**
    - Page: `/books/accounts-receivable`
-   - API: `GET /api/accounting/receivables/summary`
+   - API: `GET /api/accounting/receivables-outstanding`
    - Shows current outstanding vs credit limit
 
 3. **Credit Block Trigger**
    - Automatic when: Outstanding > Credit Limit
-   - API: `POST /api/contacts/{id}/credit-hold`
+   - API: `POST /api/crm/contacts/{id}/suspend`
    - Blocks new sales orders
 
-4. **Dunning Process**
-   - Page: `/books/accounts-receivable/dunning`
-   - API: `POST /api/accounting/dunning/run`
-   - Sends staged reminder emails (30, 60, 90 days)
-
-5. **Collection**
+4. **Collection**
    - Record payment via `/sales/payments/new`
    - Credit hold automatically released
 
@@ -1351,19 +1346,15 @@ The Inventory & Stock module includes these additional pages:
 
 4. **Supplier Invoice (Bill)**
    - Page: `/purchasing/bills`
-   - API: `POST /api/accounting/bills`
-   - Match to PO and GRN (3-way match)
+   - API: `GET /api/accounting/payables-outstanding`
+   - Bills are synced from ERPNext; match to PO and GRN (3-way match)
 
-5. **Bill Posting**
-   - API: `POST /api/accounting/bills/{id}/post`
-   - Creates AP liability
-
-6. **Payment Processing**
+5. **Payment Processing**
    - Page: `/purchasing/payments/new`
-   - API: `POST /api/accounting/payments/outgoing`
+   - API: `POST /api/accounting/ap-payments`
 
-7. **Payment Allocation**
-   - API: `POST /api/accounting/allocations`
+6. **Payment Allocation**
+   - API: `POST /api/accounting/ap-payments/{payment_id}/allocations`
    - Links payment to bill(s)
 
 **GL Impact**:
@@ -1389,7 +1380,7 @@ Payment:
 
 1. **View Aging Report**
    - Page: `/purchasing/aging`
-   - API: `GET /api/accounting/payables/aging`
+   - API: `GET /api/accounting/payables-aging`
    - Buckets: Current, 30, 60, 90, 90+ days
 
 2. **Supplier Drill-down**
@@ -2031,72 +2022,62 @@ The Assets module includes these additional pages:
 
 1. **View CRM Dashboard**
    - Page: `/crm`
-   - API: `GET /api/contacts/dashboard`
+   - API: `GET /api/crm/leads/summary`
    - Shows: Total contacts, leads, prospects, customers, MRR
 
 2. **View Sales Funnel**
    - Page: `/crm/lifecycle/funnel`
-   - API: `GET /api/contacts/funnel`
+   - API: `GET /api/crm/pipeline/kanban`
    - Leads created, qualified, converted
 
 3. **Create Contact**
    - Page: `/crm/contacts/new`
-   - API: `POST /api/contacts`
+   - API: `POST /api/crm/contacts`
    - Fields: Name, email, phone, type, category
 
 4. **List Contacts by Type**
    - Pages: `/crm/contacts/leads`, `/crm/contacts/customers`, `/crm/contacts/people`, `/crm/contacts/organizations`
-   - API: `GET /api/contacts?contact_type={type}`
+   - API: `GET /api/crm/contacts?contact_type={type}`
 
 5. **Contact Detail**
    - Page: `/crm/contacts/[id]`
-   - API: `GET /api/contacts/{id}`
+   - API: `GET /api/crm/contacts/{id}`
    - View full contact profile
 
 6. **Edit Contact**
    - Page: `/crm/contacts/[id]/edit`
-   - API: `PATCH /api/contacts/{id}`
+   - API: `PATCH /api/crm/contacts/{id}`
    - Update contact information
 
 7. **Qualification**
    - Page: `/crm/lifecycle/qualification`
-   - API: `PATCH /api/contacts/{id}`
+   - API: `POST /api/crm/contacts/{id}/qualify`
    - Status: unqualified → cold → warm → hot → qualified
 
 8. **Pipeline Management**
    - Page: `/crm/pipeline`
-   - API: `GET /api/crm/pipeline`
+   - API: `GET /api/crm/pipeline/kanban`
    - Kanban board for opportunities
 
 9. **Tag Management**
    - Page: `/crm/segments/tags`
-   - API: `GET/POST /api/contacts/tags`
+   - API: `POST /api/crm/contacts/{id}/tags/add`, `POST /api/crm/contacts/{id}/tags/remove`, `POST /api/crm/contacts/{id}/tags`
    - Organize contacts with tags
 
 10. **Territory Assignment**
     - Page: `/crm/segments/territories`
-    - API: `GET/POST /api/contacts/territories`
+    - API: `GET/POST /api/crm/config/territories`
     - Assign sales territories
 
-11. **Contact Lists**
-    - Page: `/crm/segments/lists`
-    - API: `GET/POST /api/contacts/lists`
-    - Create dynamic contact segments
+11. **Customer Groups**
+    - Page: `/crm/segments/categories`
+    - API: `GET/POST /api/crm/config/customer-groups`
+    - Group contacts for segmentation
 
-12. **Data Quality**
-    - Page: `/crm/tools/quality`
-    - API: `GET /api/contacts/quality`
-    - Identify incomplete or duplicate records
-
-13. **Duplicate Detection**
-    - Page: `/crm/tools/duplicates`
-    - API: `GET /api/contacts/duplicates`
-    - Find and merge duplicate contacts
-
-14. **Export/Import**
-    - Pages: `/crm/tools/export`, `/crm/tools/import`
-    - API: `GET/POST /api/contacts/export`, `POST /api/contacts/import`
-    - Bulk data operations
+12. **Sales Persons**
+    - Page: `/crm/segments/territories`
+    - API: `GET/POST /api/crm/config/sales-persons`
+    - Assign sales ownership
 
 ---
 
@@ -2462,12 +2443,12 @@ The Projects module includes these additional pages:
 
 5. **Relationship Analysis**
    - Page: `/insights/relationships`
-   - API: `GET /api/insights/relationships`
+   - API: `GET /api/insights/relationship-map`
    - Entity relationship mapping
 
 6. **Customer Segments**
    - Page: `/insights/segments`
-   - API: `GET /api/insights/segments`
+   - API: `GET /api/insights/customer-segments`
    - Segment distribution and analysis
 
 ---
@@ -2478,19 +2459,18 @@ The Projects module includes these additional pages:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/auth/token` | POST | Get JWT token |
-| `/api/auth/refresh` | POST | Refresh token |
-| `/api/auth/revoke` | POST | Revoke token |
+| `/api/auth/session` | POST | Set JWT as httpOnly cookie |
+| `/api/auth/session` | DELETE | Clear auth cookie |
 
 ### Core Entities
 
 | Module | Base Endpoint |
 |--------|---------------|
-| Contacts | `/api/contacts` |
+| Contacts | `/api/crm/contacts` |
 | Customers | `/api/customers` |
-| Invoices | `/api/accounting/invoices` |
-| Payments | `/api/accounting/payments` |
-| Bills | `/api/accounting/bills` |
+| Invoices | `/api/sales/invoices` |
+| Payments | `/api/accounting/ar-payments`, `/api/accounting/ap-payments` |
+| Bills | `/api/accounting/accounts-payable` |
 | Employees | `/api/hr/employees` |
 | Tickets | `/api/support/tickets` |
 | Inventory | `/api/inventory` |
@@ -2502,8 +2482,8 @@ The Projects module includes these additional pages:
 | Balance Sheet | `/api/accounting/balance-sheet` |
 | Income Statement | `/api/accounting/income-statement` |
 | Trial Balance | `/api/accounting/trial-balance` |
-| AR Aging | `/api/accounting/receivables/aging` |
-| AP Aging | `/api/accounting/payables/aging` |
+| AR Aging | `/api/accounting/receivables-aging` |
+| AP Aging | `/api/accounting/payables-aging` |
 
 ---
 

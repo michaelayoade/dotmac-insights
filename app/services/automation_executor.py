@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 
 import structlog
@@ -125,7 +125,7 @@ class AutomationExecutor:
 
             # Update rule stats
             rule.execution_count += 1
-            rule.last_executed_at = datetime.utcnow()
+            rule.last_executed_at = datetime.now(timezone.utc)
 
             # Check if we should stop processing
             if rule.stop_processing:
@@ -155,7 +155,7 @@ class AutomationExecutor:
             return True
 
         # Count executions in last hour
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
         recent_count = self.db.query(func.count(AutomationLog.id)).filter(
             AutomationLog.rule_id == rule.id,
             AutomationLog.created_at >= one_hour_ago,
@@ -565,7 +565,7 @@ class AutomationExecutor:
         Returns:
             List of idle tickets
         """
-        threshold = datetime.utcnow() - timedelta(hours=idle_hours)
+        threshold = datetime.now(timezone.utc) - timedelta(hours=idle_hours)
 
         return self.db.query(Ticket).filter(
             Ticket.status.in_([

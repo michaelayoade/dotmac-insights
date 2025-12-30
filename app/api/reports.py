@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, text, extract
 from typing import Dict, Any, Optional, List
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 
@@ -79,7 +79,7 @@ async def get_reports_cache_metadata() -> Dict[str, Any]:
     ]
     client = await get_redis_client()
     return {
-        "as_of": datetime.utcnow().isoformat() + "Z",
+        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
         "presets": CACHE_TTL,
         "cache_available": client is not None,
         "keys": cache_keys,

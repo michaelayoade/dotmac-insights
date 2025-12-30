@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
+import './leaflet.css';
 import { Providers } from '@/components/Providers';
 import AppShell from '@/components/AppShell';
 

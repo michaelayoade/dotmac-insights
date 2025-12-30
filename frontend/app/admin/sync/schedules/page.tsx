@@ -82,7 +82,7 @@ function ScheduleRow({
           <span>{schedule.task_name.split('.').pop()}</span>
           {schedule.run_count > 0 && <span>Runs: {schedule.run_count}</span>}
           {schedule.last_run_at && (
-            <span>Last: {formatRelativeTime(new Date(schedule.last_run_at))}</span>
+            <span>Last: {formatRelativeTime(schedule.last_run_at)}</span>
           )}
         </div>
       </div>

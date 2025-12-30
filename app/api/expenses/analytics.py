@@ -1,7 +1,7 @@
 """Corporate card analytics endpoints."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, Any, List, cast
 
@@ -33,7 +33,7 @@ def get_card_analytics_overview(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get overview metrics for corporate cards."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     # Card counts
@@ -121,7 +121,7 @@ def get_spend_trend(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get monthly spend trend."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     spend = db.query(
@@ -174,7 +174,7 @@ def get_top_merchants(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get top merchants by spend."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days)
 
     merchants = db.query(
@@ -221,7 +221,7 @@ def get_by_category(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get spend breakdown by merchant category code."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days)
 
     categories = db.query(
@@ -285,7 +285,7 @@ def get_card_utilization(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get spend vs limit for each active card."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days)
 
     # Get active cards with their spend
@@ -331,7 +331,7 @@ def get_status_breakdown(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get transaction count and spend by status."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days)
 
     statuses = db.query(
@@ -377,7 +377,7 @@ def get_top_spenders(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get top spending cards/employees."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=days)
 
     spenders = db.query(
@@ -427,7 +427,7 @@ def get_reconciliation_trend(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get monthly reconciliation rate trend."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     trend = db.query(

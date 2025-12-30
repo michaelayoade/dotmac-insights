@@ -507,7 +507,8 @@ export default function MigrationDetailPage() {
   } = useQuery({
     queryKey: ['migration', 'job', jobId],
     queryFn: () => migrationApi.getJob(jobId),
-    refetchInterval: (data) => (data?.status === 'running' ? 2000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? 2000 : false,
   });
 
   const { data: schema } = useQuery({

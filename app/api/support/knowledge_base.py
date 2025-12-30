@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -377,7 +377,7 @@ def create_article(
     )
 
     if payload.status == ArticleStatus.PUBLISHED.value:
-        article.published_at = datetime.utcnow()
+        article.published_at = datetime.now(timezone.utc)
 
     db.add(article)
     db.commit()
@@ -507,7 +507,7 @@ def publish_article(
         raise HTTPException(status_code=404, detail="Article not found")
 
     article.status = ArticleStatus.PUBLISHED.value
-    article.published_at = datetime.utcnow()
+    article.published_at = datetime.now(timezone.utc)
     db.commit()
     return {"id": article.id, "status": article.status, "published_at": article.published_at.isoformat()}
 

@@ -5,7 +5,7 @@ Provides immutable audit logging for all accounting operations.
 All changes to accounting documents are recorded with full before/after state.
 """
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, date, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -84,7 +84,7 @@ class AuditLogger:
             user_agent=user_agent,
             request_id=request_id,
             remarks=remarks,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
         self.db.add(entry)
         # Flush immediately to ensure the log is persisted
@@ -390,6 +390,8 @@ def serialize_for_audit(obj: Any) -> Dict[str, Any]:
 
         # Convert special types
         if isinstance(value, datetime):
+            value = value.isoformat()
+        elif isinstance(value, date):
             value = value.isoformat()
         elif isinstance(value, Decimal):
             value = str(value)

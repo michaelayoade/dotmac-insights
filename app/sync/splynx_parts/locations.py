@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.pop import Pop
@@ -21,7 +21,7 @@ async def sync_locations(sync_client, client, full_sync: bool):
 
             if existing:
                 existing.name = name
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 pop = Pop(

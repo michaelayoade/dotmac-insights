@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import structlog
 
@@ -71,7 +71,7 @@ async def sync_routers(sync_client, client, full_sync: bool):
                 existing.partners_ids = partners_ids
                 existing.additional_attributes = additional_attributes
                 existing.status = router_data.get("status")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 router = Router(

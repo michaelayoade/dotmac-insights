@@ -5,7 +5,7 @@ and breach detection.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, date, time, timezone
 from decimal import Decimal
 from typing import Optional, Dict, Any, List, Tuple
 
@@ -374,7 +374,7 @@ class SLAEngine:
             return {"policy_applied": False, "message": "No applicable SLA policy"}
 
         calendar = policy.calendar
-        start_time = ticket.opening_date or ticket.created_at or datetime.utcnow()
+        start_time = ticket.opening_date or ticket.created_at or datetime.now(timezone.utc)
 
         targets_set: List[Dict[str, Any]] = []
         updates: Dict[str, Any] = {
@@ -417,7 +417,7 @@ class SLAEngine:
                 "deadline": resolution_by.isoformat(),
             })
 
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info(
@@ -435,7 +435,7 @@ class SLAEngine:
         Returns:
             Dict with status for each SLA target (time remaining, breached, etc.)
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         policy = self.get_applicable_policy(ticket)
         calendar = policy.calendar if policy else None
 
@@ -511,7 +511,7 @@ class SLAEngine:
         Returns:
             List of tickets needing attention
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         warning_threshold = now + timedelta(minutes=threshold_minutes)
 
         # Find tickets with approaching first response deadline
@@ -546,7 +546,7 @@ class SLAEngine:
         Returns:
             List of (ticket, breach_type) tuples
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         breaches = []
 
         # First response breaches
@@ -597,7 +597,7 @@ class SLAEngine:
             target_type=target_type,
             target_hours=target_hours,
             actual_hours=actual_hours,
-            breached_at=datetime.utcnow(),
+            breached_at=datetime.now(timezone.utc),
         )
         self.db.add(breach)
         self.db.commit()
@@ -649,7 +649,7 @@ class SLAEngine:
                     )
                     if target:
                         start_time = ticket.opening_date or ticket.created_at
-                        actual_hours = (datetime.utcnow() - start_time).total_seconds() / 3600
+                        actual_hours = (datetime.now(timezone.utc) - start_time).total_seconds() / 3600
                         self.log_breach(
                             ticket,
                             breach_type,

@@ -11,7 +11,7 @@ This module handles syncing of accounting-related entities:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -81,7 +81,7 @@ async def sync_bank_accounts(
                 existing.is_company_account = ba_data.get("is_company_account", 1) == 1
                 existing.is_default = ba_data.get("is_default", 0) == 1
                 existing.disabled = ba_data.get("disabled", 0) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 bank_account = BankAccount(
@@ -150,7 +150,7 @@ async def sync_accounts(
                 existing.is_group = acc_data.get("is_group", 0) == 1
                 existing.disabled = acc_data.get("disabled", 0) == 1
                 existing.balance_must_be = acc_data.get("balance_must_be")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 account = Account(
@@ -226,7 +226,7 @@ async def sync_journal_entries(
                 existing.user_remark = entry_data.get("user_remark")
                 existing.is_opening = entry_data.get("is_opening") == "Yes"
                 existing.docstatus = entry_data.get("docstatus", 0)
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if entry_data.get("posting_date"):
                     try:
@@ -327,7 +327,7 @@ async def sync_purchase_invoices(
                 existing.currency = inv_data.get("currency", "NGN")
                 existing.status = status
                 existing.docstatus = inv_data.get("docstatus", 0)
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if inv_data.get("posting_date"):
                     try:
@@ -416,7 +416,7 @@ async def sync_gl_entries(
                 existing.company = gl_data.get("company")
                 existing.fiscal_year = gl_data.get("fiscal_year")
                 existing.is_cancelled = gl_data.get("is_cancelled", 0) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if gl_data.get("posting_date"):
                     try:
@@ -526,7 +526,7 @@ async def sync_bank_transactions(
                 existing.unallocated_amount = Decimal(str(txn_data.get("unallocated_amount", 0) or 0))
                 existing.allocated_amount = Decimal(str(txn_data.get("allocated_amount", 0) or 0))
                 existing.docstatus = txn_data.get("docstatus", 0)
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if txn_data.get("date"):
                     try:
@@ -618,7 +618,7 @@ async def sync_suppliers(
                 existing.disabled = sup_data.get("disabled", 0) == 1
                 existing.is_frozen = sup_data.get("is_frozen", 0) == 1
                 existing.on_hold = sup_data.get("on_hold", 0) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 supplier = Supplier(
@@ -689,7 +689,7 @@ async def sync_modes_of_payment(
                 existing.mode_of_payment = str(mode_data.get("mode_of_payment") or erpnext_id)
                 existing.type = payment_type
                 existing.enabled = mode_data.get("enabled", 1) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 mode = ModeOfPayment(
@@ -740,7 +740,7 @@ async def sync_cost_centers(
                 existing.disabled = cc_data.get("disabled", 0) == 1
                 existing.lft = cc_data.get("lft")
                 existing.rgt = cc_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 cost_center = CostCenter(
@@ -792,7 +792,7 @@ async def sync_fiscal_years(
                 existing.is_short_year = fy_data.get("is_short_year", 0) == 1
                 existing.disabled = fy_data.get("disabled", 0) == 1
                 existing.auto_created = fy_data.get("auto_created", 0) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if fy_data.get("year_start_date"):
                     try:
@@ -973,7 +973,7 @@ async def sync_invoices(
                 target_invoice.balance = Decimal(str(outstanding))
                 target_invoice.status = status
                 target_invoice.currency = inv_data.get("currency", "NGN")
-                target_invoice.last_synced_at = datetime.utcnow()
+                target_invoice.last_synced_at = datetime.now(timezone.utc)
 
                 posting_dt = sync_client._parse_iso_date(inv_data.get("posting_date"))
                 if posting_dt:
@@ -1003,7 +1003,7 @@ async def sync_invoices(
                     balance=outstanding,
                     status=status,
                     currency=inv_data.get("currency", "NGN"),
-                    invoice_date=datetime.utcnow(),
+                    invoice_date=datetime.now(timezone.utc),
                 )
 
                 posting_dt = sync_client._parse_iso_date(inv_data.get("posting_date"))
@@ -1162,7 +1162,7 @@ async def sync_payments(
                 target_payment.amount = Decimal(str(amount))
                 target_payment.payment_method = payment_method
                 target_payment.transaction_reference = pay_data.get("reference_no")
-                target_payment.last_synced_at = datetime.utcnow()
+                target_payment.last_synced_at = datetime.now(timezone.utc)
 
                 posting_dt = sync_client._parse_iso_date(pay_data.get("posting_date"))
                 if posting_dt:
@@ -1194,7 +1194,7 @@ async def sync_payments(
                     payment_method=payment_method,
                     receipt_number=erpnext_id,
                     transaction_reference=pay_data.get("reference_no"),
-                    payment_date=datetime.utcnow(),
+                    payment_date=datetime.now(timezone.utc),
                 )
 
                 posting_dt = sync_client._parse_iso_date(pay_data.get("posting_date"))
@@ -1335,7 +1335,7 @@ async def sync_expenses(
                 # Task
                 existing.erpnext_task = exp_data.get("task")
 
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 # Dates
                 if exp_data.get("posting_date"):
@@ -1407,9 +1407,9 @@ async def sync_expenses(
                         expense.posting_date = datetime.fromisoformat(exp_data["posting_date"])
                         expense.expense_date = expense.posting_date
                     except (ValueError, TypeError):
-                        expense.expense_date = datetime.utcnow()
+                        expense.expense_date = datetime.now(timezone.utc)
                 else:
-                    expense.expense_date = datetime.utcnow()
+                    expense.expense_date = datetime.now(timezone.utc)
 
                 if exp_data.get("clearance_date"):
                     try:

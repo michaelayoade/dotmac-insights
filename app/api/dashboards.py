@@ -1165,6 +1165,242 @@ async def get_field_service_dashboard(
 
 
 # =============================================================================
+# FIELD SERVICE SCHEDULE - Calendar/Dispatch View (3 calls → 1)
+# =============================================================================
+
+@router.get("/field-service-schedule", dependencies=[Depends(Require("field_service:read"))])
+@cached("dashboard-fs-schedule", ttl=CACHE_TTL["short"])
+async def get_field_service_schedule_dashboard(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    team_id: Optional[int] = Query(default=None, description="Filter by team ID"),
+    technician_id: Optional[int] = Query(default=None, description="Filter by technician ID"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Field Service Schedule endpoint for calendar and dispatch views.
+
+    Combines data from:
+    - Teams list with members
+    - Calendar events (service orders in date range)
+    - Dispatch board (technician assignments and workload)
+    - Summary metrics
+    """
+    from app.models.field_service import (
+        ServiceOrder,
+        ServiceOrderStatus,
+        ServiceOrderPriority,
+        FieldTeam,
+        FieldTeamMember,
+    )
+    from app.models.employee import Employee, EmploymentStatus
+
+    now = datetime.now(timezone.utc)
+
+    # Parse dates
+    start = _parse_date_param(start_date, "start_date")
+    end = _parse_date_param(end_date, "end_date")
+    if not start or not end:
+        raise HTTPException(status_code=400, detail="start_date and end_date are required")
+
+    start_dt = datetime.combine(start, datetime.min.time())
+    end_dt = datetime.combine(end, datetime.max.time())
+
+    # =========== TEAMS DATA ===========
+    teams_query = db.query(FieldTeam).filter(FieldTeam.is_active == True)
+    if team_id:
+        teams_query = teams_query.filter(FieldTeam.id == team_id)
+
+    teams_list = []
+    for team in teams_query.all():
+        members = []
+        for membership in db.query(FieldTeamMember).filter(
+            FieldTeamMember.team_id == team.id,
+            FieldTeamMember.is_active == True
+        ).all():
+            emp = db.query(Employee).filter(Employee.id == membership.employee_id).first()
+            if emp:
+                members.append({
+                    "id": emp.id,
+                    "name": emp.name,
+                    "role": membership.role,
+                    "avatar_url": None,  # Add if available
+                })
+
+        teams_list.append({
+            "id": team.id,
+            "name": team.name,
+            "max_daily_orders": team.max_daily_orders,
+            "members": members,
+            "member_count": len(members),
+        })
+
+    # =========== CALENDAR EVENTS ===========
+    orders_query = db.query(ServiceOrder).filter(
+        ServiceOrder.scheduled_date >= start,
+        ServiceOrder.scheduled_date <= end,
+    )
+    if team_id:
+        orders_query = orders_query.filter(ServiceOrder.assigned_team_id == team_id)
+    if technician_id:
+        orders_query = orders_query.filter(ServiceOrder.assigned_technician_id == technician_id)
+
+    calendar_events = []
+    for order in orders_query.order_by(ServiceOrder.scheduled_date.asc(), ServiceOrder.scheduled_start_time.asc()).all():
+        # Calculate start/end datetimes
+        order_start = datetime.combine(order.scheduled_date, order.scheduled_start_time or datetime.min.time())
+        if order.scheduled_end_time:
+            order_end = datetime.combine(order.scheduled_date, order.scheduled_end_time)
+        else:
+            # Default to estimated duration
+            order_end = order_start + timedelta(hours=float(order.estimated_duration_hours or 1))
+
+        # Get technician name
+        technician_name = order.technician.name if order.technician else None
+
+        # Determine color based on status/priority
+        color_map = {
+            ServiceOrderStatus.COMPLETED: "success",
+            ServiceOrderStatus.CANCELLED: "default",
+            ServiceOrderStatus.FAILED: "danger",
+            ServiceOrderStatus.IN_PROGRESS: "info",
+            ServiceOrderStatus.ON_SITE: "info",
+            ServiceOrderStatus.EN_ROUTE: "warning",
+            ServiceOrderStatus.PENDING_PARTS: "warning",
+        }
+        color = color_map.get(order.status, "default")
+        if order.priority in [ServiceOrderPriority.URGENT, ServiceOrderPriority.EMERGENCY]:
+            color = "danger"
+
+        calendar_events.append({
+            "id": str(order.id),
+            "title": order.title or order.order_number,
+            "start": order_start.isoformat(),
+            "end": order_end.isoformat(),
+            "allDay": False,
+            "color": color,
+            "resourceId": str(order.assigned_technician_id) if order.assigned_technician_id else None,
+            "metadata": {
+                "order_number": order.order_number,
+                "order_type": order.order_type.value if order.order_type else None,
+                "status": order.status.value if order.status else None,
+                "priority": order.priority.value if order.priority else None,
+                "customer_name": order.customer.name if order.customer else None,
+                "customer_address": order.service_address,
+                "technician_id": order.assigned_technician_id,
+                "technician_name": technician_name,
+                "team_id": order.assigned_team_id,
+                "city": order.city,
+            },
+        })
+
+    # =========== DISPATCH BOARD (Today's view) ===========
+    today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
+
+    # Get all technicians with today's assignments
+    technicians_with_orders = db.query(
+        Employee.id,
+        Employee.name,
+        func.count(ServiceOrder.id).label("order_count"),
+    ).outerjoin(
+        ServiceOrder,
+        and_(
+            ServiceOrder.assigned_technician_id == Employee.id,
+            ServiceOrder.scheduled_date == today,
+        )
+    ).filter(
+        Employee.status == EmploymentStatus.ACTIVE,
+        Employee.id.in_(
+            db.query(FieldTeamMember.employee_id).filter(FieldTeamMember.is_active == True)
+        )
+    ).group_by(Employee.id, Employee.name).all()
+
+    dispatch_board = {
+        "date": today.isoformat(),
+        "resources": [],
+    }
+
+    for tech in technicians_with_orders:
+        # Get today's orders for this technician
+        tech_orders = db.query(ServiceOrder).filter(
+            ServiceOrder.assigned_technician_id == tech.id,
+            ServiceOrder.scheduled_date == today,
+        ).order_by(ServiceOrder.scheduled_start_time.asc()).all()
+
+        orders_summary = []
+        for o in tech_orders:
+            orders_summary.append({
+                "id": o.id,
+                "order_number": o.order_number,
+                "status": o.status.value if o.status else None,
+                "priority": o.priority.value if o.priority else None,
+                "scheduled_time": o.scheduled_start_time.isoformat() if o.scheduled_start_time else None,
+                "customer_name": o.customer.name if o.customer else None,
+                "city": o.city,
+            })
+
+        # Determine availability status
+        in_progress = any(o.status in [ServiceOrderStatus.IN_PROGRESS, ServiceOrderStatus.ON_SITE, ServiceOrderStatus.EN_ROUTE] for o in tech_orders)
+        completed_count = sum(1 for o in tech_orders if o.status == ServiceOrderStatus.COMPLETED)
+        pending_count = sum(1 for o in tech_orders if o.status in [ServiceOrderStatus.SCHEDULED, ServiceOrderStatus.DISPATCHED])
+
+        if in_progress:
+            availability = "busy"
+        elif pending_count > 0:
+            availability = "scheduled"
+        elif completed_count == len(tech_orders) and len(tech_orders) > 0:
+            availability = "done"
+        else:
+            availability = "available"
+
+        dispatch_board["resources"].append({
+            "id": str(tech.id),
+            "name": tech.name,
+            "order_count": tech.order_count,
+            "orders": orders_summary,
+            "completed": completed_count,
+            "pending": pending_count,
+            "availability": availability,
+        })
+
+    # =========== SUMMARY ===========
+    total_in_range = len(calendar_events)
+    by_status = {}
+    for event in calendar_events:
+        status = event["metadata"]["status"] or "unknown"
+        by_status[status] = by_status.get(status, 0) + 1
+
+    unassigned_count = db.query(func.count(ServiceOrder.id)).filter(
+        ServiceOrder.scheduled_date >= start,
+        ServiceOrder.scheduled_date <= end,
+        ServiceOrder.assigned_technician_id.is_(None),
+        ServiceOrder.status.notin_([ServiceOrderStatus.COMPLETED, ServiceOrderStatus.CANCELLED]),
+    ).scalar() or 0
+
+    overdue_count = db.query(func.count(ServiceOrder.id)).filter(
+        ServiceOrder.scheduled_date < today,
+        ServiceOrder.status.notin_([ServiceOrderStatus.COMPLETED, ServiceOrderStatus.CANCELLED]),
+    ).scalar() or 0
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "total_orders": total_in_range,
+            "unassigned": unassigned_count,
+            "overdue": overdue_count,
+            "by_status": by_status,
+        },
+
+        "teams": teams_list,
+        "calendar_events": calendar_events,
+        "dispatch_board": dispatch_board,
+    }
+
+
+# =============================================================================
 # ACCOUNTING DASHBOARD - Consolidated (11 calls → 1)
 # =============================================================================
 
@@ -1695,6 +1931,159 @@ async def get_hr_dashboard(
             "active_count": active_onboardings,
             "recent": recent_onboardings,
         },
+    }
+
+
+# =============================================================================
+# HR LEAVE DASHBOARD - Calendar/Schedule View (3 calls → 1)
+# =============================================================================
+
+@router.get("/hr-leave", dependencies=[Depends(Require("hr:read"))])
+@cached("dashboard-hr-leave", ttl=CACHE_TTL["short"])
+async def get_hr_leave_dashboard(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department ID"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated HR Leave Dashboard for calendar and scheduling views.
+
+    Combines data from:
+    - Leave calendar events
+    - Pending leave requests
+    - Leave balance summary
+    - Department-wise leave
+    """
+    from app.models.employee import Employee, EmploymentStatus
+    from app.models.hr_leave import LeaveApplication, LeaveApplicationStatus, LeaveType, LeaveAllocation
+
+    now = datetime.now(timezone.utc)
+
+    # Parse dates
+    start = _parse_date_param(start_date, "start_date")
+    end = _parse_date_param(end_date, "end_date")
+    if not start or not end:
+        raise HTTPException(status_code=400, detail="start_date and end_date are required")
+
+    # =========== SUMMARY METRICS ===========
+    pending_count = db.query(func.count(LeaveApplication.id)).filter(
+        LeaveApplication.status == LeaveApplicationStatus.OPEN
+    ).scalar() or 0
+
+    approved_count = db.query(func.count(LeaveApplication.id)).filter(
+        LeaveApplication.status == LeaveApplicationStatus.APPROVED,
+        LeaveApplication.from_date >= start,
+        LeaveApplication.to_date <= end,
+    ).scalar() or 0
+
+    # Today's absences
+    today = date.today()
+    on_leave_today = db.query(func.count(LeaveApplication.id)).filter(
+        LeaveApplication.status == LeaveApplicationStatus.APPROVED,
+        LeaveApplication.from_date <= today,
+        LeaveApplication.to_date >= today,
+    ).scalar() or 0
+
+    # =========== CALENDAR EVENTS ===========
+    leave_query = db.query(LeaveApplication).filter(
+        LeaveApplication.status.in_([LeaveApplicationStatus.APPROVED, LeaveApplicationStatus.OPEN]),
+        LeaveApplication.from_date <= end,
+        LeaveApplication.to_date >= start,
+    )
+
+    calendar_events = []
+    for leave in leave_query.order_by(LeaveApplication.from_date.asc()).all():
+        # Get employee info
+        employee = db.query(Employee).filter(Employee.id == leave.employee_id).first() if leave.employee_id else None
+        employee_name = leave.employee_name or (employee.name if employee else "Unknown")
+
+        # Determine color based on status and leave type
+        if leave.status == LeaveApplicationStatus.OPEN:
+            color = "warning"  # Pending
+        else:
+            color = "info"  # Approved
+
+        calendar_events.append({
+            "id": str(leave.id),
+            "title": f"{employee_name} - {leave.leave_type or 'Leave'}",
+            "start": leave.from_date.isoformat() if leave.from_date else None,
+            "end": leave.to_date.isoformat() if leave.to_date else None,
+            "allDay": True,
+            "color": color,
+            "resourceId": str(leave.employee_id) if leave.employee_id else None,
+            "metadata": {
+                "employee_id": leave.employee_id,
+                "employee_name": employee_name,
+                "leave_type": leave.leave_type,
+                "status": leave.status.value if leave.status else None,
+                "total_days": float(leave.total_leave_days) if leave.total_leave_days else None,
+                "reason": leave.description,
+                "department": employee.department if employee else None,
+            },
+        })
+
+    # =========== PENDING REQUESTS ===========
+    pending_requests = []
+    for leave in db.query(LeaveApplication).filter(
+        LeaveApplication.status == LeaveApplicationStatus.OPEN
+    ).order_by(LeaveApplication.posting_date.desc()).limit(10).all():
+        employee = db.query(Employee).filter(Employee.id == leave.employee_id).first() if leave.employee_id else None
+        employee_name = leave.employee_name or (employee.name if employee else "Unknown")
+
+        pending_requests.append({
+            "id": leave.id,
+            "employee_id": leave.employee_id,
+            "employee_name": employee_name,
+            "leave_type": leave.leave_type,
+            "from_date": leave.from_date.isoformat() if leave.from_date else None,
+            "to_date": leave.to_date.isoformat() if leave.to_date else None,
+            "total_days": float(leave.total_leave_days) if leave.total_leave_days else None,
+            "reason": leave.description,
+            "posting_date": leave.posting_date.isoformat() if leave.posting_date else None,
+            "department": employee.department if employee else None,
+        })
+
+    # =========== LEAVE BY TYPE ===========
+    leave_by_type = {}
+    type_query = db.query(
+        LeaveApplication.leave_type,
+        func.count(LeaveApplication.id).label("count"),
+        func.sum(LeaveApplication.total_leave_days).label("total_days"),
+    ).filter(
+        LeaveApplication.status == LeaveApplicationStatus.APPROVED,
+        LeaveApplication.from_date >= start,
+        LeaveApplication.to_date <= end,
+    ).group_by(LeaveApplication.leave_type).all()
+
+    for row in type_query:
+        leave_by_type[row.leave_type or "Unknown"] = {
+            "count": row.count,
+            "total_days": float(row.total_days or 0),
+        }
+
+    # =========== AVAILABLE LEAVE TYPES ===========
+    leave_types = []
+    for lt in db.query(LeaveType).all():
+        leave_types.append({
+            "name": lt.leave_type_name,
+            "max_days_allowed": float(lt.max_leaves_allowed) if lt.max_leaves_allowed else None,
+            "is_carry_forward": lt.is_carry_forward,
+        })
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "pending_approvals": pending_count,
+            "approved_in_range": approved_count,
+            "on_leave_today": on_leave_today,
+        },
+
+        "calendar_events": calendar_events,
+        "pending_requests": pending_requests,
+        "leave_by_type": leave_by_type,
+        "leave_types": leave_types,
     }
 
 
@@ -2621,4 +3010,319 @@ async def get_customers_dashboard(
         },
 
         "recent": recent_customers,
+    }
+
+
+# =============================================================================
+# CRM PIPELINE DASHBOARD - Consolidated (3 calls → 1)
+# =============================================================================
+
+@router.get("/crm-pipeline", dependencies=[Depends(Require("crm:read"))])
+@cached("dashboard-crm-pipeline", ttl=CACHE_TTL["short"])
+async def get_crm_pipeline_dashboard(
+    currency: Optional[str] = Query(default=None, description="Currency code"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated CRM Pipeline Dashboard endpoint.
+
+    Combines data from:
+    - Pipeline summary (open count, total value, weighted value, win rate)
+    - Pipeline stages with opportunities
+    - Kanban board view (opportunities by stage)
+    - Recent activities
+    """
+    now = datetime.now(timezone.utc)
+    currency = currency or "NGN"
+
+    # =========== PIPELINE SUMMARY ===========
+    # Open opportunities
+    open_count = db.query(func.count(Opportunity.id)).filter(
+        Opportunity.status == OpportunityStatus.OPEN,
+        *([Opportunity.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # Total value of open opportunities
+    total_value = db.query(func.sum(Opportunity.deal_value)).filter(
+        Opportunity.status == OpportunityStatus.OPEN,
+        *([Opportunity.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # Weighted value
+    weighted_value = db.query(func.sum(Opportunity.weighted_value)).filter(
+        Opportunity.status == OpportunityStatus.OPEN,
+        *([Opportunity.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # Won/Lost counts
+    won_count = db.query(func.count(Opportunity.id)).filter(
+        Opportunity.status == OpportunityStatus.WON,
+        *([Opportunity.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    lost_count = db.query(func.count(Opportunity.id)).filter(
+        Opportunity.status == OpportunityStatus.LOST,
+        *([Opportunity.currency == currency] if currency else [])
+    ).scalar() or 0
+
+    # Win rate
+    total_closed = won_count + lost_count
+    win_rate = round((won_count / total_closed * 100), 1) if total_closed > 0 else 0
+
+    # =========== PIPELINE STAGES ===========
+    stages = []
+    for stage in db.query(OpportunityStage).filter(
+        OpportunityStage.is_active == True
+    ).order_by(OpportunityStage.sequence).all():
+        # Count opportunities in this stage
+        stage_opps = db.query(
+            func.count(Opportunity.id).label("count"),
+            func.sum(Opportunity.deal_value).label("value"),
+        ).filter(
+            Opportunity.stage_id == stage.id,
+            Opportunity.status == OpportunityStatus.OPEN,
+            *([Opportunity.currency == currency] if currency else [])
+        ).first()
+
+        stages.append({
+            "id": stage.id,
+            "name": stage.name,
+            "sequence": stage.sequence,
+            "probability": stage.probability,
+            "is_won": stage.is_won,
+            "is_lost": stage.is_lost,
+            "color": stage.color,
+            "opportunity_count": stage_opps.count if stage_opps else 0,
+            "opportunity_value": float(stage_opps.value or 0) if stage_opps else 0,
+        })
+
+    # =========== KANBAN BOARD ===========
+    kanban_columns = []
+    for stage in stages:
+        # Get opportunities for this stage
+        opportunities = db.query(Opportunity).filter(
+            Opportunity.stage_id == stage["id"],
+            Opportunity.status == OpportunityStatus.OPEN,
+            *([Opportunity.currency == currency] if currency else [])
+        ).order_by(Opportunity.deal_value.desc()).limit(20).all()
+
+        cards = []
+        for opp in opportunities:
+            # Get contact name
+            contact_name = None
+            if opp.unified_contact:
+                contact_name = opp.unified_contact.display_name
+            elif opp.customer:
+                contact_name = opp.customer.name
+            elif opp.lead:
+                contact_name = opp.lead.lead_name
+
+            # Get owner name
+            owner_name = None
+            if opp.owner:
+                owner_name = opp.owner.name
+
+            cards.append({
+                "id": opp.id,
+                "title": opp.name,
+                "subtitle": contact_name,
+                "value": float(opp.deal_value),
+                "currency": opp.currency,
+                "probability": opp.probability,
+                "expected_close_date": opp.expected_close_date.isoformat() if opp.expected_close_date else None,
+                "owner_name": owner_name,
+                "owner_id": opp.owner_id,
+                "days_in_stage": None,  # Would need stage change tracking
+            })
+
+        kanban_columns.append({
+            "id": str(stage["id"]),
+            "title": stage["name"],
+            "color": stage["color"] or "default",
+            "count": stage["opportunity_count"],
+            "value": stage["opportunity_value"],
+            "cards": cards,
+        })
+
+    # =========== RECENT ACTIVITIES ===========
+    recent_activities = []
+    for activity in db.query(Activity).filter(
+        Activity.opportunity_id.isnot(None),
+        Activity.status != ActivityStatus.CANCELLED
+    ).order_by(Activity.scheduled_at.desc().nullslast()).limit(10).all():
+        # Get opportunity name
+        opp_name = None
+        if activity.opportunity:
+            opp_name = activity.opportunity.name
+
+        recent_activities.append({
+            "id": activity.id,
+            "activity_type": activity.activity_type.value if activity.activity_type else None,
+            "subject": activity.subject,
+            "status": activity.status.value if activity.status else None,
+            "scheduled_at": activity.scheduled_at.isoformat() if activity.scheduled_at else None,
+            "priority": activity.priority,
+            "opportunity_id": activity.opportunity_id,
+            "opportunity_name": opp_name,
+        })
+
+    return {
+        "generated_at": now.isoformat(),
+        "currency": currency,
+
+        "summary": {
+            "open_count": open_count,
+            "total_value": float(total_value),
+            "weighted_value": float(weighted_value),
+            "win_rate": win_rate,
+            "won_count": won_count,
+            "lost_count": lost_count,
+        },
+
+        "stages": stages,
+
+        "kanban": {
+            "columns": kanban_columns,
+        },
+
+        "recent_activities": recent_activities,
+    }
+
+
+# =============================================================================
+# LEADS DASHBOARD - Consolidated (3 calls → 1)
+# =============================================================================
+
+@router.get("/leads", dependencies=[Depends(Require("crm:read"))])
+@cached("dashboard-leads", ttl=CACHE_TTL["short"])
+async def get_leads_dashboard(
+    status: Optional[str] = Query(default=None, description="Filter by lead status"),
+    source: Optional[str] = Query(default=None, description="Filter by lead source"),
+    limit: int = Query(default=50, ge=1, le=100, description="Number of leads to return"),
+    offset: int = Query(default=0, ge=0, description="Offset for pagination"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Consolidated Leads Dashboard endpoint.
+
+    Combines data from:
+    - Leads summary (total, by status)
+    - Lead sources breakdown
+    - Leads list with pagination
+    - Recent conversions
+    """
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+
+    # =========== LEADS SUMMARY ===========
+    total_leads = db.query(func.count(ERPNextLead.id)).scalar() or 0
+
+    # By status
+    status_counts = {}
+    for row in db.query(
+        ERPNextLead.status,
+        func.count(ERPNextLead.id).label("count")
+    ).group_by(ERPNextLead.status).all():
+        status_counts[row.status.value if row.status else "unknown"] = row.count
+
+    # New leads (last 30 days)
+    new_leads_count = db.query(func.count(ERPNextLead.id)).filter(
+        ERPNextLead.created_at >= thirty_days_ago
+    ).scalar() or 0
+
+    # Converted leads (last 30 days)
+    converted_count = db.query(func.count(ERPNextLead.id)).filter(
+        ERPNextLead.converted == True,
+        ERPNextLead.updated_at >= thirty_days_ago
+    ).scalar() or 0
+
+    # =========== SOURCES ===========
+    sources = []
+    for row in db.query(
+        ERPNextLead.source,
+        func.count(ERPNextLead.id).label("count")
+    ).filter(
+        ERPNextLead.source.isnot(None)
+    ).group_by(ERPNextLead.source).order_by(
+        func.count(ERPNextLead.id).desc()
+    ).limit(10).all():
+        sources.append({
+            "source": row.source,
+            "count": row.count,
+        })
+
+    # =========== LEADS LIST ===========
+    leads_query = db.query(ERPNextLead)
+
+    # Apply filters
+    if status:
+        try:
+            status_enum = ERPNextLeadStatus(status)
+            leads_query = leads_query.filter(ERPNextLead.status == status_enum)
+        except ValueError:
+            pass  # Invalid status, ignore filter
+
+    if source:
+        leads_query = leads_query.filter(ERPNextLead.source == source)
+
+    # Get total for pagination
+    total_filtered = leads_query.count()
+
+    # Get paginated leads
+    leads_list = []
+    for lead in leads_query.order_by(
+        ERPNextLead.created_at.desc()
+    ).offset(offset).limit(limit).all():
+        leads_list.append({
+            "id": lead.id,
+            "lead_name": lead.lead_name,
+            "company_name": lead.company_name,
+            "email_id": lead.email_id,
+            "phone": lead.phone or lead.mobile_no,
+            "source": lead.source,
+            "status": lead.status.value if lead.status else None,
+            "lead_owner": lead.lead_owner,
+            "territory": lead.territory,
+            "industry": lead.industry,
+            "city": lead.city,
+            "state": lead.state,
+            "converted": lead.converted,
+            "created_at": lead.created_at.isoformat() if lead.created_at else None,
+            "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
+        })
+
+    # =========== RECENT CONVERSIONS ===========
+    recent_conversions = []
+    for lead in db.query(ERPNextLead).filter(
+        ERPNextLead.converted == True
+    ).order_by(ERPNextLead.updated_at.desc()).limit(5).all():
+        recent_conversions.append({
+            "id": lead.id,
+            "lead_name": lead.lead_name,
+            "company_name": lead.company_name,
+            "source": lead.source,
+            "converted_at": lead.updated_at.isoformat() if lead.updated_at else None,
+            "customer_id": lead.customer_id,
+        })
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "summary": {
+            "total": total_leads,
+            "new_30d": new_leads_count,
+            "converted_30d": converted_count,
+            "by_status": status_counts,
+        },
+
+        "sources": sources,
+
+        "leads": {
+            "items": leads_list,
+            "total": total_filtered,
+            "limit": limit,
+            "offset": offset,
+        },
+
+        "recent_conversions": recent_conversions,
     }

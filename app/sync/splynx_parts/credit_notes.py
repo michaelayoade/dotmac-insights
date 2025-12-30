@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.credit_note import CreditNote, CreditNoteStatus
@@ -62,7 +62,7 @@ async def sync_credit_notes(sync_client, client, full_sync: bool):
                 existing.issue_date = issue_date
                 existing.applied_date = applied_date
                 existing.description = note.get("comment") or note.get("description")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 credit = CreditNote(

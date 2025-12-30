@@ -1,7 +1,7 @@
 """Document Posting service for posting documents to the GL."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 
@@ -439,7 +439,7 @@ class DocumentPostingService:
 
             je = self._create_journal_entry(
                 voucher_type=original.voucher_type,
-                posting_date=datetime.utcnow(),
+                posting_date=datetime.now(timezone.utc),
                 entries=reversal_entries,
                 user_remark=f"Reversal of {original.erpnext_id}: {reason}",
                 company=original.company,

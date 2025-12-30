@@ -116,7 +116,7 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 existing.amount_paid = amount_paid
                 existing.balance = total_amount - amount_paid
                 existing.status = status
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 date_created = inv_data.get("date_created", inv_data.get("real_create_datetime", ""))
                 parsed_date = parse_date(date_created)
@@ -135,7 +135,7 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                     amount_paid=amount_paid,
                     balance=total_amount - amount_paid,
                     status=status,
-                    invoice_date=datetime.utcnow(),
+                    invoice_date=datetime.now(timezone.utc),
                 )
 
                 date_created = inv_data.get("date_created", inv_data.get("real_create_datetime", ""))

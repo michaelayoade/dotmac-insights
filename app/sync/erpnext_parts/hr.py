@@ -10,7 +10,7 @@ This module handles syncing of HR-related entities:
 """
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
@@ -221,7 +221,7 @@ async def sync_employees(
                 existing.reports_to = emp_data.get("reports_to")
                 existing.status = status
                 existing.employment_type = emp_data.get("employment_type")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 join_date = _parse_datetime(emp_data.get("date_of_joining"))
                 if join_date:
@@ -294,7 +294,7 @@ async def sync_departments(
                 existing.is_group = dept_data.get("is_group", 0) == 1
                 existing.lft = dept_data.get("lft")
                 existing.rgt = dept_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 department = Department(
@@ -342,7 +342,7 @@ async def sync_designations(
             if existing:
                 existing.designation_name = desig_data.get("designation_name") or str(erpnext_id or "")
                 existing.description = desig_data.get("description")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 designation = Designation(
@@ -402,7 +402,7 @@ async def sync_erpnext_users(
                 existing.enabled = user_data.get("enabled", 1) == 1
                 existing.user_type = user_data.get("user_type")
                 existing.employee_id = employee_id
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 erpnext_user = ERPNextUser(
@@ -453,7 +453,7 @@ async def sync_hd_teams(
                 existing.description = team_data.get("description")
                 existing.assignment_rule = team_data.get("assignment_rule")
                 existing.ignore_restrictions = team_data.get("ignore_restrictions", 0) == 1
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 team = existing
                 sync_client.increment_updated()
             else:
@@ -585,7 +585,7 @@ async def sync_salary_components(
                 existing.do_not_include_in_total = _coerce_bool(comp_data.get("do_not_include_in_total"))
                 existing.disabled = _coerce_bool(comp_data.get("disabled"))
                 existing.default_account = comp_data.get("default_account")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 component = SalaryComponent(
@@ -680,7 +680,7 @@ async def sync_salary_structures(
                 existing.currency = structure_data.get("currency") or existing.currency
                 existing.payment_account = structure_data.get("payment_account")
                 existing.mode_of_payment = structure_data.get("mode_of_payment")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 structure = existing
                 sync_client.increment_updated()
             else:
@@ -823,7 +823,7 @@ async def sync_payroll_entries(
                 existing.salary_slips_created = _coerce_bool(entry_data.get("salary_slips_created"))
                 existing.salary_slips_submitted = _coerce_bool(entry_data.get("salary_slips_submitted"))
                 existing.docstatus = int(entry_data.get("docstatus") or 0)
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 entry = PayrollEntry(
@@ -953,7 +953,7 @@ async def sync_salary_slips(
                 existing.bank_name = slip_data.get("bank_name")
                 existing.bank_account_no = slip_data.get("bank_account_no")
                 existing.payroll_entry = slip_data.get("payroll_entry")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 slip = existing
                 sync_client.increment_updated()
             else:
@@ -1111,7 +1111,7 @@ async def sync_leave_types(
                 existing.is_earned_leave = _coerce_bool(lt_data.get("is_earned_leave"))
                 existing.earned_leave_frequency = lt_data.get("earned_leave_frequency")
                 existing.rounding = _parse_decimal(lt_data.get("rounding"), Decimal("0.5"))
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 leave_type = LeaveType(
@@ -1229,7 +1229,7 @@ async def sync_leave_allocations(
                 existing.status = status
                 existing.docstatus = int(alloc_data.get("docstatus") or 0)
                 existing.company = alloc_data.get("company")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 allocation = LeaveAllocation(
@@ -1359,7 +1359,7 @@ async def sync_leave_applications(
                 existing.docstatus = int(app_data.get("docstatus") or 0)
                 existing.posting_date = posting_date
                 existing.company = app_data.get("company")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 application = LeaveApplication(
@@ -1488,7 +1488,7 @@ async def sync_attendances(
                 existing.early_exit = _coerce_bool(att_data.get("early_exit"))
                 existing.company = att_data.get("company")
                 existing.docstatus = int(att_data.get("docstatus") or 0)
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 attendance = Attendance(

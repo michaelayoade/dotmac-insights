@@ -863,3 +863,125 @@ export { BackButton, type BackButtonProps } from './BackButton';
 
 // Re-export module types for convenience
 export type { ModuleKey } from '@/lib/config/modules';
+
+// =============================================================================
+// NEW LAYOUT COMPONENTS
+// =============================================================================
+
+export { SplitPane, type SplitPaneProps } from './SplitPane';
+export {
+  KanbanBoard,
+  KanbanColumn,
+  KanbanCard,
+  OpportunityCard,
+  TaskCard,
+  type KanbanBoardProps,
+  type KanbanColumnProps,
+  type KanbanCardProps,
+  type KanbanItem,
+  type KanbanColumnType,
+  type DragResult,
+  type OpportunityCardProps,
+  type OpportunityCardData,
+  type TaskCardProps,
+  type TaskCardData,
+} from './KanbanBoard';
+export {
+  CalendarGrid,
+  CalendarHeader,
+  CalendarMonthView,
+  CalendarWeekView,
+  type CalendarGridProps,
+  type CalendarHeaderProps,
+  type CalendarMonthViewProps,
+  type CalendarWeekViewProps,
+  type CalendarView,
+  type CalendarEvent,
+  type CalendarResource,
+} from './CalendarGrid';
+
+// =============================================================================
+// NEW DATA DISPLAY COMPONENTS
+// =============================================================================
+
+export { Timeline, TimelineItemComponent, type TimelineProps, type TimelineItem, type TimelineItemComponentProps } from './Timeline';
+export { ProgressRing, ProgressBar, type ProgressRingProps, type ProgressBarProps } from './ProgressRing';
+export { TrendIndicator, TrendBadge, ComparisonIndicator, type TrendIndicatorProps, type TrendBadgeProps, type ComparisonIndicatorProps } from './TrendIndicator';
+export { CountdownTimer, SLATimer, DeadlineBadge, type CountdownTimerProps, type SLATimerProps, type DeadlineBadgeProps } from './CountdownTimer';
+
+// =============================================================================
+// HIERARCHICAL & DATA ENTRY COMPONENTS
+// =============================================================================
+
+export {
+  TreeView,
+  buildTree,
+  findNode,
+  getAncestorIds,
+  flattenTree,
+  type TreeViewProps,
+  type TreeNode,
+} from './TreeView';
+
+export {
+  LineItemEditor,
+  LineItemRow,
+  type LineItemEditorProps,
+  type LineItemRowProps,
+  type LineItemColumn,
+  type TotalConfig,
+  type LineItemValidation,
+  type ColumnType,
+  type SelectOption as LineItemSelectOption,
+} from './LineItemEditor';
+
+// =============================================================================
+// CONVERSATION & COMMUNICATION COMPONENTS
+// =============================================================================
+
+export {
+  ConversationThread,
+  type ConversationThreadProps,
+  type ThreadMessage,
+  type MessageAuthor,
+  type MessageAttachment,
+  type MessageReaction,
+  type MessageStatus,
+} from './ConversationThread';
+
+// =============================================================================
+// WIZARD & WORKFLOW COMPONENTS
+// =============================================================================
+
+export {
+  MultiStepForm,
+  StepIndicator,
+  type MultiStepFormProps,
+  type StepIndicatorProps,
+  type FormStep,
+  type StepStatus,
+  type StepState,
+  type MultiStepFormState,
+} from './MultiStepForm';
+
+export {
+  ApprovalChain,
+  ApprovalSummary,
+  type ApprovalChainProps,
+  type ApprovalSummaryProps,
+  type ApprovalStep,
+  type ApprovalStatus,
+} from './ApprovalChain';
+
+// =============================================================================
+// DATA VISUALIZATION COMPONENTS
+// =============================================================================
+
+export {
+  Scorecard,
+  MiniScorecard,
+  type ScorecardProps,
+  type MiniScorecardProps,
+  type ScorecardMetric,
+  type ScorecardVariant,
+} from './Scorecard';

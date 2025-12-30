@@ -7,7 +7,7 @@ via Mono and Okra.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional, List
 
@@ -181,7 +181,7 @@ async def link_account(
             # Update existing connection
             connection.status = ConnectionStatus.CONNECTED
             connection.cached_balance = account.balance
-            connection.balance_updated_at = datetime.utcnow()
+            connection.balance_updated_at = datetime.now(timezone.utc)
         else:
             # Create new connection
             connection = OpenBankingConnection(
@@ -196,7 +196,7 @@ async def link_account(
                 account_type=account.account_type,
                 currency=account.currency,
                 cached_balance=account.balance,
-                balance_updated_at=datetime.utcnow() if account.balance else None,
+                balance_updated_at=datetime.now(timezone.utc) if account.balance else None,
                 bvn=account.bvn,
                 status=ConnectionStatus.CONNECTED,
             )
@@ -337,14 +337,14 @@ async def get_account_balance(
 
         # Update stored balance
         connection.cached_balance = balance
-        connection.balance_updated_at = datetime.utcnow()
+        connection.balance_updated_at = datetime.now(timezone.utc)
         await db.commit()
 
         return {
             "account_id": account_id,
             "balance": balance,
             "currency": connection.currency,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -387,7 +387,7 @@ async def get_account_transactions(
         )
 
         # Update last synced timestamp
-        connection.last_synced_at = datetime.utcnow()
+        connection.last_synced_at = datetime.now(timezone.utc)
         await db.commit()
 
         return [

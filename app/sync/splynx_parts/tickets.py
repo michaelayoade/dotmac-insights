@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketSource
@@ -114,7 +114,7 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                 existing.assigned_employee_id = assigned_employee_id
                 existing.opening_date = created_at
                 existing.resolution_date = updated_at if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] else None
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 ticket = Ticket(
@@ -128,7 +128,7 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                     priority=priority,
                     assigned_to=assigned_to_name or (str(assign_to_id) if assign_to_id else None),
                     assigned_employee_id=assigned_employee_id,
-                    opening_date=created_at or datetime.utcnow(),
+                    opening_date=created_at or datetime.now(timezone.utc),
                     resolution_date=updated_at if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] else None,
                 )
                 sync_client.db.add(ticket)

@@ -21,7 +21,7 @@ Usage:
 """
 import structlog
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -274,8 +274,8 @@ class LegacyTicketSync:
             erpnext_id=unified.erpnext_id,
             tags=unified.tags,
             opening_date=unified.created_at,
-            created_at=unified.created_at or datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=unified.created_at or datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self.db.add(ticket)
@@ -336,8 +336,8 @@ class LegacyTicketSync:
             region=ticket.region,
             base_station=ticket.base_station,
             tags=ticket.tags,
-            created_at=ticket.created_at or datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=ticket.created_at or datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self.db.add(unified)
@@ -396,8 +396,8 @@ class LegacyTicketSync:
             legacy_conversation_id=conv.id,
             labels=conv.labels.split(",") if conv.labels else None,
             message_count=conv.message_count or 0,
-            created_at=conv.created_at or datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=conv.created_at or datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self.db.add(unified)
@@ -448,7 +448,7 @@ class LegacyTicketSync:
         ticket.feedback_rating = unified.csat_rating
         ticket.feedback_text = unified.csat_feedback
         ticket.tags = unified.tags
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = datetime.now(timezone.utc)
 
         # Update link
         unified.legacy_ticket_id = ticket.id
@@ -496,7 +496,7 @@ class LegacyTicketSync:
         unified.region = ticket.region
         unified.base_station = ticket.base_station
         unified.tags = ticket.tags
-        unified.updated_at = datetime.utcnow()
+        unified.updated_at = datetime.now(timezone.utc)
 
         # Don't overwrite external IDs if already set
         if ticket.splynx_id and not unified.splynx_id:
@@ -543,7 +543,7 @@ class LegacyTicketSync:
         unified.resolution_time_seconds = conv.resolution_time_seconds
         unified.message_count = conv.message_count or 0
         unified.labels = conv.labels.split(",") if conv.labels else None
-        unified.updated_at = datetime.utcnow()
+        unified.updated_at = datetime.now(timezone.utc)
 
         # Don't overwrite chatwoot_conversation_id if already set
         if conv.chatwoot_id and not unified.chatwoot_conversation_id:

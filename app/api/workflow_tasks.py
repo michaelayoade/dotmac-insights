@@ -1,7 +1,7 @@
 """API endpoints for unified workflow tasks."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -338,7 +338,7 @@ async def schedule_reminder(
     from app.tasks.scheduled_actions import send_reminder
 
     # Validate remind_at is in the future
-    if request.remind_at <= datetime.utcnow():
+    if request.remind_at <= datetime.now(timezone.utc):
         raise HTTPException(
             status_code=400,
             detail="Reminder time must be in the future",

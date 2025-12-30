@@ -1,7 +1,7 @@
 """Service for scheduling delayed Celery tasks with tracking."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import structlog
@@ -61,7 +61,7 @@ class ScheduledTaskService:
             service = ScheduledTaskService(db)
             scheduled = service.schedule(
                 task=send_reminder,
-                eta=datetime.utcnow() + timedelta(days=3),
+                eta=datetime.now(timezone.utc) + timedelta(days=3),
                 kwargs={"entity_type": "lead", "entity_id": 123, "message": "Follow up"},
                 source_type="lead",
                 source_id=123,
@@ -153,7 +153,7 @@ class ScheduledTaskService:
 
         # Update tracking record
         scheduled_task.status = ScheduledTaskStatus.CANCELLED.value
-        scheduled_task.cancelled_at = datetime.utcnow()
+        scheduled_task.cancelled_at = datetime.now(timezone.utc)
         scheduled_task.cancelled_by_id = cancelled_by_id
         scheduled_task.cancellation_reason = reason
 
@@ -212,7 +212,7 @@ class ScheduledTaskService:
 
             # Update record
             task.status = ScheduledTaskStatus.CANCELLED.value
-            task.cancelled_at = datetime.utcnow()
+            task.cancelled_at = datetime.now(timezone.utc)
             task.cancelled_by_id = cancelled_by_id
             task.cancellation_reason = f"Source entity {source_type}:{source_id} cancelled"
             cancelled_count += 1
@@ -285,7 +285,7 @@ class ScheduledTaskService:
         if not scheduled_task:
             return None
 
-        scheduled_task.executed_at = datetime.utcnow()
+        scheduled_task.executed_at = datetime.now(timezone.utc)
 
         if error:
             scheduled_task.status = ScheduledTaskStatus.FAILED.value

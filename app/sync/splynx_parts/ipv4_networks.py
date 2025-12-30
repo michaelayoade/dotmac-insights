@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 import httpx
 
@@ -53,7 +53,7 @@ async def sync_ipv4_networks(sync_client, client: httpx.AsyncClient, full_sync: 
                     existing.allow_use_network_and_broadcast = bool(
                         net_data.get("allow_use_network_and_broadcast")
                     )
-                    existing.last_synced_at = datetime.utcnow()
+                    existing.last_synced_at = datetime.now(timezone.utc)
                     sync_client.increment_updated()
                 else:
                     network = IPv4Network(
@@ -72,7 +72,7 @@ async def sync_ipv4_networks(sync_client, client: httpx.AsyncClient, full_sync: 
                         allow_use_network_and_broadcast=bool(
                             net_data.get("allow_use_network_and_broadcast")
                         ),
-                        last_synced_at=datetime.utcnow(),
+                        last_synced_at=datetime.now(timezone.utc),
                     )
                     sync_client.db.add(network)
                     sync_client.increment_created()

@@ -281,7 +281,8 @@ class JournalEntry(Base):
 class JournalEntryItem(Base):
     """Line items for journal entries."""
 
-    __tablename__ = "journal_entry_items"
+    __tablename__ = "journal_entry_accounts"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     journal_entry_id: Mapped[int] = mapped_column(
@@ -294,6 +295,15 @@ class JournalEntryItem(Base):
     )  # FK for referential integrity
     debit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
     credit: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    debit_in_account_currency: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    credit_in_account_currency: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    exchange_rate: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("1")
+    )
 
     reference_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     reference_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -301,8 +311,6 @@ class JournalEntryItem(Base):
     party: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     idx: Mapped[int] = mapped_column(default=0)
-
-    created_at: Mapped[datetime] = mapped_column(default=utc_now)
 
     journal_entry: Mapped["JournalEntry"] = relationship(back_populates="items")
     account_rel: Mapped[Optional["Account"]] = relationship(

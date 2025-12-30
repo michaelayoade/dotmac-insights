@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -134,7 +134,7 @@ async def create_statement(
         period_start=payload.period_start,
         period_end=payload.period_end,
         statement_date=payload.statement_date,
-        import_date=datetime.utcnow(),
+        import_date=datetime.now(timezone.utc),
         import_source=payload.import_source,
         original_filename=payload.original_filename,
         status=StatementStatus.OPEN,
@@ -189,7 +189,7 @@ async def import_statement(
         period_start=payload.period_start,
         period_end=payload.period_end,
         statement_date=payload.statement_date,
-        import_date=datetime.utcnow(),
+        import_date=datetime.now(timezone.utc),
         import_source=payload.import_source,
         original_filename=payload.original_filename,
         status=StatementStatus.OPEN,
@@ -244,7 +244,7 @@ async def import_statement(
             authorization_code=txn_data.authorization_code,
             status=CardTransactionStatus.IMPORTED,
             import_hash=import_hash,
-            imported_at=datetime.utcnow(),
+            imported_at=datetime.now(timezone.utc),
         )
         db.add(transaction)
         total_amount += txn_data.amount
@@ -309,7 +309,7 @@ async def reconcile_statement(
     statement.matched_amount = matched_amount
     statement.unmatched_count = unmatched_count
     statement.status = StatementStatus.RECONCILED
-    statement.reconciled_at = datetime.utcnow()
+    statement.reconciled_at = datetime.now(timezone.utc)
     statement.reconciled_by_id = principal.id
 
     db.commit()
@@ -348,7 +348,7 @@ async def close_statement(
         raise HTTPException(status_code=400, detail="Statement must be reconciled before closing")
 
     statement.status = StatementStatus.CLOSED
-    statement.closed_at = datetime.utcnow()
+    statement.closed_at = datetime.now(timezone.utc)
     statement.closed_by_id = principal.id
 
     db.commit()

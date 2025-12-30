@@ -13,7 +13,7 @@ Usage:
     sync.sync_to_customer(unified_contact)
 """
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -160,8 +160,8 @@ class LegacyCustomerSync:
             deposit_balance=unified.deposit_balance,
             referrer=unified.referrer,
             notes=unified.notes,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self.db.add(customer)
@@ -211,7 +211,7 @@ class LegacyCustomerSync:
         customer.deposit_balance = unified.deposit_balance
         customer.referrer = unified.referrer
         customer.notes = unified.notes
-        customer.updated_at = datetime.utcnow()
+        customer.updated_at = datetime.now(timezone.utc)
 
         # Update link if needed
         unified.legacy_customer_id = customer.id
@@ -267,8 +267,8 @@ class LegacyCustomerSync:
             deposit_balance=customer.deposit_balance,
             referrer=customer.referrer,
             notes=customer.notes,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         self.db.add(unified)
@@ -327,7 +327,7 @@ class LegacyCustomerSync:
         unified.deposit_balance = customer.deposit_balance
         unified.referrer = customer.referrer
         unified.notes = customer.notes
-        unified.updated_at = datetime.utcnow()
+        unified.updated_at = datetime.now(timezone.utc)
 
         # Ensure link
         customer.unified_contact_id = unified.id

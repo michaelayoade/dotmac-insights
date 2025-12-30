@@ -1,7 +1,7 @@
 """Service for cash advance lifecycle."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING, Type
 
@@ -63,7 +63,7 @@ class CashAdvanceService:
 
         advance.status = CashAdvanceStatus.PENDING_APPROVAL
         advance.docstatus = 1
-        advance.submitted_at = datetime.utcnow()
+        advance.submitted_at = datetime.now(timezone.utc)
         advance.advance_number = advance.advance_number or self._generate_number(advance, company_code)
 
         engine = ApprovalEngine(self.db)
@@ -78,7 +78,7 @@ class CashAdvanceService:
         except WorkflowNotFoundError:
             # Auto-approve when no workflow is configured
             advance.status = CashAdvanceStatus.APPROVED
-            advance.approved_at = datetime.utcnow()
+            advance.approved_at = datetime.now(timezone.utc)
             advance.approved_by_id = user_id
             approval = None
 
@@ -111,7 +111,7 @@ class CashAdvanceService:
             raise ValidationError("Advance must be approved before disbursement")
 
         advance.disbursed_amount += amount
-        advance.disbursed_at = datetime.utcnow()
+        advance.disbursed_at = datetime.now(timezone.utc)
         advance.mode_of_payment = mode_of_payment
         advance.payment_reference = payment_reference
         advance.bank_account_id = bank_account_id

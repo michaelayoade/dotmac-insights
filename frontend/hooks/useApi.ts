@@ -5796,6 +5796,30 @@ export function useConsolidatedFieldServiceDashboard(config?: SWRConfiguration) 
 }
 
 /**
+ * Consolidated Field Service Schedule Dashboard (3 API calls → 1)
+ * Returns: Teams, calendar events, dispatch board, summary
+ * For calendar and dispatch board views
+ */
+export function useConsolidatedFieldServiceSchedule(
+  params: {
+    start_date: string;
+    end_date: string;
+    team_id?: number;
+    technician_id?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['consolidated-field-service-schedule', params.start_date, params.end_date, params.team_id, params.technician_id],
+    () => dashboardsApi.getFieldServiceScheduleDashboard(params),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
  * Consolidated Accounting Dashboard (11 API calls → 1)
  * Returns: Balance sheet, income statement, bank accounts, AR/AP, ratios
  */
@@ -5818,6 +5842,29 @@ export function useConsolidatedHRDashboard(config?: SWRConfiguration) {
   return useSWR(
     'consolidated-hr-dashboard',
     () => dashboardsApi.getHRDashboard(),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated HR Leave Dashboard (3 API calls → 1)
+ * Returns: Leave calendar events, pending approvals, summary
+ * For leave calendar and approvals views
+ */
+export function useConsolidatedHRLeave(
+  params: {
+    start_date: string;
+    end_date: string;
+    department_id?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['consolidated-hr-leave', params.start_date, params.end_date, params.department_id],
+    () => dashboardsApi.getHRLeaveDashboard(params),
     {
       refreshInterval: 60000,
       ...config,
@@ -5923,6 +5970,44 @@ export function useConsolidatedCustomersDashboard(currency?: string, config?: SW
   return useSWR(
     ['consolidated-customers-dashboard', currency],
     () => dashboardsApi.getCustomersDashboard(currency),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated CRM Pipeline Dashboard (3 API calls → 1)
+ * Returns: Pipeline summary, stages, kanban view, activities
+ */
+export function useConsolidatedCRMPipeline(currency?: string, config?: SWRConfiguration) {
+  return useSWR(
+    ['consolidated-crm-pipeline', currency],
+    () => dashboardsApi.getCRMPipelineDashboard(currency),
+    {
+      refreshInterval: 60000,
+      ...config,
+    }
+  );
+}
+
+/**
+ * Consolidated Leads Dashboard (3 API calls → 1)
+ * Returns: Leads summary, sources, leads list with pagination
+ */
+export function useConsolidatedLeads(
+  params?: {
+    status?: string;
+    source?: string;
+    limit?: number;
+    offset?: number;
+  },
+  config?: SWRConfiguration
+) {
+  return useSWR(
+    ['consolidated-leads', params?.status, params?.source, params?.limit, params?.offset],
+    () => dashboardsApi.getLeadsDashboard(params),
     {
       refreshInterval: 60000,
       ...config,

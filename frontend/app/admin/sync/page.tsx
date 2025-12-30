@@ -86,7 +86,7 @@ function SourceCard({
           <span className="text-slate-muted">Last Sync</span>
           <span className="text-foreground">
             {source.last_sync_at
-              ? formatRelativeTime(new Date(source.last_sync_at))
+              ? formatRelativeTime(source.last_sync_at)
               : 'Never'}
           </span>
         </div>
@@ -331,7 +331,7 @@ export default function SyncDashboardPage() {
                   </span>
                   <StatusBadge status={log.status} />
                   <span className="text-slate-muted text-xs">
-                    {log.started_at ? formatRelativeTime(new Date(log.started_at)) : '-'}
+                    {log.started_at ? formatRelativeTime(log.started_at) : '-'}
                   </span>
                 </div>
               </div>

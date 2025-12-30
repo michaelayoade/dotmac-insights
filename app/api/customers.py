@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func, extract, case, distinct, Date, select
 from typing import Dict, Any, Optional, List
 from itertools import groupby
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 
 from app.database import get_db
@@ -97,7 +97,7 @@ async def get_customer_dashboard(
     - CRM: Conversations
     """
     today = date.today()
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
     # -------------------------------------------------------------------------
     # OVERVIEW - Customer counts and status
@@ -316,7 +316,7 @@ async def get_customer_dashboard(
         "support": support,
         "projects": projects,
         "crm": crm,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -346,8 +346,8 @@ async def get_customer_360(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     today = date.today()
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    ninety_days_ago = datetime.utcnow() - timedelta(days=90)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    ninety_days_ago = datetime.now(timezone.utc) - timedelta(days=90)
 
     # -------------------------------------------------------------------------
     # PROFILE
@@ -784,7 +784,7 @@ async def get_customer_360(
         "projects": projects_section,
         "crm": crm,
         "timeline": timeline[:20],
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -1662,7 +1662,7 @@ async def get_blocked_analytics(
         "by_duration": by_duration,
         "recovery_candidates": recovery_list,
         "top_at_risk": top_risk_list,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2054,7 +2054,7 @@ async def get_active_analytics(
         "payment_risk": payment_risk,
         "top_customers": top_list,
         "support_concerns": support_concerns,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -2072,7 +2072,7 @@ async def get_signup_trend(
     Derives signup date from customer's first subscription start_date
     when signup_date is not available.
     """
-    end_dt = _parse_date(end_date, "end_date") or datetime.utcnow()
+    end_dt = _parse_date(end_date, "end_date") or datetime.now(timezone.utc)
     start_dt = _parse_date(start_date, "start_date") or (end_dt - timedelta(days=months * 30))
 
     # Subquery to get each customer's first subscription date (derived signup)
@@ -2146,7 +2146,7 @@ async def get_customer_cohort(
     effective_signup = func.coalesce(Customer.signup_date, first_sub.c.first_start)
     cohort_expr = func.to_char(func.date_trunc('month', effective_signup), 'YYYY-MM')
 
-    cutoff = datetime.utcnow() - timedelta(days=months * 30)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
     cohorts = (
         db.query(
@@ -2424,7 +2424,7 @@ async def get_customers_by_ticket_volume(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Bucket customers by ticket volume in the last N days."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     ticket_counts = (
         db.query(
@@ -2595,7 +2595,7 @@ async def get_payment_timeliness(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Payment timeliness cohorts by customer type and plan."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     days_diff = func.date_part("day", Invoice.due_date - Payment.payment_date)
 
@@ -2829,7 +2829,7 @@ async def get_customer_health(
     total_paid = int(payment_timing.total_paid or 0)
 
     # Support intensity (tickets per customer in last 30 days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     tickets_subq = db.query(
         Ticket.customer_id,
         func.count(Ticket.id).label("ticket_count")
@@ -3033,7 +3033,7 @@ async def get_plan_changes_insights(
     """
     Analyze plan changes (upgrades/downgrades/lateral moves) over the past N months.
     """
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     subs = (
@@ -3147,7 +3147,7 @@ async def get_plan_change_insights(
     where the same customer has multiple subscription records with different
     plans over time.
     """
-    start_dt = datetime.utcnow() - timedelta(days=months * 30)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
     # Get customers with multiple different plans (indicating plan changes)
     # Subquery: customers with >1 distinct plan names

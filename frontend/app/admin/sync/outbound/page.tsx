@@ -65,7 +65,7 @@ function OutboundLogRow({
         )}
         <div className="flex items-center gap-3 mt-1 text-xs text-slate-muted">
           {log.external_id && <span>External: {log.external_id}</span>}
-          <span>{formatRelativeTime(new Date(log.created_at))}</span>
+          <span>{formatRelativeTime(log.created_at)}</span>
           {log.retry_count > 0 && <span>Retries: {log.retry_count}</span>}
         </div>
       </div>

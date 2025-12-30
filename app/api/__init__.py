@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.api import (
     sync,
-    # customers,  # DEPRECATED: ISP-specific, use /crm/contacts for customer management
+    customers,  # Legacy customers endpoints (still used by E2E tests)
     analytics,
     data_explorer,
     admin,
@@ -47,8 +47,8 @@ from app.api.admin_sync import router as admin_sync_router
 api_router = APIRouter()
 
 # Domain routers (new structure)
-# DEPRECATED: customers module (ISP-specific) - use /crm/contacts instead
-# api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
+# Legacy customers module (ISP-specific) - still exposed for compatibility
+api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(sales.router, tags=["sales"])
 api_router.include_router(accounting.router, prefix="/accounting", tags=["accounting"])
@@ -63,8 +63,7 @@ api_router.include_router(expenses.router, tags=["expenses"])
 api_router.include_router(sales.router, prefix="/v1", tags=["sales"])
 api_router.include_router(accounting.router, prefix="/v1/accounting", tags=["accounting"])
 api_router.include_router(purchasing.router, prefix="/v1/purchasing", tags=["purchasing"])
-# DEPRECATED: customers module - use /crm/contacts instead
-# api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])
+api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/v1/finance", tags=["finance"])
 api_router.include_router(tax_router, prefix="/v1/tax", tags=["tax"])
 api_router.include_router(books_settings.router, prefix="/v1", tags=["books-settings"])

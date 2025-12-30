@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.payment import Payment, PaymentMethod, PaymentSource
@@ -66,7 +66,7 @@ async def sync_payments(sync_client, client, full_sync: bool):
                 existing.payment_method = payment_method
                 existing.receipt_number = pay_data.get("receipt_number")
                 existing.transaction_reference = str(pay_data.get("transaction_id", "")) if pay_data.get("transaction_id") else None
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 # Parse date
                 if pay_data.get("date"):
@@ -86,7 +86,7 @@ async def sync_payments(sync_client, client, full_sync: bool):
                     payment_method=payment_method,
                     receipt_number=pay_data.get("receipt_number"),
                     transaction_reference=str(pay_data.get("transaction_id", "")) if pay_data.get("transaction_id") else None,
-                    payment_date=datetime.utcnow(),
+                    payment_date=datetime.now(timezone.utc),
                 )
 
                 if pay_data.get("date"):

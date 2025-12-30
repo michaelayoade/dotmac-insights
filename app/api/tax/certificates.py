@@ -111,7 +111,7 @@ def issue_wht_certificate(
 
     Once issued, the certificate is final and sent to the supplier.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.models.tax_ng import WHTCertificate
 
     certificate = db.query(WHTCertificate).filter(
@@ -128,7 +128,7 @@ def issue_wht_certificate(
         raise HTTPException(status_code=400, detail="Cannot issue cancelled certificate")
 
     certificate.is_issued = True
-    certificate.issued_at = datetime.utcnow()
+    certificate.issued_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(certificate)
@@ -149,7 +149,7 @@ def cancel_wht_certificate(
     Provide a reason for cancellation.
     Transactions will become available for a new certificate.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.models.tax_ng import WHTCertificate, WHTTransaction
 
     certificate = db.query(WHTCertificate).filter(
@@ -168,7 +168,7 @@ def cancel_wht_certificate(
     ).update({"certificate_id": None})
 
     certificate.is_cancelled = True
-    certificate.cancelled_at = datetime.utcnow()
+    certificate.cancelled_at = datetime.now(timezone.utc)
     certificate.cancellation_reason = reason
 
     db.commit()

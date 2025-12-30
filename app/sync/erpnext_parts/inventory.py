@@ -6,7 +6,7 @@ This module handles syncing of inventory-related entities:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -59,7 +59,7 @@ async def sync_items(
                 existing.disabled = item_data.get("disabled", 0) == 1
                 existing.has_variants = item_data.get("has_variants", 0) == 1
                 existing.variant_of = item_data.get("variant_of")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 item = Item(
@@ -124,7 +124,7 @@ async def sync_item_groups(
                 existing.is_group = group_data.get("is_group", 0) == 1
                 existing.lft = group_data.get("lft")
                 existing.rgt = group_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 item_group = ItemGroup(

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
@@ -311,7 +311,7 @@ async def finalize_period(period_id: int, db: Session = Depends(get_db)):
     ).update(
         {
             EmployeeScorecardInstance.status: 'finalized',
-            EmployeeScorecardInstance.finalized_at: datetime.utcnow(),
+            EmployeeScorecardInstance.finalized_at: datetime.now(timezone.utc),
         },
         synchronize_session=False
     )

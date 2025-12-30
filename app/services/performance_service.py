@@ -4,7 +4,7 @@ Performance Service - Business logic for performance management
 Handles scorecard generation, team queries, finalization, and analytics.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Dict, Any, List
 
@@ -291,7 +291,7 @@ class PerformanceService:
             }
 
         scorecard.status = ScorecardInstanceStatus.FINALIZED
-        scorecard.finalized_at = datetime.utcnow()
+        scorecard.finalized_at = datetime.now(timezone.utc)
         if user:
             scorecard.finalized_by_id = user.id
 
@@ -328,7 +328,7 @@ class PerformanceService:
         ).update(
             {
                 "status": ScorecardInstanceStatus.FINALIZED,
-                "finalized_at": datetime.utcnow(),
+                "finalized_at": datetime.now(timezone.utc),
                 "finalized_by_id": user.id if user else None,
             },
             synchronize_session=False

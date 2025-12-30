@@ -10,7 +10,7 @@ Business logic for Nigerian tax compliance including:
 """
 
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import List, Dict, Optional, Tuple, Any, cast
 import uuid
 
@@ -998,7 +998,7 @@ class NigerianTaxService:
         # Update status
         if is_valid:
             einvoice.status = EInvoiceStatus.VALIDATED
-            einvoice.validated_at = datetime.utcnow()
+            einvoice.validated_at = datetime.now(timezone.utc)
         einvoice.validation_errors = errors if errors else None
 
         self.db.commit()

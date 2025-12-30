@@ -63,7 +63,7 @@ function CursorRow({
         <div className="flex items-center gap-4 text-xs text-slate-muted">
           <span>Records: {cursor.records_synced.toLocaleString()}</span>
           {cursor.last_sync_at && (
-            <span>Last: {formatRelativeTime(new Date(cursor.last_sync_at))}</span>
+            <span>Last: {formatRelativeTime(cursor.last_sync_at)}</span>
           )}
           {cursor.last_id && (
             <span className="font-mono">ID: {cursor.last_id}</span>
@@ -243,7 +243,7 @@ export default function CursorsPage() {
                     • <span className="capitalize">{cursor.source}</span> / {cursor.entity_type}
                     {cursor.last_sync_at && (
                       <span className="text-amber-400/60">
-                        {' '}(last: {formatRelativeTime(new Date(cursor.last_sync_at))})
+                        {' '}(last: {formatRelativeTime(cursor.last_sync_at)})
                       </span>
                     )}
                   </li>

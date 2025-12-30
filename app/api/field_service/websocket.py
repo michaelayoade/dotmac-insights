@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query, H
 from typing import Dict, List, Any, Optional, Set
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 import structlog
 
@@ -166,7 +166,7 @@ async def broadcast_order_event(
     message = {
         "event": event_type,
         "data": order_data,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Broadcast to dispatch channel
@@ -197,7 +197,7 @@ async def broadcast_location_update(
             "location": location,
             "order_id": order_id,
         },
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     await manager.broadcast_to_channel("tracking", message)
@@ -331,7 +331,7 @@ async def dispatch_websocket(
             "event": "connected",
             "channel": "dispatch",
             "team_id": team_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         # Keep connection alive and handle incoming messages
@@ -404,7 +404,7 @@ async def orders_websocket(
         await websocket.send_json({
             "event": "connected",
             "channel": "orders",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         while True:
@@ -481,7 +481,7 @@ async def tracking_websocket(
             "event": "connected",
             "channel": "tracking",
             "technician_id": technician_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         while True:

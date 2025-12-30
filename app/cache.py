@@ -28,7 +28,7 @@ async def get_redis_client() -> Optional[redis.Redis]:
         try:
             _redis_client = redis.from_url(settings.redis_url)
             await _redis_client.ping()
-        except RedisConnectionError:
+        except (RedisConnectionError, RuntimeError):
             _redis_client = None
     return _redis_client
 
@@ -122,8 +122,10 @@ def cached(
                     logger.warning("cache_set_failed", key=key, prefix=prefix, error=str(err))
 
                 return result
-            except (RedisError, json.JSONDecodeError):
+            except (RedisError, json.JSONDecodeError, RuntimeError):
                 # Fall back to uncached execution on any Redis error
+                global _redis_client
+                _redis_client = None
                 return await func(*args, **kwargs)
 
         return wrapper

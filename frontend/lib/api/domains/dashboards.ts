@@ -280,6 +280,73 @@ export interface FieldServiceDashboardResponse {
   }>;
 }
 
+export interface FieldServiceScheduleDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    total_orders: number;
+    unassigned: number;
+    overdue: number;
+    by_status: Record<string, number>;
+  };
+
+  teams: Array<{
+    id: number;
+    name: string;
+    max_daily_orders: number;
+    members: Array<{
+      id: number;
+      name: string;
+      role: string;
+      avatar_url: string | null;
+    }>;
+    member_count: number;
+  }>;
+
+  calendar_events: Array<{
+    id: string;
+    title: string;
+    start: string;
+    end: string;
+    allDay: boolean;
+    color: 'default' | 'success' | 'warning' | 'danger' | 'info';
+    resourceId: string | null;
+    metadata: {
+      order_number: string | null;
+      order_type: string | null;
+      status: string | null;
+      priority: string | null;
+      customer_name: string | null;
+      customer_address: string | null;
+      technician_id: number | null;
+      technician_name: string | null;
+      team_id: number | null;
+      city: string | null;
+    };
+  }>;
+
+  dispatch_board: {
+    date: string;
+    resources: Array<{
+      id: string;
+      name: string;
+      order_count: number;
+      orders: Array<{
+        id: number;
+        order_number: string | null;
+        status: string | null;
+        priority: string | null;
+        scheduled_time: string | null;
+        customer_name: string | null;
+        city: string | null;
+      }>;
+      completed: number;
+      pending: number;
+      availability: 'available' | 'busy' | 'scheduled' | 'done';
+    }>;
+  };
+}
+
 export interface AccountingDashboardResponse {
   currency: string;
   generated_at: string;
@@ -413,6 +480,56 @@ export interface HRDashboardResponse {
       date_of_joining: string | null;
     }>;
   };
+}
+
+export interface HRLeaveDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    pending_approvals: number;
+    approved_in_range: number;
+    on_leave_today: number;
+  };
+
+  calendar_events: Array<{
+    id: string;
+    title: string;
+    start: string | null;
+    end: string | null;
+    allDay: boolean;
+    color: 'warning' | 'info' | 'default';
+    resourceId: string | null;
+    metadata: {
+      employee_id: number | null;
+      employee_name: string | null;
+      leave_type: string | null;
+      status: string | null;
+      total_days: number | null;
+      reason: string | null;
+      department: string | null;
+    };
+  }>;
+
+  pending_requests: Array<{
+    id: number;
+    employee_id: number | null;
+    employee_name: string | null;
+    leave_type: string | null;
+    from_date: string | null;
+    to_date: string | null;
+    total_days: number | null;
+    reason: string | null;
+    posting_date: string | null;
+    department: string | null;
+  }>;
+
+  leave_by_type: Record<string, { count: number; total_days: number }>;
+
+  leave_types: Array<{
+    name: string;
+    max_days_allowed: number | null;
+    is_carry_forward: boolean;
+  }>;
 }
 
 // =============================================================================
@@ -690,6 +807,121 @@ export interface CustomersDashboardResponse {
 }
 
 // =============================================================================
+// CRM PIPELINE DASHBOARD
+// =============================================================================
+
+export interface CRMPipelineDashboardResponse {
+  generated_at: string;
+  currency: string;
+
+  summary: {
+    open_count: number;
+    total_value: number;
+    weighted_value: number;
+    win_rate: number;
+    won_count: number;
+    lost_count: number;
+  };
+
+  stages: Array<{
+    id: number;
+    name: string;
+    sequence: number;
+    probability: number;
+    is_won: boolean;
+    is_lost: boolean;
+    color: string | null;
+    opportunity_count: number;
+    opportunity_value: number;
+  }>;
+
+  kanban: {
+    columns: Array<{
+      id: string;
+      title: string;
+      color: string;
+      count: number;
+      value: number;
+      cards: Array<{
+        id: number;
+        title: string;
+        subtitle: string | null;
+        value: number;
+        currency: string;
+        probability: number;
+        expected_close_date: string | null;
+        owner_name: string | null;
+        owner_id: number | null;
+        days_in_stage: number | null;
+      }>;
+    }>;
+  };
+
+  recent_activities: Array<{
+    id: number;
+    activity_type: string | null;
+    subject: string;
+    status: string | null;
+    scheduled_at: string | null;
+    priority: string | null;
+    opportunity_id: number | null;
+    opportunity_name: string | null;
+  }>;
+}
+
+// =============================================================================
+// LEADS DASHBOARD
+// =============================================================================
+
+export interface LeadsDashboardResponse {
+  generated_at: string;
+
+  summary: {
+    total: number;
+    new_30d: number;
+    converted_30d: number;
+    by_status: Record<string, number>;
+  };
+
+  sources: Array<{
+    source: string;
+    count: number;
+  }>;
+
+  leads: {
+    items: Array<{
+      id: number;
+      lead_name: string;
+      company_name: string | null;
+      email_id: string | null;
+      phone: string | null;
+      source: string | null;
+      status: string | null;
+      lead_owner: string | null;
+      territory: string | null;
+      industry: string | null;
+      city: string | null;
+      state: string | null;
+      converted: boolean;
+      created_at: string | null;
+      updated_at: string | null;
+    }>;
+    total: number;
+    limit: number;
+    offset: number;
+  };
+
+  recent_conversions: Array<{
+    id: number;
+    lead_name: string;
+    company_name: string | null;
+    source: string | null;
+    converted_at: string | null;
+    customer_id: number | null;
+  }>;
+}
+
+// =============================================================================
 // API FUNCTIONS
 // =============================================================================
 
@@ -730,6 +962,25 @@ export const dashboardsApi = {
    */
   getFieldServiceDashboard: () =>
     fetchApi<FieldServiceDashboardResponse>('/dashboards/field-service'),
+
+  /**
+   * Get consolidated Field Service Schedule data (3 calls → 1)
+   * For calendar and dispatch board views
+   */
+  getFieldServiceScheduleDashboard: (params: {
+    start_date: string;
+    end_date: string;
+    team_id?: number;
+    technician_id?: number;
+  }) =>
+    fetchApi<FieldServiceScheduleDashboardResponse>('/dashboards/field-service-schedule', {
+      params: {
+        start_date: params.start_date,
+        end_date: params.end_date,
+        ...(params.team_id ? { team_id: params.team_id } : {}),
+        ...(params.technician_id ? { technician_id: params.technician_id } : {}),
+      },
+    }),
 
   /**
    * Get consolidated Accounting Dashboard data (11 calls → 1)
@@ -789,5 +1040,50 @@ export const dashboardsApi = {
   getCustomersDashboard: (currency?: string) =>
     fetchApi<CustomersDashboardResponse>('/dashboards/customers', {
       params: currency ? { currency } : undefined,
+    }),
+
+  /**
+   * Get consolidated HR Leave Dashboard data (3 calls → 1)
+   * For leave calendar and pending approvals views
+   */
+  getHRLeaveDashboard: (params: {
+    start_date: string;
+    end_date: string;
+    department_id?: number;
+  }) =>
+    fetchApi<HRLeaveDashboardResponse>('/dashboards/hr-leave', {
+      params: {
+        start_date: params.start_date,
+        end_date: params.end_date,
+        ...(params.department_id ? { department_id: params.department_id } : {}),
+      },
+    }),
+
+  /**
+   * Get consolidated CRM Pipeline Dashboard data (3 calls → 1)
+   * For kanban board and pipeline views
+   */
+  getCRMPipelineDashboard: (currency?: string) =>
+    fetchApi<CRMPipelineDashboardResponse>('/dashboards/crm-pipeline', {
+      params: currency ? { currency } : undefined,
+    }),
+
+  /**
+   * Get consolidated Leads Dashboard data (3 calls → 1)
+   * For leads list and sources views
+   */
+  getLeadsDashboard: (params?: {
+    status?: string;
+    source?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<LeadsDashboardResponse>('/dashboards/leads', {
+      params: params ? {
+        ...(params.status ? { status: params.status } : {}),
+        ...(params.source ? { source: params.source } : {}),
+        ...(params.limit ? { limit: params.limit } : {}),
+        ...(params.offset ? { offset: params.offset } : {}),
+      } : undefined,
     }),
 };

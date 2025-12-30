@@ -11,7 +11,7 @@ Admin-only endpoints for managing application settings:
 import uuid
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
@@ -236,7 +236,7 @@ async def test_settings(
         raise HTTPException(400, f"No test action available for group: {group}")
 
     job_id = str(uuid.uuid4())
-    _test_jobs[job_id] = {"status": "pending", "started_at": datetime.utcnow().isoformat()}
+    _test_jobs[job_id] = {"status": "pending", "started_at": datetime.now(timezone.utc).isoformat()}
 
     background_tasks.add_task(run_test_action, job_id, group, payload.data)
 

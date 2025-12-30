@@ -189,6 +189,9 @@ class TicketBaseRequest(BaseModel):
     resolution_by: Optional[datetime] = None
     response_by: Optional[datetime] = None
     resolution_team: Optional[str] = None
+    resolution: Optional[str] = None
+    resolution_details: Optional[str] = None
+    resolution_date: Optional[datetime] = None
     customer_email: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_name: Optional[str] = None
@@ -727,6 +730,261 @@ def get_ticket(
     }
 
 
+@router.get("/tickets/{ticket_id}/full", dependencies=[ticket_read_dep])
+@cached("ticket-full-detail", ttl=CACHE_TTL.get("short", 60))
+def get_ticket_full_detail(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get consolidated ticket detail with all related data in a single call.
+
+    Combines:
+    - Ticket details
+    - Unified timeline (activities, comments, communications merged & sorted)
+    - Attachments
+    - Related tickets (dependencies, sub-tickets, merged tickets)
+    - Full SLA status with time calculations
+    - Assignee details
+    """
+    now = datetime.now(timezone.utc)
+    today = date.today()
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Customer info
+    customer = None
+    if ticket.customer_id:
+        cust = db.query(Customer).filter(Customer.id == ticket.customer_id).first()
+        if cust:
+            customer = {
+                "id": cust.id,
+                "name": cust.name,
+                "email": cust.email,
+                "phone": cust.phone,
+                "status": cust.status.value if cust.status else None,
+            }
+
+    # Assignee info
+    assignee = None
+    if ticket.assigned_to:
+        agent = db.query(Agent).filter(Agent.name == ticket.assigned_to).first()
+        if agent:
+            assignee = {
+                "id": agent.id,
+                "name": agent.name,
+                "email": agent.email,
+                "avatar_url": None,
+                "team": ticket.resolution_team,
+            }
+
+    # Build unified timeline
+    timeline = []
+
+    # Add comments to timeline
+    for comment in ticket.comments:
+        timeline.append({
+            "id": f"comment-{comment.id}",
+            "type": "comment",
+            "content": comment.comment or comment.content,
+            "author": {
+                "id": comment.comment_by,
+                "name": comment.comment_by,
+                "role": "internal" if comment.is_internal else "public",
+            },
+            "timestamp": comment.created_at.isoformat() if comment.created_at else None,
+            "is_internal": comment.is_internal,
+            "metadata": {
+                "comment_email": comment.comment_email,
+            },
+        })
+
+    # Add activities to timeline
+    for activity in ticket.activities:
+        timeline.append({
+            "id": f"activity-{activity.id}",
+            "type": "activity",
+            "content": activity.content,
+            "author": {
+                "id": activity.author,
+                "name": activity.author,
+                "role": "system",
+            },
+            "timestamp": activity.created_at.isoformat() if activity.created_at else None,
+            "is_internal": True,
+            "metadata": {
+                "activity_type": activity.activity_type,
+            },
+        })
+
+    # Add communications to timeline
+    for comm in ticket.communications:
+        timeline.append({
+            "id": f"comm-{comm.id}",
+            "type": "communication",
+            "content": comm.content,
+            "author": {
+                "id": comm.sender,
+                "name": comm.sender,
+                "role": "external" if comm.communication_type and "email" in comm.communication_type.lower() else "internal",
+            },
+            "timestamp": comm.sent_on.isoformat() if comm.sent_on else None,
+            "is_internal": False,
+            "metadata": {
+                "subject": comm.subject,
+                "communication_type": comm.communication_type,
+                "recipients": comm.recipients,
+            },
+        })
+
+    # Sort timeline by timestamp
+    timeline.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+
+    # Attachments (from communications)
+    attachments = []
+    for comm in ticket.communications:
+        if comm.attachments:
+            for att in comm.attachments:
+                attachments.append({
+                    "id": f"att-{comm.id}-{att.get('name', '')}",
+                    "name": att.get("name"),
+                    "url": att.get("file_url"),
+                    "type": "file",
+                    "size": att.get("file_size"),
+                    "uploaded_at": comm.sent_on.isoformat() if comm.sent_on else None,
+                })
+
+    # Related tickets
+    related_tickets = {
+        "depends_on": [],
+        "sub_tickets": [],
+        "merged_tickets": [],
+        "parent": None,
+    }
+
+    # Dependencies
+    for dep in ticket.depends_on:
+        dep_ticket = db.query(Ticket).filter(Ticket.id == dep.depends_on_ticket_id).first()
+        if dep_ticket:
+            related_tickets["depends_on"].append({
+                "id": dep_ticket.id,
+                "ticket_number": dep_ticket.ticket_number,
+                "subject": dep_ticket.subject,
+                "status": dep_ticket.status.value if dep_ticket.status else None,
+            })
+
+    # Sub-tickets
+    sub_tickets = db.query(Ticket).filter(
+        Ticket.parent_ticket_id == ticket.id,
+        Ticket.is_deleted == False,
+    ).all()
+    for sub in sub_tickets:
+        related_tickets["sub_tickets"].append({
+            "id": sub.id,
+            "ticket_number": sub.ticket_number,
+            "subject": sub.subject,
+            "status": sub.status.value if sub.status else None,
+        })
+
+    # Merged tickets
+    if ticket.merged_tickets:
+        for merged_id in ticket.merged_tickets:
+            merged = db.query(Ticket).filter(Ticket.id == merged_id).first()
+            if merged:
+                related_tickets["merged_tickets"].append({
+                    "id": merged.id,
+                    "ticket_number": merged.ticket_number,
+                    "subject": merged.subject,
+                    "status": merged.status.value if merged.status else None,
+                })
+
+    # Parent ticket
+    if ticket.parent_ticket_id:
+        parent = db.query(Ticket).filter(Ticket.id == ticket.parent_ticket_id).first()
+        if parent:
+            related_tickets["parent"] = {
+                "id": parent.id,
+                "ticket_number": parent.ticket_number,
+                "subject": parent.subject,
+                "status": parent.status.value if parent.status else None,
+            }
+
+    # SLA status with calculations
+    sla_status = {
+        "response_by": ticket.response_by.isoformat() if ticket.response_by else None,
+        "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
+        "first_responded_on": ticket.first_responded_on.isoformat() if ticket.first_responded_on else None,
+        "agreement_status": ticket.agreement_status,
+        "is_overdue": ticket.is_overdue,
+        "response_met": ticket.first_responded_on <= ticket.response_by if ticket.first_responded_on and ticket.response_by else None,
+        "resolution_met": None,
+        "time_to_resolution_hours": ticket.time_to_resolution_hours,
+    }
+
+    # Calculate resolution SLA status
+    if ticket.status == TicketStatus.CLOSED and ticket.resolution_date and ticket.resolution_by:
+        sla_status["resolution_met"] = ticket.resolution_date <= ticket.resolution_by
+
+    # Time remaining/overdue calculation
+    if ticket.resolution_by and ticket.status not in [TicketStatus.CLOSED, TicketStatus.RESOLVED]:
+        resolution_deadline = datetime.combine(ticket.resolution_by, datetime.max.time()) if isinstance(ticket.resolution_by, date) else ticket.resolution_by
+        if hasattr(resolution_deadline, 'tzinfo') and resolution_deadline.tzinfo is None:
+            from datetime import timezone as tz
+            resolution_deadline = resolution_deadline.replace(tzinfo=tz.utc)
+        time_remaining = resolution_deadline - now
+        sla_status["time_remaining_hours"] = max(0, time_remaining.total_seconds() / 3600)
+        sla_status["is_breached"] = time_remaining.total_seconds() < 0
+    else:
+        sla_status["time_remaining_hours"] = None
+        sla_status["is_breached"] = False
+
+    return {
+        "generated_at": now.isoformat(),
+
+        "ticket": {
+            "id": ticket.id,
+            "ticket_number": ticket.ticket_number,
+            "subject": ticket.subject,
+            "description": ticket.description,
+            "status": ticket.status.value if ticket.status else None,
+            "priority": ticket.priority.value if ticket.priority else None,
+            "ticket_type": ticket.ticket_type,
+            "issue_type": ticket.issue_type,
+            "source": ticket.source.value if ticket.source else None,
+            "tags": ticket.tags or [],
+            "watchers": ticket.watchers or [],
+            "custom_fields": ticket.custom_fields or {},
+            "region": ticket.region,
+            "base_station": ticket.base_station,
+            "resolution": ticket.resolution,
+            "resolution_details": ticket.resolution_details,
+            "resolution_date": ticket.resolution_date.isoformat() if ticket.resolution_date else None,
+            "feedback_rating": ticket.feedback_rating,
+            "feedback_text": ticket.feedback_text,
+            "opening_date": ticket.opening_date.isoformat() if ticket.opening_date else None,
+            "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+            "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+        },
+
+        "customer": customer,
+        "assignee": assignee,
+        "sla_status": sla_status,
+        "timeline": timeline,
+        "attachments": attachments,
+        "related_tickets": related_tickets,
+
+        "summary": {
+            "timeline_count": len(timeline),
+            "attachment_count": len(attachments),
+            "dependencies_count": len(related_tickets["depends_on"]),
+            "sub_tickets_count": len(related_tickets["sub_tickets"]),
+        },
+    }
+
+
 @router.post("/tickets", dependencies=[ticket_write_dep], status_code=201)
 def create_ticket(
     payload: TicketCreateRequest,
@@ -815,7 +1073,8 @@ def update_ticket(
     for field in [
         "subject", "description", "ticket_type", "issue_type", "customer_id",
         "project_id", "assigned_to", "assigned_employee_id", "resolution_by",
-        "response_by", "resolution_team", "customer_email", "customer_phone",
+        "response_by", "resolution_team", "resolution", "resolution_details",
+        "resolution_date", "customer_email", "customer_phone",
         "customer_name", "region", "base_station", "parent_ticket_id", "merged_into_id",
     ]:
         value = getattr(payload, field)
@@ -824,6 +1083,8 @@ def update_ticket(
 
     if status:
         ticket.status = status
+        if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] and ticket.resolution_date is None:
+            ticket.resolution_date = datetime.now(timezone.utc)
     if priority:
         ticket.priority = priority
 

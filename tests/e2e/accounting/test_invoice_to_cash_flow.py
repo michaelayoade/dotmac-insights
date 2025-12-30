@@ -16,8 +16,11 @@ import pytest
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 
-from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json
+from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json, assert_response_schema
 from tests.e2e.fixtures.factories import create_customer, create_invoice, create_payment
+
+# Apply module marker
+pytestmark = pytest.mark.accounting
 
 
 class TestInvoiceCreation:
@@ -55,8 +58,8 @@ class TestInvoiceCreation:
         assert_http_ok(response, "List invoices")
 
         data = get_json(response)
-        assert "items" in data
-        assert len(data["items"]) >= 2
+        assert "data" in data
+        assert len(data["data"]) >= 2
 
     def test_filter_invoices_by_status(self, e2e_superuser_client, e2e_db):
         """Test filtering invoices by status."""
@@ -69,7 +72,7 @@ class TestInvoiceCreation:
         assert_http_ok(response, "Filter invoices by status")
 
         data = get_json(response)
-        for inv in data["items"]:
+        for inv in data["data"]:
             assert inv["status"] == "pending"
 
 
@@ -344,8 +347,15 @@ class TestInvoiceToCashFlow:
             params={"customer_id": customer.id},
         )
         ar_data_after = get_json(ar_resp_after)
-        # Should have no outstanding after full payment
-        assert ar_data_after["total_invoices"] == 0 or ar_data_after["total_receivable"] == 0
+        # Should have no outstanding after full payment - use explicit assertions
+        assert "total_invoices" in ar_data_after, "Response missing 'total_invoices' field"
+        assert "total_receivable" in ar_data_after, "Response missing 'total_receivable' field"
+        assert ar_data_after["total_invoices"] == 0, (
+            f"Expected 0 invoices after full payment, got {ar_data_after['total_invoices']}"
+        )
+        assert ar_data_after["total_receivable"] == 0, (
+            f"Expected 0 receivable after full payment, got {ar_data_after['total_receivable']}"
+        )
 
     def test_multiple_invoice_payment(self, e2e_superuser_client, e2e_db):
         """Test paying multiple invoices with one payment."""

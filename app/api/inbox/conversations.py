@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -288,7 +288,7 @@ async def update_conversation(
     if payload.status is not None:
         conv.status = payload.status
         if payload.status == "resolved":
-            conv.resolved_at = datetime.utcnow()
+            conv.resolved_at = datetime.now(timezone.utc)
         elif payload.status == "snoozed" and payload.snoozed_until:
             conv.snoozed_until = payload.snoozed_until
 
@@ -347,7 +347,7 @@ async def assign_conversation(
             conv.assigned_team_id = None
 
     if payload.agent_id or payload.team_id:
-        conv.assigned_at = datetime.utcnow()
+        conv.assigned_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(conv)
@@ -386,17 +386,17 @@ async def send_reply(
         body=payload.body,
         message_type="private_note" if payload.is_private else "outgoing",
         channel_id=conv.channel_id,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(msg)
 
     # Update conversation stats
     conv.message_count = (conv.message_count or 0) + 1
-    conv.last_message_at = datetime.utcnow()
+    conv.last_message_at = datetime.now(timezone.utc)
 
     # Track first response time
     if not conv.first_response_at and not payload.is_private:
-        conv.first_response_at = datetime.utcnow()
+        conv.first_response_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(msg)
@@ -438,7 +438,7 @@ async def mark_conversation_read(
         OmniMessage.conversation_id == conversation_id,
         OmniMessage.direction == "inbound",
         OmniMessage.read_at.is_(None),
-    ).update({"read_at": datetime.utcnow()})
+    ).update({"read_at": datetime.now(timezone.utc)})
 
     db.commit()
 
@@ -494,7 +494,7 @@ async def create_ticket_from_conversation(
         contact_name=conv.contact_name,
         contact_email=conv.contact_email,
         source="inbox",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(ticket)
     db.flush()
@@ -538,7 +538,7 @@ async def create_lead_from_conversation(
         source=payload.source or "inbox",
         notes=payload.notes or f"Created from inbox conversation #{conv.id}",
         status="Open",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(lead)
     db.flush()

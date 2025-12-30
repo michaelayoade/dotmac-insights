@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -30,7 +30,7 @@ async def get_analytics_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get inbox analytics summary for dashboard."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
 
     # Total conversations in period
@@ -176,7 +176,7 @@ async def get_volume_analytics(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get conversation volume by day for charts."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
 
     # Volume by day
@@ -235,7 +235,7 @@ async def get_agent_analytics(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get agent performance metrics."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
 
     # Conversations per agent
@@ -317,7 +317,7 @@ async def get_channel_analytics(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get channel performance metrics."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
 
     # Conversations per channel

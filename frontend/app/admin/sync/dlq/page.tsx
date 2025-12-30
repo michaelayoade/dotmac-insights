@@ -74,7 +74,7 @@ function DlqRecordRow({
         <p className="text-sm text-rose-400 truncate">{record.error_message}</p>
         <div className="flex items-center gap-3 mt-1 text-xs text-slate-muted">
           <span>Retries: {record.retry_count}/{record.max_retries}</span>
-          <span>{formatRelativeTime(new Date(record.created_at))}</span>
+          <span>{formatRelativeTime(record.created_at)}</span>
         </div>
       </div>
       <StatusBadge isResolved={record.is_resolved} />

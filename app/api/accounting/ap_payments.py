@@ -1,7 +1,7 @@
 """AP Payments: Supplier payment CRUD and workflow."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -334,7 +334,7 @@ def delete_ap_payment(
     ).delete()
 
     payment.is_deleted = True
-    payment.deleted_at = datetime.utcnow()
+    payment.deleted_at = datetime.now(timezone.utc)
     payment.deleted_by_id = principal.id
     db.commit()
 

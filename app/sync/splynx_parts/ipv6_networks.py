@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 import structlog
 import httpx
@@ -69,7 +69,7 @@ async def sync_ipv6_networks(sync_client, client: httpx.AsyncClient, full_sync: 
                     existing.rootnet = rootnet
                     existing.location_id = location_id
                     existing.used = used
-                    existing.last_synced_at = datetime.utcnow()
+                    existing.last_synced_at = datetime.now(timezone.utc)
                     sync_client.increment_updated()
                 else:
                     network = IPv6Network(
@@ -85,7 +85,7 @@ async def sync_ipv6_networks(sync_client, client: httpx.AsyncClient, full_sync: 
                         rootnet=rootnet,
                         location_id=location_id,
                         used=used,
-                        last_synced_at=datetime.utcnow(),
+                        last_synced_at=datetime.now(timezone.utc),
                     )
                     sync_client.db.add(network)
                     sync_client.increment_created()

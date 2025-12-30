@@ -468,6 +468,9 @@ class FXService:
                     account=entry["account_id"] or entry["account_name"],
                     debit=gain_loss,
                     credit=Decimal("0"),
+                    debit_in_account_currency=gain_loss,
+                    credit_in_account_currency=Decimal("0"),
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 self.db.add(je_line_account)
@@ -480,6 +483,9 @@ class FXService:
                     account=gain_account,
                     debit=Decimal("0"),
                     credit=gain_loss,
+                    debit_in_account_currency=Decimal("0"),
+                    credit_in_account_currency=gain_loss,
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 self.db.add(je_line_gain)
@@ -495,6 +501,9 @@ class FXService:
                     account=entry["account_id"] or entry["account_name"],
                     debit=Decimal("0"),
                     credit=loss_amount,
+                    debit_in_account_currency=Decimal("0"),
+                    credit_in_account_currency=loss_amount,
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 self.db.add(je_line_account)
@@ -507,6 +516,9 @@ class FXService:
                     account=loss_account,
                     debit=loss_amount,
                     credit=Decimal("0"),
+                    debit_in_account_currency=loss_amount,
+                    credit_in_account_currency=Decimal("0"),
+                    exchange_rate=Decimal("1"),
                     idx=idx,
                 )
                 self.db.add(je_line_loss)

@@ -12,7 +12,7 @@ Features:
 """
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN, ROUND_UP, ROUND_HALF_DOWN, ROUND_HALF_EVEN
 from typing import Optional, Tuple
 
@@ -128,7 +128,7 @@ class NumberGenerator:
 
         # Update the sequence
         format_config.current_number = next_seq
-        format_config.updated_at = datetime.utcnow()
+        format_config.updated_at = datetime.now(timezone.utc)
 
         # Build context for token replacement
         context = self._build_context(
@@ -209,7 +209,7 @@ class NumberGenerator:
         format_config.last_reset_period = self._get_period_key(
             date.today(), format_config.reset_frequency
         )
-        format_config.updated_at = datetime.utcnow()
+        format_config.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
         return True

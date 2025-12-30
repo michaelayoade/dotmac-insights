@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -149,7 +149,7 @@ async def create_transaction(
         authorization_code=payload.authorization_code,
         status=CardTransactionStatus.IMPORTED,
         import_hash=import_hash,
-        imported_at=datetime.utcnow(),
+        imported_at=datetime.now(timezone.utc),
     )
 
     db.add(transaction)
@@ -269,7 +269,7 @@ async def dispute_transaction(
 
     transaction.status = CardTransactionStatus.DISPUTED
     transaction.dispute_reason = payload.reason
-    transaction.disputed_at = datetime.utcnow()
+    transaction.disputed_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(transaction)

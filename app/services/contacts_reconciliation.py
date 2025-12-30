@@ -14,7 +14,7 @@ The reconciliation job should be scheduled via Celery Beat to run periodically
 (e.g., every hour or daily) depending on sync frequency requirements.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import dataclass, field
 
@@ -135,7 +135,7 @@ class ContactsReconciliationService:
         except Exception as e:
             logger.error(f"Customer reconciliation failed: {e}")
             reports["customer_legacy"] = ReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_contacts=0,
                 contacts_with_drift=0,
                 drift_percentage=0,
@@ -154,7 +154,7 @@ class ContactsReconciliationService:
         except Exception as e:
             logger.error(f"Splynx reconciliation failed: {e}")
             reports["splynx"] = ReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_contacts=0,
                 contacts_with_drift=0,
                 drift_percentage=0,
@@ -172,7 +172,7 @@ class ContactsReconciliationService:
         except Exception as e:
             logger.error(f"ERPNext reconciliation failed: {e}")
             reports["erpnext"] = ReconciliationReport(
-                run_at=datetime.utcnow(),
+                run_at=datetime.now(timezone.utc),
                 total_contacts=0,
                 contacts_with_drift=0,
                 drift_percentage=0,
@@ -247,7 +247,7 @@ class ContactsReconciliationService:
         drift_pct = (drift_count / total * 100) if total > 0 else 0
 
         report = ReconciliationReport(
-            run_at=datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
             total_contacts=total,
             contacts_with_drift=drift_count,
             drift_percentage=drift_pct,
@@ -332,7 +332,7 @@ class ContactsReconciliationService:
         drift_pct = (drift_count / total * 100) if total > 0 else 0
 
         report = ReconciliationReport(
-            run_at=datetime.utcnow(),
+            run_at=datetime.now(timezone.utc),
             total_contacts=total,
             contacts_with_drift=drift_count,
             drift_percentage=drift_pct,

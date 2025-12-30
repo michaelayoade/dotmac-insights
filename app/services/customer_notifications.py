@@ -12,7 +12,7 @@ Supports multiple channels: email, SMS, WhatsApp, push notifications.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
 
@@ -336,7 +336,7 @@ class CustomerNotificationService:
             elif notification.channel == CustomerNotificationChannel.IN_APP:
                 # In-app notifications are stored and retrieved by the frontend
                 notification.status = CustomerNotificationStatus.DELIVERED
-                notification.delivered_at = datetime.utcnow()
+                notification.delivered_at = datetime.now(timezone.utc)
                 return
 
             # Process result
@@ -344,7 +344,7 @@ class CustomerNotificationService:
                 notification.attempt_count += 1
                 if result.success:
                     notification.status = CustomerNotificationStatus.SENT
-                    notification.delivered_at = datetime.utcnow()
+                    notification.delivered_at = datetime.now(timezone.utc)
                     notification.external_id = result.external_id
                     logger.info(f"Notification {notification.id} sent via {result.provider}")
                 else:
@@ -480,7 +480,7 @@ class CustomerNotificationService:
         if service_order.technician:
             technician_name = service_order.technician.name or "Your technician"
 
-        arrival_time = service_order.arrival_time or datetime.utcnow()
+        arrival_time = service_order.arrival_time or datetime.now(timezone.utc)
 
         return self.notify_customer(
             customer_id=service_order.customer_id,
@@ -499,7 +499,7 @@ class CustomerNotificationService:
         if service_order.technician:
             technician_name = service_order.technician.name or "Our technician"
 
-        start_time = service_order.actual_start_time or datetime.utcnow()
+        start_time = service_order.actual_start_time or datetime.now(timezone.utc)
         estimated_duration = f"{float(service_order.estimated_duration_hours)} hours"
 
         return self.notify_customer(
@@ -517,7 +517,7 @@ class CustomerNotificationService:
 
     def notify_service_completed(self, service_order: ServiceOrder) -> List[CustomerNotification]:
         """Notify customer that service has been completed."""
-        end_time = service_order.actual_end_time or datetime.utcnow()
+        end_time = service_order.actual_end_time or datetime.now(timezone.utc)
         actual_duration = "Unknown"
         if service_order.actual_duration_hours:
             hours = float(service_order.actual_duration_hours)
@@ -650,7 +650,7 @@ class CustomerNotificationService:
             notification_type=CustomerNotificationType.PROJECT_STARTED,
             data={
                 "project_name": project.project_name,
-                "start_date": (project.actual_start_date or project.expected_start_date or datetime.utcnow()).strftime("%B %d, %Y"),
+                "start_date": (project.actual_start_date or project.expected_start_date or datetime.now(timezone.utc)).strftime("%B %d, %Y"),
                 "expected_end_date": project.expected_end_date.strftime("%B %d, %Y") if project.expected_end_date else "TBD",
                 "project_manager": manager_name,
             },
@@ -693,7 +693,7 @@ class CustomerNotificationService:
             notification_type=CustomerNotificationType.PROJECT_COMPLETED,
             data={
                 "project_name": project.project_name,
-                "end_date": (project.actual_end_date or datetime.utcnow()).strftime("%B %d, %Y"),
+                "end_date": (project.actual_end_date or datetime.now(timezone.utc)).strftime("%B %d, %Y"),
                 "summary": summary or "All project deliverables have been completed.",
             },
             project_id=project.id,

@@ -2,7 +2,7 @@
  * Auto-generated smoke test page definitions.
  * Generated on: 2025-12-27T06:53:49.034Z
  *
- * To regenerate: node scripts/generate-smoke-pages.js > tests/e2e/fixtures/smoke-pages.ts
+ * To regenerate: node scripts/generate-smoke-pages.mjs > tests/e2e/fixtures/smoke-pages.ts
  */
 
 import type { Scope } from './auth';
@@ -560,4 +560,3 @@ export function getPageCount(): { total: number; static: number; dynamic: number
     dynamic: all.length - staticPages.length,
   };
 }
-

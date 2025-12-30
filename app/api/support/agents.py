@@ -1,7 +1,7 @@
 """Agent and team management endpoints."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -197,7 +197,7 @@ def update_agent(
     if payload.is_active is not None:
         agent.is_active = payload.is_active
 
-    agent.updated_at = datetime.utcnow()
+    agent.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(agent)
     return {"id": agent.id}

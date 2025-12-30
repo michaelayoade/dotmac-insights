@@ -1,7 +1,7 @@
 """Support analytics and insights endpoints."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends, Query
@@ -26,7 +26,7 @@ def get_support_overview(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Lightweight overview used by the support dashboards."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     total = db.query(func.count(Ticket.id)).scalar() or 0
@@ -83,7 +83,7 @@ def get_volume_trend(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get monthly ticket volume trend."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     volume = db.query(
@@ -123,7 +123,7 @@ def get_resolution_time_trend(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get average resolution time trend by month."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     resolution_hours = func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
@@ -163,7 +163,7 @@ def get_tickets_by_category(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get ticket distribution by type and category."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     # By ticket type
     by_type = db.query(
@@ -208,7 +208,7 @@ async def get_sla_performance(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get SLA attainment trend by month."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     sla_data = db.query(
@@ -255,7 +255,7 @@ def get_support_metrics(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Alias for support metrics expected by the frontend."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     total = db.query(func.count(Ticket.id)).filter(Ticket.created_at >= start_dt).scalar() or 0
     resolved = db.query(func.count(Ticket.id)).filter(
@@ -292,7 +292,7 @@ async def get_support_patterns(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Analyze support patterns including peak times and common issues."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Peak hours
     by_hour = db.query(
@@ -343,7 +343,7 @@ async def get_agent_performance(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Analyze agent/assignee performance metrics."""
-    start_dt = datetime.utcnow() - timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     resolution_hours = func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
 

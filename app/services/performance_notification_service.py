@@ -4,7 +4,7 @@ Integrates with the main NotificationService to emit performance-related events
 like scorecard generation, review requests, approvals, and scheduled reports.
 """
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Dict, Any, List, Optional, cast
 
 from sqlalchemy import func, and_
@@ -510,5 +510,5 @@ class PerformanceNotificationService:
                 "maximum": round(max_score, 2),
             },
             "distribution": distribution,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }

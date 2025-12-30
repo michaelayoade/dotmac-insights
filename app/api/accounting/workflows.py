@@ -1,7 +1,7 @@
 """Workflows: Approval workflows, accounting controls, audit log, account CRUD."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -587,7 +587,7 @@ def update_accounting_controls(
     if fx_loss_account is not None:
         controls.fx_loss_account = fx_loss_account
 
-    controls.updated_at = datetime.utcnow()
+    controls.updated_at = datetime.now(timezone.utc)
     controls.updated_by_id = user.id
 
     # Audit log
@@ -864,7 +864,7 @@ def update_account(
     # Apply updates
     for field, value in updates.items():
         setattr(account, field, value)
-    account.updated_at = datetime.utcnow()
+    account.updated_at = datetime.now(timezone.utc)
 
     # Audit log
     audit = AuditLogger(db)
@@ -914,7 +914,7 @@ def disable_account(
 
     old_values = serialize_for_audit(account)
     account.disabled = True
-    account.updated_at = datetime.utcnow()
+    account.updated_at = datetime.now(timezone.utc)
 
     # Audit log
     audit = AuditLogger(db)

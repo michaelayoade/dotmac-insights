@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.database import get_db
@@ -274,7 +274,7 @@ async def update_webhook(
     if request.retry_delay_seconds is not None:
         webhook.retry_delay_seconds = request.retry_delay_seconds
 
-    webhook.updated_at = datetime.utcnow()
+    webhook.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
@@ -324,7 +324,7 @@ async def test_webhook(
     test_payload = request.payload or {
         "test": True,
         "message": "This is a test webhook delivery",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Queue delivery
@@ -433,7 +433,7 @@ async def rotate_webhook_secret(
     # Generate new signing secret
     new_secret = secrets.token_urlsafe(32)
     webhook.signing_secret = new_secret
-    webhook.updated_at = datetime.utcnow()
+    webhook.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info("webhook_secret_rotated", extra={"webhook_id": webhook_id})
@@ -441,7 +441,7 @@ async def rotate_webhook_secret(
     return {
         "webhook_id": webhook_id,
         "signing_secret": new_secret,
-        "rotated_at": datetime.utcnow().isoformat(),
+        "rotated_at": datetime.now(timezone.utc).isoformat(),
         "message": "Secret rotated successfully. Update your endpoint to use the new secret.",
     }
 
@@ -590,7 +590,7 @@ async def mark_all_notifications_read(
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark all notifications as read."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = db.query(Notification).filter(
         and_(
             Notification.user_id == principal.id,
@@ -659,7 +659,7 @@ async def update_my_preferences(
         pref.slack_enabled = request.slack_enabled
         pref.threshold_amount = Decimal(str(request.threshold_amount)) if request.threshold_amount else None
         pref.threshold_days = request.threshold_days
-        pref.updated_at = datetime.utcnow()
+        pref.updated_at = datetime.now(timezone.utc)
     else:
         pref = NotificationPreference(
             user_id=principal.id,

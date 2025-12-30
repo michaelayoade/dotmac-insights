@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.network_monitor import NetworkMonitor, MonitorState
@@ -66,7 +66,7 @@ async def sync_network_monitors(sync_client, client, full_sync: bool):
                 existing.snmp_uptime = monitor_data.get("snmp_uptime")
                 existing.snmp_status = monitor_data.get("snmp_status")
                 existing.delay_timer = monitor_data.get("delay_timer")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 monitor = NetworkMonitor(

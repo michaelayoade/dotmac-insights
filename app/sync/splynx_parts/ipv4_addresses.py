@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.ipv4_address import IPv4Address
@@ -73,7 +73,7 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
                 existing.is_used = is_used
                 existing.status = ip_data.get("status")
                 existing.last_check = parse_datetime(ip_data.get("last_check"))
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 ip_addr = IPv4Address(
@@ -92,7 +92,7 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
                     is_used=is_used,
                     status=ip_data.get("status"),
                     last_check=parse_datetime(ip_data.get("last_check")),
-                    last_synced_at=datetime.utcnow(),
+                    last_synced_at=datetime.now(timezone.utc),
                 )
                 sync_client.db.add(ip_addr)
                 sync_client.increment_created()

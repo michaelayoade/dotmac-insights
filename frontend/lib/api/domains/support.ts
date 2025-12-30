@@ -705,6 +705,112 @@ export interface SupportCannedResponseList {
   total?: number;
 }
 
+// Ticket Full Detail (Consolidated)
+export interface TicketFullDetailTimelineItem {
+  id: string;
+  type: 'comment' | 'activity' | 'communication';
+  content: string;
+  author: {
+    id: string | null;
+    name: string | null;
+    role: 'internal' | 'public' | 'system' | 'external';
+  };
+  timestamp: string | null;
+  is_internal: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface TicketFullDetailAttachment {
+  id: string;
+  name: string | null;
+  url: string | null;
+  type: string;
+  size: number | null;
+  uploaded_at: string | null;
+}
+
+export interface TicketFullDetailRelated {
+  id: number;
+  ticket_number: string | null;
+  subject: string | null;
+  status: string | null;
+}
+
+export interface TicketFullDetailResponse {
+  generated_at: string;
+
+  ticket: {
+    id: number;
+    ticket_number: string | null;
+    subject: string | null;
+    description: string | null;
+    status: string | null;
+    priority: string | null;
+    ticket_type: string | null;
+    issue_type: string | null;
+    source: string | null;
+    tags: string[];
+    watchers: number[];
+    custom_fields: Record<string, unknown>;
+    region: string | null;
+    base_station: string | null;
+    resolution: string | null;
+    resolution_details: string | null;
+    resolution_date: string | null;
+    feedback_rating: number | null;
+    feedback_text: string | null;
+    opening_date: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  };
+
+  customer: {
+    id: number;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+    status: string | null;
+  } | null;
+
+  assignee: {
+    id: number;
+    name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    team: string | null;
+  } | null;
+
+  sla_status: {
+    response_by: string | null;
+    resolution_by: string | null;
+    first_responded_on: string | null;
+    agreement_status: string | null;
+    is_overdue: boolean;
+    response_met: boolean | null;
+    resolution_met: boolean | null;
+    time_to_resolution_hours: number | null;
+    time_remaining_hours: number | null;
+    is_breached: boolean;
+  };
+
+  timeline: TicketFullDetailTimelineItem[];
+  attachments: TicketFullDetailAttachment[];
+
+  related_tickets: {
+    depends_on: TicketFullDetailRelated[];
+    sub_tickets: TicketFullDetailRelated[];
+    merged_tickets: TicketFullDetailRelated[];
+    parent: TicketFullDetailRelated | null;
+  };
+
+  summary: {
+    timeline_count: number;
+    attachment_count: number;
+    dependencies_count: number;
+    sub_tickets_count: number;
+  };
+}
+
 // =============================================================================
 // API
 // =============================================================================
@@ -735,6 +841,13 @@ export const supportApi = {
 
   getTicketDetail: (id: number | string) =>
     fetchApi<SupportTicketDetail>(`/support/tickets/${id}`),
+
+  /**
+   * Get consolidated ticket full detail (5 API calls → 1)
+   * Returns: Ticket, timeline, attachments, related tickets, SLA status
+   */
+  getTicketFullDetail: (id: number | string) =>
+    fetchApi<TicketFullDetailResponse>(`/support/tickets/${id}/full`),
 
   createTicket: (body: SupportTicketPayload) =>
     fetchApi<SupportTicketCreateResponse>('/support/tickets', {

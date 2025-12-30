@@ -1,7 +1,7 @@
 """Posting service for expense claims."""
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import List, Dict, Any
 
@@ -129,7 +129,7 @@ class ExpensePostingService:
         )
 
         claim.journal_entry_id = je.id
-        claim.posted_at = datetime.utcnow()
+        claim.posted_at = datetime.now(timezone.utc)
         claim.posted_by_id = user_id
         claim.status = ExpenseClaimStatus.POSTED
         claim.posting_date = posting_dt
@@ -150,7 +150,7 @@ class ExpensePostingService:
         claim.status = ExpenseClaimStatus.REVERSED
         claim.reversal_reason = reason
         claim.reversal_journal_entry_id = reversal.id
-        claim.reversed_at = datetime.utcnow()
+        claim.reversed_at = datetime.now(timezone.utc)
         claim.reversed_by_id = user_id
 
         return reversal

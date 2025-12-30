@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 import httpx
 
@@ -95,7 +95,7 @@ async def sync_services(sync_client, client: httpx.AsyncClient, full_sync: bool)
                     existing.ipv4_address = svc_data.get("ipv4")
                     existing.ipv6_address = svc_data.get("ipv6")
                     existing.mac_address = svc_data.get("mac")
-                    existing.last_synced_at = datetime.utcnow()
+                    existing.last_synced_at = datetime.now(timezone.utc)
 
                     # Parse dates
                     start_date = svc_data.get("start_date")

@@ -1,7 +1,7 @@
 """Automation rules management endpoints."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, cast
 from enum import Enum
 
@@ -404,7 +404,7 @@ def list_logs(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List automation execution logs."""
-    start_dt = datetime.utcnow() - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
 
     query = db.query(AutomationLog).filter(AutomationLog.created_at >= start_dt)
 
@@ -450,7 +450,7 @@ async def logs_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get automation execution summary statistics."""
-    start_dt = datetime.utcnow() - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
 
     # Total executions
     total = db.query(func.count(AutomationLog.id)).filter(

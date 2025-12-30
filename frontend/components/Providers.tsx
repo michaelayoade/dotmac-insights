@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ToastProvider, useToast } from '@dotmac/core';
 import { ThemeProvider } from '@dotmac/design-tokens';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SWRConfig, type Key } from 'swr';
 import { ApiError, onAuthError, clearAuthToken } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth-context';
@@ -127,6 +128,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
     show: false,
     message: '',
   });
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: 1,
+            refetchOnWindowFocus: false,
+            staleTime: 30000,
+          },
+        },
+      })
+  );
 
   useEffect(() => {
     const result = validateEnv();
@@ -167,22 +180,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider defaultVariant="admin" defaultColorScheme={initialScheme}>
       <ThemePersistence>
-        <AuthProvider>
-          <FeatureGateProvider>
-            <ToastProvider>
-              <SwrErrorBoundary>
-                <CommandPaletteProvider>
-                  <AuthErrorBanner
-                    show={authError.show}
-                    message={authError.message}
-                    onDismiss={dismissAuthError}
-                  />
-                  <div className={authError.show ? 'pt-12' : ''}>{children}</div>
-                </CommandPaletteProvider>
-              </SwrErrorBoundary>
-            </ToastProvider>
-          </FeatureGateProvider>
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <FeatureGateProvider>
+              <ToastProvider>
+                <SwrErrorBoundary>
+                  <CommandPaletteProvider>
+                    <AuthErrorBanner
+                      show={authError.show}
+                      message={authError.message}
+                      onDismiss={dismissAuthError}
+                    />
+                    <div className={authError.show ? 'pt-12' : ''}>{children}</div>
+                  </CommandPaletteProvider>
+                </SwrErrorBoundary>
+              </ToastProvider>
+            </FeatureGateProvider>
+          </AuthProvider>
+        </QueryClientProvider>
       </ThemePersistence>
     </ThemeProvider>
   );

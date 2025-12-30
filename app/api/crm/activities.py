@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from typing import Optional, List
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
@@ -168,7 +168,7 @@ async def get_activities_summary(db: Session = Depends(get_db)):
     by_status = {s.value if s else "unknown": c for s, c in status_counts}
 
     # Overdue (scheduled in past, not completed)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     overdue = db.query(func.count(Activity.id)).filter(
         Activity.status == ActivityStatus.PLANNED,
         Activity.scheduled_at < now
@@ -300,7 +300,7 @@ async def complete_activity(
         raise HTTPException(status_code=404, detail="Activity not found")
 
     activity.status = ActivityStatus.COMPLETED
-    activity.completed_at = datetime.utcnow()
+    activity.completed_at = datetime.now(timezone.utc)
 
     if outcome and activity.activity_type == ActivityType.CALL:
         activity.call_outcome = outcome

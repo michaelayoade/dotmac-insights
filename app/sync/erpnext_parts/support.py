@@ -6,7 +6,7 @@ This module handles syncing of support-related entities:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -163,7 +163,7 @@ async def sync_hd_tickets(
                 existing.feedback_rating = ticket_data.get("feedback_rating")
                 existing.feedback_text = ticket_data.get("feedback_text")
 
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 date_fields = [
                     ("opening_date", "opening_date"),
@@ -229,7 +229,7 @@ async def sync_hd_tickets(
                             pass
 
                 if not ticket.opening_date:
-                    ticket.opening_date = datetime.utcnow()
+                    ticket.opening_date = datetime.now(timezone.utc)
 
                 sync_client.db.add(ticket)
                 sync_client.increment_created()
@@ -351,7 +351,7 @@ async def sync_projects(
                 existing.message = proj_data.get("message")
                 existing.notes = proj_data.get("notes")
 
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 date_fields = ["expected_start_date", "expected_end_date", "actual_start_date", "actual_end_date"]
                 for date_field in date_fields:

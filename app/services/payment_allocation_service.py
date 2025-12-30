@@ -118,17 +118,21 @@ class PaymentAllocationService:
         amount_paid: Decimal,
     ) -> None:
         if doc_type == "invoice":
+            from app.models.invoice import InvoiceStatus
+
             doc.amount_paid = (doc.amount_paid or Decimal("0")) + amount_paid
             doc.balance = doc.total_amount - doc.amount_paid
             if doc.balance <= 0:
-                doc.status = "paid"
+                doc.status = InvoiceStatus.PAID
             elif doc.amount_paid > 0:
-                doc.status = "partially_paid"
+                doc.status = InvoiceStatus.PARTIALLY_PAID
         elif doc_type == "bill":
+            from app.models.accounting import PurchaseInvoiceStatus
+
             doc.paid_amount = (doc.paid_amount or Decimal("0")) + amount_paid
             doc.outstanding_amount = doc.grand_total - doc.paid_amount
             if doc.outstanding_amount <= 0:
-                doc.status = "paid"
+                doc.status = PurchaseInvoiceStatus.PAID
         elif doc_type == "debit_note":
             doc.amount_applied = (doc.amount_applied or Decimal("0")) + amount_paid
             doc.amount_remaining = doc.total_amount - doc.amount_applied

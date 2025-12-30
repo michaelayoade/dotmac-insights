@@ -32,7 +32,7 @@ import json
 
 from alembic import op, context
 import sqlalchemy as sa
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 revision: str = "20251217_add_crm_project_kpis"

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case, and_, or_, desc, asc, exists, text
 from typing import Dict, Any, List, Optional, cast
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.database import get_db
@@ -210,7 +210,7 @@ async def get_revenue_summary(
     ).filter(
         Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
         Payment.payment_date.isnot(None),
-        Payment.payment_date >= datetime.utcnow() - timedelta(days=months * 30),
+        Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=months * 30),
     ).group_by(
         extract("year", Payment.payment_date),
         extract("month", Payment.payment_date),
@@ -247,7 +247,7 @@ async def get_revenue_trend(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     payments = (
@@ -293,7 +293,7 @@ async def get_churn_trend(
     db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get monthly churn trend with churn rates based on subscription expiration (no active renewal)."""
-    end_dt = _parse_date_param(end_date, "end_date") or datetime.utcnow()
+    end_dt = _parse_date_param(end_date, "end_date") or datetime.now(timezone.utc)
     start_dt = _parse_date_param(start_date, "start_date") or (end_dt - timedelta(days=months * 30))
 
     # Determine churn events: customers whose latest subscription end_date fell in period and have no active subs
@@ -505,7 +505,7 @@ async def get_customer_summary(
     churned = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.INACTIVE).scalar() or 0
     new_last_30 = db.query(func.count(Customer.id)).filter(
         Customer.signup_date.isnot(None),
-        Customer.signup_date >= datetime.utcnow() - timedelta(days=30)
+        Customer.signup_date >= datetime.now(timezone.utc) - timedelta(days=30)
     ).scalar() or 0
 
     by_status = db.query(
@@ -530,7 +530,7 @@ async def get_support_metrics(
     db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get support/ticket metrics."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Total conversations in period
     total = db.query(Conversation).filter(Conversation.created_at >= start_date).count()
@@ -697,7 +697,7 @@ async def get_customers_by_plan(
 @cached("dso", ttl=CACHE_TTL["long"], include_principal=True)
 async def _get_dso_impl(months: int, db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of DSO calculation (cached - expensive monthly iteration)."""
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=months * 30)
 
     results = []
@@ -949,7 +949,7 @@ async def get_credit_notes_summary(
     db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get credit notes issued trend and summary."""
-    start_date = datetime.utcnow() - timedelta(days=months * 30)
+    start_date = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
     # Monthly trend
     trend = (
@@ -1072,7 +1072,7 @@ async def get_quotation_trend(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     trend = (
@@ -1119,7 +1119,7 @@ async def get_quotation_trend(
 @cached("sla_attainment", ttl=CACHE_TTL["medium"], include_principal=True)
 async def _get_sla_attainment_impl(days: int, db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of SLA attainment metrics (cached - SQL aggregation)."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Calculate resolution hours in SQL (time_to_resolution_hours is a Python property)
     resolution_hours_expr = func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
@@ -1197,7 +1197,7 @@ async def get_agent_productivity(
     db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get ticket handling metrics by assigned employee/agent."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     agents = (
         db.query(
@@ -1239,7 +1239,7 @@ async def get_tickets_by_type(
     db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get ticket distribution by type/category."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     by_type = (
         db.query(
@@ -1384,7 +1384,7 @@ async def get_expenses_by_category(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     by_category = (
@@ -1428,7 +1428,7 @@ async def get_expenses_by_cost_center(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     by_cost_center = (
@@ -1472,7 +1472,7 @@ async def get_expense_trend(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     trend = (
@@ -1523,7 +1523,7 @@ async def get_vendor_spend(
         start_dt = datetime.strptime(start_date, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
     else:
-        end_dt = datetime.utcnow()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=months * 30)
 
     vendors = (
@@ -1571,7 +1571,7 @@ async def get_tickets_per_employee(
     db: Session = Depends(get_db_with_timeout),
 ) -> Dict[str, Any]:
     """Get ticket handling distribution per employee."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     by_employee = (
         db.query(
@@ -1622,7 +1622,7 @@ async def get_metrics_by_department(
     db: Session = Depends(get_db_with_timeout),
 ) -> List[Dict[str, Any]]:
     """Get ticket and expense metrics aggregated by department."""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Employee counts by department
     employee_counts = (

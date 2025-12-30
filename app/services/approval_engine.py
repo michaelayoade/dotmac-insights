@@ -11,7 +11,7 @@ Provides a full workflow engine for document approvals with:
 - Pending approvals dashboard per user
 """
 from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
@@ -293,7 +293,7 @@ class ApprovalEngine:
             # No steps apply - auto-approve
             if approval:
                 approval.status = ApprovalStatus.APPROVED
-                approval.approved_at = datetime.utcnow()
+                approval.approved_at = datetime.now(timezone.utc)
                 approval.approved_by_id = user_id
             else:
                 approval = DocumentApproval(
@@ -303,9 +303,9 @@ class ApprovalEngine:
                     current_step=0,
                     status=ApprovalStatus.APPROVED,
                     amount=amount,
-                    submitted_at=datetime.utcnow(),
+                    submitted_at=datetime.now(timezone.utc),
                     submitted_by_id=user_id,
-                    approved_at=datetime.utcnow(),
+                    approved_at=datetime.now(timezone.utc),
                     approved_by_id=user_id,
                 )
                 self.db.add(approval)
@@ -315,7 +315,7 @@ class ApprovalEngine:
             if first_step.auto_approve_below and amount and amount < first_step.auto_approve_below:
                 if approval:
                     approval.status = ApprovalStatus.APPROVED
-                    approval.approved_at = datetime.utcnow()
+                    approval.approved_at = datetime.now(timezone.utc)
                     approval.approved_by_id = user_id
                 else:
                     approval = DocumentApproval(
@@ -325,9 +325,9 @@ class ApprovalEngine:
                         current_step=0,
                         status=ApprovalStatus.APPROVED,
                         amount=amount,
-                        submitted_at=datetime.utcnow(),
+                        submitted_at=datetime.now(timezone.utc),
                         submitted_by_id=user_id,
-                        approved_at=datetime.utcnow(),
+                        approved_at=datetime.now(timezone.utc),
                         approved_by_id=user_id,
                     )
                     self.db.add(approval)
@@ -338,7 +338,7 @@ class ApprovalEngine:
                     approval.current_step = first_step.step_order
                     approval.status = ApprovalStatus.PENDING
                     approval.amount = amount
-                    approval.submitted_at = datetime.utcnow()
+                    approval.submitted_at = datetime.now(timezone.utc)
                     approval.submitted_by_id = user_id
                     approval.approved_at = None
                     approval.approved_by_id = None
@@ -353,7 +353,7 @@ class ApprovalEngine:
                         current_step=first_step.step_order,
                         status=ApprovalStatus.PENDING,
                         amount=amount,
-                        submitted_at=datetime.utcnow(),
+                        submitted_at=datetime.now(timezone.utc),
                         submitted_by_id=user_id,
                     )
                     self.db.add(approval)
@@ -452,7 +452,7 @@ class ApprovalEngine:
             raise InvalidStateError("Current approval step not found.")
 
         # Record step approval
-        approval.step_approved_at = datetime.utcnow()
+        approval.step_approved_at = datetime.now(timezone.utc)
         approval.step_approved_by_id = user_id
         approval.step_remarks = remarks
 
@@ -478,7 +478,7 @@ class ApprovalEngine:
         else:
             # Final approval - mark as approved
             approval.status = ApprovalStatus.APPROVED
-            approval.approved_at = datetime.utcnow()
+            approval.approved_at = datetime.now(timezone.utc)
             approval.approved_by_id = user_id
 
         self.db.flush()
@@ -577,7 +577,7 @@ class ApprovalEngine:
 
         # Update approval
         approval.status = ApprovalStatus.REJECTED
-        approval.rejected_at = datetime.utcnow()
+        approval.rejected_at = datetime.now(timezone.utc)
         approval.rejected_by_id = user_id
         approval.rejection_reason = reason
 
@@ -653,7 +653,7 @@ class ApprovalEngine:
 
         # Update approval
         approval.status = ApprovalStatus.POSTED
-        approval.posted_at = datetime.utcnow()
+        approval.posted_at = datetime.now(timezone.utc)
         approval.posted_by_id = user_id
 
         # Record history
@@ -997,7 +997,7 @@ class ApprovalEngine:
             if not step_start:
                 continue
 
-            hours_elapsed = (datetime.utcnow() - step_start).total_seconds() / 3600
+            hours_elapsed = (datetime.now(timezone.utc) - step_start).total_seconds() / 3600
             if workflow.escalation_hours and hours_elapsed >= workflow.escalation_hours:
                 escalated_approval = self._escalate_approval(approval)
                 if escalated_approval:
@@ -1018,7 +1018,7 @@ class ApprovalEngine:
         old_values = serialize_for_audit(approval)
 
         # Mark as escalated
-        approval.escalated_at = datetime.utcnow()
+        approval.escalated_at = datetime.now(timezone.utc)
         approval.escalation_count = (approval.escalation_count or 0) + 1
 
         # Record history
@@ -1150,7 +1150,7 @@ class ApprovalEngine:
             if field in allowed_fields:
                 setattr(workflow, field, value)
 
-        workflow.updated_at = datetime.utcnow()
+        workflow.updated_at = datetime.now(timezone.utc)
         self.db.flush()
 
         # Audit log

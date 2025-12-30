@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from typing import List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models.unified_contact import (
@@ -60,7 +60,7 @@ async def bulk_update_contacts(payload: BulkUpdateRequest, db: Session = Depends
     if "lead_qualification" in update_data and update_data["lead_qualification"]:
         update_data["lead_qualification"] = LeadQualification(update_data["lead_qualification"].value)
 
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc)
 
     update_mappings = {
         getattr(UnifiedContact, key): value
@@ -97,7 +97,7 @@ async def bulk_assign_contacts(payload: BulkAssignRequest, db: Session = Depends
         UnifiedContact.id.in_(payload.contact_ids)
     ).update({
         "owner_id": payload.owner_id,
-        "updated_at": datetime.utcnow(),
+        "updated_at": datetime.now(timezone.utc),
     }, synchronize_session="fetch")
 
     db.commit()
@@ -185,7 +185,7 @@ async def bulk_delete_contacts(
             UnifiedContact.id.in_(contact_ids)
         ).update({
             "status": ContactStatus.INACTIVE,
-            "updated_at": datetime.utcnow(),
+            "updated_at": datetime.now(timezone.utc),
         }, synchronize_session="fetch")
 
     db.commit()
@@ -286,7 +286,7 @@ async def merge_contacts(payload: MergeContactsRequest, db: Session = Depends(ge
         UnifiedContact.id.in_(payload.duplicate_contact_ids)
     ).delete(synchronize_session="fetch")
 
-    primary.updated_at = datetime.utcnow()
+    primary.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
@@ -431,7 +431,7 @@ async def import_contacts(payload: ImportContactsRequest, db: Session = Depends(
                 notes=row.notes,
                 tags=row.tags,
                 owner_id=payload.owner_id,
-                first_contact_date=datetime.utcnow(),
+                first_contact_date=datetime.now(timezone.utc),
             )
             db.add(contact)
             created += 1

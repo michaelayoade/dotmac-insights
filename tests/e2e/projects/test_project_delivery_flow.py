@@ -15,8 +15,11 @@ import pytest
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 
-from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json
+from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json, assert_response_schema
 from tests.e2e.fixtures.factories import create_customer, create_employee, create_project
+
+# Apply module marker
+pytestmark = pytest.mark.projects
 
 
 class TestProjectCreation:
@@ -55,8 +58,8 @@ class TestProjectCreation:
         assert_http_ok(response, "List projects")
 
         data = get_json(response)
-        assert "items" in data
-        assert len(data["items"]) >= 2
+        assert "data" in data
+        assert len(data["data"]) >= 2
 
     def test_filter_projects_by_status(self, e2e_superuser_client, e2e_db):
         """Test filtering projects by status."""
@@ -68,7 +71,7 @@ class TestProjectCreation:
         assert_http_ok(response, "Filter by status")
 
         data = get_json(response)
-        for project in data["items"]:
+        for project in data["data"]:
             assert project["status"] == "open"
 
     def test_get_project_detail(self, e2e_superuser_client, e2e_db):
@@ -92,8 +95,8 @@ class TestProjectTasks:
         payload = {
             "project_id": project.id,
             "subject": "Implement feature X",
-            "status": "Open",
-            "priority": "High",
+            "status": "open",
+            "priority": "high",
             "exp_start_date": date.today().isoformat(),
             "exp_end_date": (date.today() + timedelta(days=7)).isoformat(),
         }
@@ -120,40 +123,40 @@ class TestProjectTasks:
         assert_http_ok(response, "List tasks")
 
         data = get_json(response)
-        assert "items" in data
-        assert len(data["items"]) >= 2
+        assert "data" in data
+        assert len(data["data"]) >= 2
 
     def test_update_task_status(self, e2e_superuser_client, e2e_db):
         """Test updating task status."""
         from tests.e2e.fixtures.factories import create_task
 
         project = create_project(e2e_db, project_name="Task Update Project")
-        task = create_task(e2e_db, project.id, status="Open")
+        task = create_task(e2e_db, project.id, status="open")
 
         response = e2e_superuser_client.patch(
             f"/api/projects/tasks/{task.id}",
-            json={"status": "Working"},
+            json={"status": "working"},
         )
         assert_http_ok(response, "Update task status")
 
         data = get_json(response)
-        assert data["status"] == "Working"
+        assert data["status"] == "working"
 
     def test_complete_task(self, e2e_superuser_client, e2e_db):
         """Test completing a task."""
         from tests.e2e.fixtures.factories import create_task
 
         project = create_project(e2e_db, project_name="Complete Task Project")
-        task = create_task(e2e_db, project.id, status="Working")
+        task = create_task(e2e_db, project.id, status="working")
 
         response = e2e_superuser_client.patch(
             f"/api/projects/tasks/{task.id}",
-            json={"status": "Completed"},
+            json={"status": "completed"},
         )
         assert_http_ok(response, "Complete task")
 
         data = get_json(response)
-        assert data["status"] == "Completed"
+        assert data["status"] == "completed"
 
     def test_assign_task_to_employee(self, e2e_superuser_client, e2e_db):
         """Test assigning a task to an employee."""
@@ -217,7 +220,8 @@ class TestProjectProgress:
         assert_http_ok(response, "Update progress")
 
         data = get_json(response)
-        assert float(data.get("percent_complete", 0)) == 50
+        assert "percent_complete" in data, "Response missing 'percent_complete' field"
+        assert float(data["percent_complete"]) == 50
 
     def test_progress_recalculation(self, e2e_superuser_client, e2e_db):
         """Test that progress is recalculated from tasks."""
@@ -226,10 +230,10 @@ class TestProjectProgress:
         project = create_project(e2e_db, project_name="Auto Progress Project")
 
         # Create tasks
-        task1 = create_task(e2e_db, project.id, status="Completed")
-        task2 = create_task(e2e_db, project.id, status="Completed")
-        task3 = create_task(e2e_db, project.id, status="Open")
-        task4 = create_task(e2e_db, project.id, status="Open")
+        task1 = create_task(e2e_db, project.id, status="completed")
+        task2 = create_task(e2e_db, project.id, status="completed")
+        task3 = create_task(e2e_db, project.id, status="open")
+        task4 = create_task(e2e_db, project.id, status="open")
 
         # Get project - progress should reflect task completion
         response = e2e_superuser_client.get(f"/api/projects/projects/{project.id}")
@@ -343,7 +347,7 @@ class TestFullProjectLifecycle:
             task_payload = {
                 "project_id": project_id,
                 "subject": task_name,
-                "status": "Open",
+                "status": "open",
             }
             task_resp = e2e_superuser_client.post("/api/projects/tasks", json=task_payload)
             assert_http_ok(task_resp, f"Step 2: Create task {task_name}")
@@ -362,12 +366,12 @@ class TestFullProjectLifecycle:
             # Working
             e2e_superuser_client.patch(
                 f"/api/projects/tasks/{task_id}",
-                json={"status": "Working"},
+                json={"status": "working"},
             )
             # Completed
             complete_resp = e2e_superuser_client.patch(
                 f"/api/projects/tasks/{task_id}",
-                json={"status": "Completed"},
+                json={"status": "completed"},
             )
             assert_http_ok(complete_resp, "Step 4/5: Complete task")
 
@@ -389,7 +393,8 @@ class TestFullProjectLifecycle:
         final_resp = e2e_superuser_client.get(f"/api/projects/projects/{project_id}")
         final = get_json(final_resp)
         assert final["status"] == "completed"
-        assert float(final.get("percent_complete", 0)) == 100
+        assert "percent_complete" in final, "Response missing 'percent_complete' field"
+        assert float(final["percent_complete"]) == 100
 
 
 class TestProjectCosting:

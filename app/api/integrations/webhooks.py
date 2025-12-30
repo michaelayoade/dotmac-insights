@@ -324,7 +324,7 @@ def get_provider_stats(
     Includes daily breakdown and event type distribution.
     """
     from sqlalchemy import func, cast, Date, case
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     from app.models.webhook_event import WebhookEvent
 
     valid_providers = ["paystack", "flutterwave", "mono", "okra"]
@@ -334,7 +334,7 @@ def get_provider_stats(
             detail=f"Unknown provider. Valid providers: {', '.join(valid_providers)}"
         )
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Overall stats
     overall = db.query(
@@ -425,7 +425,7 @@ async def replay_webhook_event(
     This will re-run the event processing logic as if the webhook was just received.
     Useful for recovering from transient failures or after fixing bugs.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.models.webhook_event import WebhookEvent
     from app.integrations.payments.enums import PaymentProvider
 
@@ -472,9 +472,9 @@ async def replay_webhook_event(
         # Mark as successfully replayed
         event.processed = True
         event.error = None
-        event.processed_at = datetime.utcnow()
+        event.processed_at = datetime.now(timezone.utc)
         event.retry_count += 1
-        event.last_retry_at = datetime.utcnow()
+        event.last_retry_at = datetime.now(timezone.utc)
         db.commit()
 
         logger.info(f"Webhook event replayed successfully: {event_id}")
@@ -498,7 +498,7 @@ async def replay_webhook_event(
         # Log the error but don't reset the event
         event.error = str(e)[:1000]
         event.retry_count += 1
-        event.last_retry_at = datetime.utcnow()
+        event.last_retry_at = datetime.now(timezone.utc)
         db.commit()
 
         logger.error(f"Webhook event replay failed: {event_id} - {e}")

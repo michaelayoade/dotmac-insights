@@ -1,7 +1,7 @@
 """Expense claim service for creation and submission."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING, Type
 
@@ -157,7 +157,7 @@ class ExpenseService:
 
         claim.status = ExpenseClaimStatus.PENDING_APPROVAL
         claim.docstatus = 1
-        claim.submitted_at = datetime.utcnow()
+        claim.submitted_at = datetime.now(timezone.utc)
         claim.claim_number = claim.claim_number or self._generate_claim_number(claim, company_code)
 
         # Approval workflow integration
@@ -174,7 +174,7 @@ class ExpenseService:
             # If no workflow, auto-approve and continue
             claim.status = ExpenseClaimStatus.APPROVED
             claim.approval_status = "approved"
-            claim.approved_at = datetime.utcnow()
+            claim.approved_at = datetime.now(timezone.utc)
             claim.approved_by_id = user_id
             approval = None
 

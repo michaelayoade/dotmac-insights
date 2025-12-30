@@ -1,7 +1,7 @@
 """Tax: Tax categories, templates, withholding, rules, and tax filing."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
@@ -658,7 +658,7 @@ def file_tax_period(
 
     old_status = period.status.value
     period.status = TaxFilingStatus.FILED
-    period.filed_at = datetime.utcnow()
+    period.filed_at = datetime.now(timezone.utc)
     period.filed_by_id = user.id
     period.filing_reference = filing_reference
 

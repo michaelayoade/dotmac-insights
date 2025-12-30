@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, text
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models.contact import (
@@ -551,7 +551,7 @@ async def create_contact(payload: ContactCreate, db: Session = Depends(get_db)):
         tags=payload.tags,
         custom_fields=payload.custom_fields,
         notes=payload.notes,
-        first_contact_date=datetime.utcnow(),
+        first_contact_date=datetime.now(timezone.utc),
     )
 
     # If primary contact, unmark other primary contacts for same parent
@@ -604,7 +604,7 @@ async def update_contact(contact_id: int, payload: ContactUpdate, db: Session = 
     for key, value in update_data.items():
         setattr(contact, key, value)
 
-    contact.updated_at = datetime.utcnow()
+    contact.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(contact)

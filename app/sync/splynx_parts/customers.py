@@ -445,7 +445,7 @@ async def sync_customers(sync_client, client, full_sync: bool):
                 if activation_date:
                     existing.activation_date = activation_date
 
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 # Normalize address for new customers

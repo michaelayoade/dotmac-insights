@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract, and_, or_
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
@@ -116,6 +116,8 @@ class TaskCreate(BaseModel):
     priority: Optional[TaskPriority] = None
     assigned_to: Optional[str] = None
     completed_by: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    completed_by_id: Optional[int] = None
     progress: Optional[Decimal] = None
     expected_time: Optional[Decimal] = None
     actual_time: Optional[Decimal] = None
@@ -256,10 +258,10 @@ async def get_projects_dashboard(
     ).filter(Project.status == ProjectStatus.OPEN, Project.is_deleted == False).scalar() or Decimal("0")
 
     # Projects due this week
-    week_end = datetime.utcnow() + timedelta(days=7)
+    week_end = datetime.now(timezone.utc) + timedelta(days=7)
     due_this_week = db.query(func.count(Project.id)).filter(
         Project.expected_end_date <= week_end,
-        Project.expected_end_date >= datetime.utcnow(),
+        Project.expected_end_date >= datetime.now(timezone.utc),
         Project.status == ProjectStatus.OPEN,
         Project.is_deleted == False,
     ).scalar() or 0
@@ -348,7 +350,7 @@ async def list_projects(
 
     if overdue_only:
         query = query.filter(
-            Project.expected_end_date < datetime.utcnow(),
+            Project.expected_end_date < datetime.now(timezone.utc),
             Project.status == ProjectStatus.OPEN
         )
 
@@ -487,6 +489,9 @@ async def get_project(
         "department": project.department,
         "company": project.company,
         "cost_center": project.cost_center,
+        "percent_complete": float(project.percent_complete) if project.percent_complete else 0,
+        "gross_margin": float(project.gross_margin) if project.gross_margin else 0,
+        "total_sales_amount": float(project.total_sales_amount) if project.total_sales_amount else 0,
         "progress": {
             "percent_complete": float(project.percent_complete) if project.percent_complete else 0,
             "percent_complete_method": project.percent_complete_method,
@@ -789,7 +794,7 @@ async def delete_milestone(
         raise HTTPException(status_code=404, detail="Milestone not found")
 
     milestone.is_deleted = True
-    milestone.deleted_at = datetime.utcnow()
+    milestone.deleted_at = datetime.now(timezone.utc)
     milestone.deleted_by_id = current_user.id
     db.commit()
 
@@ -1053,7 +1058,7 @@ async def delete_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     project.is_deleted = True
-    project.deleted_at = datetime.utcnow()
+    project.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {"message": "Project deleted", "id": project_id}
 
@@ -1234,6 +1239,9 @@ async def get_task(
         "erpnext_id": task.erpnext_id,
         "subject": task.subject,
         "description": task.description,
+        "project_id": task.project_id,
+        "assigned_to_id": task.assigned_to_id,
+        "completed_by_id": task.completed_by_id,
         "status": task.status.value if task.status else None,
         "priority": task.priority.value if task.priority else None,
         "task_type": task.task_type,
@@ -1295,6 +1303,17 @@ async def create_task(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new task with optional dependencies."""
+    assigned_to = payload.assigned_to
+    completed_by = payload.completed_by
+    if payload.assigned_to_id and not assigned_to:
+        employee = db.query(Employee).filter(Employee.id == payload.assigned_to_id).first()
+        if employee:
+            assigned_to = employee.name
+    if payload.completed_by_id and not completed_by:
+        employee = db.query(Employee).filter(Employee.id == payload.completed_by_id).first()
+        if employee:
+            completed_by = employee.name
+
     task = Task(
         subject=payload.subject,
         description=payload.description,
@@ -1305,8 +1324,10 @@ async def create_task(
         color=payload.color,
         status=payload.status or TaskStatus.OPEN,
         priority=payload.priority or TaskPriority.MEDIUM,
-        assigned_to=payload.assigned_to,
-        completed_by=payload.completed_by,
+        assigned_to=assigned_to,
+        completed_by=completed_by,
+        assigned_to_id=payload.assigned_to_id,
+        completed_by_id=payload.completed_by_id,
         progress=_decimal_or_default(payload.progress),
         expected_time=_decimal_or_default(payload.expected_time),
         actual_time=_decimal_or_default(payload.actual_time),
@@ -1380,8 +1401,20 @@ async def update_task(
         task.priority = payload.priority
     if payload.assigned_to is not None:
         task.assigned_to = payload.assigned_to
+    if payload.assigned_to_id is not None:
+        task.assigned_to_id = payload.assigned_to_id
+        if payload.assigned_to is None:
+            employee = db.query(Employee).filter(Employee.id == payload.assigned_to_id).first()
+            if employee:
+                task.assigned_to = employee.name
     if payload.completed_by is not None:
         task.completed_by = payload.completed_by
+    if payload.completed_by_id is not None:
+        task.completed_by_id = payload.completed_by_id
+        if payload.completed_by is None:
+            employee = db.query(Employee).filter(Employee.id == payload.completed_by_id).first()
+            if employee:
+                task.completed_by = employee.name
     if payload.progress is not None:
         task.progress = _decimal_or_default(payload.progress)
     if payload.expected_time is not None:
@@ -1467,7 +1500,7 @@ async def get_project_status_trend(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Get monthly project creation and completion trend."""
-    end_dt = datetime.utcnow()
+    end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=months * 30)
 
     created = db.query(
@@ -1809,7 +1842,7 @@ async def update_comment(
 
     comment.content = payload.content
     comment.is_edited = True
-    comment.edited_at = datetime.utcnow()
+    comment.edited_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(comment)
@@ -1833,7 +1866,7 @@ async def delete_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
 
     comment.is_deleted = True
-    comment.deleted_at = datetime.utcnow()
+    comment.deleted_at = datetime.now(timezone.utc)
     comment.deleted_by_id = current_user.id
     db.commit()
 

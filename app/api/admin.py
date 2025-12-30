@@ -8,7 +8,7 @@ Provides CRUD operations for:
 - Current User: /me endpoint
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import structlog
@@ -543,7 +543,7 @@ async def create_service_token(
     expires_at = None
     if request.expires_in_days:
         from datetime import timedelta
-        expires_at = datetime.utcnow() + timedelta(days=request.expires_in_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=request.expires_in_days)
 
     service_token = ServiceToken(
         name=request.name,
@@ -594,7 +594,7 @@ async def revoke_service_token(
         raise HTTPException(status_code=400, detail="Token already revoked")
 
     token.is_active = False
-    token.revoked_at = datetime.utcnow()
+    token.revoked_at = datetime.now(timezone.utc)
     token.revoked_by_id = principal.id if principal.type == "user" else None
     db.commit()
 

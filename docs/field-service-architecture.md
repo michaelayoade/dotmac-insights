@@ -285,60 +285,83 @@ class ServiceZone(Base):
 
 ### Service Orders API (`app/api/field_service/orders.py`)
 ```
-GET    /api/field-service/dashboard         - Dashboard metrics
-GET    /api/field-service/orders            - List orders (filterable)
-GET    /api/field-service/orders/{id}       - Order detail
-POST   /api/field-service/orders            - Create order
-PATCH  /api/field-service/orders/{id}       - Update order
-DELETE /api/field-service/orders/{id}       - Cancel order
+GET    /api/field-service/dashboard                  - Dashboard metrics
+GET    /api/field-service/orders                     - List orders (filterable)
+GET    /api/field-service/orders/{order_id}          - Order detail
+POST   /api/field-service/orders                     - Create order
+PATCH  /api/field-service/orders/{order_id}          - Update order
+DELETE /api/field-service/orders/{order_id}          - Cancel order
 
-POST   /api/field-service/orders/{id}/dispatch    - Dispatch to technician
-POST   /api/field-service/orders/{id}/start       - Start work
-POST   /api/field-service/orders/{id}/complete    - Complete order
-POST   /api/field-service/orders/{id}/reschedule  - Reschedule
+POST   /api/field-service/orders/{order_id}/schedule - Schedule order
+POST   /api/field-service/orders/{order_id}/dispatch - Dispatch to technician
+POST   /api/field-service/orders/{order_id}/en-route - Technician en-route
+POST   /api/field-service/orders/{order_id}/arrive   - Technician arrived
+POST   /api/field-service/orders/{order_id}/start    - Start work
+POST   /api/field-service/orders/{order_id}/complete - Complete order
+POST   /api/field-service/orders/{order_id}/reschedule - Reschedule
 
-POST   /api/field-service/orders/{id}/checklist/{item_id}/complete
-POST   /api/field-service/orders/{id}/photos      - Upload photo
-POST   /api/field-service/orders/{id}/items       - Add inventory item
-POST   /api/field-service/orders/{id}/time-entry  - Log time
-POST   /api/field-service/orders/{id}/signature   - Capture signature
+PATCH  /api/field-service/orders/{order_id}/checklist/{item_id} - Update checklist item
+POST   /api/field-service/orders/{order_id}/time-entries        - Log time
+POST   /api/field-service/orders/{order_id}/items               - Add inventory item
+POST   /api/field-service/orders/{order_id}/signature           - Capture signature
+POST   /api/field-service/orders/{order_id}/photos              - Upload photo
+GET    /api/field-service/photos/{photo_id}                     - Fetch photo
+DELETE /api/field-service/orders/{order_id}/photos/{photo_id}   - Delete photo
+
+POST   /api/field-service/orders/bulk/reschedule                - Bulk reschedule
+POST   /api/field-service/orders/bulk/cancel                    - Bulk cancel
+POST   /api/field-service/orders/bulk/delete                    - Bulk delete
 ```
 
-### Teams & Scheduling API (`app/api/field_service/scheduling.py`)
+### Teams API (`app/api/field_service/teams.py`)
 ```
 GET    /api/field-service/teams                   - List teams
-GET    /api/field-service/teams/{id}              - Team detail
+GET    /api/field-service/teams/{team_id}         - Team detail
 POST   /api/field-service/teams                   - Create team
-PATCH  /api/field-service/teams/{id}              - Update team
+PATCH  /api/field-service/teams/{team_id}         - Update team
+DELETE /api/field-service/teams/{team_id}         - Delete team
+POST   /api/field-service/teams/{team_id}/members - Add team member
+DELETE /api/field-service/teams/{team_id}/members/{employee_id} - Remove team member
 
 GET    /api/field-service/technicians             - List available technicians
-GET    /api/field-service/technicians/{id}/schedule - Technician schedule
-GET    /api/field-service/technicians/{id}/availability - Check availability
+GET    /api/field-service/technicians/{technician_id} - Technician detail
+POST   /api/field-service/technicians/{technician_id}/skills - Add skill
+DELETE /api/field-service/technicians/{technician_id}/skills/{skill_id} - Remove skill
 
-GET    /api/field-service/schedule/calendar       - Calendar view
-GET    /api/field-service/schedule/optimize       - Route optimization suggestions
-POST   /api/field-service/schedule/bulk-assign    - Bulk assign orders
-```
-
-### Configuration API (`app/api/field_service/config.py`)
-```
 GET    /api/field-service/zones                   - List service zones
 POST   /api/field-service/zones                   - Create zone
-PATCH  /api/field-service/zones/{id}              - Update zone
+PATCH  /api/field-service/zones/{zone_id}         - Update zone
+```
 
-GET    /api/field-service/checklists              - List checklist templates
-POST   /api/field-service/checklists              - Create template
-PATCH  /api/field-service/checklists/{id}         - Update template
-
-GET    /api/field-service/skills                  - List skill types
+### Scheduling API (`app/api/field_service/scheduling.py`)
+```
+GET    /api/field-service/schedule/calendar       - Calendar view
+GET    /api/field-service/schedule/technician/{technician_id} - Technician schedule
+GET    /api/field-service/schedule/availability   - Availability check
+GET    /api/field-service/schedule/available-technicians - Available technicians
+GET    /api/field-service/schedule/dispatch-board - Dispatch board
+POST   /api/field-service/schedule/bulk-assign    - Bulk assign orders
+GET    /api/field-service/schedule/optimize       - Route optimization suggestions
 ```
 
 ### Analytics API (`app/api/field_service/analytics.py`)
 ```
+GET    /api/field-service/analytics/dashboard     - Overview KPIs
+GET    /api/field-service/analytics/order-type-breakdown - Order breakdown
 GET    /api/field-service/analytics/performance   - Team/technician performance
-GET    /api/field-service/analytics/completion    - Completion rates, SLA
+GET    /api/field-service/analytics/technician-performance - Technician performance
+GET    /api/field-service/analytics/team-performance - Team performance
+GET    /api/field-service/analytics/trends        - Trend analysis
 GET    /api/field-service/analytics/costs         - Cost analysis
 GET    /api/field-service/analytics/utilization   - Resource utilization
+```
+
+### WebSocket API (`app/api/field_service/websocket.py`)
+```
+WS     /api/field-service/ws/dispatch             - Dispatch updates
+WS     /api/field-service/ws/orders               - Order updates
+WS     /api/field-service/ws/tracking             - Live tracking
+GET    /api/field-service/ws/stats                - WebSocket stats
 ```
 
 ---

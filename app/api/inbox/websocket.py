@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from typing import Dict, Set, Any, Optional
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -175,7 +175,7 @@ async def broadcast_stats_update(stats: Dict[str, Any]) -> None:
     message = {
         "event": InboxEvent.STATS_UPDATE,
         "data": stats,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     await manager.broadcast_to_channel("stats", message)
 
@@ -188,7 +188,7 @@ async def broadcast_conversation_update(
     message = {
         "event": InboxEvent.CONVERSATION_UPDATE,
         "data": conversation_data,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Broadcast to conversations channel
@@ -211,7 +211,7 @@ async def broadcast_new_message(
             "conversation_id": conversation_id,
             "message": message_data,
         },
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Broadcast to messages channel
@@ -235,7 +235,7 @@ async def broadcast_assignment(
             "agent_id": agent_id,
             "conversation": conversation_data,
         },
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # Notify the assigned agent
@@ -424,7 +424,7 @@ async def inbox_websocket(
             "event": "connected",
             "channel": channel,
             "agent_id": agent_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         # Keep connection alive and handle incoming messages

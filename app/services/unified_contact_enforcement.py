@@ -19,7 +19,7 @@ Configuration:
 """
 import os
 from typing import Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -173,8 +173,8 @@ class UnifiedContactEnforcement:
             splynx_id=customer_data.get("splynx_id"),
             erpnext_id=customer_data.get("erpnext_id"),
             legacy_customer_id=customer_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.db.add(uc)
         self.db.flush()  # Get ID without committing
@@ -230,8 +230,8 @@ class UnifiedContactEnforcement:
             territory=lead_data.get("territory"),
             erpnext_id=lead_data.get("name"),
             legacy_lead_id=lead_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.db.add(uc)
         self.db.flush()
@@ -293,8 +293,8 @@ class UnifiedContactEnforcement:
             designation=contact_data.get("designation"),
             department=contact_data.get("department"),
             legacy_contact_id=contact_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.db.add(uc)
         self.db.flush()
@@ -340,8 +340,8 @@ class UnifiedContactEnforcement:
             designation=inbox_data.get("job_title"),
             tags=inbox_data.get("tags"),
             legacy_inbox_contact_id=inbox_contact_id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         self.db.add(uc)
         self.db.flush()

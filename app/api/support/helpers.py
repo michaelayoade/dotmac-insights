@@ -1,7 +1,7 @@
 """Shared helpers for support API endpoints."""
 from __future__ import annotations
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, Tuple, List, Any
 
 from fastapi import HTTPException
@@ -73,7 +73,7 @@ def paginate(query, offset: int, limit: int) -> Tuple[int, List[Any]]:
 
 def generate_local_ticket_number() -> str:
     """Generate a deterministic ticket number for locally created tickets."""
-    return f"HD-LOCAL-{int(datetime.utcnow().timestamp() * 1000)}"
+    return f"HD-LOCAL-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
 
 
 def serialize_ticket_brief(ticket) -> dict:

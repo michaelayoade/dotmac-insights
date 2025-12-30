@@ -14,7 +14,7 @@ Usage:
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Any
 
@@ -83,7 +83,7 @@ class BillingOutboundSyncService:
         operation = SyncOperation.UPDATE.value if invoice.erpnext_id else SyncOperation.CREATE.value
 
         # Create log entry
-        idempotency_key = f"erpnext:invoice:{invoice.id}:{invoice.updated_at.timestamp() if invoice.updated_at else datetime.utcnow().timestamp()}"
+        idempotency_key = f"erpnext:invoice:{invoice.id}:{invoice.updated_at.timestamp() if invoice.updated_at else datetime.now(timezone.utc).timestamp()}"
         log = OutboundSyncLog.create_pending(
             entity_type="invoice",
             entity_id=invoice.id,
@@ -159,7 +159,7 @@ class BillingOutboundSyncService:
         operation = SyncOperation.UPDATE.value if payment.erpnext_id else SyncOperation.CREATE.value
 
         # Create log entry
-        idempotency_key = f"erpnext:payment:{payment.id}:{payment.updated_at.timestamp() if payment.updated_at else datetime.utcnow().timestamp()}"
+        idempotency_key = f"erpnext:payment:{payment.id}:{payment.updated_at.timestamp() if payment.updated_at else datetime.now(timezone.utc).timestamp()}"
         log = OutboundSyncLog.create_pending(
             entity_type="payment",
             entity_id=payment.id,
@@ -327,7 +327,7 @@ class BillingOutboundSyncService:
             operation=SyncOperation.UPDATE.value,
             status=SyncStatus.SKIPPED.value,
             error_message=reason,
-            created_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
         )
         return log

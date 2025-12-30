@@ -7,7 +7,7 @@ This module handles syncing of sales-related entities:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -118,7 +118,7 @@ async def sync_customers(
                 if cust_data.get("custom_notes") and not existing.notes:
                     existing.notes = cust_data.get("custom_notes")
 
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 # Create new customer record with all available data
@@ -183,7 +183,7 @@ async def sync_customer_groups(
                 existing.default_payment_terms_template = group_data.get("default_payment_terms_template")
                 existing.lft = group_data.get("lft")
                 existing.rgt = group_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 customer_group = CustomerGroup(
@@ -236,7 +236,7 @@ async def sync_territories(
                 existing.territory_manager = terr_data.get("territory_manager")
                 existing.lft = terr_data.get("lft")
                 existing.rgt = terr_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 territory = Territory(
@@ -291,7 +291,7 @@ async def sync_sales_persons(
                 existing.commission_rate = Decimal(str(person_data.get("commission_rate", 0) or 0))
                 existing.lft = person_data.get("lft")
                 existing.rgt = person_data.get("rgt")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 sales_person = SalesPerson(
@@ -374,7 +374,7 @@ async def sync_erpnext_leads(
                 existing.country = lead_data.get("country")
                 existing.notes = lead_data.get("notes")
                 existing.converted = lead_data.get("converted", 0) == 1 or status == ERPNextLeadStatus.CONVERTED
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 lead = ERPNextLead(
@@ -470,7 +470,7 @@ async def sync_quotations(
                 existing.source = quote_data.get("source")
                 existing.campaign = quote_data.get("campaign")
                 existing.order_lost_reason = quote_data.get("order_lost_reason")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if quote_data.get("transaction_date"):
                     try:
@@ -607,7 +607,7 @@ async def sync_sales_orders(
                 existing.territory = order_data.get("territory")
                 existing.source = order_data.get("source")
                 existing.campaign = order_data.get("campaign")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
 
                 if order_data.get("transaction_date"):
                     try:

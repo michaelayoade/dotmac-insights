@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.administrator import Administrator
@@ -44,7 +44,7 @@ async def sync_administrators(sync_client, client, full_sync: bool):
                 existing.last_activity = last_activity
                 existing.calendar_color = admin_data.get("calendar_color")
                 existing.send_from_my_name = admin_data.get("send_from_my_name")
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 admin = Administrator(

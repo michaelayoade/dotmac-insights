@@ -4,7 +4,7 @@ Handles automatic ticket assignment based on routing rules and strategies.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List, TypedDict
 
 import structlog
@@ -100,7 +100,7 @@ class RoutingEngine:
             team = self.db.query(Team).filter(Team.id == rule.team_id).first()
             if team:
                 ticket.resolution_team = team.name
-        ticket.updated_at = datetime.utcnow()
+        ticket.updated_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info(
@@ -584,7 +584,7 @@ class RoutingEngine:
                     # Move ticket
                     old_assignee = ticket.assigned_to
                     ticket.assigned_to = target_agent["name"]
-                    ticket.updated_at = datetime.utcnow()
+                    ticket.updated_at = datetime.now(timezone.utc)
 
                     # Update workload tracking
                     target_agent["load"] += 1

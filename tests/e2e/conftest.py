@@ -8,23 +8,29 @@ Provides fixtures for comprehensive end-to-end testing including:
 - State verification utilities
 """
 import os
+import logging
+
 import pytest
 from decimal import Decimal
 from datetime import datetime, date
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text, event
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import JSON
 
-# Set test database URL before importing app - prefer PostgreSQL for E2E tests
+# Configure E2E test logging
+logging.basicConfig(level=logging.INFO)
+e2e_logger = logging.getLogger("e2e")
+
+# Get database URL from environment - fail fast if not configured
+_DEFAULT_DB_URL = "postgresql+psycopg://dotmac:dotmac_dev_password@localhost:5432/dotmac_insights"
+E2E_DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL") or _DEFAULT_DB_URL
+
+# Set for app import
 if "TEST_DATABASE_URL" not in os.environ:
-    # Use the main DATABASE_URL for E2E tests (PostgreSQL), or fall back to SQLite
-    os.environ["TEST_DATABASE_URL"] = os.environ.get(
-        "DATABASE_URL",
-        "postgresql+psycopg://dotmac:dotmac_dev_password@localhost:5432/dotmac_insights"
-    )
+    os.environ["TEST_DATABASE_URL"] = E2E_DATABASE_URL
 
 # For SQLite compatibility, we need to compile JSONB as JSON
 from sqlalchemy.ext.compiler import compiles
@@ -40,27 +46,45 @@ from app.auth import get_current_principal, Principal
 
 
 # =============================================================================
+# PYTEST CONFIGURATION
+# =============================================================================
+
+def pytest_configure(config):
+    """Register custom markers for E2E tests."""
+    config.addinivalue_line("markers", "accounting: Accounting module tests")
+    config.addinivalue_line("markers", "crm: CRM module tests")
+    config.addinivalue_line("markers", "hr: HR module tests")
+    config.addinivalue_line("markers", "projects: Projects module tests")
+    config.addinivalue_line("markers", "support: Support module tests")
+
+
+# =============================================================================
 # DATABASE FIXTURES
 # =============================================================================
 
 @pytest.fixture(scope="session")
 def e2e_engine():
     """Create test database engine."""
-    db_url = os.environ.get("TEST_DATABASE_URL", "sqlite:///./test_e2e.db")
-    connect_args = {}
+    db_url = E2E_DATABASE_URL
+
+    # Force PostgreSQL for E2E tests - SQLite lacks needed features
     if db_url.startswith("sqlite"):
-        connect_args = {"check_same_thread": False}
+        db_url = _DEFAULT_DB_URL
+        e2e_logger.warning(f"SQLite not supported for E2E tests, using PostgreSQL: {db_url}")
 
     engine = create_engine(
         db_url,
         pool_pre_ping=True,
-        connect_args=connect_args,
+        connect_args={},
     )
 
-    # For PostgreSQL, assume schema is managed by Alembic migrations
-    # Only create tables for SQLite test databases
-    if db_url.startswith("sqlite"):
-        Base.metadata.create_all(bind=engine)
+    # Validate database connectivity at session start
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        e2e_logger.info(f"E2E database connection established: {db_url.split('@')[-1]}")
+    except Exception as e:
+        pytest.fail(f"E2E database connection failed: {e}")
 
     yield engine
 
@@ -76,6 +100,14 @@ def e2e_db(e2e_engine):
     Each test runs in its own transaction that is rolled back after.
     """
     connection = e2e_engine.connect()
+
+    # Validate connectivity before starting transaction
+    try:
+        connection.execute(text("SELECT 1"))
+    except Exception as e:
+        connection.close()
+        pytest.fail(f"Database connection failed at test start: {e}")
+
     transaction = connection.begin()
 
     TestSessionLocal = sessionmaker(
@@ -106,6 +138,7 @@ def e2e_client(e2e_db):
         finally:
             pass  # Don't close - handled by e2e_db fixture
 
+    # Use direct override assignment for cleaner fixture chain
     fastapi_app.dependency_overrides[get_db] = override_get_db
 
     with TestClient(fastapi_app) as client:
@@ -152,6 +185,7 @@ def e2e_superuser_client(e2e_db, e2e_client):
     async def override_principal():
         return mock_principal
 
+    # Use direct override assignment for cleaner fixture chain
     fastapi_app.dependency_overrides[get_current_principal] = override_principal
 
     yield e2e_client
@@ -191,26 +225,25 @@ def e2e_scoped_client(e2e_db, e2e_client):
 # =============================================================================
 
 @pytest.fixture(scope="function")
-def e2e_fiscal_year(e2e_db, e2e_superuser_client):
-    """Create a fiscal year for accounting tests."""
+def e2e_fiscal_year(e2e_db):
+    """Create or get a fiscal year for accounting tests."""
     from app.models.accounting import FiscalYear
 
     current_year = datetime.now().year
+    current_year_str = str(current_year)
 
-    # Check if already exists
+    # Check if already exists (get_or_create pattern for shared resources)
     existing = e2e_db.query(FiscalYear).filter(
-        FiscalYear.year == current_year
+        FiscalYear.year == current_year_str
     ).first()
 
     if existing:
         return existing
 
     fiscal_year = FiscalYear(
-        year=current_year,
-        name=f"FY {current_year}",
-        start_date=date(current_year, 1, 1),
-        end_date=date(current_year, 12, 31),
-        is_closed=False,
+        year=current_year_str,
+        year_start_date=date(current_year, 1, 1),
+        year_end_date=date(current_year, 12, 31),
     )
     e2e_db.add(fiscal_year)
     e2e_db.commit()
@@ -220,9 +253,11 @@ def e2e_fiscal_year(e2e_db, e2e_superuser_client):
 
 
 @pytest.fixture(scope="function")
-def e2e_chart_of_accounts(e2e_db, e2e_superuser_client):
+def e2e_chart_of_accounts(e2e_db, e2e_fiscal_year):
     """Create basic chart of accounts for accounting tests."""
     from app.models.accounting import Account, AccountType
+    from app.models.accounting_ext import FiscalPeriod
+    from app.services.period_manager import PeriodManager
 
     accounts = []
     account_defs = [
@@ -261,14 +296,25 @@ def e2e_chart_of_accounts(e2e_db, e2e_superuser_client):
     for acc in accounts:
         e2e_db.refresh(acc)
 
+    # Ensure fiscal periods exist for the fiscal year (needed for JE validation)
+    existing_period = e2e_db.query(FiscalPeriod).filter(
+        FiscalPeriod.fiscal_year_id == e2e_fiscal_year.id
+    ).first()
+    if not existing_period:
+        PeriodManager(e2e_db).create_fiscal_periods_for_year(
+            fiscal_year_id=e2e_fiscal_year.id
+        )
+        e2e_db.commit()
+
     return {acc.account_number: acc for acc in accounts}
 
 
 @pytest.fixture(scope="function")
-def e2e_payment_terms(e2e_db, e2e_superuser_client):
-    """Create payment terms for invoicing tests."""
+def e2e_payment_terms(e2e_db):
+    """Create or get payment terms for invoicing tests."""
     from app.models.payment_terms import PaymentTerms
 
+    # Check if already exists (get_or_create pattern for shared resources)
     existing = e2e_db.query(PaymentTerms).filter(
         PaymentTerms.code == "NET30"
     ).first()
@@ -294,11 +340,13 @@ def e2e_payment_terms(e2e_db, e2e_superuser_client):
 # =============================================================================
 
 @pytest.fixture(autouse=True)
-def e2e_cleanup(e2e_db):
-    """Clean up any test data after each test."""
+def e2e_cleanup():
+    """Clean up dependency overrides after each test."""
     yield
 
-    # Transaction rollback in e2e_db handles cleanup
+    # Transaction rollback in e2e_db handles data cleanup
+    # Clear any remaining dependency overrides as safety measure
+    fastapi_app.dependency_overrides.clear()
 
 
 # =============================================================================
@@ -323,3 +371,52 @@ def get_json(response):
     """Get JSON from response, with helpful error message."""
     assert response.status_code < 500, f"Server error: {response.text}"
     return response.json()
+
+
+# =============================================================================
+# RESPONSE VALIDATION HELPERS
+# =============================================================================
+
+def assert_response_schema(data: dict, required_fields: list[str], message: str = ""):
+    """Validate response contains required fields."""
+    missing = [f for f in required_fields if f not in data]
+    assert not missing, f"{message}: Missing required fields: {missing}"
+
+
+def assert_field_exists(data: dict, *path: str, message: str = ""):
+    """
+    Assert nested field exists in response.
+
+    Usage:
+        assert_field_exists(data, "resolution", "resolution", message="Ticket resolution")
+    """
+    current = data
+    for key in path:
+        assert key in current, f"{message}: Missing field '{key}' in {list(current.keys())}"
+        current = current[key]
+    return current
+
+
+def assert_invoice_response(data: dict):
+    """Validate invoice response schema."""
+    assert_response_schema(data, ["id", "invoice_number", "status"], "Invoice response")
+
+
+def assert_payment_response(data: dict):
+    """Validate payment response schema."""
+    assert_response_schema(data, ["id", "amount"], "Payment response")
+
+
+def assert_ticket_response(data: dict):
+    """Validate ticket response schema."""
+    assert_response_schema(data, ["id", "subject", "status", "priority"], "Ticket response")
+
+
+def assert_project_response(data: dict):
+    """Validate project response schema."""
+    assert_response_schema(data, ["id", "project_name", "status"], "Project response")
+
+
+def assert_lead_response(data: dict):
+    """Validate lead response schema."""
+    assert_response_schema(data, ["id", "lead_name", "status"], "Lead response")

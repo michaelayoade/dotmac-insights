@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 from enum import Enum
@@ -199,7 +199,7 @@ async def approve_scorecard(
         raise HTTPException(status_code=400, detail=f"Cannot approve scorecard in {scorecard.status} status")
 
     scorecard.status = ScorecardInstanceStatus.APPROVED
-    scorecard.reviewed_at = datetime.utcnow()
+    scorecard.reviewed_at = datetime.now(timezone.utc)
     # scorecard.reviewed_by_id = current_user.id  # TODO
     db.commit()
 
@@ -464,7 +464,7 @@ async def finalize_scorecard(scorecard_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Can only finalize approved scorecards")
 
     scorecard.status = ScorecardInstanceStatus.FINALIZED
-    scorecard.finalized_at = datetime.utcnow()
+    scorecard.finalized_at = datetime.now(timezone.utc)
     # scorecard.finalized_by_id = current_user.id  # TODO
     db.commit()
 

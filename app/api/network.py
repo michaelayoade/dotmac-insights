@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_, or_, distinct
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
 from app.models.pop import Pop
@@ -385,7 +385,7 @@ async def get_pop_performance(
     ).group_by(Customer.pop_id).subquery()
 
     # Tickets by POP
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     ticket_data = db.query(
         Customer.pop_id,
         func.count(Ticket.id).label("ticket_count"),
@@ -506,7 +506,7 @@ async def get_network_health(
     ).scalar() or 0
 
     # Network-related tickets
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     network_tickets = db.query(func.count(Ticket.id)).filter(
         Ticket.created_at >= thirty_days_ago,
         or_(

@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Dict, Any, Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
 from app.models.auth import User
+from app.models.employee import Employee
 from app.models.hr_leave import (
     LeaveType,
     HolidayList,
@@ -317,6 +318,7 @@ def list_leave_allocations(
                 "new_leaves_allocated": float(a.new_leaves_allocated) if a.new_leaves_allocated else 0,
                 "total_leaves_allocated": float(a.total_leaves_allocated) if a.total_leaves_allocated else 0,
                 "unused_leaves": float(a.unused_leaves) if a.unused_leaves else 0,
+                "used_days": float((a.total_leaves_allocated or 0) - (a.unused_leaves or 0)),
                 "status": a.status.value if a.status else None,
                 "company": a.company,
             }
@@ -394,6 +396,7 @@ def get_leave_allocation(
         "new_leaves_allocated": float(a.new_leaves_allocated) if a.new_leaves_allocated else 0,
         "total_leaves_allocated": float(a.total_leaves_allocated) if a.total_leaves_allocated else 0,
         "unused_leaves": float(a.unused_leaves) if a.unused_leaves else 0,
+        "used_days": float((a.total_leaves_allocated or 0) - (a.unused_leaves or 0)),
         "carry_forwarded_leaves": float(a.carry_forwarded_leaves) if a.carry_forwarded_leaves else 0,
         "carry_forwarded_leaves_count": float(a.carry_forwarded_leaves_count) if a.carry_forwarded_leaves_count else 0,
         "leave_policy": a.leave_policy,
@@ -516,7 +519,7 @@ def update_leave_allocation(
     # Track status change
     if allocation.status != old_status:
         allocation.status_changed_by_id = current_user.id if current_user else None
-        allocation.status_changed_at = datetime.utcnow()
+        allocation.status_changed_at = datetime.now(timezone.utc)
 
     # Log audit event
     audit = AuditLogger(db)
@@ -666,23 +669,30 @@ def bulk_create_leave_allocations(
 # =============================================================================
 
 class LeaveApplicationCreate(BaseModel):
-    employee: str
+    employee: Optional[str] = None
     employee_id: Optional[int] = None
     employee_name: Optional[str] = None
-    leave_type: str
+    leave_type: Optional[str] = None
     leave_type_id: Optional[int] = None
     from_date: date
     to_date: date
-    posting_date: date
+    posting_date: Optional[date] = None
     half_day: Optional[bool] = False
     half_day_date: Optional[date] = None
     total_leave_days: Optional[Decimal] = Decimal("0")
     description: Optional[str] = None
+    reason: Optional[str] = None
     leave_approver: Optional[str] = None
     leave_approver_name: Optional[str] = None
     status: Optional[LeaveApplicationStatus] = LeaveApplicationStatus.OPEN
     docstatus: Optional[int] = 0
     company: Optional[str] = None
+
+    @field_validator("status", mode="before")
+    def _normalize_status(cls, value):
+        if isinstance(value, str) and value.lower() == "pending":
+            return "open"
+        return value
 
 
 class LeaveApplicationUpdate(BaseModel):
@@ -703,6 +713,12 @@ class LeaveApplicationUpdate(BaseModel):
     status: Optional[LeaveApplicationStatus] = None
     docstatus: Optional[int] = None
     company: Optional[str] = None
+
+    @field_validator("status", mode="before")
+    def _normalize_status(cls, value):
+        if isinstance(value, str) and value.lower() == "pending":
+            return "open"
+        return value
 
 
 class LeaveApplicationBulkAction(BaseModel):
@@ -745,7 +761,8 @@ def list_leave_applications(
         query = query.filter(LeaveApplication.leave_type_id == leave_type_id)
     if status:
         try:
-            status_enum = LeaveApplicationStatus(status)
+            normalized_status = "open" if status == "pending" else status
+            status_enum = LeaveApplicationStatus(normalized_status)
             query = query.filter(LeaveApplication.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
@@ -872,10 +889,42 @@ def create_leave_application(
     current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new leave application."""
+    if not payload.employee and not payload.employee_id:
+        raise HTTPException(status_code=400, detail="employee or employee_id is required")
+
+    if not payload.leave_type and not payload.leave_type_id:
+        raise HTTPException(status_code=400, detail="leave_type or leave_type_id is required")
+
+    if payload.description is None and payload.reason:
+        payload.description = payload.reason
+
+    if payload.posting_date is None:
+        payload.posting_date = date.today()
+
+    if payload.employee_id and not payload.employee:
+        employee = db.query(Employee).filter(Employee.id == payload.employee_id).first()
+        if employee:
+            payload.employee = employee.employee_number or f"EMP-{employee.id}"
+            if payload.employee_name is None:
+                payload.employee_name = employee.name
+    if payload.leave_type_id and not payload.leave_type:
+        leave_type = db.query(LeaveType).filter(LeaveType.id == payload.leave_type_id).first()
+        if leave_type:
+            payload.leave_type = leave_type.leave_type_name
+        else:
+            raise HTTPException(status_code=400, detail=f"Leave type {payload.leave_type_id} not found")
+
+    if payload.employee is None:
+        raise HTTPException(status_code=400, detail="employee is required")
+    if payload.leave_type is None:
+        raise HTTPException(status_code=400, detail="leave_type is required")
+
     if payload.from_date > payload.to_date:
         raise HTTPException(status_code=400, detail="from_date must be on or before to_date")
     if payload.total_leave_days is not None and payload.total_leave_days < 0:
         raise HTTPException(status_code=400, detail="total_leave_days must be non-negative")
+    if payload.total_leave_days is None or payload.total_leave_days == 0:
+        payload.total_leave_days = Decimal((payload.to_date - payload.from_date).days + 1)
 
     # Validate leave type constraints if leave_type_id is provided
     if payload.leave_type_id and payload.employee_id:
@@ -1000,7 +1049,7 @@ def update_leave_application(
     # Track status change
     if application.status != old_status:
         application.status_changed_by_id = current_user.id if current_user else None
-        application.status_changed_at = datetime.utcnow()
+        application.status_changed_at = datetime.now(timezone.utc)
 
     # Log audit event
     audit = AuditLogger(db)
@@ -1072,7 +1121,7 @@ def approve_leave_application(
     old_status = application.status
     application.status = LeaveApplicationStatus.APPROVED
     application.status_changed_by_id = current_user.id if current_user else None
-    application.status_changed_at = datetime.utcnow()
+    application.status_changed_at = datetime.now(timezone.utc)
     application.updated_by_id = current_user.id if current_user else None
 
     # Deduct leave days from allocation balance
@@ -1121,7 +1170,7 @@ def reject_leave_application(
     old_status = application.status
     application.status = LeaveApplicationStatus.REJECTED
     application.status_changed_by_id = current_user.id if current_user else None
-    application.status_changed_at = datetime.utcnow()
+    application.status_changed_at = datetime.now(timezone.utc)
     application.updated_by_id = current_user.id if current_user else None
 
     # Log audit event
@@ -1169,7 +1218,7 @@ def cancel_leave_application(
 
     application.status = LeaveApplicationStatus.CANCELLED
     application.status_changed_by_id = current_user.id if current_user else None
-    application.status_changed_at = datetime.utcnow()
+    application.status_changed_at = datetime.now(timezone.utc)
     application.updated_by_id = current_user.id if current_user else None
 
     # Log audit event
@@ -1205,7 +1254,7 @@ def bulk_approve_leave_applications(
     updated = 0
     skipped: List[Dict[str, Any]] = []
     audit = AuditLogger(db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for app_id in payload.application_ids:
         application = db.query(LeaveApplication).filter(LeaveApplication.id == app_id).first()
@@ -1283,7 +1332,7 @@ def bulk_reject_leave_applications(
     """Bulk reject leave applications."""
     updated = 0
     audit = AuditLogger(db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for app_id in payload.application_ids:
         application = db.query(LeaveApplication).filter(LeaveApplication.id == app_id).first()

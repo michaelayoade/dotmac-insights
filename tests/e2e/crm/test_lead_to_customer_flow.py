@@ -15,7 +15,10 @@ import pytest
 from decimal import Decimal
 from datetime import date, timedelta
 
-from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json
+from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json, assert_response_schema
+
+# Apply module marker
+pytestmark = pytest.mark.crm
 
 
 class TestLeadLifecycle:
@@ -219,14 +222,14 @@ class TestOpportunityPipeline:
 
     def test_create_opportunity(self, e2e_superuser_client, e2e_db):
         """Test opportunity creation."""
-        # First create a customer
-        from tests.e2e.fixtures.factories import create_customer
+        from tests.e2e.fixtures.factories import create_customer, get_or_create_opportunity_stage
         customer = create_customer(e2e_db, name="Opp Test Customer")
+        stage = get_or_create_opportunity_stage(e2e_db, name="New", sequence=1, probability=10)
 
         payload = {
             "name": "Test Opportunity",
             "customer_id": customer.id,
-            "stage": "New",
+            "stage_id": stage.id,
             "deal_value": 100000.0,
             "probability": 20,
             "expected_close_date": (date.today() + timedelta(days=30)).isoformat(),
@@ -237,18 +240,22 @@ class TestOpportunityPipeline:
 
         data = get_json(response)
         assert data["name"] == "Test Opportunity"
-        assert data["stage"] == "New"
+        assert data["stage"]["name"] == "New"
 
     def test_opportunity_pipeline_stages(self, e2e_superuser_client, e2e_db):
         """Test opportunity progression through pipeline stages."""
-        from tests.e2e.fixtures.factories import create_customer
+        from tests.e2e.fixtures.factories import create_customer, get_or_create_opportunity_stage
         customer = create_customer(e2e_db, name="Pipeline Test Customer")
+
+        # Get or create stages (shared resources)
+        new_stage = get_or_create_opportunity_stage(e2e_db, name="New", sequence=1, probability=10)
+        qual_stage = get_or_create_opportunity_stage(e2e_db, name="Qualification", sequence=2, probability=30)
 
         # Create opportunity
         payload = {
             "name": "Pipeline Test Opp",
             "customer_id": customer.id,
-            "stage": "New",
+            "stage_id": new_stage.id,
             "deal_value": 250000.0,
             "expected_close_date": (date.today() + timedelta(days=60)).isoformat(),
         }
@@ -256,30 +263,29 @@ class TestOpportunityPipeline:
         opp = get_json(create_resp)
         opp_id = opp["id"]
 
-        # Progress through stages
-        stages = ["Qualification", "Proposal", "Negotiation"]
+        # Progress to Qualification stage
+        update_resp = e2e_superuser_client.patch(
+            f"/api/crm/opportunities/{opp_id}",
+            json={"stage_id": qual_stage.id},
+        )
+        assert_http_ok(update_resp, "Update to Qualification")
 
-        for stage in stages:
-            update_resp = e2e_superuser_client.patch(
-                f"/api/crm/opportunities/{opp_id}",
-                json={"stage": stage},
-            )
-            assert_http_ok(update_resp, f"Update to {stage}")
-
-            verify_resp = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
-            verified = get_json(verify_resp)
-            assert verified["stage"] == stage
+        verify_resp = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
+        verified = get_json(verify_resp)
+        assert verified["stage"]["name"] == "Qualification"
 
     def test_win_opportunity(self, e2e_superuser_client, e2e_db):
         """Test winning an opportunity."""
-        from tests.e2e.fixtures.factories import create_customer
+        from tests.e2e.fixtures.factories import create_customer, get_or_create_opportunity_stage
         customer = create_customer(e2e_db, name="Win Test Customer")
+        neg_stage = get_or_create_opportunity_stage(e2e_db, name="Negotiation", sequence=4, probability=70)
+        won_stage = get_or_create_opportunity_stage(e2e_db, name="Won", sequence=10, probability=100, is_won=True)
 
         # Create opportunity
         payload = {
             "name": "Win Test Opp",
             "customer_id": customer.id,
-            "stage": "Negotiation",
+            "stage_id": neg_stage.id,
             "deal_value": 500000.0,
             "expected_close_date": date.today().isoformat(),
         }
@@ -290,23 +296,25 @@ class TestOpportunityPipeline:
         # Mark as won
         response = e2e_superuser_client.patch(
             f"/api/crm/opportunities/{opp_id}",
-            json={"stage": "Won", "status": "won"},
+            json={"stage_id": won_stage.id, "status": "won"},
         )
         assert_http_ok(response, "Win opportunity")
 
         data = get_json(response)
-        assert data["stage"] == "Won"
+        assert data["stage"]["name"] == "Won"
 
     def test_lose_opportunity(self, e2e_superuser_client, e2e_db):
         """Test losing an opportunity."""
-        from tests.e2e.fixtures.factories import create_customer
+        from tests.e2e.fixtures.factories import create_customer, get_or_create_opportunity_stage
         customer = create_customer(e2e_db, name="Lose Test Customer")
+        proposal_stage = get_or_create_opportunity_stage(e2e_db, name="Proposal", sequence=3, probability=50)
+        lost_stage = get_or_create_opportunity_stage(e2e_db, name="Lost", sequence=11, probability=0, is_lost=True)
 
         # Create opportunity
         payload = {
             "name": "Lose Test Opp",
             "customer_id": customer.id,
-            "stage": "Proposal",
+            "stage_id": proposal_stage.id,
             "deal_value": 300000.0,
             "expected_close_date": date.today().isoformat(),
         }
@@ -317,12 +325,12 @@ class TestOpportunityPipeline:
         # Mark as lost
         response = e2e_superuser_client.patch(
             f"/api/crm/opportunities/{opp_id}",
-            json={"stage": "Lost", "status": "lost"},
+            json={"stage_id": lost_stage.id, "status": "lost"},
         )
         assert_http_ok(response, "Lose opportunity")
 
         data = get_json(response)
-        assert data["stage"] == "Lost"
+        assert data["stage"]["name"] == "Lost"
 
 
 class TestLeadSummary:
@@ -370,6 +378,14 @@ class TestFullSalesCycle:
         4. Progress opportunity
         5. Win opportunity
         """
+        from tests.e2e.fixtures.factories import get_or_create_opportunity_stage
+
+        # Get or create pipeline stages (shared resources)
+        qual_stage = get_or_create_opportunity_stage(e2e_db, name="Qualification", sequence=2, probability=30)
+        proposal_stage = get_or_create_opportunity_stage(e2e_db, name="Proposal", sequence=3, probability=50)
+        neg_stage = get_or_create_opportunity_stage(e2e_db, name="Negotiation", sequence=4, probability=70)
+        won_stage = get_or_create_opportunity_stage(e2e_db, name="Won", sequence=10, probability=100, is_won=True)
+
         # Step 1: Create Lead
         lead_payload = {
             "lead_name": "Full Cycle Lead",
@@ -406,18 +422,19 @@ class TestFullSalesCycle:
         opp_id = convert_result["opportunity_id"]
 
         # Step 4: Progress Opportunity through stages
-        stages = ["Qualification", "Proposal", "Negotiation"]
-        for stage in stages:
+        stage_ids = [qual_stage.id, proposal_stage.id, neg_stage.id]
+        stage_names = ["Qualification", "Proposal", "Negotiation"]
+        for stage_id, stage_name in zip(stage_ids, stage_names):
             stage_resp = e2e_superuser_client.patch(
                 f"/api/crm/opportunities/{opp_id}",
-                json={"stage": stage},
+                json={"stage_id": stage_id},
             )
-            assert_http_ok(stage_resp, f"Step 4: Progress to {stage}")
+            assert_http_ok(stage_resp, f"Step 4: Progress to {stage_name}")
 
         # Step 5: Win Opportunity
         win_resp = e2e_superuser_client.patch(
             f"/api/crm/opportunities/{opp_id}",
-            json={"stage": "Won", "status": "won"},
+            json={"stage_id": won_stage.id, "status": "won"},
         )
         assert_http_ok(win_resp, "Step 5: Win opportunity")
 
@@ -434,4 +451,4 @@ class TestFullSalesCycle:
         # - Opportunity should be won
         opp_check = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
         opp_final = get_json(opp_check)
-        assert opp_final["stage"] == "Won"
+        assert opp_final["stage"]["name"] == "Won"

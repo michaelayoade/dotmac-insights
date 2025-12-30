@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, cast
 
@@ -82,7 +82,7 @@ def _export_headers(base_filename: str, extension: str) -> Dict[str, str]:
 def get_expense_export_status() -> Dict[str, Any]:
     """Get export service availability."""
     return {
-        "as_of": datetime.utcnow().isoformat() + "Z",
+        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
         "formats": {
             "csv": {"available": True},
             "excel": {"available": OPENPYXL_AVAILABLE, "requires": "openpyxl"},
@@ -207,7 +207,7 @@ def _build_claims_report_data(claims: List[ExpenseClaim], include_lines: bool, s
 
     return {
         "report_title": "Expense Claims Report",
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
         "period": {
             "start": start_date or "Beginning",
             "end": end_date or "Present",
@@ -465,7 +465,7 @@ def _build_advances_report_data(advances: List[CashAdvance], start_date: Optiona
 
     return {
         "report_title": "Cash Advances Report",
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
         "period": {
             "start": start_date or "Beginning",
             "end": end_date or "Present",
@@ -688,7 +688,7 @@ def get_expense_summary_report(
             {"category": row.name, "count": row.count, "total": float(row.total or 0)}
             for row in top_categories
         ],
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
     }
 
 
@@ -736,7 +736,7 @@ def export_transactions_report(
 
     data: Dict[str, Any] = {
         "report_title": "Card Transactions Report",
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat() + "Z",
         "period": {"start": start_date or "All time", "end": end_date or "Present"},
         "transactions": [
             {

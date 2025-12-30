@@ -30,4 +30,4 @@ Use these examples to build dashboards/alerts during burn-in.
 
 ## Error budget (contacts 500s)
 - If you expose API request totals by status_code:  
-  `sum(rate(api_requests_total{endpoint=~"/api/contacts.*", status_code=~"5.."}[5m]))`
+  `sum(rate(api_requests_total{endpoint=~"/api/crm/contacts.*", status_code=~"5.."}[5m]))`

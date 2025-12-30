@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List, Dict, Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -343,7 +343,7 @@ async def update_vehicle(
     for field, value in update_data.items():
         setattr(vehicle, field, value)
 
-    vehicle.updated_at = datetime.utcnow()
+    vehicle.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(vehicle)
 

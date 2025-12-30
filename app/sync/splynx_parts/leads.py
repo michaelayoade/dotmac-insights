@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from app.models.lead import Lead
@@ -73,7 +73,7 @@ async def sync_leads(sync_client, client, full_sync: bool):
                 existing.last_online = parse_datetime(lead_data.get("last_online"))
                 existing.last_update = parse_datetime(lead_data.get("last_update"))
                 existing.conversion_date = parse_datetime(lead_data.get("conversion_date"))
-                existing.last_synced_at = datetime.utcnow()
+                existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 lead = Lead(
@@ -100,7 +100,7 @@ async def sync_leads(sync_client, client, full_sync: bool):
                     last_online=parse_datetime(lead_data.get("last_online")),
                     last_update=parse_datetime(lead_data.get("last_update")),
                     conversion_date=parse_datetime(lead_data.get("conversion_date")),
-                    last_synced_at=datetime.utcnow(),
+                    last_synced_at=datetime.now(timezone.utc),
                 )
                 sync_client.db.add(lead)
                 sync_client.increment_created()

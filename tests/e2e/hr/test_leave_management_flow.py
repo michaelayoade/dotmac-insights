@@ -14,8 +14,11 @@ import pytest
 from decimal import Decimal
 from datetime import date, timedelta
 
-from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json
+from tests.e2e.conftest import assert_http_ok, assert_http_error, get_json, assert_response_schema
 from tests.e2e.fixtures.factories import create_employee
+
+# Apply module marker
+pytestmark = pytest.mark.hr
 
 
 class TestLeaveAllocation:
@@ -48,7 +51,7 @@ class TestLeaveAllocation:
         from tests.e2e.fixtures.factories import create_leave_allocation
 
         employee = create_employee(e2e_db, name="Allocation List Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("21"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("21"))
 
         response = e2e_superuser_client.get("/api/hr/leave-allocations")
         assert_http_ok(response, "List leave allocations")
@@ -61,7 +64,7 @@ class TestLeaveAllocation:
         from tests.e2e.fixtures.factories import create_leave_allocation
 
         employee = create_employee(e2e_db, name="Balance Test Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
 
         response = e2e_superuser_client.get(
             "/api/hr/leave/balance",
@@ -79,7 +82,7 @@ class TestLeaveApplication:
         from tests.e2e.fixtures.factories import create_leave_allocation
 
         employee = create_employee(e2e_db, name="Leave App Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
 
         start_date = date.today() + timedelta(days=7)
         end_date = start_date + timedelta(days=3)
@@ -92,7 +95,7 @@ class TestLeaveApplication:
             "reason": "Family vacation",
         }
 
-        response = e2e_superuser_client.post("/api/hr/leave/applications", json=payload)
+        response = e2e_superuser_client.post("/api/hr/leave-applications", json=payload)
         assert_http_ok(response, "Submit leave application")
 
         data = get_json(response)
@@ -104,24 +107,24 @@ class TestLeaveApplication:
         from tests.e2e.fixtures.factories import create_leave_allocation, create_leave_application
 
         employee = create_employee(e2e_db, name="App List Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
         create_leave_application(e2e_db, employee.id)
 
-        response = e2e_superuser_client.get("/api/hr/leave/applications")
+        response = e2e_superuser_client.get("/api/hr/leave-applications")
         assert_http_ok(response, "List leave applications")
 
         data = get_json(response)
-        assert "items" in data
+        assert "data" in data
 
     def test_get_leave_application_detail(self, e2e_superuser_client, e2e_db):
         """Test getting leave application details."""
         from tests.e2e.fixtures.factories import create_leave_allocation, create_leave_application
 
         employee = create_employee(e2e_db, name="App Detail Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
         application = create_leave_application(e2e_db, employee.id)
 
-        response = e2e_superuser_client.get(f"/api/hr/leave/applications/{application.id}")
+        response = e2e_superuser_client.get(f"/api/hr/leave-applications/{application.id}")
         assert_http_ok(response, "Get leave application")
 
         data = get_json(response)
@@ -136,11 +139,11 @@ class TestLeaveApproval:
         from tests.e2e.fixtures.factories import create_leave_allocation, create_leave_application
 
         employee = create_employee(e2e_db, name="Approve Test Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
-        application = create_leave_application(e2e_db, employee.id, status="pending")
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
+        application = create_leave_application(e2e_db, employee.id, status="open")
 
         response = e2e_superuser_client.post(
-            f"/api/hr/leave/applications/{application.id}/approve",
+            f"/api/hr/leave-applications/{application.id}/approve",
         )
         assert_http_ok(response, "Approve leave")
 
@@ -152,11 +155,11 @@ class TestLeaveApproval:
         from tests.e2e.fixtures.factories import create_leave_allocation, create_leave_application
 
         employee = create_employee(e2e_db, name="Reject Test Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
-        application = create_leave_application(e2e_db, employee.id, status="pending")
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
+        application = create_leave_application(e2e_db, employee.id, status="open")
 
         response = e2e_superuser_client.post(
-            f"/api/hr/leave/applications/{application.id}/reject",
+            f"/api/hr/leave-applications/{application.id}/reject",
             json={"reason": "Business-critical period"},
         )
         assert_http_ok(response, "Reject leave")
@@ -169,7 +172,7 @@ class TestLeaveApproval:
         from tests.e2e.fixtures.factories import create_leave_allocation
 
         employee = create_employee(e2e_db, name="Exceed Test Employee")
-        create_leave_allocation(e2e_db, employee.id, total_days=Decimal("5"))
+        create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("5"))
 
         # Try to apply for more days than allocated
         start_date = date.today() + timedelta(days=7)
@@ -183,7 +186,7 @@ class TestLeaveApproval:
             "reason": "Long vacation",
         }
 
-        response = e2e_superuser_client.post("/api/hr/leave/applications", json=payload)
+        response = e2e_superuser_client.post("/api/hr/leave-applications", json=payload)
         # Should either fail or return warning
         # Behavior depends on implementation
         assert response.status_code in [200, 201, 400], f"Exceed allocation: {response.text}"
@@ -197,19 +200,19 @@ class TestLeaveBalance:
         from tests.e2e.fixtures.factories import create_leave_allocation, create_leave_application
 
         employee = create_employee(e2e_db, name="Balance Update Employee")
-        allocation = create_leave_allocation(e2e_db, employee.id, total_days=Decimal("20"))
+        allocation = create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
 
         # Create and approve leave application
         application = create_leave_application(
             e2e_db,
             employee.id,
             from_date=date.today() + timedelta(days=7),
-            to_date=date.today() + timedelta(days=9),  # 3 days
-            status="pending",
+            to_date=date.today() + timedelta(days=9),  # 3 working days
+            status="open",
         )
 
         # Approve
-        e2e_superuser_client.post(f"/api/hr/leave/applications/{application.id}/approve")
+        e2e_superuser_client.post(f"/api/hr/leave-applications/{application.id}/approve")
 
         # Check allocation was updated
         e2e_db.refresh(allocation)
@@ -221,7 +224,7 @@ class TestLeaveTypes:
 
     def test_list_leave_types(self, e2e_superuser_client, e2e_db):
         """Test listing available leave types."""
-        response = e2e_superuser_client.get("/api/hr/leave/types")
+        response = e2e_superuser_client.get("/api/hr/leave-types")
         # May return 200 or 404 depending on endpoint availability
         assert response.status_code in [200, 404], f"List leave types: {response.text}"
 
@@ -263,13 +266,18 @@ class TestFullLeaveWorkflow:
         employee = create_employee(e2e_db, name="Full Leave Cycle Employee")
 
         # Step 2: Allocate leave
+        current_year = date.today().year
         alloc_payload = {
+            "employee": f"EMP-{employee.id}",
             "employee_id": employee.id,
+            "employee_name": employee.name,
             "leave_type": "Annual Leave",
-            "total_days": 21,
-            "year": date.today().year,
+            "from_date": f"{current_year}-01-01",
+            "to_date": f"{current_year}-12-31",
+            "new_leaves_allocated": 21,
+            "total_leaves_allocated": 21,
         }
-        alloc_resp = e2e_superuser_client.post("/api/hr/leave/allocations", json=alloc_payload)
+        alloc_resp = e2e_superuser_client.post("/api/hr/leave-allocations", json=alloc_payload)
         assert_http_ok(alloc_resp, "Step 2: Allocate leave")
 
         # Step 3: Submit application
@@ -283,25 +291,31 @@ class TestFullLeaveWorkflow:
             "to_date": end_date.isoformat(),
             "reason": "Annual family vacation",
         }
-        app_resp = e2e_superuser_client.post("/api/hr/leave/applications", json=app_payload)
+        app_resp = e2e_superuser_client.post("/api/hr/leave-applications", json=app_payload)
         assert_http_ok(app_resp, "Step 3: Submit application")
         application = get_json(app_resp)
         app_id = application["id"]
 
         # Step 4: Approve application
-        approve_resp = e2e_superuser_client.post(f"/api/hr/leave/applications/{app_id}/approve")
+        approve_resp = e2e_superuser_client.post(f"/api/hr/leave-applications/{app_id}/approve")
         assert_http_ok(approve_resp, "Step 4: Approve application")
 
         # Step 5: Verify balance updated (check allocation)
         alloc_list_resp = e2e_superuser_client.get(
-            "/api/hr/leave/allocations",
+            "/api/hr/leave-allocations",
             params={"employee_id": employee.id},
         )
         alloc_data = get_json(alloc_list_resp)
 
         # Find the allocation and verify used_days increased
-        if "items" in alloc_data:
-            for alloc in alloc_data["items"]:
-                if alloc["employee_id"] == employee.id:
-                    assert float(alloc.get("used_days", 0)) >= 5
-                    break
+        assert "data" in alloc_data, "Response missing 'data' field"
+        found_allocation = False
+        for alloc in alloc_data["data"]:
+            if alloc["employee_id"] == employee.id:
+                assert "used_days" in alloc, "Allocation missing 'used_days' field"
+                assert float(alloc["used_days"]) >= 5, (
+                    f"Expected at least 5 used_days, got {alloc['used_days']}"
+                )
+                found_allocation = True
+                break
+        assert found_allocation, f"No allocation found for employee {employee.id}"

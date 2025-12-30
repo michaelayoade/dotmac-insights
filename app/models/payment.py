@@ -91,13 +91,20 @@ class Payment(SoftDeleteMixin, Base):
     # Notes
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Write-back tracking
+    write_back_status: Mapped[str] = mapped_column(String(50), default="pending")
+    write_back_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    write_back_attempted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Additional links
     bank_account_id: Mapped[Optional[int]] = mapped_column(ForeignKey("bank_accounts.id"), nullable=True)
     fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
     journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
+    origin_system: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

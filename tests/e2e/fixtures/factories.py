@@ -3,6 +3,10 @@ Test Data Factories for E2E Tests.
 
 Factory functions for creating test entities with sensible defaults.
 Each factory returns the created database model instance.
+
+Factory patterns:
+- create_X() - Always creates a new instance
+- get_or_create_X() - Returns existing or creates new (for shared resources)
 """
 from datetime import datetime, date, timedelta
 from decimal import Decimal
@@ -30,6 +34,26 @@ def random_email() -> str:
 def random_phone() -> str:
     """Generate a random phone number."""
     return f"+234{random.randint(7000000000, 9999999999)}"
+
+
+def calculate_working_days(start: date, end: date) -> Decimal:
+    """
+    Calculate working days excluding weekends.
+
+    Args:
+        start: Start date (inclusive)
+        end: End date (inclusive)
+
+    Returns:
+        Number of working days (Mon-Fri)
+    """
+    days = 0
+    current = start
+    while current <= end:
+        if current.weekday() < 5:  # Mon-Fri (0-4)
+            days += 1
+        current += timedelta(days=1)
+    return Decimal(days)
 
 
 # =============================================================================
@@ -62,6 +86,71 @@ def create_lead(
     db.commit()
     db.refresh(lead)
     return lead
+
+
+def create_opportunity_stage(
+    db: Session,
+    name: str = None,
+    sequence: int = 0,
+    probability: int = 0,
+    is_won: bool = False,
+    is_lost: bool = False,
+    color: str = None,
+    **kwargs
+) -> "OpportunityStage":
+    """
+    Always create a new opportunity stage.
+
+    Use get_or_create_opportunity_stage() for idempotent creation.
+    """
+    from app.models.crm import OpportunityStage
+
+    stage = OpportunityStage(
+        name=name or f"Stage {random_string(4)}",
+        sequence=sequence,
+        probability=probability,
+        is_won=is_won,
+        is_lost=is_lost,
+        color=color,
+        **kwargs
+    )
+    db.add(stage)
+    db.commit()
+    db.refresh(stage)
+    return stage
+
+
+def get_or_create_opportunity_stage(
+    db: Session,
+    name: str,
+    sequence: int = 0,
+    probability: int = 0,
+    is_won: bool = False,
+    is_lost: bool = False,
+    color: str = None,
+    **kwargs
+) -> "OpportunityStage":
+    """
+    Get existing opportunity stage by name or create new one.
+
+    Use this for shared pipeline stages that shouldn't be duplicated.
+    """
+    from app.models.crm import OpportunityStage
+
+    existing = db.query(OpportunityStage).filter(OpportunityStage.name == name).first()
+    if existing:
+        return existing
+
+    return create_opportunity_stage(
+        db,
+        name=name,
+        sequence=sequence,
+        probability=probability,
+        is_won=is_won,
+        is_lost=is_lost,
+        color=color,
+        **kwargs
+    )
 
 
 def create_customer(
@@ -99,22 +188,22 @@ def create_opportunity(
     client,
     name: str = None,
     customer_id: int = None,
-    stage: str = "New",
-    value: Decimal = None,
+    stage_id: int = None,
+    deal_value: Decimal = None,
     **kwargs
 ) -> dict:
     """Create an opportunity via API."""
     payload = {
         "name": name or f"Test Opportunity {random_string(6)}",
-        "stage": stage,
         "expected_close_date": (date.today() + timedelta(days=30)).isoformat(),
-        "value": float(value or Decimal("500000")),
-        "currency": "NGN",
+        "deal_value": float(deal_value or Decimal("500000")),
         "probability": 50,
         **kwargs
     }
     if customer_id:
         payload["customer_id"] = customer_id
+    if stage_id:
+        payload["stage_id"] = stage_id
 
     response = client.post("/api/crm/opportunities/", json=payload)
     assert response.status_code in [200, 201], f"Failed to create opportunity: {response.text}"
@@ -176,17 +265,31 @@ def create_payment(
     **kwargs
 ) -> "Payment":
     """Create a payment record for testing."""
-    from app.models.payment import Payment, PaymentStatus, PaymentSource
+    from app.models.payment import Payment, PaymentStatus, PaymentSource, PaymentMethod
+
+    if customer_id is None:
+        customer = create_customer(db, name="Payment Customer")
+        customer_id = customer.id
+
+    payment_amount = amount or Decimal("50000")
 
     payment = Payment(
         source=PaymentSource.INTERNAL,
         customer_id=customer_id,
-        payment_number=f"PAY-{random_string(8).upper()}",
-        amount=amount or Decimal("50000"),
+        receipt_number=f"PAY-{random_string(8).upper()}",
+        amount=payment_amount,
         currency="NGN",
         payment_date=payment_date or datetime.utcnow(),
+        payment_method=PaymentMethod.BANK_TRANSFER,
         status=PaymentStatus.COMPLETED,
-        payment_type="Receipt",
+        conversion_rate=Decimal("1"),
+        base_currency="NGN",
+        base_amount=payment_amount,
+        total_allocated=Decimal("0"),
+        unallocated_amount=payment_amount,
+        workflow_status="completed",
+        write_back_status="pending",
+        origin_system="local",  # Required field for audit tracking
         **kwargs
     )
     db.add(payment)
@@ -200,10 +303,34 @@ def create_journal_entry(
     lines: list = None,
     posting_date: date = None,
     description: str = None,
+    validate_balance: bool = True,
     **kwargs
 ) -> "JournalEntry":
-    """Create a journal entry for testing."""
+    """
+    Create a journal entry for testing.
+
+    Args:
+        db: Database session
+        lines: List of line dicts with account_id, debit, credit
+        posting_date: Posting date (default: today)
+        description: Entry description
+        validate_balance: If True, raises error if debits != credits
+        **kwargs: Additional fields
+
+    Raises:
+        ValueError: If validate_balance=True and entry doesn't balance
+    """
     from app.models.accounting import JournalEntry, JournalEntryLine
+
+    # Pre-validate balance before creating
+    if lines and validate_balance:
+        total_debit = sum(Decimal(str(l.get("debit", 0))) for l in lines)
+        total_credit = sum(Decimal(str(l.get("credit", 0))) for l in lines)
+        if total_debit != total_credit:
+            raise ValueError(
+                f"Journal entry must balance: total_debit={total_debit}, "
+                f"total_credit={total_credit}, difference={total_debit - total_credit}"
+            )
 
     je = JournalEntry(
         entry_number=f"JE-{random_string(8).upper()}",
@@ -225,9 +352,9 @@ def create_journal_entry(
             )
             db.add(line)
             if line_data.get("debit"):
-                je.total_debit += line_data["debit"]
+                je.total_debit += Decimal(str(line_data["debit"]))
             if line_data.get("credit"):
-                je.total_credit += line_data["credit"]
+                je.total_credit += Decimal(str(line_data["credit"]))
 
     db.commit()
     db.refresh(je)
@@ -272,21 +399,30 @@ def create_employee(
 def create_leave_allocation(
     db: Session,
     employee_id: int,
+    employee_name: str = None,
     leave_type: str = "Annual Leave",
-    total_days: Decimal = None,
-    year: int = None,
+    new_leaves_allocated: Decimal = None,
+    from_date: date = None,
+    to_date: date = None,
     **kwargs
 ) -> "LeaveAllocation":
     """Create a leave allocation for an employee."""
     from app.models.hr_leave import LeaveAllocation
 
+    current_year = datetime.now().year
+    start = from_date or date(current_year, 1, 1)
+    end = to_date or date(current_year, 12, 31)
+    leaves = new_leaves_allocated or Decimal("20")
+
     allocation = LeaveAllocation(
+        employee=f"EMP-{employee_id}",
         employee_id=employee_id,
+        employee_name=employee_name or f"Employee {employee_id}",
         leave_type=leave_type,
-        total_days=total_days or Decimal("20"),
-        used_days=Decimal("0"),
-        carry_forward=Decimal("0"),
-        year=year or datetime.now().year,
+        from_date=start,
+        to_date=end,
+        new_leaves_allocated=leaves,
+        total_leaves_allocated=leaves,
         **kwargs
     )
     db.add(allocation)
@@ -301,23 +437,57 @@ def create_leave_application(
     leave_type: str = "Annual Leave",
     from_date: date = None,
     to_date: date = None,
-    status: str = "pending",
+    status: str = "open",
     **kwargs
 ) -> "LeaveApplication":
-    """Create a leave application for testing."""
-    from app.models.hr_leave import LeaveApplication, LeaveStatus
+    """
+    Create a leave application for testing.
+
+    Args:
+        db: Database session
+        employee_id: Employee ID
+        leave_type: Type of leave (default: Annual Leave)
+        from_date: Start date (default: 7 days from now)
+        to_date: End date (default: 2 days after start)
+        status: Must be a valid LeaveApplicationStatus value (open, approved, rejected, cancelled)
+        **kwargs: Additional fields
+
+    Note:
+        - Uses working days calculation (excludes weekends)
+        - Status "pending" is not valid - use "open" instead
+    """
+    from app.models.employee import Employee
+    from app.models.hr_leave import LeaveApplication, LeaveApplicationStatus
 
     start = from_date or date.today() + timedelta(days=7)
     end = to_date or start + timedelta(days=2)
 
+    # Validate status - don't silently convert
+    valid_statuses = [s.value for s in LeaveApplicationStatus]
+    if status not in valid_statuses:
+        raise ValueError(
+            f"Invalid status '{status}'. Valid values: {valid_statuses}. "
+            f"Note: Use 'open' instead of 'pending'."
+        )
+
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    employee_number = employee.employee_number if employee else f"EMP-{employee_id}"
+    employee_name = employee.name if employee else f"Employee {employee_id}"
+
+    # Calculate working days (excludes weekends)
+    working_days = calculate_working_days(start, end)
+
     application = LeaveApplication(
+        employee=employee_number,
         employee_id=employee_id,
+        employee_name=employee_name,
         leave_type=leave_type,
         from_date=start,
         to_date=end,
-        total_leave_days=Decimal((end - start).days + 1),
-        reason="Test leave request",
-        status=LeaveStatus(status),
+        posting_date=start,
+        total_leave_days=working_days,
+        description="Test leave request",
+        status=LeaveApplicationStatus(status),
         **kwargs
     )
     db.add(application)
@@ -421,7 +591,7 @@ def create_task(
     db: Session,
     project_id: int,
     subject: str = None,
-    status: str = "Open",
+    status: str = "open",
     assigned_to_id: int = None,
     **kwargs
 ) -> "Task":
