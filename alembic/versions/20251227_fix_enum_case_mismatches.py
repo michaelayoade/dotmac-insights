@@ -1,7 +1,7 @@
 """Fix enum case mismatches between Python code and database.
 
 Revision ID: fix_enum_case_001
-Revises:
+Revises: 20251224_rename_unified_contact_to_contact
 Create Date: 2025-12-27
 
 This migration adds missing enum values to match what the Python code expects.
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = 'fix_enum_case_001'
-down_revision = None
+down_revision = "20251224_rename_unified_contact_to_contact"
 branch_labels = None
 depends_on = None
 
