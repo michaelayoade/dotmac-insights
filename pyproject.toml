@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Business intelligence dashboard for Dotmac Technologies"
 authors = ["Dotmac Technologies"]
 readme = "README.md"
+packages = [{ include = "app" }]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -106,3 +108,4 @@ directory = "coverage_html"
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
