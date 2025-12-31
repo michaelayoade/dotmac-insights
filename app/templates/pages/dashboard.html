@@ -1,0 +1,306 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">
+            Good {{ 'morning' if now.hour < 12 else 'afternoon' if now.hour < 17 else 'evening' }}, {{ user.name.split()[0] if user.name else user.email.split('@')[0] }}
+        </h1>
+        <p class="mt-1.5 text-gray-500 font-body">
+            Here's what's happening with your business today.
+        </p>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 text-sm text-gray-500 font-body">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            {{ "now" | format_date("%B %d, %Y") if "now" | format_date else "" }}
+        </span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-10" data-testid="stats-grid">
+    {% if stats %}
+        {% for stat in stats %}
+        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <dt class="text-sm font-medium text-gray-500 font-body">{{ stat.label }}</dt>
+                    <dd class="mt-2 flex items-baseline gap-2">
+                        <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">{{ stat.value }}</span>
+                        {% if stat.change %}
+                        <span class="inline-flex items-center gap-0.5 text-sm font-medium {{ 'text-emerald-600' if stat.change > 0 else 'text-red-600' }}">
+                            <svg class="w-4 h-4 {{ 'rotate-180' if stat.change < 0 else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                            </svg>
+                            {{ stat.change | abs }}%
+                        </span>
+                        {% endif %}
+                    </dd>
+                    {% if stat.subtext %}
+                    <p class="mt-1 text-xs text-gray-400 font-body">{{ stat.subtext }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0 p-3 rounded-xl {{ stat.icon_bg | default('bg-primary-50') }} {{ stat.icon_color | default('text-primary-600') }} group-hover:scale-110 transition-transform duration-300">
+                    {% if stat.icon == 'users' %}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    {% elif stat.icon == 'ticket' %}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    {% elif stat.icon == 'currency' %}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    {% elif stat.icon == 'invoice' %}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                    {% else %}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Hover accent line -->
+            <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r {{ stat.accent_gradient | default('from-primary-400 to-primary-600') }} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <!-- Placeholder stats when no data -->
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-contacts">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <dt class="text-sm font-medium text-gray-500 font-body">Total Contacts</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">Leads & customers</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-primary-50 text-primary-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </div>
+
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-tickets">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <dt class="text-sm font-medium text-gray-500 font-body">Open Tickets</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">Awaiting response</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </div>
+
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-revenue">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <dt class="text-sm font-medium text-gray-500 font-body">Revenue (MTD)</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">{{ base_currency }} this month</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </div>
+
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-invoices">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <dt class="text-sm font-medium text-gray-500 font-body">Pending Invoices</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">Awaiting payment</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-red-50 text-red-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-red-400 to-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Two Column Layout: Activity + Quick Actions -->
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+    <!-- Recent Activity (wider) -->
+    <div class="lg:col-span-3 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="recent-activity">
+        <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-display font-semibold text-gray-900">Recent Activity</h3>
+                <p class="mt-0.5 text-sm text-gray-500 font-body">Latest updates across your workspace</p>
+            </div>
+            <a href="#" class="text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">View all</a>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% if activities %}
+                {% for activity in activities[:6] %}
+                <div class="px-6 py-4 hover:bg-surface-50 transition-colors">
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0">
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ activity.color_from | default('from-gray-100') }} {{ activity.color_to | default('to-gray-200') }}">
+                                <span class="text-sm font-semibold {{ activity.text_color | default('text-gray-600') }}">{{ activity.user_initials | default('??') }}</span>
+                            </span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm text-gray-900 font-body">
+                                <span class="font-medium">{{ activity.user_name | default('Someone') }}</span>
+                                {{ activity.action | default('performed an action') }}
+                            </p>
+                            <p class="mt-0.5 text-sm text-gray-500 font-body">{{ activity.description | default('') }}</p>
+                            <p class="mt-1 text-xs text-gray-400 font-body">{{ activity.timestamp | format_datetime if activity.timestamp else 'Just now' }}</p>
+                        </div>
+                        {% if activity.badge %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ activity.badge_color | default('bg-gray-100 text-gray-600') }}">
+                            {{ activity.badge }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="px-6 py-12 text-center">
+                <div class="mx-auto w-14 h-14 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+                    <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h4 class="text-sm font-medium text-gray-900 font-body">No recent activity</h4>
+                <p class="mt-1 text-sm text-gray-500 font-body">Activity from your team will appear here.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Quick Actions (narrower) -->
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="quick-actions-panel">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-base font-display font-semibold text-gray-900">Quick Actions</h3>
+            <p class="mt-0.5 text-sm text-gray-500 font-body">Jump into common tasks</p>
+        </div>
+        <div class="p-4 space-y-2">
+            {% if has_scope('crm:write') %}
+            <a
+                href="/crm/contacts/new"
+                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
+                data-testid="quick-action-new-contact"
+            >
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100 group-hover:scale-105 transition-all duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 font-body">New Contact</p>
+                    <p class="text-xs text-gray-500 font-body">Add a lead or customer</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endif %}
+
+            {% if has_scope('support:write') %}
+            <a
+                href="/support/tickets/new"
+                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
+                data-testid="quick-action-new-ticket"
+            >
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 group-hover:scale-105 transition-all duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 font-body">New Ticket</p>
+                    <p class="text-xs text-gray-500 font-body">Create support ticket</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endif %}
+
+            {% if has_scope('accounting:write') %}
+            <a
+                href="/accounting/invoices/new"
+                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
+                data-testid="quick-action-new-invoice"
+            >
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 group-hover:scale-105 transition-all duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 font-body">New Invoice</p>
+                    <p class="text-xs text-gray-500 font-body">Bill a customer</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endif %}
+
+            {% if has_scope('expenses:write') %}
+            <a
+                href="/expenses/new"
+                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
+                data-testid="quick-action-new-expense"
+            >
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:bg-violet-100 group-hover:scale-105 transition-all duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 font-body">Log Expense</p>
+                    <p class="text-xs text-gray-500 font-body">Record a business expense</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endif %}
+
+            <!-- View all link -->
+            <div class="pt-2 mt-2 border-t border-gray-100">
+                <a href="/crm/contacts" class="flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">
+                    <span>Browse all modules</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

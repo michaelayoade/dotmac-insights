@@ -1,9 +1,13 @@
+from pathlib import Path
+
 from fastapi import FastAPI, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import structlog
 
 from app.api import api_router, public_api_router
+from app.web.routes import web_router
 from app.config import settings
 from app.auth import get_current_principal
 from app.middleware.metrics import get_metrics_response
@@ -41,7 +45,7 @@ async def lifespan(app: FastAPI):
 
     logger.info(
         "starting_application",
-        app="dotmac-insights",
+        app="dotmac-bos",
         environment=settings.environment,
         jwt_configured=bool(settings.jwks_url),
         otel_enabled=settings.otel_enabled,
@@ -68,8 +72,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Dotmac Insights",
-    description="Unified data platform for Dotmac Technologies - syncing Splynx, ERPNext, and Chatwoot",
+    title="DotMac BOS",
+    description="Business Operating System - Comprehensive ERP platform for business operations",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -104,18 +108,16 @@ app.include_router(
     prefix="/api",
 )
 
+# Mount static files for SSR frontend
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    logger.info("static_files_mounted", path=str(STATIC_DIR))
 
-
-@app.get("/")
-async def root():
-    """Root endpoint (public)."""
-    return {
-        "name": "Dotmac Insights",
-        "version": "1.0.0",
-        "status": "running",
-        "docs": "/docs",
-        "environment": settings.environment,
-    }
+# Include SSR web routes (no /api prefix)
+# This provides HTML pages rendered server-side with HTMX
+app.include_router(web_router)
+logger.info("web_router_mounted")
 
 
 @app.get("/health")

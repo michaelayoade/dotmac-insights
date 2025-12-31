@@ -71,8 +71,8 @@ class Settings(BaseSettings):
 
     # Branding (used in templates and emails)
     company_name: str = "dotMac Limited"
-    product_name: str = "DotMac Insights"
-    support_email: str = "support@dotmac.com"
+    product_name: str = "DotMac BOS"
+    support_email: str = "support@dotmac.ng"
 
     # OpenBao (secrets management)
     openbao_url: Optional[str] = None  # e.g., http://localhost:8200
@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     # OTEL observability
     otel_enabled: bool = False
     otel_exporter_endpoint: Optional[str] = None
-    otel_service_name: str = "dotmac-insights"
+    otel_service_name: str = "dotmac-bos"
     otel_service_namespace: str = "dotmac"
     otel_trace_sample_rate: float = 0.1  # 10% sampling default to avoid overhead
 

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ product_name }} - Unified Business Management Platform">
+    <title>{% block title %}{{ page_title | default("Dashboard") }}{% endblock %} | {{ product_name }}</title>
+
+    <!-- Fonts: DM Sans (display) + Source Sans 3 (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"DM Sans"', 'system-ui', 'sans-serif'],
+                        body: ['"Source Sans 3"', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        // Deep teal - professional yet distinctive
+                        primary: {
+                            50: '#effcfc',
+                            100: '#d7f5f6',
+                            200: '#b3ebec',
+                            300: '#7fdcdf',
+                            400: '#44c3c9',
+                            500: '#28a7ae',
+                            600: '#0d7377',
+                            700: '#135c60',
+                            800: '#164b4e',
+                            900: '#173f42',
+                            950: '#082628',
+                        },
+                        // Warm amber accent
+                        accent: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            200: '#fde68a',
+                            300: '#fcd34d',
+                            400: '#f2a900',
+                            500: '#d97706',
+                            600: '#b45309',
+                            700: '#92400e',
+                            800: '#78350f',
+                            900: '#451a03',
+                        },
+                        // Rich charcoal for sidebar
+                        slate: {
+                            850: '#1a1d21',
+                            950: '#0f1114',
+                        },
+                        // Warm backgrounds
+                        surface: {
+                            50: '#fdfcfb',
+                            100: '#faf9f7',
+                            200: '#f5f3f0',
+                        }
+                    },
+                    boxShadow: {
+                        'warm-sm': '0 1px 2px 0 rgba(26, 29, 33, 0.04)',
+                        'warm': '0 1px 3px 0 rgba(26, 29, 33, 0.08), 0 1px 2px -1px rgba(26, 29, 33, 0.08)',
+                        'warm-md': '0 4px 6px -1px rgba(26, 29, 33, 0.08), 0 2px 4px -2px rgba(26, 29, 33, 0.06)',
+                        'warm-lg': '0 10px 15px -3px rgba(26, 29, 33, 0.08), 0 4px 6px -4px rgba(26, 29, 33, 0.06)',
+                        'warm-xl': '0 20px 25px -5px rgba(26, 29, 33, 0.1), 0 8px 10px -6px rgba(26, 29, 33, 0.08)',
+                        'inner-glow': 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'fade-up': 'fadeUp 0.5s ease-out',
+                        'slide-in-right': 'slideInRight 0.3s ease-out',
+                        'slide-out-right': 'slideOutRight 0.25s ease-in forwards',
+                        'scale-in': 'scaleIn 0.2s ease-out',
+                        'shimmer': 'shimmer 2s linear infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        fadeUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInRight: {
+                            '0%': { opacity: '0', transform: 'translateX(20px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        slideOutRight: {
+                            '0%': { opacity: '1', transform: 'translateX(0)' },
+                            '100%': { opacity: '0', transform: 'translateX(20px)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Base styles */
+        [x-cloak] { display: none !important; }
+
+        body {
+            font-family: 'Source Sans 3', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        h1, h2, h3, h4, h5, h6, .font-display {
+            font-family: 'DM Sans', system-ui, sans-serif;
+        }
+
+        /* Subtle grain texture */
+        .grain::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* HTMX indicators */
+        .htmx-indicator {
+            opacity: 0;
+            transition: opacity 200ms ease-out;
+        }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator {
+            opacity: 1;
+        }
+
+        /* Sidebar transition */
+        .sidebar-transition {
+            transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Custom scrollbar */
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Form focus states */
+        input:focus, select:focus, textarea:focus {
+            --tw-ring-color: rgb(13 115 119 / 0.3);
+        }
+
+        /* Button press effect */
+        button:active:not(:disabled),
+        a[role="button"]:active {
+            transform: scale(0.98);
+        }
+
+        /* Smooth link transitions */
+        a {
+            transition: color 150ms ease;
+        }
+
+        /* Loading shimmer */
+        .shimmer {
+            background: linear-gradient(
+                90deg,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.4) 50%,
+                rgba(255,255,255,0) 100%
+            );
+            background-size: 200% 100%;
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body
+    class="h-full bg-surface-100 font-body antialiased"
+    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+    x-data="{ sidebarOpen: false }"
+>
+    {% block body %}{% endblock %}
+
+    <!-- Toast Container -->
+    <div
+        id="toast-container"
+        class="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none"
+        x-data="toastManager()"
+        @show-toast.window="show($event.detail)"
+    >
+        <template x-for="toast in toasts" :key="toast.id">
+            <div
+                class="pointer-events-auto max-w-sm w-full overflow-hidden rounded-xl shadow-warm-lg"
+                :class="{
+                    'animate-slide-in-right': toast.entering,
+                    'animate-slide-out-right': toast.leaving,
+                    'bg-emerald-50 border border-emerald-200': toast.type === 'success',
+                    'bg-red-50 border border-red-200': toast.type === 'error',
+                    'bg-amber-50 border border-amber-200': toast.type === 'warning',
+                    'bg-primary-50 border border-primary-200': toast.type === 'info'
+                }"
+                x-show="!toast.hidden"
+                data-testid="toast"
+                :data-toast-type="toast.type"
+            >
+                <div class="p-4 flex items-start gap-3">
+                    <div class="flex-shrink-0 mt-0.5">
+                        <template x-if="toast.type === 'success'">
+                            <div class="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M2.5 6.5l2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'error'">
+                            <div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3l6 6M9 3l-6 6" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'warning'">
+                            <div class="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 3v4M6 9v.01"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'info'">
+                            <div class="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="currentColor">
+                                    <circle cx="6" cy="3.5" r="0.75"/>
+                                    <path d="M5 6h2v3.5H5z"/>
+                                </svg>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium"
+                           :class="{
+                               'text-emerald-900': toast.type === 'success',
+                               'text-red-900': toast.type === 'error',
+                               'text-amber-900': toast.type === 'warning',
+                               'text-primary-900': toast.type === 'info'
+                           }"
+                           x-text="toast.message"></p>
+                    </div>
+                    <button
+                        type="button"
+                        class="flex-shrink-0 rounded-md p-1 transition-colors"
+                        :class="{
+                            'text-emerald-500 hover:bg-emerald-100': toast.type === 'success',
+                            'text-red-500 hover:bg-red-100': toast.type === 'error',
+                            'text-amber-600 hover:bg-amber-100': toast.type === 'warning',
+                            'text-primary-600 hover:bg-primary-100': toast.type === 'info'
+                        }"
+                        @click="dismiss(toast.id)"
+                    >
+                        <span class="sr-only">Close</span>
+                        <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.28 3.22a.75.75 0 00-1.06 1.06L6.94 8l-3.72 3.72a.75.75 0 101.06 1.06L8 9.06l3.72 3.72a.75.75 0 101.06-1.06L9.06 8l3.72-3.72a.75.75 0 00-1.06-1.06L8 6.94 4.28 3.22z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Modal Container -->
+    <div
+        id="modal-container"
+        x-data="{ open: false }"
+        @open-modal.window="open = true"
+        @close-modal.window="open = false"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 z-40 overflow-y-auto"
+        aria-labelledby="modal-title"
+        role="dialog"
+        aria-modal="true"
+    >
+        <!-- Backdrop -->
+        <div
+            class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+            x-show="open"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="open = false"
+        ></div>
+
+        <!-- Modal Panel -->
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                id="modal-content"
+                class="relative w-full max-w-lg transform overflow-hidden rounded-2xl bg-white shadow-warm-xl"
+                x-show="open"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                @click.stop
+            >
+                <!-- Modal content injected by HTMX -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Message (from server) -->
+    {% if flash %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    message: {{ flash.message | tojson }},
+                    type: {{ flash.category | tojson }}
+                }
+            }));
+        });
+    </script>
+    {% endif %}
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <!-- App JavaScript -->
+    <script>
+        // Toast Manager
+        function toastManager() {
+            return {
+                toasts: [],
+                nextId: 0,
+                show(detail) {
+                    const id = this.nextId++;
+                    const toast = {
+                        id,
+                        message: detail.message,
+                        type: detail.type || 'info',
+                        entering: true,
+                        leaving: false,
+                        hidden: false
+                    };
+                    this.toasts.push(toast);
+
+                    setTimeout(() => { toast.entering = false; }, 300);
+                    setTimeout(() => this.dismiss(id), 5000);
+                },
+                dismiss(id) {
+                    const toast = this.toasts.find(t => t.id === id);
+                    if (toast && !toast.leaving) {
+                        toast.leaving = true;
+                        setTimeout(() => {
+                            toast.hidden = true;
+                            this.toasts = this.toasts.filter(t => t.id !== id);
+                        }, 250);
+                    }
+                }
+            };
+        }
+
+        // HTMX Event Handlers
+        document.addEventListener('htmx:afterRequest', function(evt) {
+            const trigger = evt.detail.xhr.getResponseHeader('HX-Trigger');
+            if (trigger) {
+                try {
+                    const parsed = JSON.parse(trigger);
+                    if (parsed.showToast) {
+                        window.dispatchEvent(new CustomEvent('show-toast', { detail: parsed.showToast }));
+                    }
+                    if (parsed.closeModal) {
+                        window.dispatchEvent(new CustomEvent('close-modal'));
+                    }
+                } catch (e) {}
+            }
+        });
+
+        document.addEventListener('htmx:responseError', function(evt) {
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: { message: 'An error occurred. Please try again.', type: 'error' }
+            }));
+        });
+
+        document.addEventListener('htmx:beforeSwap', function(evt) {
+            if (evt.detail.xhr.status === 401) {
+                const redirectUrl = evt.detail.xhr.getResponseHeader('HX-Redirect');
+                window.location.href = redirectUrl || '/login';
+                evt.detail.shouldSwap = false;
+            }
+        });
+
+        document.addEventListener('keydown', function(evt) {
+            if (evt.key === 'Escape') {
+                window.dispatchEvent(new CustomEvent('close-modal'));
+            }
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

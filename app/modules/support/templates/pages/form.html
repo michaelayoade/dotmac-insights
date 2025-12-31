@@ -1,0 +1,387 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <form
+        method="POST"
+        action="{% if ticket %}/support/tickets/{{ ticket.id }}{% else %}/support/tickets{% endif %}"
+        class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
+        data-testid="ticket-form"
+        x-data="{ submitting: false }"
+        @submit="submitting = true"
+    >
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">
+                {% if ticket %}Edit Ticket{% else %}New Support Ticket{% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if ticket %}
+                Update the ticket information below.
+                {% else %}
+                Fill in the details to create a new support ticket.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="px-6 py-6 space-y-6">
+            <!-- Subject -->
+            <div>
+                <label for="subject" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Subject <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="subject"
+                    id="subject"
+                    value="{{ ticket.subject if ticket else (form_data.subject if form_data else '') }}"
+                    required
+                    placeholder="Brief description of the issue"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.subject else '' }}"
+                    data-testid="ticket-subject-input"
+                >
+                {% if errors.subject %}
+                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="subject-error">{{ errors.subject }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Description <span class="text-red-500">*</span>
+                </label>
+                <textarea
+                    name="description"
+                    id="description"
+                    rows="6"
+                    required
+                    placeholder="Detailed description of the issue or request..."
+                    class="block w-full px-4 py-3 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm resize-none {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.description else '' }}"
+                    data-testid="ticket-description-textarea"
+                >{{ ticket.description if ticket else (form_data.description if form_data else '') }}</textarea>
+                {% if errors.description %}
+                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="description-error">{{ errors.description }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Type and Priority row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Type -->
+                <div>
+                    <label for="ticket_type" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Type <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="ticket_type"
+                            id="ticket_type"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="ticket-type-select"
+                        >
+                            {% for opt in type_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (ticket.ticket_type.value if ticket else (form_data.ticket_type if form_data else 'support')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority -->
+                <div>
+                    <label for="priority" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Priority <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="priority"
+                            id="priority"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="ticket-priority-select"
+                        >
+                            {% for opt in priority_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (ticket.priority.value if ticket else (form_data.priority if form_data else 'medium')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel and Status row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Channel -->
+                <div>
+                    <label for="channel" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Channel
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="channel"
+                            id="channel"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="ticket-channel-select"
+                        >
+                            <option value="">Select channel...</option>
+                            {% for opt in channel_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (ticket.channel.value if ticket and ticket.channel else (form_data.channel if form_data else '')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status (only for edit) -->
+                {% if ticket %}
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Status <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="status"
+                            id="status"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="ticket-status-select"
+                        >
+                            {% for opt in status_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if ticket.status.value == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Contact Section -->
+            <div class="border-t border-gray-100 pt-6 mt-6">
+                <h4 class="text-sm font-display font-semibold text-gray-900 mb-4">Contact Information</h4>
+
+                <!-- Contact Search -->
+                <div class="mb-4" x-data="{ showContactSearch: false, selectedContact: null }">
+                    <label class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Link to Contact
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="hidden"
+                            name="unified_contact_id"
+                            :value="selectedContact?.id"
+                            value="{{ ticket.unified_contact_id if ticket and ticket.unified_contact_id else '' }}"
+                        >
+                        <input
+                            type="text"
+                            placeholder="Search for a contact..."
+                            class="block w-full pl-11 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                            @focus="showContactSearch = true"
+                            hx-get="/crm/contacts/search"
+                            hx-trigger="input changed delay:300ms"
+                            hx-target="#contact-search-results"
+                            data-testid="contact-search-input"
+                        >
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="contact-search-results" class="mt-2"></div>
+                </div>
+
+                <p class="text-xs text-gray-500 font-body mb-4">Or enter contact details manually:</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Contact Name -->
+                    <div>
+                        <label for="contact_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                            Name
+                        </label>
+                        <input
+                            type="text"
+                            name="contact_name"
+                            id="contact_name"
+                            value="{{ ticket.contact_name if ticket else (form_data.contact_name if form_data else '') }}"
+                            placeholder="John Doe"
+                            class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                            data-testid="contact-name-input"
+                        >
+                    </div>
+
+                    <!-- Contact Email -->
+                    <div>
+                        <label for="contact_email" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                            Email
+                        </label>
+                        <input
+                            type="email"
+                            name="contact_email"
+                            id="contact_email"
+                            value="{{ ticket.contact_email if ticket else (form_data.contact_email if form_data else '') }}"
+                            placeholder="email@company.com"
+                            class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                            data-testid="contact-email-input"
+                        >
+                    </div>
+
+                    <!-- Contact Phone -->
+                    <div>
+                        <label for="contact_phone" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                            Phone
+                        </label>
+                        <input
+                            type="tel"
+                            name="contact_phone"
+                            id="contact_phone"
+                            value="{{ ticket.contact_phone if ticket else (form_data.contact_phone if form_data else '') }}"
+                            placeholder="+234 800 000 0000"
+                            class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                            data-testid="contact-phone-input"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignment Section -->
+            <div class="border-t border-gray-100 pt-6 mt-6">
+                <h4 class="text-sm font-display font-semibold text-gray-900 mb-4">Assignment</h4>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Assigned To -->
+                    <div>
+                        <label for="assigned_to_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                            Assign to Agent
+                        </label>
+                        <div class="relative">
+                            <select
+                                name="assigned_to_id"
+                                id="assigned_to_id"
+                                class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                                data-testid="assigned-to-select"
+                            >
+                                <option value="">Unassigned</option>
+                                {% for agent in agents %}
+                                <option
+                                    value="{{ agent.id }}"
+                                    {{ 'selected' if ticket and ticket.assigned_to_id == agent.id else '' }}
+                                >{{ agent.first_name }} {{ agent.last_name | default('') }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Assigned Team -->
+                    <div>
+                        <label for="assigned_team" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                            Assign to Team
+                        </label>
+                        <div class="relative">
+                            <select
+                                name="assigned_team"
+                                id="assigned_team"
+                                class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                                data-testid="assigned-team-select"
+                            >
+                                <option value="">No team</option>
+                                {% for team in teams %}
+                                <option
+                                    value="{{ team.name }}"
+                                    {{ 'selected' if ticket and ticket.assigned_team == team.name else '' }}
+                                >{{ team.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Internal Notes -->
+            <div class="border-t border-gray-100 pt-6 mt-6">
+                <label for="internal_notes" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Internal Notes
+                    <span class="text-gray-400 font-normal">(not visible to customer)</span>
+                </label>
+                <textarea
+                    name="internal_notes"
+                    id="internal_notes"
+                    rows="3"
+                    placeholder="Add any internal notes or context for the team..."
+                    class="block w-full px-4 py-3 text-gray-900 placeholder-gray-400 bg-amber-50/50 border border-amber-200 rounded-xl shadow-warm-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all duration-200 font-body sm:text-sm resize-none"
+                    data-testid="internal-notes-textarea"
+                >{{ ticket.internal_notes if ticket else (form_data.internal_notes if form_data else '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-between sm:justify-end gap-3">
+            <a
+                href="{% if ticket %}/support/tickets/{{ ticket.id }}{% else %}/support/tickets{% endif %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+                data-testid="cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200 disabled:opacity-50"
+                :class="{ 'pointer-events-none': submitting }"
+                data-testid="submit-button"
+            >
+                <span x-show="!submitting">
+                    {% if ticket %}Save Changes{% else %}Create Ticket{% endif %}
+                </span>
+                <svg x-show="!submitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

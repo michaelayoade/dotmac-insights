@@ -1,378 +1,242 @@
-# Dotmac Insights
+# DotMac BOS
 
-Unified data platform for Dotmac Technologies - aggregating data from Splynx, ERPNext, and Chatwoot into a single database for analysis and insights.
+**Business Operating System** - A comprehensive, modular ERP platform for managing all aspects of business operations.
+
+DotMac BOS integrates with external systems (Splynx, ERPNext, Chatwoot) while providing a unified, modern interface for CRM, Support, Finance, HR, Inventory, Projects, and more.
 
 ## Features
 
-- **Data Sync**: Automated sync from Splynx (ISP billing), ERPNext (ERP), and Chatwoot (support)
-- **Unified Customer View**: Link customers across all systems
-- **Web Dashboard**: Next.js frontend with customer analytics, insights, and data explorer
-- **Data Explorer**: Query and explore all synced data via API or UI
-- **Analytics**: Revenue trends, churn analysis, POP performance, support metrics
-- **Customer 360**: Complete customer profile with finance, services, support history
-- **Real-time Updates**: Configurable sync intervals via Celery
+### Core Modules
+
+| Module | Description | Status |
+|--------|-------------|--------|
+| **CRM** | Contact management, opportunities, sales pipeline | ✅ Complete |
+| **Support** | Ticket management, SLA tracking, conversations | ✅ Complete |
+| **Finance** | Invoicing, payments, credit notes, AR/AP | ✅ Complete |
+| **Accounting** | Chart of accounts, journal entries, financial reports | ✅ Complete |
+| **HR** | Employees, departments, leave management, payroll | ✅ Complete |
+| **Inventory** | Items, stock levels, warehouses, transfers | ✅ Complete |
+| **Projects** | Tasks, timesheets, milestones | ✅ Complete |
+| **Field Service** | Work orders, technician dispatch, scheduling | ✅ Complete |
+| **Purchasing** | Purchase orders, suppliers, expenses | ✅ Complete |
+
+### Technical Features
+
+- **SSR + HTMX**: Fast, server-side rendered pages with HTMX for interactivity
+- **Real-time Updates**: WebSocket support for live data
+- **Multi-source Sync**: Automated sync from Splynx, ERPNext, and Chatwoot
+- **Unified Data Model**: Consolidated customer, contact, and transaction views
+- **REST API**: Full API for mobile apps and integrations
+- **Multi-currency**: Support for NGN, USD, and other currencies
+- **RBAC**: Role-based access control with granular permissions
+- **Audit Trail**: Complete tracking of all changes
+- **Observability**: OpenTelemetry integration for tracing and metrics
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | Python 3.11+, FastAPI, SQLAlchemy 2.0 |
+| Frontend | Jinja2 Templates, HTMX, Alpine.js, Tailwind CSS |
+| Database | PostgreSQL 15+ |
+| Cache | Redis |
+| Task Queue | Celery |
+| Auth | JWT/OIDC (better-auth compatible) |
 
 ## Quick Start
 
-### 1. Prerequisites
+### Prerequisites
 
 - Python 3.11+
 - PostgreSQL 15+
-- Redis (optional, for Celery background tasks)
-- Node.js 18+ (for frontend)
-- pnpm (for building component library)
+- Redis (for background tasks)
+- Node.js 18+ (for Tailwind CSS build)
 
-### 2. Setup
+### Installation
 
 ```bash
-# Clone and enter directory
-cd dotmac-insights
+# Clone repository
+git clone https://github.com/dotmac/dotmac-bos.git
+cd dotmac-bos
 
-# Install Poetry
-curl -sSL https://install.python-poetry.org | python3 -
-# Add poetry to PATH if needed: export PATH="$HOME/.local/bin:$PATH"
+# Install Python dependencies
+poetry install
 
-# Install dependencies (no dev)
-poetry install --only main
-
-# Copy environment file and configure
+# Copy environment file
 cp .env.example .env
-# Edit .env with your API credentials
+# Edit .env with your configuration
+
+# Run database migrations
+poetry run alembic upgrade head
+
+# Start the server
+poetry run uvicorn app.main:app --reload
 ```
 
-### 3. Configure Environment
-
-Edit `.env` with your credentials:
+### Environment Configuration
 
 ```env
-# Database (psycopg3 driver)
-DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/dotmac_insights
+# Database
+DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/dotmac_bos
 
-# API Security (required in prod)
-ENVIRONMENT=development  # development, staging, production
-CORS_ORIGINS=http://localhost:3000
+# Authentication
+ENVIRONMENT=development
 JWKS_URL=https://auth.example.com/.well-known/jwks.json
-JWT_ISSUER=https://auth.example.com  # optional
-JWT_AUDIENCE=dotmac-insights        # optional
+JWT_ISSUER=https://auth.example.com
+CORS_ORIGINS=http://localhost:3000
+
+# Company
 DEFAULT_COMPANY=dotmac
+COMPANY_NAME=dotMac Limited
+PRODUCT_NAME=DotMac BOS
 
-# Splynx API (Basic auth recommended: base64 of "key:secret")
+# External Integrations (optional)
 SPLYNX_API_URL=https://your-splynx.com/api/2.0
-SPLYNX_AUTH_BASIC=base64_key_secret
-# or token auth:
-SPLYNX_API_KEY=your_key
-SPLYNX_API_SECRET=your_secret
+SPLYNX_AUTH_BASIC=base64_encoded_key_secret
 
-# ERPNext API
 ERPNEXT_API_URL=https://your-erpnext.com
 ERPNEXT_API_KEY=your_key
 ERPNEXT_API_SECRET=your_secret
 
-# Chatwoot API
 CHATWOOT_API_URL=https://your-chatwoot.com/api/v1
 CHATWOOT_API_TOKEN=your_token
-CHATWOOT_ACCOUNT_ID=1
 
-# Redis (required for Celery workers/beat; unset = asyncio fallback)
+# Redis (for Celery)
 REDIS_URL=redis://localhost:6379/0
 ```
 
-### 4. Initialize Database (migrations only)
+### Running Services
 
 ```bash
-# Create database tables (run migrations)
-scripts/run_migrations.sh
-```
+# Terminal 1: Web Server
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-### 5. Test Connections
-
-```bash
-poetry run python cli.py test-connections
-```
-
-### 6. Run Initial Sync
-
-```bash
-# Sync all sources (full sync)
-poetry run python cli.py sync all --full
-
-# Or sync individually
-poetry run python cli.py sync splynx --full
-poetry run python cli.py sync erpnext --full
-poetry run python cli.py sync chatwoot --full
-```
-
-### 7. Start the API Server
-
-```bash
-poetry run uvicorn app.main:app --reload
-```
-
-Access the API at: http://localhost:8000
-API Documentation: http://localhost:8000/docs
-Auth: click **Authorize** in Swagger UI and enter a Bearer token (JWT or service token).
-
-> Production requirements: set `ENVIRONMENT=production`, `DATABASE_URL` (PostgreSQL), `CORS_ORIGINS` (no wildcards), `JWKS_URL`, and `DEFAULT_COMPANY`, then run migrations before starting the API. `JWT_ISSUER`/`JWT_AUDIENCE` are optional; `REDIS_URL` is required only if you want Celery tasks.
-
-### Production docker-compose
-
-Use the production overrides with an environment file:
-
-```bash
-cp .env.production.example .env.production
-# fill values
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-### 8. Setup Frontend
-
-The frontend requires the `@dotmac/core` and `@dotmac/design-tokens` packages from the component library.
-
-```bash
-# Clone the component library (one level up from dotmac-insights)
-cd ..
-git clone https://github.com/michaelayoade/dotmac-component-library.git
-cd dotmac-component-library
-
-# Install and build
-pnpm install
-pnpm build
-
-# Create tarballs for local installation
-cd packages/core && pnpm pack && cd ../..
-cd packages/design-tokens && pnpm pack && cd ../..
-
-# Return to frontend directory
-cd ../dotmac-insights/frontend
-```
-
-### 9. Configure Frontend Environment
-
-Create `frontend/.env.local`:
-
-```env
-# Backend API URL
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Service token for server-side calls
-# Create via Admin API: POST /api/admin/tokens (requires JWT)
-INTERNAL_SERVICE_TOKEN=your_service_token_here
-```
-
-> **Note**: Generate a service token via the Admin API and use it only for server-side calls. It should never be exposed to the browser.
-
-### 10. Install and Run Frontend
-
-```bash
-cd frontend
-
-# Install dependencies (will use local tarballs from component library)
-npm install
-
-# Start development server
-npm run dev
-```
-
-Access the dashboard at: http://localhost:3000
-
-## Accounting & Finance API Quick Reference
-
-All finance/accounting endpoints require an API key and the appropriate scopes. Many endpoints enforce a single currency; if multiple currencies exist and no `currency` is provided, the API returns 400 to avoid mixed-currency aggregates.
-
-**Finance** (`/api/finance`)
-- `/dashboard?currency=`: KPIs (MRR/ARR, collections, DSO, outstanding, invoice status).
-- `/invoices` filters: `status, customer_id, start_date, end_date, min_amount, max_amount, currency, overdue_only, search, sort_by (invoice_date|due_date|total_amount|amount_paid|customer_id|status), sort_dir, limit, offset`.
-- `/payments` filters: `status, payment_method, customer_id, invoice_id, start_date, end_date, min_amount, max_amount, currency, search, sort_by (payment_date|amount|customer_id|invoice_id|status), sort_dir, limit, offset`.
-- `/credit-notes` filters: `customer_id, invoice_id, start_date, end_date, currency, search, sort_by (issue_date|amount|customer_id|invoice_id|status), sort_dir, limit, offset`.
-- Analytics: `revenue-trend (months, currency)`, `collections (currency)`, `aging (currency)`, `by-currency`, `insights/payment-behavior (currency)`, `insights/forecasts (currency)`.
-
-**Accounting** (`/api/accounting`)
-- `/chart-of-accounts?currency=&root_type=&include_disabled=`
-- `/trial-balance?as_of_date=&fiscal_year=&cost_center=&currency=`
-- `/balance-sheet?as_of_date=&comparative_date=&currency=`
-- `/income-statement?start_date=&end_date=&fiscal_year=&cost_center=&currency=`
-- `/cash-flow?start_date=&end_date=&fiscal_year=&currency=`
-- `/accounts-payable?as_of_date=&supplier=&currency=`
-- `/accounts-receivable?as_of_date=&customer_id=&currency=`
-- `/general-ledger?account=&cost_center=&start_date=&end_date=&voucher_type=&fiscal_year=&currency=&limit=&offset=`
-- `/journal-entries?type=&start_date=&end_date=&cost_center=&currency=&limit=&offset=`
-- `/balance-sheet`, `/income-statement` include period metadata and respect currency filters; AR/AP aging use due dates and currency.
-
-Date params accept ISO-8601 (UTC, `Z` accepted). Sorting defaults to date desc with id tiebreakers; see `sort_by/sort_dir` above.
-
-### Quick Reference: Running the Full Stack
-
-```bash
-# Terminal 1: Backend API
-cd dotmac-insights
-poetry run uvicorn app.main:app --reload --host 0.0.0.0
-
-# Terminal 2: Celery Worker (optional, for background sync)
-cd dotmac-insights
+# Terminal 2: Celery Worker (optional)
 poetry run celery -A app.worker:celery_app worker --loglevel=info
 
-# Terminal 3: Celery Beat (optional, for scheduled sync)
-cd dotmac-insights
+# Terminal 3: Celery Beat (optional, for scheduled tasks)
 poetry run celery -A app.worker:celery_app beat --loglevel=info
-
-# Terminal 4: Frontend
-cd dotmac-insights/frontend
-npm run dev
 ```
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Frontend | http://localhost:3000 | Next.js Dashboard |
-| Backend API | http://localhost:8000 | FastAPI Server |
-| API Docs | http://localhost:8000/docs | Swagger UI |
-| Health Check | http://localhost:8000/health | Service health status |
-| Metrics | http://localhost:8000/metrics | Prometheus metrics |
-| Platform Status | http://localhost:8000/api/platform/license | License & feature flags |
-
-## Using Docker
+### Docker Deployment
 
 ```bash
-# Start all services (PostgreSQL, Redis, API, Celery worker, Celery beat)
+# Development
 docker-compose up -d --build
 
-# View logs
-docker-compose logs -f api
+# Production
+cp .env.production.example .env.production
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+## Project Structure
+
+```
+dotmac-bos/
+├── app/
+│   ├── api/                    # JSON API routes (mobile/external)
+│   ├── core/                   # Core utilities (security, config)
+│   ├── models/                 # SQLAlchemy models
+│   ├── modules/                # Feature modules
+│   │   ├── crm/               # CRM module (contacts, pipeline)
+│   │   ├── support/           # Support module (tickets)
+│   │   └── .../               # Other modules
+│   ├── services/              # Business logic services
+│   ├── templates/             # Jinja2 templates
+│   │   ├── layouts/           # Base layouts
+│   │   ├── components/        # Reusable UI components
+│   │   └── pages/             # Full page templates
+│   ├── static/                # Static assets (CSS, JS)
+│   └── web/                   # SSR web routes
+├── tests/                     # Test suite
+├── e2e/                       # Playwright E2E tests
+├── migrations/                # Alembic migrations
+└── scripts/                   # Utility scripts
+```
+
+## Module Architecture
+
+Each module follows a consistent structure:
+
+```
+app/modules/{module}/
+├── routes.py                  # SSR page routes
+└── templates/
+    ├── pages/                 # Full page templates
+    │   ├── list.html         # List/index page
+    │   ├── detail.html       # Detail view
+    │   └── form.html         # Create/edit form
+    └── partials/             # HTMX partials
+        ├── table.html        # Table component
+        └── row.html          # Single row
 ```
 
 ## API Endpoints
 
-### Sync Management
+### Web Routes (SSR)
 
-- `POST /api/sync/all` - Sync all sources (Splynx via Celery if available; ERPNext/Chatwoot enqueued if Celery is on)
-- `POST /api/sync/splynx` - Full Splynx sync
-- `POST /api/sync/splynx/customers` - Customers only
-- `POST /api/sync/splynx/invoices` - Invoices only
-- `POST /api/sync/splynx/payments` - Payments only
-- `POST /api/sync/splynx/services` - Services only
-- `POST /api/sync/splynx/credit-notes` - Credit notes only
-- `POST /api/sync/erpnext` - ERPNext full sync (Celery if available)
-- `POST /api/sync/chatwoot` - Chatwoot full sync (Celery if available)
-- `GET /api/sync/task/{task_id}` - Check Celery task status
-- `GET /api/sync/status` - Get sync status (includes `celery_enabled` flag)
-- `GET /api/sync/logs` - View sync logs
-- `POST /api/sync/test-connections` - Test API connections
+| Route | Description |
+|-------|-------------|
+| `/` | Dashboard |
+| `/crm/contacts` | Contact list |
+| `/crm/contacts/{id}` | Contact detail |
+| `/support/tickets` | Ticket list |
+| `/support/tickets/{id}` | Ticket detail |
+| `/accounting/invoices` | Invoice list |
+| `/hr/employees` | Employee list |
 
-### Data Explorer
+### JSON API
 
-- `GET /api/explore/tables` - List all tables with counts
-- `GET /api/explore/tables/{table}` - Browse table data
-- `GET /api/explore/tables/{table}/stats` - Get table statistics
-- `GET /api/explore/data-quality` - Check data quality
-- `GET /api/explore/search?q=term` - Search across all tables
-- `POST /api/explore/query` - Run custom queries
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/customers` | List customers |
+| `GET /api/finance/dashboard` | Finance KPIs |
+| `GET /api/accounting/balance-sheet` | Balance sheet |
+| `GET /api/analytics/overview` | Analytics overview |
+| `POST /api/sync/all` | Trigger full sync |
 
-### Customers
+Full API documentation available at `/docs` (Swagger UI).
 
-- `GET /api/customers` - List customers
-- `GET /api/customers/{id}` - Get customer details
-- `GET /api/customers/churned` - Get churned customers
-
-### Analytics
-
-- `GET /api/analytics/overview` - High-level metrics
-- `GET /api/analytics/revenue/trend` - Revenue trends
-- `GET /api/analytics/churn/trend` - Churn trends
-- `GET /api/analytics/pop/performance` - POP performance
-- `GET /api/analytics/support/metrics` - Support metrics
-- `GET /api/analytics/invoices/aging` - Invoice aging report
-- `GET /api/analytics/customers/by-plan` - Distribution by plan
-
-### Platform Services
-
-- `GET /api/platform/license` - License validation status (valid, grace period, expired)
-- `GET /api/platform/feature-flags` - Current feature flag values with descriptions
-- `GET /api/platform/config` - System configuration overview (integrations, environment)
-- `GET /health` - Health check endpoint
-- `GET /metrics` - Prometheus metrics endpoint
-
-## CLI Commands
+## Testing
 
 ```bash
-# Test connections
-poetry run python cli.py test-connections
+# Run unit tests
+poetry run pytest tests/unit/
 
-# Sync data
-poetry run python cli.py sync all           # Incremental sync all
-poetry run python cli.py sync all --full    # Full sync all
-poetry run python cli.py sync splynx        # Sync Splynx only
-poetry run python cli.py sync erpnext       # Sync ERPNext only
-poetry run python cli.py sync chatwoot      # Sync Chatwoot only
+# Run integration tests
+poetry run pytest tests/integration/
 
-# View statistics
-poetry run python cli.py stats
+# Run E2E tests (requires running server)
+cd e2e && npx playwright test
 
-# Initialize database
-poetry run alembic upgrade head
+# Run all tests with coverage
+poetry run pytest --cov=app --cov-report=html
 ```
 
-## Data Model
+## Design System
 
-### Core Tables
+DotMac BOS uses a custom design system built on Tailwind CSS:
 
-- **customers** - Unified customer records linked across all systems
-- **pops** - Points of Presence / network locations
-- **subscriptions** - Customer service subscriptions
-- **invoices** - Billing invoices from Splynx and ERPNext
-- **payments** - Payment records
-- **conversations** - Support tickets from Chatwoot
-- **messages** - Individual messages in conversations
-- **employees** - Staff records from ERPNext
-- **expenses** - Expense records for cost analysis
-- **sync_logs** - Track all sync operations
+- **Typography**: DM Sans (display) + Source Sans 3 (body)
+- **Primary Color**: Deep Teal (#0d7377)
+- **Accent Color**: Warm Amber (#f2a900)
+- **Shadows**: Warm shadow system with subtle brown tints
+- **Borders**: Rounded corners (xl for cards, lg for buttons)
 
-### Customer Linkage
+## Contributing
 
-Customers are linked across systems using:
-- `splynx_id` - Splynx customer ID
-- `erpnext_id` - ERPNext customer name
-- `chatwoot_contact_id` - Chatwoot contact ID
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Architecture
+## License
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Splynx    │     │   ERPNext   │     │  Chatwoot   │
-│  (Billing)  │     │    (ERP)    │     │  (Support)  │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       └───────────┬───────┴───────────────────┘
-                   │ REST APIs
-           ┌───────▼───────┐
-           │  Sync Engine  │
-           │ (Python/Celery)│
-           └───────┬───────┘
-                   │
-           ┌───────▼───────┐
-           │  PostgreSQL   │
-           │   Database    │
-           └───────┬───────┘
-                   │
-           ┌───────▼───────┐
-           │   FastAPI     │
-           │    Server     │
-           │  :8000/api    │
-           └───────┬───────┘
-                   │
-           ┌───────▼───────┐
-           │   Next.js     │
-           │  Dashboard    │
-           │    :3000      │
-           └───────────────┘
-```
-
-## Next Steps
-
-1. **Churn Prediction** - ML-based customer risk scoring
-2. **Automated Reports** - Scheduled email reports
-3. **Alerts** - Notifications for critical events
-4. **Manager Views** - Role-based dashboards
-5. **Mobile App** - React Native companion app
+Proprietary - dotMac Limited. All rights reserved.
 
 ## Support
 
-For issues or questions, contact the development team.
+For issues or questions:
+- Email: support@dotmac.ng
+- GitHub Issues: [Report a bug](https://github.com/dotmac/dotmac-bos/issues)

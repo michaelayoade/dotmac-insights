@@ -1,0 +1,264 @@
+{% extends "layouts/base.html" %}
+
+{% block body %}
+<div class="min-h-full" x-data="{ sidebarOpen: false }">
+    <!-- Mobile sidebar overlay -->
+    <div
+        x-show="sidebarOpen"
+        x-cloak
+        class="fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm lg:hidden"
+        @click="sidebarOpen = false"
+        x-transition:enter="transition-opacity ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    ></div>
+
+    <!-- Sidebar -->
+    <aside
+        class="fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-gradient-to-b from-slate-850 to-slate-950 sidebar-transition"
+        :class="{ '-translate-x-full lg:translate-x-0': !sidebarOpen, 'translate-x-0': sidebarOpen }"
+        data-testid="sidebar"
+    >
+        <!-- Logo & Brand -->
+        <div class="flex h-20 shrink-0 items-center px-6 border-b border-white/5">
+            <a href="/" class="flex items-center gap-3 group" data-testid="sidebar-logo">
+                <!-- Logo mark -->
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:shadow-primary-500/30 transition-shadow">
+                    <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <span class="text-lg font-display font-bold text-white tracking-tight">{{ product_name }}</span>
+                    <span class="block text-xs text-white/40 font-medium tracking-wide">Business Suite</span>
+                </div>
+            </a>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto scrollbar-thin py-6 px-4" data-testid="sidebar-nav">
+            {% for section in navigation %}
+            <div class="mb-8">
+                <h3 class="px-3 mb-3 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">
+                    {{ section.section }}
+                </h3>
+                <ul class="space-y-1">
+                    {% for item in section.items %}
+                    <li>
+                        <a
+                            href="{{ item.href }}"
+                            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                                   {% if current_path == item.href %}
+                                   bg-white/10 text-white shadow-inner-glow
+                                   {% else %}
+                                   text-white/60 hover:bg-white/5 hover:text-white
+                                   {% endif %}"
+                            data-testid="nav-{{ item.label | lower | replace(' ', '-') }}"
+                            {% if current_path != item.href %}
+                            hx-get="{{ item.href }}"
+                            hx-target="#main-content"
+                            hx-push-url="true"
+                            hx-indicator="#page-loader"
+                            {% endif %}
+                        >
+                            <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
+                                {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
+                            </span>
+                            <span>{{ item.label }}</span>
+                            {% if current_path == item.href %}
+                            <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
+                            {% endif %}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </nav>
+
+        <!-- User section -->
+        <div class="shrink-0 border-t border-white/5 p-4">
+            <div class="flex items-center gap-3 rounded-xl bg-white/5 p-3">
+                <!-- Avatar -->
+                <div class="relative">
+                    <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-accent-400 to-accent-500 flex items-center justify-center shadow-lg shadow-accent-500/20">
+                        <span class="text-sm font-bold text-white">
+                            {{ user.name[:2] | upper if user.name else 'U' }}
+                        </span>
+                    </div>
+                    <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full"></span>
+                </div>
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-white truncate" data-testid="user-name">
+                        {{ user.name or user.email.split('@')[0] }}
+                    </p>
+                    <p class="text-xs text-white/40 truncate" data-testid="user-email">
+                        {{ user.email }}
+                    </p>
+                </div>
+                <!-- Logout -->
+                <a
+                    href="/logout"
+                    class="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                    title="Sign out"
+                    data-testid="logout-button"
+                >
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main content area -->
+    <div class="lg:pl-72">
+        <!-- Top bar -->
+        <header class="sticky top-0 z-20 bg-surface-50/80 backdrop-blur-xl border-b border-gray-200/50">
+            <div class="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+                <!-- Mobile menu button -->
+                <button
+                    type="button"
+                    class="lg:hidden -m-2 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    @click="sidebarOpen = true"
+                    data-testid="mobile-menu-button"
+                >
+                    <span class="sr-only">Open sidebar</span>
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+
+                <!-- Breadcrumbs -->
+                {% if breadcrumbs %}
+                <nav class="hidden sm:flex" aria-label="Breadcrumb" data-testid="breadcrumbs">
+                    <ol class="flex items-center">
+                        {% for crumb in breadcrumbs %}
+                        <li class="flex items-center">
+                            {% if not loop.first %}
+                            <svg class="h-4 w-4 text-gray-300 mx-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            {% endif %}
+                            {% if crumb.href and not crumb.is_current %}
+                            <a href="{{ crumb.href }}" class="text-sm text-gray-500 hover:text-primary-600 transition-colors">
+                                {{ crumb.label }}
+                            </a>
+                            {% else %}
+                            <span class="text-sm font-semibold text-gray-900">{{ crumb.label }}</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </nav>
+                {% endif %}
+
+                <!-- Page title (mobile) -->
+                <h1 class="sm:hidden text-lg font-display font-bold text-gray-900" data-testid="page-title-mobile">
+                    {{ page_title | default("Dashboard") }}
+                </h1>
+
+                <!-- Right side -->
+                <div class="ml-auto flex items-center gap-3">
+                    <!-- Loading indicator -->
+                    <div id="page-loader" class="htmx-indicator">
+                        <div class="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                    </div>
+
+                    <!-- Quick actions -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:bg-primary-500 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all"
+                            @click="open = !open"
+                            data-testid="quick-actions-button"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            <span class="hidden sm:inline">New</span>
+                        </button>
+
+                        <div
+                            x-show="open"
+                            x-cloak
+                            @click.away="open = false"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-xl bg-white p-2 shadow-warm-xl ring-1 ring-gray-200/50"
+                            role="menu"
+                            data-testid="quick-actions-menu"
+                        >
+                            {% if has_scope('crm:write') %}
+                            <a href="/crm/contacts/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
+                                <span class="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                                </span>
+                                <div>
+                                    <span class="font-medium">New Contact</span>
+                                    <span class="block text-xs text-gray-500">Add a lead or customer</span>
+                                </div>
+                            </a>
+                            {% endif %}
+                            {% if has_scope('support:write') %}
+                            <a href="/support/tickets/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
+                                <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                </span>
+                                <div>
+                                    <span class="font-medium">New Ticket</span>
+                                    <span class="block text-xs text-gray-500">Create support ticket</span>
+                                </div>
+                            </a>
+                            {% endif %}
+                            {% if has_scope('accounting:write') %}
+                            <a href="/accounting/invoices/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
+                                <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                </span>
+                                <div>
+                                    <span class="font-medium">New Invoice</span>
+                                    <span class="block text-xs text-gray-500">Bill a customer</span>
+                                </div>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="py-8" id="main-content" data-testid="main-content">
+            <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                <!-- Page header -->
+                {% block page_header %}
+                <div class="mb-8">
+                    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">
+                        {{ page_title | default("Dashboard") }}
+                    </h1>
+                    {% if page_description %}
+                    <p class="mt-2 text-gray-500">{{ page_description }}</p>
+                    {% endif %}
+                </div>
+                {% endblock %}
+
+                <!-- Page content -->
+                {% block content %}
+                <div class="text-gray-600">
+                    Welcome to {{ product_name }}
+                </div>
+                {% endblock %}
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

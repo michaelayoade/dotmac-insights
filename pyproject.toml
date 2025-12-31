@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "dotmac-insights"
-version = "0.1.0"
-description = "Business intelligence dashboard for Dotmac Technologies"
-authors = ["Dotmac Technologies"]
+name = "dotmac-bos"
+version = "1.0.0"
+description = "Business Operating System - Comprehensive ERP platform for business operations"
+authors = ["Michael Ayoade <michaelayoade@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]

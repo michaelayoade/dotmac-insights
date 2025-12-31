@@ -1,0 +1,51 @@
+{#
+Badge Component
+
+Usage:
+{% include "components/ui/badge.html" with {
+    label: "Active",
+    variant: "success",  # success, warning, error, info, neutral
+    size: "sm",          # sm, md
+    dot: true,           # Show dot indicator
+    removable: false,    # Show remove button
+} %}
+#}
+
+{% set size_classes = {
+    "sm": "px-2 py-0.5 text-xs",
+    "md": "px-2.5 py-1 text-sm"
+} %}
+
+{% set variant_classes = {
+    "success": "bg-green-50 text-green-700 ring-green-600/20",
+    "warning": "bg-yellow-50 text-yellow-800 ring-yellow-600/20",
+    "error": "bg-red-50 text-red-700 ring-red-600/10",
+    "info": "bg-blue-50 text-blue-700 ring-blue-700/10",
+    "neutral": "bg-gray-50 text-gray-600 ring-gray-500/10"
+} %}
+
+{% set dot_classes = {
+    "success": "bg-green-500",
+    "warning": "bg-yellow-500",
+    "error": "bg-red-500",
+    "info": "bg-blue-500",
+    "neutral": "bg-gray-500"
+} %}
+
+<span
+    class="inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset {{ size_classes[size | default('sm')] }} {{ variant_classes[variant | default('neutral')] }}"
+    {% if testid %}data-testid="{{ testid }}"{% endif %}
+>
+    {% if dot %}
+    <span class="h-1.5 w-1.5 rounded-full {{ dot_classes[variant | default('neutral')] }}"></span>
+    {% endif %}
+    {{ label }}
+    {% if removable %}
+    <button type="button" class="group relative -mr-1 h-3.5 w-3.5 rounded-sm hover:bg-gray-500/20">
+        <span class="sr-only">Remove</span>
+        <svg viewBox="0 0 14 14" class="h-3.5 w-3.5 stroke-gray-600/50 group-hover:stroke-gray-600/75">
+            <path d="M4 4l6 6m0-6l-6 6" />
+        </svg>
+    </button>
+    {% endif %}
+</span>
