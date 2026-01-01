@@ -1,0 +1,28 @@
+{# Single supplier row #}
+<tr class="group hover:bg-surface-50" id="supplier-row-{{ supplier.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <a href="/suppliers/{{ supplier.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ supplier.supplier_name }}</a>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+        {{ supplier.supplier_group_rel.name if supplier.supplier_group_rel else (supplier.supplier_group or '-') }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ supplier.email_id or '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ supplier.country or '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">{{ supplier.default_currency or 'USD' }}</td>
+    <td class="whitespace-nowrap px-3 py-4">
+        {% if supplier.disabled %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-gray-50 text-gray-700 ring-gray-600/20">Inactive</span>
+        {% elif supplier.on_hold %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-yellow-50 text-yellow-700 ring-yellow-600/20">On Hold</span>
+        {% else %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Active</span>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a href="/suppliers/{{ supplier.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

@@ -1,0 +1,78 @@
+{#
+Contact Search Results Partial - HTMX typeahead dropdown
+
+Used by support ticket form and other FK selectors.
+Expects: contacts (list), search_query (string)
+#}
+{% if contacts %}
+<div class="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-warm-lg ring-1 ring-gray-200 max-h-64 overflow-y-auto" data-testid="contact-search-results">
+    {% for contact in contacts %}
+    <button
+        type="button"
+        class="w-full px-4 py-3 text-left hover:bg-primary-50 focus:bg-primary-50 focus:outline-none transition-colors first:rounded-t-xl last:rounded-b-xl border-b border-gray-100 last:border-b-0"
+        onclick="selectContact({{ contact.id }}, '{{ contact.name | e }}', '{{ contact.email | default('', true) | e }}', '{{ contact.phone | default('', true) | e }}')"
+        data-contact-id="{{ contact.id }}"
+        data-testid="contact-option-{{ contact.id }}"
+    >
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-100 text-primary-700 text-sm font-semibold">
+                    {{ contact.name[:2] | upper }}
+                </span>
+            </div>
+            <div class="min-w-0 flex-1">
+                <div class="font-medium text-gray-900 truncate">{{ contact.name }}</div>
+                <div class="text-sm text-gray-500 truncate">
+                    {% if contact.email %}{{ contact.email }}{% endif %}
+                    {% if contact.email and contact.phone %} &bull; {% endif %}
+                    {% if contact.phone %}{{ contact.phone }}{% endif %}
+                </div>
+            </div>
+            {% set type_styles = {
+                'lead': 'bg-blue-50 text-blue-700',
+                'prospect': 'bg-amber-50 text-amber-700',
+                'customer': 'bg-emerald-50 text-emerald-700',
+                'churned': 'bg-gray-50 text-gray-600',
+                'person': 'bg-gray-50 text-gray-600'
+            } %}
+            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium {{ type_styles.get(contact.contact_type.value, 'bg-gray-50 text-gray-600') }}">
+                {{ contact.contact_type.value | title }}
+            </span>
+        </div>
+    </button>
+    {% endfor %}
+</div>
+<script>
+function selectContact(id, name, email, phone) {
+    // Set hidden FK field
+    const hiddenInput = document.querySelector('input[name="unified_contact_id"]');
+    if (hiddenInput) hiddenInput.value = id;
+
+    // Fill in contact fields
+    const nameInput = document.querySelector('input[name="contact_name"]');
+    const emailInput = document.querySelector('input[name="contact_email"]');
+    const phoneInput = document.querySelector('input[name="contact_phone"]');
+
+    if (nameInput) nameInput.value = name;
+    if (emailInput) emailInput.value = email;
+    if (phoneInput) phoneInput.value = phone;
+
+    // Clear search results
+    document.getElementById('contact-search-results')?.remove();
+
+    // Update search input to show selected contact
+    const searchInput = document.querySelector('[data-testid="contact-search-input"]');
+    if (searchInput) searchInput.value = name;
+}
+</script>
+{% elif search_query and search_query | length >= 2 %}
+<div class="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-warm-lg ring-1 ring-gray-200 p-4 text-center" data-testid="contact-search-no-results">
+    <p class="text-sm text-gray-500">No contacts found for "{{ search_query }}"</p>
+    <a href="/crm/contacts/new" class="mt-2 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-500">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create new contact
+    </a>
+</div>
+{% endif %}

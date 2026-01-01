@@ -1,0 +1,74 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Bills</h1>
+            <p class="mt-1 text-sm text-gray-500">Purchase invoices from suppliers</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/suppliers" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                View Suppliers
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form hx-get="/suppliers/bills" hx-target="#table-container" hx-push-url="true" class="flex flex-col lg:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text" name="q" value="{{ q }}" placeholder="Search bills..."
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <select name="status" class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                    <option value="">All Status</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if opt.value == status_filter else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="date_from" value="{{ date_from }}" placeholder="From Date"
+                    class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <input type="date" name="date_to" value="{{ date_to }}" placeholder="To Date"
+                    class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                    Search
+                </button>
+                {% if q or status_filter or date_from or date_to %}
+                <a href="/suppliers/bills" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                    Clear
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Total Bills</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ total }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Unpaid</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1">{{ bills|selectattr('status')|selectattr('status.value', 'equalto', 'UNPAID')|list|length if bills else 0 }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Overdue</p>
+            <p class="text-2xl font-bold text-red-600 mt-1">{{ bills|selectattr('status')|selectattr('status.value', 'equalto', 'OVERDUE')|list|length if bills else 0 }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Paid</p>
+            <p class="text-2xl font-bold text-green-600 mt-1">{{ bills|selectattr('status')|selectattr('status.value', 'equalto', 'PAID')|list|length if bills else 0 }}</p>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+        {% include "suppliers/partials/bills_table.html" %}
+    </div>
+</div>
+{% endblock %}

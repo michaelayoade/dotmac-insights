@@ -1,0 +1,93 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Customer Analytics</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Segments, health indicators, and churn analysis</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    {% set stat = {"label": "Total Customers", "value": "{:,}".format(customers.total_customers | default(0)), "icon": "users", "color": "blue"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Active Customers", "value": "{:,}".format(customers.active_customers | default(0)), "icon": "users", "color": "green"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Churned Customers", "value": "{:,}".format(customers.churned_customers | default(0)), "icon": "trending-up", "color": "red"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "New (Last 30 Days)", "value": "{:,}".format(customers.new_last_30_days | default(0)), "icon": "users", "color": "primary"} %}
+    {% include "components/ui/stat_card.html" %}
+</div>
+
+<!-- Customer Segments -->
+{% if segments %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- By Status -->
+    {% if segments.by_status %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">By Status</h3>
+        <div class="space-y-3">
+            {% for status, data in segments.by_status.items() %}
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-700 capitalize">{{ status | replace("_", " ") }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ "{:,}".format(data.count | default(0)) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- By Type -->
+    {% if segments.by_type %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="font-semibold text-gray-900 mb-4">By Type</h3>
+        <div class="space-y-3">
+            {% for type_name, data in segments.by_type.items() %}
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-700 capitalize">{{ type_name | replace("_", " ") }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ "{:,}".format(data.count | default(0)) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Customer Health -->
+{% if health %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Customer Health Indicators</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <!-- Overdue Customers -->
+        <div class="text-center p-4 rounded-xl bg-red-50">
+            <div class="text-3xl font-bold text-red-700">{{ health.overdue_customers | default(0) }}</div>
+            <div class="text-sm text-red-600 mt-1">Overdue Customers</div>
+            {% if health.overdue_percent %}
+            <div class="text-xs text-red-500 mt-0.5">{{ "{:.1f}%".format(health.overdue_percent) }} of active</div>
+            {% endif %}
+        </div>
+
+        <!-- High Support -->
+        <div class="text-center p-4 rounded-xl bg-yellow-50">
+            <div class="text-3xl font-bold text-yellow-700">{{ health.high_support_customers | default(0) }}</div>
+            <div class="text-sm text-yellow-600 mt-1">High Support Customers</div>
+            <div class="text-xs text-yellow-500 mt-0.5">3+ open tickets</div>
+        </div>
+
+        <!-- Recent Cancellations -->
+        <div class="text-center p-4 rounded-xl bg-orange-50">
+            <div class="text-3xl font-bold text-orange-700">{{ health.recent_cancellations | default(0) }}</div>
+            <div class="text-sm text-orange-600 mt-1">Recent Cancellations</div>
+            <div class="text-xs text-orange-500 mt-0.5">Last 30 days</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

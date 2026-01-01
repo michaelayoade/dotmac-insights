@@ -19,9 +19,12 @@ from app.models.invoice import Invoice, InvoiceStatus
 def _get_contact_or_customer_name(inv) -> str:
     """Get name from contact (preferred) or customer (legacy)."""
     if inv.contact:
-        return inv.contact.display_name or inv.contact.name or "Unknown"
+        name = inv.contact.display_name or inv.contact.name
+        if name:
+            return str(name)
     if inv.customer:
-        return inv.customer.name
+        if inv.customer.name:
+            return str(inv.customer.name)
     return "Unknown"
 
 from .helpers import parse_date, resolve_currency_or_raise

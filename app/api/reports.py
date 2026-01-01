@@ -14,7 +14,7 @@ from sqlalchemy import func, case, and_, or_, text, extract
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
 from app.database import get_db
 from app.auth import Require

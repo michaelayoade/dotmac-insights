@@ -1,0 +1,212 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">Knowledge Base</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Help articles and documentation for customers and agents</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a
+                href="/support/kb/categories"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                Categories
+            </a>
+            <a
+                href="/support/kb/new"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Article
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Published</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.published | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.draft | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Views</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.total_views | default(0) | int }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col lg:flex-row gap-4">
+            <!-- Search -->
+            <div class="flex-1">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        name="q"
+                        placeholder="Search articles by title, content, or keywords..."
+                        value="{{ search_query or '' }}"
+                        class="block w-full pl-11 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                        hx-get="/support/kb/table"
+                        hx-trigger="input changed delay:300ms, search"
+                        hx-target="#kb-table-container"
+                        hx-include="[name='status'], [name='category_id']"
+                    >
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Status Filter -->
+                <div class="relative" x-data="{ open: false }">
+                    <button
+                        @click="open = !open"
+                        @click.outside="open = false"
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_status else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        {{ current_status | title if current_status else 'Status' }}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div
+                        x-show="open"
+                        x-transition:enter="transition ease-out duration-100"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="opacity-100 scale-100"
+                        x-transition:leave-end="opacity-0 scale-95"
+                        class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-100 py-1"
+                        style="display: none;"
+                    >
+                        <a
+                            href="#"
+                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
+                            hx-get="/support/kb/table?status="
+                            hx-target="#kb-table-container"
+                            hx-include="[name='q'], [name='category_id']"
+                            @click="open = false"
+                        >All Statuses</a>
+                        {% for opt in status_options %}
+                        <a
+                            href="#"
+                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {{ 'bg-primary-50 text-primary-700' if current_status == opt.value else '' }}"
+                            hx-get="/support/kb/table?status={{ opt.value }}"
+                            hx-target="#kb-table-container"
+                            hx-include="[name='q'], [name='category_id']"
+                            @click="open = false"
+                        >{{ opt.label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="relative" x-data="{ open: false }">
+                    <button
+                        @click="open = !open"
+                        @click.outside="open = false"
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_category_id else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                        {% if current_category_id %}
+                            {% for cat in categories if cat.id == current_category_id %}{{ cat.name }}{% endfor %}
+                        {% else %}
+                            Category
+                        {% endif %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div
+                        x-show="open"
+                        x-transition:enter="transition ease-out duration-100"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="opacity-100 scale-100"
+                        x-transition:leave-end="opacity-0 scale-95"
+                        class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-100 py-1 max-h-64 overflow-y-auto"
+                        style="display: none;"
+                    >
+                        <a
+                            href="#"
+                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
+                            hx-get="/support/kb/table?category_id="
+                            hx-target="#kb-table-container"
+                            hx-include="[name='q'], [name='status']"
+                            @click="open = false"
+                        >All Categories</a>
+                        {% for cat in categories %}
+                        <a
+                            href="#"
+                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50 {{ 'bg-primary-50 text-primary-700' if current_category_id == cat.id else '' }}"
+                            hx-get="/support/kb/table?category_id={{ cat.id }}"
+                            hx-target="#kb-table-container"
+                            hx-include="[name='q'], [name='status']"
+                            @click="open = false"
+                        >{{ cat.name }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div id="kb-table-container">
+        {% include "modules/support/templates/partials/kb_articles_table.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{# Training events table partial #}
+{% if events %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="?sort=event_name&dir={{ 'desc' if sort == 'event_name' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/hr/training/table?sort=event_name&dir={{ 'desc' if sort == 'event_name' and dir == 'asc' else 'asc' }}" hx-target="#events-table-container" hx-push-url="true">
+                    Event
+                    {% if sort == 'event_name' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Program</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">
+                <a href="?sort=start_time&dir={{ 'desc' if sort == 'start_time' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/hr/training/table?sort=start_time&dir={{ 'desc' if sort == 'start_time' and dir == 'asc' else 'asc' }}" hx-target="#events-table-container" hx-push-url="true">
+                    Date
+                    {% if sort == 'start_time' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Trainer</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for event in events %}
+            {% include "modules/hr/templates/training/partials/event_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No training events found</h3>
+    <p class="text-sm text-gray-500 mb-6">Get started by creating a new training event.</p>
+    <a href="/hr/training/new" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Event
+    </a>
+</div>
+{% endif %}

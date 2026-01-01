@@ -79,7 +79,7 @@ def list_ar_payments(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List customer payments with filters."""
@@ -518,6 +518,8 @@ def get_outstanding_invoices(
     if contact_id:
         docs = alloc_service.get_outstanding_documents("contact", contact_id, currency)
     else:
+        if customer_id is None:
+            raise HTTPException(status_code=400, detail="customer_id is required")
         docs = alloc_service.get_outstanding_documents("customer", customer_id, currency)
 
     return {

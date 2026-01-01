@@ -95,7 +95,7 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
     return {
         "id": quote.id,
         "erpnext_id": quote.erpnext_id,
-        "contact_id": quote.contact_id,
+        "contact_id": None,
         "customer_name": quote.customer_name,
         "status": quote.status.value if quote.status else None,
         "quotation_date": quote.transaction_date.isoformat() if quote.transaction_date else None,
@@ -120,7 +120,7 @@ async def list_quotations(
     contact_id: Optional[int] = None,
     customer_name: Optional[str] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List quotations with filtering."""
@@ -132,7 +132,10 @@ async def list_quotations(
             query = query.filter(Quotation.status == status_enum)
 
     if contact_id:
-        query = query.filter(Quotation.contact_id == contact_id)
+        contact = db.query(Contact).filter(Contact.id == contact_id).first()
+        if not contact:
+            raise HTTPException(status_code=400, detail="Contact not found")
+        query = query.filter(Quotation.party_name == contact.display_name)
 
     if customer_name:
         query = query.filter(Quotation.customer_name.ilike(f"%{customer_name}%"))
@@ -167,14 +170,15 @@ async def create_quotation(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new quotation."""
-    # Validate contact if provided
+    party_name = payload.customer_name
     if payload.contact_id:
         contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
         if not contact:
             raise HTTPException(status_code=400, detail="Contact not found")
+        party_name = contact.display_name
 
     quote = Quotation(
-        contact_id=payload.contact_id,
+        party_name=party_name,
         customer_name=payload.customer_name,
         transaction_date=payload.quotation_date,
         valid_till=payload.valid_till,
@@ -207,6 +211,14 @@ async def update_quotation(
         raise HTTPException(status_code=404, detail="Quotation not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+
+    if "contact_id" in update_data:
+        contact_id = update_data.pop("contact_id")
+        if contact_id:
+            contact = db.query(Contact).filter(Contact.id == contact_id).first()
+            if not contact:
+                raise HTTPException(status_code=400, detail="Contact not found")
+            update_data["party_name"] = contact.display_name
 
     # Handle status conversion
     if "status" in update_data and update_data["status"]:
@@ -260,7 +272,7 @@ async def submit_quotation(quotation_id: int, db: Session = Depends(get_db)) -> 
     if quote.status != QuotationStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Only draft quotations can be submitted")
 
-    quote.status = QuotationStatus.SUBMITTED
+    quote.status = QuotationStatus.OPEN
     quote.docstatus = 1
     db.commit()
     db.refresh(quote)
@@ -285,9 +297,8 @@ async def convert_to_order(quotation_id: int, db: Session = Depends(get_db)) -> 
 
     # Create sales order from quotation
     order = SalesOrder(
-        contact_id=quote.contact_id,
-        customer_id=quote.customer_id,
-        customer_name=quote.customer_name,
+        customer_name=quote.customer_name or quote.party_name,
+        customer=quote.party_name,
         transaction_date=datetime.now(timezone.utc),
         currency=quote.currency,
         total=quote.total,

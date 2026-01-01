@@ -1,0 +1,48 @@
+{# Payroll runs table partial #}
+{% if runs %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Payroll Entry</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Company</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Status</th>
+            <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for run in runs %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <a href="/hr/payroll/runs/{{ run.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ run.name or run.id }}</a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ run.start_date }} - {{ run.end_date }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ run.company or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell">
+                    {% set status_colors = {
+                        'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                        'Submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'Completed': 'bg-green-50 text-green-700 ring-green-600/20',
+                        'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                    } %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(run.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ run.status or 'Draft' }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="/hr/payroll/runs/{{ run.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No payroll runs found</h3>
+    <p class="text-sm text-gray-500">Payroll runs are synced from ERPNext.</p>
+</div>
+{% endif %}

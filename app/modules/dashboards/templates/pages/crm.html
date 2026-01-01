@@ -1,0 +1,129 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ page_title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Overview of your CRM pipeline, contacts, and leads</p>
+    </div>
+    <div class="flex gap-3">
+        <a
+            href="/crm/contacts/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all"
+            data-testid="new-contact-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Contact</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" data-testid="stats-grid">
+    {% for stat in stats %}
+    {% set title = stat.title %}
+    {% set value = stat.value %}
+    {% set icon = stat.icon %}
+    {% set color = stat.color %}
+    {% set href = stat.get('href') %}
+    {% set trend = stat.get('trend') %}
+    {% include "components/dashboard/stat_card.html" %}
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column - 2/3 width -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Pipeline Stages -->
+        {% if pipeline.stages %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="pipeline-stages">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Pipeline Stages</h3>
+                <a href="/crm/pipeline" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View Pipeline</a>
+            </div>
+            <div class="p-5">
+                <div class="flex gap-4 overflow-x-auto pb-2">
+                    {% for stage in pipeline.stages %}
+                    <div class="flex-shrink-0 w-48">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">{{ stage.name }}</span>
+                            <span class="text-xs text-gray-500">{{ stage.count }}</span>
+                        </div>
+                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary-500 rounded-full" style="width: {{ (stage.count / (pipeline.total_count or 1) * 100) | round }}%"></div>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">${{ stage.value | default(0) | round(0) | int | format_number }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recent Contacts -->
+        {% set title = "Recent Contacts" %}
+        {% set view_all_href = "/crm/contacts" %}
+        {% set empty_message = "No contacts yet" %}
+        {% set items = [] %}
+        {% for contact in recent_contacts %}
+        {% set items = items + [{
+            "title": contact.name,
+            "subtitle": contact.email,
+            "href": "/crm/contacts/" ~ contact.id,
+            "avatar": contact.name[:2] | upper,
+            "badge": contact.type | default('') | title,
+            "badge_class": "bg-primary-50 text-primary-700"
+        }] %}
+        {% endfor %}
+        {% include "components/dashboard/recent_items.html" %}
+    </div>
+
+    <!-- Right Column - 1/3 width -->
+    <div class="space-y-6">
+        <!-- Quick Links -->
+        {% set title = "Quick Links" %}
+        {% set links = quick_links %}
+        {% include "components/dashboard/quick_links.html" %}
+
+        <!-- Recent Leads -->
+        {% if recent_leads %}
+        {% set title = "Recent Leads" %}
+        {% set view_all_href = "/crm/opportunities" %}
+        {% set empty_message = "No leads yet" %}
+        {% set items = [] %}
+        {% for lead in recent_leads %}
+        {% set items = items + [{
+            "title": lead.company or lead.name,
+            "subtitle": lead.status | default('New'),
+            "href": "/crm/opportunities/" ~ lead.id,
+            "avatar": (lead.company or lead.name)[:2] | upper,
+            "badge": "$" ~ (lead.estimated_value | default(0) | round(0) | int | format_number),
+            "badge_class": "bg-emerald-50 text-emerald-700"
+        }] %}
+        {% endfor %}
+        {% include "components/dashboard/recent_items.html" %}
+        {% endif %}
+
+        <!-- Lead Sources -->
+        {% if leads.by_source %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Lead Sources</h3>
+            </div>
+            <div class="p-5 space-y-3">
+                {% for source, count in leads.by_source.items() %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">{{ source | title }}</span>
+                    <span class="text-sm font-medium text-gray-900">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

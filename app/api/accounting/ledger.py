@@ -113,7 +113,7 @@ def list_accounts(
     include_disabled: bool = False,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List all accounts with filtering and pagination.
@@ -347,7 +347,7 @@ def get_account_ledger(
     party: Optional[str] = None,
     voucher_type: Optional[str] = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get ledger (GL entries) for a specific account with running balance.
@@ -563,7 +563,7 @@ def get_general_ledger(
     voucher_type: Optional[str] = None,
     currency: Optional[str] = None,
     limit: int = Query(default=100, le=1000),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get general ledger transactions with filtering and pagination.
@@ -646,7 +646,7 @@ def list_gl_entries(
     sort_by: Optional[str] = Query(default="posting_date", description="posting_date,account,debit,credit"),
     sort_dir: Optional[str] = Query(default="desc"),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List GL entries with filtering and sorting.

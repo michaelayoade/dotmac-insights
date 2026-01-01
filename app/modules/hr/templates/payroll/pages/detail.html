@@ -1,0 +1,167 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/hr/payroll" class="hover:text-primary-600">Salary Slips</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ slip.employee_name or slip.employee_id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ slip.employee_name or slip.employee_id }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Salary slip for {{ slip.start_date }} - {{ slip.end_date }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if slip.status == 'Draft' %}
+        <form method="POST" action="/hr/payroll/{{ slip.id }}/submit" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Submit
+            </button>
+        </form>
+        {% elif slip.status == 'Submitted' %}
+        <form method="POST" action="/hr/payroll/{{ slip.id }}/mark-paid" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Mark Paid
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Salary Details</h3>
+                {% set status_colors = {
+                    'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'Submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'Paid': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(slip.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ slip.status }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Employee</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.employee_name or slip.employee_id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Department</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.department or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Designation</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.designation or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Salary Structure</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.salary_structure or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Pay Period</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.start_date }} - {{ slip.end_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Working Days</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ slip.total_working_days or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h3 class="text-lg font-display font-semibold text-green-700">Earnings</h3>
+                </div>
+                <div class="px-6 py-4">
+                    {% if slip.earnings %}
+                    <dl class="space-y-3">
+                        {% for earning in slip.earnings %}
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-gray-600">{{ earning.salary_component }}</dt>
+                            <dd class="text-sm font-medium text-gray-900">{{ earning.amount|round(2) }}</dd>
+                        </div>
+                        {% endfor %}
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No earnings recorded</p>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-3 bg-green-50 border-t border-green-100">
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-green-800">Total Earnings</span>
+                        <span class="text-sm font-bold text-green-800">{{ slip.gross_pay|default(0)|round(2) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h3 class="text-lg font-display font-semibold text-red-700">Deductions</h3>
+                </div>
+                <div class="px-6 py-4">
+                    {% if slip.deductions %}
+                    <dl class="space-y-3">
+                        {% for deduction in slip.deductions %}
+                        <div class="flex justify-between">
+                            <dt class="text-sm text-gray-600">{{ deduction.salary_component }}</dt>
+                            <dd class="text-sm font-medium text-gray-900">{{ deduction.amount|round(2) }}</dd>
+                        </div>
+                        {% endfor %}
+                    </dl>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No deductions recorded</p>
+                    {% endif %}
+                </div>
+                <div class="px-6 py-3 bg-red-50 border-t border-red-100">
+                    <div class="flex justify-between">
+                        <span class="text-sm font-medium text-red-800">Total Deductions</span>
+                        <span class="text-sm font-bold text-red-800">{{ slip.total_deduction|default(0)|round(2) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Net Pay</h3>
+                <p class="mt-4 text-4xl font-bold">{{ slip.net_pay|default(0)|round(2) }}</p>
+                <p class="mt-2 text-sm opacity-75">{{ slip.start_date }} - {{ slip.end_date }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Payment Info</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Payment Days</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ slip.payment_days or '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Bank Account</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ slip.bank_account_no or '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Bank Name</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ slip.bank_name or '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

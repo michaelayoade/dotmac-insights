@@ -5,7 +5,17 @@
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
-                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                {# Bulk select checkbox #}
+                <th scope="col" class="w-12 py-3.5 pl-6 pr-2">
+                    <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        @change="toggleAll($event.target.checked)"
+                        :checked="allSelected"
+                        data-testid="select-all-checkbox"
+                    >
+                </th>
+                <th scope="col" class="py-3.5 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
                     <a
                         href="#"
                         class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"

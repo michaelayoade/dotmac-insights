@@ -1,0 +1,226 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/accounting/ar-payments" class="hover:text-primary-600">Customer Receipts</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="text-gray-900">{{ 'Edit' if payment else 'New' }} Receipt</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">
+            {{ 'Edit Receipt' if payment else 'New Customer Receipt' }}
+        </h1>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ 'Update payment details' if payment else 'Record a new customer payment' }}
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="{{ '/accounting/ar-payments/' ~ payment.id if payment else '/accounting/ar-payments' }}" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Payment Information -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Payment Information</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="receipt_number" class="block text-sm font-medium text-gray-700 mb-1">Receipt Number</label>
+                            <input
+                                type="text"
+                                id="receipt_number"
+                                name="receipt_number"
+                                value="{{ payment.receipt_number if payment else '' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="Auto-generated if blank"
+                            >
+                        </div>
+                        <div>
+                            <label for="payment_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                Payment Date <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                id="payment_date"
+                                name="payment_date"
+                                value="{{ payment.payment_date.strftime('%Y-%m-%d') if payment and payment.payment_date else '' }}"
+                                required
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="contact_id" class="block text-sm font-medium text-gray-700 mb-1">
+                            Customer <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="contact_id"
+                            name="contact_id"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        >
+                            <option value="">Select customer</option>
+                            {% for contact in contacts %}
+                            <option value="{{ contact.id }}" {{ 'selected' if payment and payment.contact_id == contact.id else '' }}>
+                                {{ contact.name or contact.email }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-2">
+                            <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">
+                                Amount <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <input
+                                    type="number"
+                                    id="amount"
+                                    name="amount"
+                                    value="{{ payment.amount if payment else '' }}"
+                                    step="0.01"
+                                    min="0"
+                                    required
+                                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                    placeholder="0.00"
+                                >
+                            </div>
+                        </div>
+                        <div>
+                            <label for="currency" class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                            <select
+                                id="currency"
+                                name="currency"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            >
+                                <option value="NGN" {{ 'selected' if not payment or payment.currency == 'NGN' else '' }}>NGN</option>
+                                <option value="USD" {{ 'selected' if payment and payment.currency == 'USD' else '' }}>USD</option>
+                                <option value="GBP" {{ 'selected' if payment and payment.currency == 'GBP' else '' }}>GBP</option>
+                                <option value="EUR" {{ 'selected' if payment and payment.currency == 'EUR' else '' }}>EUR</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="payment_method" class="block text-sm font-medium text-gray-700 mb-1">
+                            Payment Method <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="payment_method"
+                            name="payment_method"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        >
+                            <option value="">Select method</option>
+                            {% for opt in method_options %}
+                            <option value="{{ opt.value }}" {{ 'selected' if payment and payment.payment_method.value == opt.value else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reference Information -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Reference Information</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="transaction_reference" class="block text-sm font-medium text-gray-700 mb-1">Transaction Reference</label>
+                            <input
+                                type="text"
+                                id="transaction_reference"
+                                name="transaction_reference"
+                                value="{{ payment.transaction_reference if payment else '' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="Bank reference, check number, etc."
+                            >
+                        </div>
+                        <div>
+                            <label for="bank_account_id" class="block text-sm font-medium text-gray-700 mb-1">Bank Account</label>
+                            <select
+                                id="bank_account_id"
+                                name="bank_account_id"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            >
+                                <option value="">Select bank account</option>
+                                {% for account in bank_accounts %}
+                                <option value="{{ account.id }}" {{ 'selected' if payment and payment.bank_account_id == account.id else '' }}>
+                                    {{ account.account_name }} ({{ account.bank_name }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea
+                            id="notes"
+                            name="notes"
+                            rows="3"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            placeholder="Any additional notes..."
+                        >{{ payment.notes if payment else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Actions -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="p-6 space-y-3">
+                    <button
+                        type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {{ 'Update Receipt' if payment else 'Create Receipt' }}
+                    </button>
+                    <a
+                        href="{{ '/accounting/ar-payments/' ~ payment.id if payment else '/accounting/ar-payments' }}"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                        Cancel
+                    </a>
+                </div>
+            </div>
+
+            <!-- Help -->
+            <div class="bg-blue-50 rounded-xl p-6">
+                <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-blue-900">About Receipts</h3>
+                        <p class="mt-1 text-sm text-blue-700">
+                            After creating a receipt, you can allocate it to outstanding invoices. Unallocated amounts will show as credit balance.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

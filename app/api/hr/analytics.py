@@ -333,7 +333,7 @@ async def leave_balance_report(
     year: Optional[int] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get leave balance report for employees."""
@@ -387,7 +387,7 @@ async def attendance_summary_report(
     to_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get attendance summary report grouped by employee."""

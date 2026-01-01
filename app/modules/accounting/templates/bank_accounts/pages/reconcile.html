@@ -1,0 +1,191 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/accounting/bank-accounts/{{ account.id }}"
+                    class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                        Reconcile {{ account.account_name }}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500 font-body">
+                        Match bank transactions with your records
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Unreconciled Transactions</p>
+            <p class="mt-1 text-2xl font-bold text-amber-600">{{ unreconciled_txns|length }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Unreconciled Deposits</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(unreconciled_deposits) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Unreconciled Withdrawals</p>
+            <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(unreconciled_withdrawals) }}</p>
+        </div>
+    </div>
+
+    <!-- Reconciliation Form -->
+    {% if unreconciled_txns %}
+    <form action="/accounting/bank-accounts/{{ account.id }}/reconcile" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Unreconciled Transactions</h2>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onclick="document.querySelectorAll('input[name=transaction_ids]').forEach(cb => cb.checked = true)"
+                        class="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                        Select All
+                    </button>
+                    <span class="text-gray-300">|</span>
+                    <button
+                        type="button"
+                        onclick="document.querySelectorAll('input[name=transaction_ids]').forEach(cb => cb.checked = false)"
+                        class="text-sm text-gray-600 hover:text-gray-700 font-medium"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead>
+                        <tr class="bg-surface-50">
+                            <th class="py-3 pl-6 pr-3 w-10">
+                                <span class="sr-only">Select</span>
+                            </th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Description</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Reference</th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Deposit</th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Withdrawal</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for txn in unreconciled_txns %}
+                        <tr class="hover:bg-surface-50">
+                            <td class="py-3.5 pl-6 pr-3">
+                                <input
+                                    type="checkbox"
+                                    name="transaction_ids"
+                                    value="{{ txn.id }}"
+                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                >
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-3.5 text-sm text-gray-600">
+                                {{ txn.date.strftime('%b %d, %Y') if txn.date else '-' }}
+                            </td>
+                            <td class="px-3 py-3.5 text-sm">
+                                <div class="max-w-xs truncate text-gray-900">
+                                    {{ txn.description or txn.payee_name or '-' }}
+                                </div>
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-3.5 text-sm text-gray-600 font-mono hidden sm:table-cell">
+                                {{ txn.reference_number or txn.transaction_id or '-' }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono {{ 'text-emerald-600 font-medium' if txn.deposit and txn.deposit > 0 else 'text-gray-400' }}">
+                                {{ '{:,.2f}'.format(txn.deposit) if txn.deposit and txn.deposit > 0 else '-' }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-3.5 pr-6 text-sm text-right font-mono {{ 'text-red-600 font-medium' if txn.withdrawal and txn.withdrawal > 0 else 'text-gray-400' }}">
+                                {{ '{:,.2f}'.format(txn.withdrawal) if txn.withdrawal and txn.withdrawal > 0 else '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 bg-surface-50">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Mark Selected as Reconciled
+                </button>
+            </div>
+        </div>
+    </form>
+    {% else %}
+    <!-- All Reconciled -->
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-emerald-900 mb-2">All Caught Up!</h3>
+        <p class="text-sm text-emerald-700">There are no unreconciled transactions for this account.</p>
+    </div>
+    {% endif %}
+
+    <!-- Recent Reconciliations -->
+    {% if reconciliations %}
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Reconciliation History</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Period</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Opening</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Closing</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for rec in reconciliations %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3.5 pl-6 pr-3 text-sm text-gray-900">
+                            {{ rec.from_date.strftime('%b %d') if rec.from_date else '?' }} - {{ rec.to_date.strftime('%b %d, %Y') if rec.to_date else '?' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono text-gray-600">
+                            {{ '{:,.2f}'.format(rec.bank_statement_opening_balance or 0) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono text-gray-900">
+                            {{ '{:,.2f}'.format(rec.bank_statement_closing_balance or 0) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 pr-6 text-sm">
+                            {% set rec_status_colors = {
+                                'DRAFT': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+                                'IN_PROGRESS': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+                                'COMPLETED': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+                                'CANCELLED': 'text-red-700 bg-red-50 ring-red-600/20'
+                            } %}
+                            <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ rec_status_colors.get(rec.status.value if rec.status else 'DRAFT', rec_status_colors['DRAFT']) }}">
+                                {{ rec.status.value.replace('_', ' ').title() if rec.status else 'Draft' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

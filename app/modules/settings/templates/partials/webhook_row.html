@@ -1,0 +1,49 @@
+{# Single webhook row #}
+<tr class="group hover:bg-surface-50" id="webhook-row-{{ webhook.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <a href="/settings/admin/webhooks/{{ webhook.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ webhook.name }}</a>
+        {% if webhook.description %}
+        <p class="text-xs text-gray-500 mt-0.5">{{ webhook.description|truncate(50) }}</p>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+        <span class="font-mono text-xs">{{ webhook.url|truncate(40) }}</span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell">
+        <div class="flex flex-wrap gap-1">
+            {% for event in (webhook.event_types or [])[:3] %}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ event }}</span>
+            {% endfor %}
+            {% if (webhook.event_types or [])|length > 3 %}
+            <span class="text-xs text-gray-500">+{{ (webhook.event_types|length) - 3 }} more</span>
+            {% endif %}
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">
+        <div class="flex items-center gap-2">
+            <span class="text-green-600">{{ webhook.success_count or 0 }}</span>
+            <span class="text-gray-400">/</span>
+            <span class="text-red-600">{{ webhook.failure_count or 0 }}</span>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4">
+        {% if webhook.is_active %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Active</span>
+        {% else %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-gray-50 text-gray-700 ring-gray-600/20">Inactive</span>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {% if can_edit %}
+            <button hx-post="/settings/admin/webhooks/{{ webhook.id }}/toggle" hx-target="#webhook-row-{{ webhook.id }}" hx-swap="outerHTML"
+                class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="{{ 'Deactivate' if webhook.is_active else 'Activate' }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' if webhook.is_active else 'M5 13l4 4L19 7' }}"/></svg>
+            </button>
+            {% endif %}
+            <a href="/settings/admin/webhooks/{{ webhook.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View/Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

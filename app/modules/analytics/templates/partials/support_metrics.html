@@ -1,0 +1,14 @@
+{# Support Metrics Partial - HTMX refreshable #}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    {% set stat = {"label": "Total Conversations", "value": "{:,}".format(metrics.total_conversations | default(0)), "icon": "life-buoy", "color": "blue"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Open", "value": "{:,}".format(metrics.open | default(0)), "icon": "life-buoy", "color": "yellow"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Resolution Rate", "value": "{:.1f}%".format(metrics.resolution_rate | default(0)), "icon": "trending-up", "color": "green"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Avg Resolution", "value": "{:.1f}h".format(metrics.avg_resolution_hours | default(0)), "icon": "calendar", "color": "primary"} %}
+    {% include "components/ui/stat_card.html" %}
+</div>

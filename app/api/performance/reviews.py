@@ -4,7 +4,7 @@ Reviews API - Manager review workflows and score overrides
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
@@ -334,38 +334,52 @@ async def create_override(
     )
 
 
-@router.get("/scorecards/{scorecard_id}/overrides", response_model=List[OverrideResponse], dependencies=[Depends(Require("performance:read"))])
-async def list_overrides(scorecard_id: int, db: Session = Depends(get_db)):
+@router.get("/scorecards/{scorecard_id}/overrides", dependencies=[Depends(Require("performance:read"))])
+async def list_overrides(
+    scorecard_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """List all overrides for a scorecard."""
-    overrides = db.query(ScoreOverride).filter(
+    query = db.query(ScoreOverride).filter(
         ScoreOverride.scorecard_instance_id == scorecard_id
-    ).order_by(ScoreOverride.created_at.desc()).all()
+    )
+    total = query.count()
+    overrides = query.order_by(ScoreOverride.created_at.desc()).offset(offset).limit(limit).all()
 
-    return [
-        OverrideResponse(
-            id=o.id,
-            scorecard_instance_id=o.scorecard_instance_id,
-            override_type=o.override_type,
-            kpi_result_id=o.kpi_result_id,
-            kra_result_id=o.kra_result_id,
-            original_score=float(o.original_score) if o.original_score else None,
-            overridden_score=float(o.overridden_score) if o.overridden_score else None,
-            reason=o.reason.value,
-            justification=o.justification,
-            overridden_by_id=o.overridden_by_id,
-            created_at=o.created_at,
-        )
-        for o in overrides
-    ]
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id": o.id,
+                "scorecard_instance_id": o.scorecard_instance_id,
+                "override_type": o.override_type,
+                "kpi_result_id": o.kpi_result_id,
+                "kra_result_id": o.kra_result_id,
+                "original_score": float(o.original_score) if o.original_score else None,
+                "overridden_score": float(o.overridden_score) if o.overridden_score else None,
+                "reason": o.reason.value,
+                "justification": o.justification,
+                "overridden_by_id": o.overridden_by_id,
+                "created_at": o.created_at.isoformat() if o.created_at else None,
+            }
+            for o in overrides
+        ],
+    }
 
 
 # ============= NOTES =============
-@router.get("/scorecards/{scorecard_id}/notes", response_model=List[ReviewNoteResponse], dependencies=[Depends(Require("performance:read"))])
+@router.get("/scorecards/{scorecard_id}/notes", dependencies=[Depends(Require("performance:read"))])
 async def list_notes(
     scorecard_id: int,
     include_private: bool = Query(False),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """List review notes for a scorecard."""
     query = db.query(PerformanceReviewNote).filter(
         PerformanceReviewNote.scorecard_instance_id == scorecard_id
@@ -374,22 +388,28 @@ async def list_notes(
     if not include_private:
         query = query.filter(PerformanceReviewNote.is_private == False)
 
-    notes = query.order_by(PerformanceReviewNote.created_at.desc()).all()
+    total = query.count()
+    notes = query.order_by(PerformanceReviewNote.created_at.desc()).offset(offset).limit(limit).all()
 
-    return [
-        ReviewNoteResponse(
-            id=n.id,
-            scorecard_instance_id=n.scorecard_instance_id,
-            note_type=n.note_type,
-            content=n.content,
-            kpi_result_id=n.kpi_result_id,
-            kra_result_id=n.kra_result_id,
-            is_private=n.is_private,
-            created_by_id=n.created_by_id,
-            created_at=n.created_at,
-        )
-        for n in notes
-    ]
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id": n.id,
+                "scorecard_instance_id": n.scorecard_instance_id,
+                "note_type": n.note_type,
+                "content": n.content,
+                "kpi_result_id": n.kpi_result_id,
+                "kra_result_id": n.kra_result_id,
+                "is_private": n.is_private,
+                "created_by_id": n.created_by_id,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+            for n in notes
+        ],
+    }
 
 
 @router.post("/scorecards/{scorecard_id}/notes", response_model=ReviewNoteResponse, dependencies=[Depends(Require("performance:review"))])

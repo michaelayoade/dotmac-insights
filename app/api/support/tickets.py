@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, List, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func, or_
 
 from app.database import get_db
@@ -570,7 +570,7 @@ def list_tickets(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List tickets with filtering and pagination."""
@@ -622,11 +622,48 @@ def list_tickets(
     if end_date:
         query = query.filter(Ticket.created_at <= datetime.fromisoformat(end_date))
 
-    total = query.count()
+    # Use separate count query to avoid 2 full table scans
+    total = db.query(func.count(Ticket.id)).filter(Ticket.is_deleted == False)
+    if status:
+        total = total.filter(Ticket.status == parse_ticket_status(status))
+    if priority:
+        total = total.filter(Ticket.priority == parse_ticket_priority(priority))
+    if customer_id:
+        total = total.filter(Ticket.customer_id == customer_id)
+    if ticket_type:
+        total = total.filter(Ticket.ticket_type == ticket_type)
+    if assigned_to:
+        total = total.filter(Ticket.assigned_to.ilike(f"%{assigned_to}%"))
+    if search:
+        search_term = f"%{search}%"
+        total = total.filter(
+            or_(
+                Ticket.subject.ilike(search_term),
+                Ticket.ticket_number.ilike(search_term),
+                Ticket.customer_name.ilike(search_term),
+            )
+        )
+    if overdue_only:
+        total = total.filter(
+            Ticket.resolution_by.isnot(None),
+            Ticket.resolution_by < func.current_timestamp(),
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+        )
+    if unassigned_only:
+        total = total.filter(
+            Ticket.assigned_to.is_(None),
+            Ticket.assigned_employee_id.is_(None),
+        )
+    if start_date:
+        total = total.filter(Ticket.created_at >= datetime.fromisoformat(start_date))
+    if end_date:
+        total = total.filter(Ticket.created_at <= datetime.fromisoformat(end_date))
+    total_count = total.scalar()
+
     tickets = query.order_by(Ticket.created_at.desc()).offset(offset).limit(limit).all()
 
     return {
-        "total": total,
+        "total": total_count,
         "limit": limit,
         "offset": offset,
         "data": [serialize_ticket_brief(t) for t in tickets],
@@ -639,16 +676,23 @@ def get_ticket(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get detailed ticket information with all child tables."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
+    # Use eager loading to avoid N+1 queries (reduces 6+ queries to 1-2)
+    ticket = db.query(Ticket).options(
+        joinedload(Ticket.customer),
+        selectinload(Ticket.comments),
+        selectinload(Ticket.activities),
+        selectinload(Ticket.communications),
+        selectinload(Ticket.depends_on),
+        selectinload(Ticket.expenses),
+    ).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
+    # Customer is now eagerly loaded
     customer = None
-    if ticket.customer_id:
-        cust = db.query(Customer).filter(Customer.id == ticket.customer_id).first()
-        if cust:
-            customer = {"id": cust.id, "name": cust.name, "email": cust.email, "phone": cust.phone}
+    if ticket.customer:
+        customer = {"id": ticket.customer.id, "name": ticket.customer.name, "email": ticket.customer.email, "phone": ticket.customer.phone}
 
     comments = [serialize_comment(c) for c in sorted(ticket.comments, key=lambda x: x.idx)]
     activities = [serialize_activity(a) for a in sorted(ticket.activities, key=lambda x: x.idx)]
@@ -732,7 +776,7 @@ def get_ticket(
 
 @router.get("/tickets/{ticket_id}/full", dependencies=[ticket_read_dep])
 @cached("ticket-full-detail", ttl=CACHE_TTL.get("short", 60))
-def get_ticket_full_detail(
+async def get_ticket_full_detail(
     ticket_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -771,11 +815,16 @@ def get_ticket_full_detail(
     # Assignee info
     assignee = None
     if ticket.assigned_to:
-        agent = db.query(Agent).filter(Agent.name == ticket.assigned_to).first()
+        agent = db.query(Agent).filter(
+            or_(
+                Agent.display_name == ticket.assigned_to,
+                Agent.email == ticket.assigned_to,
+            )
+        ).first()
         if agent:
             assignee = {
                 "id": agent.id,
-                "name": agent.name,
+                "name": agent.display_name or agent.email,
                 "email": agent.email,
                 "avatar_url": None,
                 "team": ticket.resolution_team,
@@ -789,17 +838,15 @@ def get_ticket_full_detail(
         timeline.append({
             "id": f"comment-{comment.id}",
             "type": "comment",
-            "content": comment.comment or comment.content,
+            "content": comment.comment,
             "author": {
-                "id": comment.comment_by,
-                "name": comment.comment_by,
-                "role": "internal" if comment.is_internal else "public",
+                "id": comment.commented_by,
+                "name": comment.commented_by_name or comment.commented_by,
+                "role": "public" if comment.is_public else "internal",
             },
-            "timestamp": comment.created_at.isoformat() if comment.created_at else None,
-            "is_internal": comment.is_internal,
-            "metadata": {
-                "comment_email": comment.comment_email,
-            },
+            "timestamp": comment.comment_date.isoformat() if comment.comment_date else None,
+            "is_internal": not comment.is_public,
+            "metadata": {},
         })
 
     # Add activities to timeline
@@ -807,13 +854,13 @@ def get_ticket_full_detail(
         timeline.append({
             "id": f"activity-{activity.id}",
             "type": "activity",
-            "content": activity.content,
+            "content": activity.activity,
             "author": {
-                "id": activity.author,
-                "name": activity.author,
+                "id": activity.owner,
+                "name": activity.owner,
                 "role": "system",
             },
-            "timestamp": activity.created_at.isoformat() if activity.created_at else None,
+            "timestamp": activity.activity_date.isoformat() if activity.activity_date else None,
             "is_internal": True,
             "metadata": {
                 "activity_type": activity.activity_type,
@@ -828,10 +875,10 @@ def get_ticket_full_detail(
             "content": comm.content,
             "author": {
                 "id": comm.sender,
-                "name": comm.sender,
+                "name": comm.sender_full_name or comm.sender,
                 "role": "external" if comm.communication_type and "email" in comm.communication_type.lower() else "internal",
             },
-            "timestamp": comm.sent_on.isoformat() if comm.sent_on else None,
+            "timestamp": comm.communication_date.isoformat() if comm.communication_date else None,
             "is_internal": False,
             "metadata": {
                 "subject": comm.subject,
@@ -841,35 +888,22 @@ def get_ticket_full_detail(
         })
 
     # Sort timeline by timestamp
-    timeline.sort(key=lambda x: x["timestamp"] or "", reverse=True)
+    timeline.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
 
     # Attachments (from communications)
-    attachments = []
-    for comm in ticket.communications:
-        if comm.attachments:
-            for att in comm.attachments:
-                attachments.append({
-                    "id": f"att-{comm.id}-{att.get('name', '')}",
-                    "name": att.get("name"),
-                    "url": att.get("file_url"),
-                    "type": "file",
-                    "size": att.get("file_size"),
-                    "uploaded_at": comm.sent_on.isoformat() if comm.sent_on else None,
-                })
+    attachments: list[dict[str, Any]] = []
 
     # Related tickets
-    related_tickets = {
-        "depends_on": [],
-        "sub_tickets": [],
-        "merged_tickets": [],
-        "parent": None,
-    }
+    depends_on_tickets: list[dict[str, Any]] = []
+    sub_tickets_list: list[dict[str, Any]] = []
+    merged_tickets_list: list[dict[str, Any]] = []
+    parent_ticket: Optional[dict[str, Any]] = None
 
     # Dependencies
     for dep in ticket.depends_on:
         dep_ticket = db.query(Ticket).filter(Ticket.id == dep.depends_on_ticket_id).first()
         if dep_ticket:
-            related_tickets["depends_on"].append({
+            depends_on_tickets.append({
                 "id": dep_ticket.id,
                 "ticket_number": dep_ticket.ticket_number,
                 "subject": dep_ticket.subject,
@@ -882,7 +916,7 @@ def get_ticket_full_detail(
         Ticket.is_deleted == False,
     ).all()
     for sub in sub_tickets:
-        related_tickets["sub_tickets"].append({
+        sub_tickets_list.append({
             "id": sub.id,
             "ticket_number": sub.ticket_number,
             "subject": sub.subject,
@@ -894,7 +928,7 @@ def get_ticket_full_detail(
         for merged_id in ticket.merged_tickets:
             merged = db.query(Ticket).filter(Ticket.id == merged_id).first()
             if merged:
-                related_tickets["merged_tickets"].append({
+                merged_tickets_list.append({
                     "id": merged.id,
                     "ticket_number": merged.ticket_number,
                     "subject": merged.subject,
@@ -905,12 +939,18 @@ def get_ticket_full_detail(
     if ticket.parent_ticket_id:
         parent = db.query(Ticket).filter(Ticket.id == ticket.parent_ticket_id).first()
         if parent:
-            related_tickets["parent"] = {
+            parent_ticket = {
                 "id": parent.id,
                 "ticket_number": parent.ticket_number,
                 "subject": parent.subject,
                 "status": parent.status.value if parent.status else None,
             }
+    related_tickets = {
+        "depends_on": depends_on_tickets,
+        "sub_tickets": sub_tickets_list,
+        "merged_tickets": merged_tickets_list,
+        "parent": parent_ticket,
+    }
 
     # SLA status with calculations
     sla_status = {
@@ -979,8 +1019,8 @@ def get_ticket_full_detail(
         "summary": {
             "timeline_count": len(timeline),
             "attachment_count": len(attachments),
-            "dependencies_count": len(related_tickets["depends_on"]),
-            "sub_tickets_count": len(related_tickets["sub_tickets"]),
+            "dependencies_count": len(depends_on_tickets),
+            "sub_tickets_count": len(sub_tickets_list),
         },
     }
 
@@ -1131,7 +1171,7 @@ def add_ticket_comment(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    idx = len(ticket.comments)
+    idx = len(ticket.comments or [])
     comment = HDTicketComment(
         ticket_id=ticket.id,
         comment=payload.comment,
@@ -1210,7 +1250,7 @@ def add_ticket_activity(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    idx = len(ticket.activities)
+    idx = len(ticket.activities or [])
     activity = HDTicketActivity(
         ticket_id=ticket.id,
         activity_type=payload.activity_type,
@@ -1300,7 +1340,7 @@ def add_ticket_dependency(
         depends_on_erpnext_id=payload.depends_on_erpnext_id,
         depends_on_subject=payload.depends_on_subject,
         depends_on_status=payload.depends_on_status,
-        idx=len(ticket.depends_on),
+        idx=len(ticket.depends_on or []),
     )
     db.add(dependency)
     db.commit()
@@ -1564,7 +1604,7 @@ def list_tags(
     active_only: bool = True,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List all tag definitions."""
@@ -1965,7 +2005,7 @@ def merge_tickets(
                 commented_by_name=comment.commented_by_name,
                 is_public=comment.is_public,
                 comment_date=comment.comment_date,
-                idx=len(target.comments),
+                idx=len(target.comments or []),
             )
             db.add(new_comment)
 
@@ -1997,7 +2037,7 @@ def merge_tickets(
             activity=f"Merged ticket #{source.ticket_number} into this ticket",
             owner=getattr(principal, "email", None),
             activity_date=datetime.now(timezone.utc),
-            idx=len(target.activities),
+            idx=len(target.activities or []),
         )
         db.add(activity)
 
@@ -2064,7 +2104,7 @@ def split_ticket(
         activity=f"Created sub-ticket: {payload.subject}",
         owner=getattr(principal, "email", None),
         activity_date=datetime.now(timezone.utc),
-        idx=len(parent.activities),
+        idx=len(parent.activities or []),
     )
     db.add(activity)
 

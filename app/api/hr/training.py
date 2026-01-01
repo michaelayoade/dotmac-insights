@@ -53,7 +53,7 @@ class TrainingProgramUpdate(BaseModel):
 async def list_training_programs(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training programs with filtering."""
@@ -231,7 +231,7 @@ async def list_training_events(
     to_time: Optional[datetime] = None,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training events with filtering."""
@@ -501,7 +501,7 @@ async def list_training_results(
     employee_id: Optional[int] = None,
     result: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training results with filtering."""

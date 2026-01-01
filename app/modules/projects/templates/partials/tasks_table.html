@@ -1,0 +1,43 @@
+{% if tasks %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Task</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Project</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Priority</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Due Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for task in tasks %}
+            {% include "modules/projects/templates/partials/task_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total_pages > 1 %}
+<div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-500">Showing {{ pagination.start }} to {{ pagination.end }} of {{ pagination.total }}</p>
+    <div class="flex gap-2">
+        {% if pagination.page > 1 %}
+        <button hx-get="/projects/tasks?page={{ pagination.page - 1 }}&q={{ search_query }}&status={{ current_status }}&priority={{ current_priority }}&project_id={{ current_project_id }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <button hx-get="/projects/tasks?page={{ pagination.page + 1 }}&q={{ search_query }}&status={{ current_status }}&priority={{ current_priority }}&project_id={{ current_project_id }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No tasks found</h3>
+    <p class="text-sm text-gray-500 mb-4">{% if search_query %}Try adjusting your search.{% else %}Tasks will appear here when added to projects.{% endif %}</p>
+</div>
+{% endif %}

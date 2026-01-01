@@ -1,0 +1,86 @@
+{# Departments table partial - returned for HTMX updates #}
+
+{% if departments %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="departments-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/hr/departments/table?sort=department_name&dir={% if sort_key == 'department_name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#departments-table-container"
+                        hx-include="[name='q']"
+                        hx-push-url="true"
+                        data-testid="sort-name"
+                    >
+                        Department
+                        {% if sort_key == 'department_name' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Parent
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Company
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Employees
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100" id="departments-tbody">
+            {% for department in departments %}
+            {% include "modules/hr/templates/departments/partials/department_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="departments-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No departments found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query %}
+        No departments match your search. Try adjusting your search terms.
+        {% else %}
+        Get started by creating your first department.
+        {% endif %}
+    </p>
+    {% if not search_query %}
+    <a
+        href="/hr/departments/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        data-testid="empty-add-department-btn"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Your First Department
+    </a>
+    {% endif %}
+</div>
+{% endif %}

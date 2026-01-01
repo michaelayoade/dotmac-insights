@@ -1,0 +1,208 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Article' if article else 'New Article' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update the knowledge base article' if article else 'Create a new knowledge base article' }}
+            </p>
+        </div>
+        <a
+            href="{{ '/support/kb/' ~ article.id if article else '/support/kb' }}"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/support/kb/' ~ article.id if article else '/support/kb' }}"
+        method="POST"
+        class="space-y-6"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Content -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Title & Slug -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-4">
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-gray-700 mb-1.5">
+                            Title <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="title"
+                            name="title"
+                            value="{{ form_data.title if form_data else (article.title if article else '') }}"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('title') else 'ring-gray-200 focus:ring-primary-500' }} placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                            placeholder="Article title"
+                        >
+                        {% if errors.get('title') %}
+                        <p class="mt-1.5 text-sm text-red-600">{{ errors.title }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="slug" class="block text-sm font-medium text-gray-700 mb-1.5">
+                            Slug
+                        </label>
+                        <input
+                            type="text"
+                            id="slug"
+                            name="slug"
+                            value="{{ form_data.slug if form_data else (article.slug if article else '') }}"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('slug') else 'ring-gray-200 focus:ring-primary-500' }} placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm font-mono transition-colors"
+                            placeholder="auto-generated-from-title"
+                        >
+                        <p class="mt-1.5 text-xs text-gray-500">URL-friendly identifier. Leave blank to auto-generate from title.</p>
+                        {% if errors.get('slug') %}
+                        <p class="mt-1.5 text-sm text-red-600">{{ errors.slug }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="excerpt" class="block text-sm font-medium text-gray-700 mb-1.5">
+                            Excerpt
+                        </label>
+                        <textarea
+                            id="excerpt"
+                            name="excerpt"
+                            rows="2"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                            placeholder="Brief summary of the article"
+                        >{{ form_data.excerpt if form_data else (article.excerpt if article else '') }}</textarea>
+                        <p class="mt-1.5 text-xs text-gray-500">Short description shown in search results.</p>
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                    <label for="content" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Content <span class="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        id="content"
+                        name="content"
+                        rows="20"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('content') else 'ring-gray-200 focus:ring-primary-500' }} placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm font-mono transition-colors"
+                        placeholder="Write your article content here. Markdown is supported."
+                    >{{ form_data.content if form_data else (article.content if article else '') }}</textarea>
+                    <p class="mt-1.5 text-xs text-gray-500">Markdown formatting is supported.</p>
+                    {% if errors.get('content') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.content }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Publishing -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-900">Publishing</h3>
+
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                        <select
+                            id="status"
+                            name="status"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                        >
+                            {% for opt in status_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (form_data.status if form_data else (article.status if article else 'draft')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="visibility" class="block text-sm font-medium text-gray-700 mb-1.5">Visibility</label>
+                        <select
+                            id="visibility"
+                            name="visibility"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                        >
+                            {% for opt in visibility_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (form_data.visibility if form_data else (article.visibility if article else 'public')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="mt-1.5 text-xs text-gray-500">
+                            Public = Everyone, Internal = Agents only, Restricted = Specific teams
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Category -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-900">Category</h3>
+
+                    <div>
+                        <label for="category_id" class="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+                        <select
+                            id="category_id"
+                            name="category_id"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                        >
+                            <option value="">No category</option>
+                            {% for cat in categories %}
+                            <option
+                                value="{{ cat.id }}"
+                                {{ 'selected' if (form_data.category_id|int if form_data and form_data.category_id else (article.category_id if article else None)) == cat.id else '' }}
+                            >{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- SEO -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-4">
+                    <h3 class="text-sm font-semibold text-gray-900">Search Optimization</h3>
+
+                    <div>
+                        <label for="search_keywords" class="block text-sm font-medium text-gray-700 mb-1.5">Keywords</label>
+                        <input
+                            type="text"
+                            id="search_keywords"
+                            name="search_keywords"
+                            value="{{ form_data.search_keywords if form_data else (article.search_keywords if article else '') }}"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                            placeholder="keyword1, keyword2, keyword3"
+                        >
+                        <p class="mt-1.5 text-xs text-gray-500">Comma-separated keywords for search.</p>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                    <button
+                        type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {{ 'Update Article' if article else 'Create Article' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

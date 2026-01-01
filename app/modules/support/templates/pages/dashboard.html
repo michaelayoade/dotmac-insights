@@ -1,0 +1,228 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Support Dashboard</h1>
+            <p class="mt-1 text-sm text-gray-500">Overview of ticket status and agent activity</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/support/tickets/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                New Ticket
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Open Tickets</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.total_open }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Urgent Tickets</p>
+                    <p class="text-3xl font-bold text-red-600 mt-1">{{ stats.urgent_tickets }}</p>
+                </div>
+                <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Created Today</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ stats.created_today }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Resolved Today</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ stats.resolved_today }}</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Unassigned Tickets -->
+            {% if unassigned_tickets %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Unassigned Tickets</h2>
+                    <a href="/support/tickets?assigned=unassigned" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for ticket in unassigned_tickets %}
+                    <a href="/support/tickets/{{ ticket.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-600">{{ ticket.ticket_number }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if ticket.priority.value == 'urgent' %}bg-red-50 text-red-700
+                                    {% elif ticket.priority.value == 'high' %}bg-orange-50 text-orange-700
+                                    {% elif ticket.priority.value == 'medium' %}bg-yellow-50 text-yellow-700
+                                    {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                    {{ ticket.priority.value.title() }}
+                                </span>
+                            </div>
+                            <p class="font-medium text-gray-900 truncate">{{ ticket.subject }}</p>
+                            <p class="text-sm text-gray-500">{{ ticket.contact_name or ticket.contact_email or 'No contact' }}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="text-sm text-gray-500">{{ ticket.created_at.strftime('%b %d, %H:%M') }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recent Tickets -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Recent Tickets</h2>
+                    <a href="/support/tickets" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                {% if recent_tickets %}
+                <div class="divide-y divide-gray-100">
+                    {% for ticket in recent_tickets %}
+                    <a href="/support/tickets/{{ ticket.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-600">{{ ticket.ticket_number }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if ticket.status.value == 'open' %}bg-amber-50 text-amber-700
+                                    {% elif ticket.status.value == 'in_progress' %}bg-blue-50 text-blue-700
+                                    {% elif ticket.status.value == 'resolved' %}bg-emerald-50 text-emerald-700
+                                    {% elif ticket.status.value == 'closed' %}bg-gray-50 text-gray-700
+                                    {% else %}bg-purple-50 text-purple-700{% endif %}">
+                                    {{ ticket.status.value.replace('_', ' ').title() }}
+                                </span>
+                            </div>
+                            <p class="font-medium text-gray-900 truncate">{{ ticket.subject }}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="text-sm text-gray-500">{{ ticket.created_at.strftime('%b %d, %H:%M') }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-6 py-12 text-center text-gray-500">
+                    <p>No tickets yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- Status Distribution -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">By Status</h3>
+                <div class="space-y-3">
+                    {% for item in status_distribution %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600 capitalize">{{ item.status.replace('_', ' ') }}</span>
+                        <span class="text-sm font-medium text-gray-900">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Priority Distribution -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">By Priority</h3>
+                <div class="space-y-3">
+                    {% for item in priority_distribution %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full
+                                {% if item.priority == 'urgent' %}bg-red-500
+                                {% elif item.priority == 'high' %}bg-orange-500
+                                {% elif item.priority == 'medium' %}bg-yellow-500
+                                {% else %}bg-gray-400{% endif %}"></span>
+                            <span class="text-sm text-gray-600 capitalize">{{ item.priority }}</span>
+                        </div>
+                        <span class="text-sm font-medium text-gray-900">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Agent Workload -->
+            {% if agent_stats %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Agent Workload</h3>
+                    <a href="/support/agents" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                <div class="space-y-3">
+                    {% for agent in agent_stats %}
+                    <div class="flex items-center justify-between">
+                        <a href="/support/agents/{{ agent.id }}" class="text-sm text-gray-600 hover:text-primary-600">{{ agent.name }}</a>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                            {% if agent.open_tickets > 10 %}bg-red-50 text-red-700
+                            {% elif agent.open_tickets > 5 %}bg-amber-50 text-amber-700
+                            {% else %}bg-emerald-50 text-emerald-700{% endif %}">
+                            {{ agent.open_tickets }} open
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quick Links -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Quick Links</h3>
+                <div class="space-y-2">
+                    <a href="/support/tickets" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span class="text-sm font-medium">All Tickets</span>
+                    </a>
+                    <a href="/support/kb" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        <span class="text-sm font-medium">Knowledge Base</span>
+                    </a>
+                    <a href="/support/agents" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span class="text-sm font-medium">Agents</span>
+                    </a>
+                    <a href="/support/canned-responses" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                        <span class="text-sm font-medium">Canned Responses</span>
+                    </a>
+                    <a href="/support/sla" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="text-sm font-medium">SLA Policies</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

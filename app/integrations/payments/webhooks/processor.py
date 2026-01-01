@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Optional, Dict, Any, Callable, Awaitable, cast
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.gateway_transaction import (
     GatewayTransaction,
@@ -36,7 +36,7 @@ from app.integrations.payments.exceptions import WebhookVerificationError
 logger = logging.getLogger(__name__)
 
 # Type alias for webhook handlers
-WebhookHandler = Callable[[Dict[str, Any], AsyncSession], Awaitable[None]]
+WebhookHandler = Callable[[Dict[str, Any], Session], Awaitable[None]]
 
 
 class WebhookProcessor:
@@ -103,7 +103,7 @@ class WebhookProcessor:
         self,
         payload: bytes,
         signature: str,
-        db: AsyncSession,
+        db: Session,
         source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -142,7 +142,7 @@ class WebhookProcessor:
         self,
         payload: bytes,
         signature: str,
-        db: AsyncSession,
+        db: Session,
         source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -187,7 +187,7 @@ class WebhookProcessor:
         event_type: str,
         event_data: Dict[str, Any],
         raw_payload: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
         source_ip: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -228,7 +228,7 @@ class WebhookProcessor:
             received_at=datetime.utcnow(),
         )
         db.add(webhook_event)
-        await db.flush()
+        db.flush()
 
         try:
             # Route to appropriate handler
@@ -240,7 +240,7 @@ class WebhookProcessor:
             # Mark as processed
             webhook_event.processed = True
             webhook_event.processed_at = datetime.utcnow()
-            await db.commit()
+            db.commit()
 
             logger.info(f"Webhook processed: {provider.value}/{event_type}/{provider_event_id}")
             return {
@@ -254,7 +254,7 @@ class WebhookProcessor:
             webhook_event.error = str(e)[:1000]  # Truncate to fit TEXT field
             webhook_event.retry_count += 1
             webhook_event.last_retry_at = datetime.utcnow()
-            await db.commit()
+            db.commit()
 
             return {
                 "status": "failed",
@@ -295,12 +295,12 @@ class WebhookProcessor:
 
     async def _get_existing_event(
         self,
-        db: AsyncSession,
+        db: Session,
         provider: str,
         provider_event_id: str,
     ) -> Optional[WebhookEvent]:
         """Check if event was already processed."""
-        result = await db.execute(
+        result = db.execute(
             select(WebhookEvent).where(
                 WebhookEvent.provider == provider,
                 WebhookEvent.provider_event_id == provider_event_id,
@@ -313,7 +313,7 @@ class WebhookProcessor:
         provider: PaymentProvider,
         event_type: str,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Route event to appropriate handler based on type."""
         # Normalize event types across providers
@@ -366,7 +366,7 @@ class WebhookProcessor:
         self,
         event_type: str,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Run any custom handlers registered for this event type."""
         handlers = self._custom_handlers.get(event_type, [])
@@ -384,7 +384,7 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle successful payment webhook."""
         reference = self._get_reference(provider, event_data)
@@ -392,7 +392,7 @@ class WebhookProcessor:
             return
 
         # Find and update transaction
-        result = await db.execute(
+        result = db.execute(
             select(GatewayTransaction).where(
                 GatewayTransaction.reference == reference
             )
@@ -423,14 +423,14 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle failed payment webhook."""
         reference = self._get_reference(provider, event_data)
         if not reference:
             return
 
-        result = await db.execute(
+        result = db.execute(
             select(GatewayTransaction).where(
                 GatewayTransaction.reference == reference
             )
@@ -446,14 +446,14 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle successful transfer webhook."""
         reference = self._get_reference(provider, event_data)
         if not reference:
             return
 
-        result = await db.execute(
+        result = db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
         transfer = cast(Optional[Transfer], result.scalar_one_or_none())
@@ -466,7 +466,7 @@ class WebhookProcessor:
 
             claim_id = (transfer.extra_data or {}).get("expense_claim_id")
             if claim_id:
-                result = await db.execute(
+                result = db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
                 claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
@@ -489,14 +489,14 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle failed transfer webhook."""
         reference = self._get_reference(provider, event_data)
         if not reference:
             return
 
-        result = await db.execute(
+        result = db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
         transfer = cast(Optional[Transfer], result.scalar_one_or_none())
@@ -508,7 +508,7 @@ class WebhookProcessor:
 
             claim_id = (transfer.extra_data or {}).get("expense_claim_id")
             if claim_id:
-                result = await db.execute(
+                result = db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
                 claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
@@ -519,14 +519,14 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle reversed transfer webhook."""
         reference = self._get_reference(provider, event_data)
         if not reference:
             return
 
-        result = await db.execute(
+        result = db.execute(
             select(Transfer).where(Transfer.reference == reference)
         )
         transfer = cast(Optional[Transfer], result.scalar_one_or_none())
@@ -538,7 +538,7 @@ class WebhookProcessor:
 
             claim_id = (transfer.extra_data or {}).get("expense_claim_id")
             if claim_id:
-                result = await db.execute(
+                result = db.execute(
                     select(ExpenseClaim).where(ExpenseClaim.id == int(claim_id))
                 )
                 claim = cast(Optional[ExpenseClaim], result.scalar_one_or_none())
@@ -549,7 +549,7 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle refund processed webhook."""
         # Get original transaction reference
@@ -561,7 +561,7 @@ class WebhookProcessor:
         if not transaction_ref:
             return
 
-        result = await db.execute(
+        result = db.execute(
             select(GatewayTransaction).where(
                 GatewayTransaction.reference == transaction_ref
             )
@@ -578,7 +578,7 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle virtual account credit (payment received)."""
         # This is essentially a payment success via bank transfer
@@ -588,7 +588,7 @@ class WebhookProcessor:
         self,
         provider: PaymentProvider,
         event_data: Dict[str, Any],
-        db: AsyncSession,
+        db: Session,
     ) -> None:
         """Handle virtual account assignment/creation (e.g., Paystack dedicated account)."""
         # Log the event for now - actual handling depends on business logic

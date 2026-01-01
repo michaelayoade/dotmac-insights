@@ -19,7 +19,7 @@ from app.models.accounting import (
     GLEntry,
 )
 
-from .helpers import parse_date, invalidate_report_cache
+from .helpers import parse_date, invalidate_report_cache, get_accounts_by_erpnext_id
 
 router = APIRouter()
 
@@ -473,7 +473,7 @@ def get_cost_center_detail(
 
     results = query.group_by(GLEntry.account).all()
 
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts = get_accounts_by_erpnext_id(db)
     breakdown = []
     total = Decimal("0")
 

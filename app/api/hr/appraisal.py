@@ -54,7 +54,7 @@ class AppraisalTemplateUpdate(BaseModel):
 async def list_appraisal_templates(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List appraisal templates with filtering."""
@@ -266,7 +266,7 @@ async def list_appraisals(
     to_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List appraisals with filtering."""

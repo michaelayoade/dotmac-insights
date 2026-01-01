@@ -1,0 +1,68 @@
+{#
+Dashboard Stat Card Component
+
+Usage:
+{% include "components/dashboard/stat_card.html" with context %}
+
+Parameters:
+- title: Card title
+- value: Main value (number, currency, etc.)
+- subtitle: Optional subtitle/context
+- icon: Icon name (optional)
+- trend: Optional trend object {value: "+12%", direction: "up"|"down"|"neutral"}
+- color: Color theme (primary, emerald, amber, red, blue, purple) - default: primary
+- href: Optional link URL
+#}
+
+{% set colors = {
+    'primary': {'bg': 'bg-primary-50', 'text': 'text-primary-600', 'ring': 'ring-primary-100'},
+    'emerald': {'bg': 'bg-emerald-50', 'text': 'text-emerald-600', 'ring': 'ring-emerald-100'},
+    'amber': {'bg': 'bg-amber-50', 'text': 'text-amber-600', 'ring': 'ring-amber-100'},
+    'red': {'bg': 'bg-red-50', 'text': 'text-red-600', 'ring': 'ring-red-100'},
+    'blue': {'bg': 'bg-blue-50', 'text': 'text-blue-600', 'ring': 'ring-blue-100'},
+    'purple': {'bg': 'bg-purple-50', 'text': 'text-purple-600', 'ring': 'ring-purple-100'},
+    'cyan': {'bg': 'bg-cyan-50', 'text': 'text-cyan-600', 'ring': 'ring-cyan-100'}
+} %}
+{% set c = colors.get(color, colors.primary) %}
+
+<{% if href %}a href="{{ href }}"{% else %}div{% endif %}
+    class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 {{ 'hover:shadow-warm-md hover:ring-gray-200 transition-all cursor-pointer' if href else '' }}"
+    data-testid="stat-card-{{ title | lower | replace(' ', '-') }}"
+>
+    <div class="flex items-start justify-between">
+        <div class="flex-1">
+            <p class="text-sm font-medium text-gray-500">{{ title }}</p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{{ value }}</p>
+            {% if subtitle %}
+            <p class="mt-1 text-sm text-gray-500">{{ subtitle }}</p>
+            {% endif %}
+            {% if trend %}
+            <div class="mt-2 flex items-center gap-1.5">
+                {% if trend.direction == 'up' %}
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                </svg>
+                <span class="text-sm font-medium text-emerald-600">{{ trend.value }}</span>
+                {% elif trend.direction == 'down' %}
+                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                </svg>
+                <span class="text-sm font-medium text-red-600">{{ trend.value }}</span>
+                {% else %}
+                <span class="text-sm text-gray-500">{{ trend.value }}</span>
+                {% endif %}
+                {% if trend.label %}
+                <span class="text-xs text-gray-400">{{ trend.label }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if icon %}
+        <div class="flex-shrink-0 ml-4">
+            <div class="w-12 h-12 rounded-xl {{ c.bg }} {{ c.text }} flex items-center justify-center ring-1 {{ c.ring }}">
+                {% include "components/icons/" ~ icon ~ ".html" ignore missing %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</{% if href %}a{% else %}div{% endif %}>

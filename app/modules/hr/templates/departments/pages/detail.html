@@ -1,0 +1,202 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-4">
+        <div class="flex-shrink-0">
+            <span class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 ring-2 ring-blue-200/50 shadow-lg shadow-blue-500/10">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+            </span>
+        </div>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ department.department_name }}</h1>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                {% if department.is_group %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-500/20">
+                    Group Department
+                </span>
+                {% endif %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-xs font-medium text-gray-700">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    {{ employee_count }} employees
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <a
+            href="/hr/departments/{{ department.id }}/edit"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+            data-testid="edit-department-button"
+        >
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Edit
+        </a>
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 hover:border-red-300 focus-visible:ring-2 focus-visible:ring-red-100 transition-all duration-200"
+            hx-delete="/hr/departments/{{ department.id }}"
+            hx-confirm="Are you sure you want to delete '{{ department.department_name }}'?"
+            data-testid="delete-department-button"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Delete
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <!-- Main content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Department Information -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-base font-display font-semibold text-gray-900">Department Information</h3>
+            </div>
+            <div class="px-6 py-5">
+                <dl class="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500 font-body">Parent Department</dt>
+                        <dd class="mt-1.5 text-sm text-gray-900 font-body">
+                            {{ department.parent_department or 'None (Top Level)' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500 font-body">Company</dt>
+                        <dd class="mt-1.5 text-sm text-gray-900 font-body">
+                            {{ department.company or 'Not specified' }}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Employees in Department -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-base font-display font-semibold text-gray-900">Employees ({{ employee_count }})</h3>
+                {% if employee_count > 10 %}
+                <a href="/hr/employees?department={{ department.id }}" class="text-sm text-primary-600 hover:text-primary-500 font-medium">
+                    View all
+                </a>
+                {% endif %}
+            </div>
+            {% if employees %}
+            <ul class="divide-y divide-gray-100">
+                {% for emp in employees %}
+                <li class="px-6 py-4 hover:bg-surface-50 transition-colors">
+                    <a href="/hr/employees/{{ emp.id }}" class="flex items-center gap-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 ring-1 ring-primary-200/50">
+                            <span class="text-sm font-semibold text-primary-700">{{ emp.name[:2] | upper }}</span>
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ emp.name }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ emp.designation_rel.designation_name if emp.designation_rel else emp.designation or 'No designation' }}</p>
+                        </div>
+                        <span class="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                            {% set status_styles = {
+                                'active': 'bg-emerald-500',
+                                'inactive': 'bg-gray-400',
+                                'terminated': 'bg-red-500',
+                                'on_leave': 'bg-amber-500'
+                            } %}
+                            <span class="w-1.5 h-1.5 rounded-full {{ status_styles.get(emp.status.value, 'bg-gray-400') }}"></span>
+                            {{ emp.status.value | replace('_', ' ') | title }}
+                        </span>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="px-6 py-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                </svg>
+                <p class="mt-4 text-sm text-gray-500 font-body">No employees in this department yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Activity -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-base font-display font-semibold text-gray-900">Activity</h3>
+            </div>
+            <div class="px-6 py-5">
+                <dl class="space-y-5">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <dt class="text-xs font-medium text-gray-500 font-body uppercase tracking-wide">Created</dt>
+                            <dd class="mt-0.5 text-sm font-medium text-gray-900 font-body">
+                                {{ department.created_at | format_date }}
+                            </dd>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <dt class="text-xs font-medium text-gray-500 font-body uppercase tracking-wide">Last Updated</dt>
+                            <dd class="mt-0.5 text-sm font-medium text-gray-900 font-body">
+                                {{ department.updated_at | format_date if department.updated_at else "Never" }}
+                            </dd>
+                        </div>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-base font-display font-semibold text-gray-900">Quick Actions</h3>
+            </div>
+            <div class="p-3 space-y-1">
+                <a
+                    href="/hr/employees/new?department={{ department.id }}"
+                    class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-xl hover:bg-surface-50 transition-colors font-body"
+                >
+                    <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                    </div>
+                    <span>Add Employee</span>
+                </a>
+                <a
+                    href="/hr/departments/{{ department.id }}/edit"
+                    class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-xl hover:bg-surface-50 transition-colors font-body"
+                >
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </div>
+                    <span>Edit Department</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

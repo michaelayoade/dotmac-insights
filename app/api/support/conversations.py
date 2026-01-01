@@ -21,7 +21,7 @@ def list_conversations(
     channel: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List Chatwoot conversations with filtering and pagination."""

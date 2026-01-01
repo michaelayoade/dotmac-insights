@@ -669,3 +669,778 @@ def create_bill(
     db.commit()
     db.refresh(bill)
     return bill
+
+
+# =============================================================================
+# UNIFIED CONTACT FACTORIES
+# =============================================================================
+
+def create_unified_contact(
+    db: Session,
+    name: str = None,
+    contact_type: str = "customer",
+    category: str = "business",
+    email: str = None,
+    phone: str = None,
+    status: str = "active",
+    company_name: str = None,
+    **kwargs
+) -> "UnifiedContact":
+    """
+    Create a unified contact for testing.
+
+    Contact types: lead, prospect, customer, churned, person
+    Categories: residential, business, enterprise, government, non_profit
+    """
+    from app.models.unified_contact import (
+        UnifiedContact, ContactType, ContactCategory, ContactStatus
+    )
+
+    contact = UnifiedContact(
+        name=name or f"Test Contact {random_string(6)}",
+        contact_type=ContactType(contact_type),
+        category=ContactCategory(category),
+        status=ContactStatus(status),
+        email=email or random_email(),
+        phone=phone or random_phone(),
+        company_name=company_name,
+        city="Lagos",
+        state="Lagos",
+        country="Nigeria",
+        first_contact_date=datetime.now(),
+        **kwargs
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+def create_person_contact(
+    db: Session,
+    parent_id: int,
+    name: str = None,
+    role: str = "Primary Contact",
+    email: str = None,
+    **kwargs
+) -> "UnifiedContact":
+    """Create a person contact linked to an organization."""
+    from app.models.unified_contact import (
+        UnifiedContact, ContactType, ContactCategory, ContactStatus
+    )
+
+    contact = UnifiedContact(
+        name=name or f"Contact Person {random_string(6)}",
+        contact_type=ContactType.PERSON,
+        category=ContactCategory.BUSINESS,
+        status=ContactStatus.ACTIVE,
+        email=email or random_email(),
+        phone=random_phone(),
+        parent_id=parent_id,
+        designation=role,
+        is_primary_contact=True,
+        first_contact_date=datetime.now(),
+        **kwargs
+    )
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+# =============================================================================
+# FIELD SERVICE FACTORIES
+# =============================================================================
+
+def create_service_zone(
+    db: Session,
+    name: str = None,
+    code: str = None,
+    coverage_areas: list = None,
+    **kwargs
+) -> "ServiceZone":
+    """Create a service zone for field service testing."""
+    from app.models.field_service import ServiceZone
+
+    zone = ServiceZone(
+        name=name or f"Zone {random_string(4)}",
+        code=code or f"ZN-{random_string(4).upper()}",
+        coverage_areas=coverage_areas or ["Lagos Island", "Victoria Island"],
+        center_latitude=Decimal("6.4541"),
+        center_longitude=Decimal("3.3947"),
+        **kwargs
+    )
+    db.add(zone)
+    db.commit()
+    db.refresh(zone)
+    return zone
+
+
+def create_service_order(
+    db: Session,
+    customer_id: int = None,
+    order_type: str = "installation",
+    status: str = "draft",
+    priority: str = "medium",
+    scheduled_date: date = None,
+    technician_id: int = None,
+    **kwargs
+) -> "ServiceOrder":
+    """
+    Create a field service order for testing.
+
+    Types: installation, repair, maintenance, inspection, relocation, upgrade, disconnection
+    """
+    from app.models.field_service import (
+        ServiceOrder, ServiceOrderType, ServiceOrderStatus, ServiceOrderPriority
+    )
+
+    order = ServiceOrder(
+        order_number=f"FSO-{random_string(8).upper()}",
+        customer_id=customer_id,
+        order_type=ServiceOrderType(order_type),
+        status=ServiceOrderStatus(status),
+        priority=ServiceOrderPriority(priority),
+        scheduled_date=scheduled_date or date.today() + timedelta(days=1),
+        description=f"Test service order - {order_type}",
+        technician_id=technician_id,
+        **kwargs
+    )
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+# =============================================================================
+# INVENTORY FACTORIES
+# =============================================================================
+
+def create_warehouse(
+    db: Session,
+    name: str = None,
+    warehouse_type: str = "Stock",
+    **kwargs
+) -> "Warehouse":
+    """Create a warehouse for inventory testing."""
+    from app.models.inventory import Warehouse
+
+    warehouse = Warehouse(
+        warehouse_name=name or f"Warehouse {random_string(4)}",
+        warehouse_type=warehouse_type,
+        company="Test Company",
+        is_group=False,
+        disabled=False,
+        origin_system="local",
+        **kwargs
+    )
+    db.add(warehouse)
+    db.commit()
+    db.refresh(warehouse)
+    return warehouse
+
+
+def create_stock_item(
+    db: Session,
+    item_name: str = None,
+    item_code: str = None,
+    item_group: str = "Products",
+    **kwargs
+) -> "Item":
+    """Create an inventory item for testing."""
+    from app.models.inventory import Item
+
+    item = Item(
+        item_name=item_name or f"Test Item {random_string(6)}",
+        item_code=item_code or f"ITM-{random_string(6).upper()}",
+        item_group=item_group,
+        stock_uom="Nos",
+        is_stock_item=True,
+        disabled=False,
+        origin_system="local",
+        **kwargs
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def create_stock_entry(
+    db: Session,
+    entry_type: str = "Material Receipt",
+    from_warehouse: str = None,
+    to_warehouse: str = None,
+    total_amount: Decimal = None,
+    **kwargs
+) -> "StockEntry":
+    """Create a stock entry (inventory transaction) for testing."""
+    from app.models.inventory import StockEntry
+
+    entry = StockEntry(
+        stock_entry_type=entry_type,
+        posting_date=datetime.now(),
+        from_warehouse=from_warehouse,
+        to_warehouse=to_warehouse,
+        total_amount=total_amount or Decimal("0"),
+        company="Test Company",
+        origin_system="local",
+        **kwargs
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+# =============================================================================
+# EXPENSE MANAGEMENT FACTORIES
+# =============================================================================
+
+def create_expense_claim(
+    db: Session,
+    employee_id: int,
+    claim_date: date = None,
+    total_amount: Decimal = None,
+    status: str = "draft",
+    funding_method: str = "out_of_pocket",
+    **kwargs
+) -> "ExpenseClaim":
+    """Create an expense claim for testing."""
+    from app.models.expense_management import (
+        ExpenseClaim, ExpenseClaimStatus, FundingMethod
+    )
+
+    claim = ExpenseClaim(
+        claim_number=f"EXP-{random_string(8).upper()}",
+        employee_id=employee_id,
+        claim_date=claim_date or date.today(),
+        total_claimed=total_amount or Decimal("50000"),
+        total_approved=Decimal("0"),
+        status=ExpenseClaimStatus(status),
+        funding_method=FundingMethod(funding_method),
+        description="Test expense claim",
+        **kwargs
+    )
+    db.add(claim)
+    db.commit()
+    db.refresh(claim)
+    return claim
+
+
+def create_cash_advance(
+    db: Session,
+    employee_id: int,
+    amount: Decimal = None,
+    status: str = "draft",
+    purpose: str = "Business Travel",
+    **kwargs
+) -> "CashAdvance":
+    """Create a cash advance for testing."""
+    from app.models.expense_management import CashAdvance, CashAdvanceStatus
+
+    advance = CashAdvance(
+        advance_number=f"ADV-{random_string(8).upper()}",
+        employee_id=employee_id,
+        amount_requested=amount or Decimal("100000"),
+        amount_approved=Decimal("0"),
+        amount_disbursed=Decimal("0"),
+        amount_settled=Decimal("0"),
+        status=CashAdvanceStatus(status),
+        purpose=purpose,
+        request_date=date.today(),
+        **kwargs
+    )
+    db.add(advance)
+    db.commit()
+    db.refresh(advance)
+    return advance
+
+
+# =============================================================================
+# PERFORMANCE MANAGEMENT FACTORIES
+# =============================================================================
+
+def create_evaluation_period(
+    db: Session,
+    period_type: str = "quarterly",
+    status: str = "active",
+    start_date: date = None,
+    end_date: date = None,
+    **kwargs
+) -> "EvaluationPeriod":
+    """Create an evaluation period for performance testing."""
+    from app.models.performance import (
+        EvaluationPeriod, EvaluationPeriodType, EvaluationPeriodStatus
+    )
+
+    current_year = datetime.now().year
+    start = start_date or date(current_year, 1, 1)
+    end = end_date or date(current_year, 3, 31)
+
+    period = EvaluationPeriod(
+        code=f"Q1-{current_year}-{random_string(4).upper()}",
+        name=f"Q1 {current_year}",
+        period_type=EvaluationPeriodType(period_type),
+        status=EvaluationPeriodStatus(status),
+        start_date=start,
+        end_date=end,
+        **kwargs
+    )
+    db.add(period)
+    db.commit()
+    db.refresh(period)
+    return period
+
+
+def create_kpi_definition(
+    db: Session,
+    name: str = None,
+    code: str = None,
+    data_source: str = "manual",
+    aggregation: str = "sum",
+    **kwargs
+) -> "KPIDefinition":
+    """Create a KPI definition for performance testing."""
+    from app.models.performance import KPIDefinition, KPIDataSource, KPIAggregation
+
+    kpi = KPIDefinition(
+        name=name or f"Test KPI {random_string(4)}",
+        code=code or f"KPI-{random_string(4).upper()}",
+        description="Test KPI for performance management",
+        data_source=KPIDataSource(data_source),
+        aggregation=KPIAggregation(aggregation),
+        is_active=True,
+        **kwargs
+    )
+    db.add(kpi)
+    db.commit()
+    db.refresh(kpi)
+    return kpi
+
+
+def create_employee_scorecard(
+    db: Session,
+    employee_id: int,
+    period_id: int,
+    template_id: int = None,
+    status: str = "pending",
+    **kwargs
+) -> "EmployeeScorecardInstance":
+    """Create an employee scorecard instance for testing."""
+    from app.models.performance import (
+        EmployeeScorecardInstance, ScorecardInstanceStatus
+    )
+
+    scorecard = EmployeeScorecardInstance(
+        employee_id=employee_id,
+        period_id=period_id,
+        template_id=template_id,
+        status=ScorecardInstanceStatus(status),
+        overall_score=Decimal("0"),
+        **kwargs
+    )
+    db.add(scorecard)
+    db.commit()
+    db.refresh(scorecard)
+    return scorecard
+
+
+# =============================================================================
+# BANK RECONCILIATION FACTORIES
+# =============================================================================
+
+def create_bank_account(
+    db: Session,
+    account_name: str = None,
+    bank_name: str = "Test Bank",
+    account_number: str = None,
+    **kwargs
+) -> "BankAccount":
+    """Create a bank account for reconciliation testing."""
+    from app.models.accounting import BankAccount
+
+    bank_account = BankAccount(
+        account_name=account_name or f"Test Account {random_string(4)}",
+        bank=bank_name,
+        account_number=account_number or f"{random.randint(1000000000, 9999999999)}",
+        company="Test Company",
+        currency="NGN",
+        disabled=False,
+        **kwargs
+    )
+    db.add(bank_account)
+    db.commit()
+    db.refresh(bank_account)
+    return bank_account
+
+
+def create_bank_statement(
+    db: Session,
+    bank_account_id: int,
+    statement_date: date = None,
+    opening_balance: Decimal = None,
+    closing_balance: Decimal = None,
+    **kwargs
+) -> "BankStatement":
+    """Create a bank statement for reconciliation testing."""
+    from app.models.accounting_ext import BankStatement
+
+    statement = BankStatement(
+        bank_account_id=bank_account_id,
+        statement_number=f"STMT-{random_string(8).upper()}",
+        statement_date=statement_date or date.today(),
+        opening_balance=opening_balance or Decimal("1000000"),
+        closing_balance=closing_balance or Decimal("1200000"),
+        status="pending",
+        **kwargs
+    )
+    db.add(statement)
+    db.commit()
+    db.refresh(statement)
+    return statement
+
+
+def create_bank_transaction(
+    db: Session,
+    bank_account_id: int,
+    amount: Decimal = None,
+    transaction_type: str = "credit",
+    transaction_date: date = None,
+    **kwargs
+) -> "BankTransaction":
+    """Create a bank transaction for reconciliation testing."""
+    from app.models.accounting_ext import BankTransaction
+
+    transaction = BankTransaction(
+        bank_account_id=bank_account_id,
+        transaction_ref=f"TXN-{random_string(10).upper()}",
+        amount=amount or Decimal("50000"),
+        transaction_type=transaction_type,
+        transaction_date=transaction_date or date.today(),
+        description="Test transaction",
+        status="unreconciled",
+        **kwargs
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+    return transaction
+
+
+# =============================================================================
+# NOTIFICATION FACTORIES
+# =============================================================================
+
+def create_notification(
+    db: Session,
+    user_id: int,
+    notification_type: str = "info",
+    title: str = None,
+    message: str = None,
+    **kwargs
+) -> "Notification":
+    """Create a notification for testing."""
+    from app.models.notification import Notification
+
+    notification = Notification(
+        user_id=user_id,
+        notification_type=notification_type,
+        title=title or f"Test Notification {random_string(4)}",
+        message=message or "This is a test notification",
+        is_read=False,
+        **kwargs
+    )
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return notification
+
+
+# =============================================================================
+# SCENARIO BUILDERS
+# =============================================================================
+
+def setup_accounting_period(db: Session) -> dict:
+    """
+    Setup a complete accounting period with fiscal year, periods, and chart of accounts.
+
+    Returns dict with: fiscal_year, periods, accounts
+    """
+    from app.models.accounting import FiscalYear, Account, AccountType
+    from app.models.accounting_ext import FiscalPeriod
+    from app.services.period_manager import PeriodManager
+
+    current_year = datetime.now().year
+
+    # Create fiscal year
+    fiscal_year = FiscalYear(
+        year=str(current_year),
+        year_start_date=date(current_year, 1, 1),
+        year_end_date=date(current_year, 12, 31),
+    )
+    db.add(fiscal_year)
+    db.commit()
+
+    # Create fiscal periods
+    PeriodManager(db).create_fiscal_periods_for_year(fiscal_year.id)
+    db.commit()
+
+    periods = db.query(FiscalPeriod).filter(
+        FiscalPeriod.fiscal_year_id == fiscal_year.id
+    ).all()
+
+    # Create chart of accounts
+    accounts = {}
+    account_defs = [
+        ("1000", "Cash", AccountType.ASSET),
+        ("1100", "Accounts Receivable", AccountType.ASSET),
+        ("1200", "Bank", AccountType.ASSET),
+        ("2000", "Accounts Payable", AccountType.LIABILITY),
+        ("2100", "Accrued Expenses", AccountType.LIABILITY),
+        ("3000", "Retained Earnings", AccountType.EQUITY),
+        ("4000", "Revenue", AccountType.INCOME),
+        ("4100", "Service Revenue", AccountType.INCOME),
+        ("5000", "Cost of Sales", AccountType.EXPENSE),
+        ("6000", "Operating Expenses", AccountType.EXPENSE),
+        ("6100", "Salaries Expense", AccountType.EXPENSE),
+    ]
+
+    for code, name, acc_type in account_defs:
+        account = Account(
+            account_number=code,
+            account_name=name,
+            root_type=acc_type,
+            company="Test Company",
+            is_group=False,
+            disabled=False,
+        )
+        db.add(account)
+        accounts[code] = account
+
+    db.commit()
+
+    return {
+        "fiscal_year": fiscal_year,
+        "periods": periods,
+        "accounts": accounts,
+    }
+
+
+def setup_invoice_with_payments(
+    db: Session,
+    invoice_amount: Decimal = None,
+    payment_amounts: list = None,
+) -> dict:
+    """
+    Setup an invoice with partial/full payments for allocation testing.
+
+    Returns dict with: customer, invoice, payments
+    """
+    amount = invoice_amount or Decimal("100000")
+    payments_list = payment_amounts or [Decimal("30000"), Decimal("40000")]
+
+    customer = create_customer(db, name="Invoice Test Customer")
+    invoice = create_invoice(
+        db,
+        customer_id=customer.id,
+        amount=amount,
+        status="unpaid"
+    )
+
+    payments = []
+    for pay_amount in payments_list:
+        payment = create_payment(db, customer_id=customer.id, amount=pay_amount)
+        payments.append(payment)
+
+    return {
+        "customer": customer,
+        "invoice": invoice,
+        "payments": payments,
+    }
+
+
+def setup_employee_with_leaves(
+    db: Session,
+    leave_days: Decimal = None,
+) -> dict:
+    """
+    Setup an employee with leave allocations.
+
+    Returns dict with: employee, allocation
+    """
+    employee = create_employee(db, name="Leave Test Employee")
+    allocation = create_leave_allocation(
+        db,
+        employee_id=employee.id,
+        employee_name=employee.name,
+        new_leaves_allocated=leave_days or Decimal("20"),
+    )
+
+    return {
+        "employee": employee,
+        "allocation": allocation,
+    }
+
+
+def setup_support_queue(
+    db: Session,
+    agent_count: int = 3,
+) -> dict:
+    """
+    Setup a support queue with agents and SLA policy.
+
+    Returns dict with: team, agents, sla_policy
+    """
+    from app.models.agent import Agent, Team, TeamMembership
+    from app.models.support_sla import SLAPolicy, SLATarget
+
+    # Create team
+    team = Team(
+        name=f"Support Team {random_string(4)}",
+        description="Test support team",
+        is_active=True,
+    )
+    db.add(team)
+    db.flush()
+
+    # Create agents
+    agents = []
+    for i in range(agent_count):
+        agent = Agent(
+            email=random_email(),
+            display_name=f"Agent {i + 1}",
+            is_active=True,
+            capacity=10,
+        )
+        db.add(agent)
+        db.flush()
+
+        membership = TeamMembership(
+            team_id=team.id,
+            agent_id=agent.id,
+            is_active=True,
+        )
+        db.add(membership)
+        agents.append(agent)
+
+    # Create SLA policy
+    sla_policy = SLAPolicy(
+        name=f"Standard SLA {random_string(4)}",
+        is_active=True,
+        is_default=True,
+        priority=100,
+    )
+    db.add(sla_policy)
+    db.flush()
+
+    # Add SLA targets
+    targets = [
+        SLATarget(policy_id=sla_policy.id, target_type="first_response", target_hours=Decimal("4")),
+        SLATarget(policy_id=sla_policy.id, target_type="resolution", target_hours=Decimal("24")),
+    ]
+    for target in targets:
+        db.add(target)
+
+    db.commit()
+
+    return {
+        "team": team,
+        "agents": agents,
+        "sla_policy": sla_policy,
+    }
+
+
+def setup_field_service_dispatch(
+    db: Session,
+) -> dict:
+    """
+    Setup field service with zones, technicians, and service orders.
+
+    Returns dict with: zone, technicians, service_orders
+    """
+    zone = create_service_zone(db, name="Lagos Zone")
+
+    # Create technicians (employees with field service role)
+    technicians = []
+    for i in range(3):
+        tech = create_employee(
+            db,
+            name=f"Technician {i + 1}",
+            department="Field Operations",
+            designation="Field Technician",
+        )
+        technicians.append(tech)
+
+    # Create service orders
+    customer = create_customer(db, name="Field Service Customer")
+    orders = []
+    for order_type in ["installation", "repair", "maintenance"]:
+        order = create_service_order(
+            db,
+            customer_id=customer.id,
+            order_type=order_type,
+            technician_id=technicians[0].id if technicians else None,
+        )
+        orders.append(order)
+
+    return {
+        "zone": zone,
+        "technicians": technicians,
+        "customer": customer,
+        "service_orders": orders,
+    }
+
+
+def setup_expense_workflow(
+    db: Session,
+    claim_amount: Decimal = None,
+) -> dict:
+    """
+    Setup expense claim workflow with employee and claim.
+
+    Returns dict with: employee, expense_claim
+    """
+    employee = create_employee(db, name="Expense Test Employee")
+    claim = create_expense_claim(
+        db,
+        employee_id=employee.id,
+        total_amount=claim_amount or Decimal("75000"),
+        status="draft",
+    )
+
+    return {
+        "employee": employee,
+        "expense_claim": claim,
+    }
+
+
+def setup_performance_review(
+    db: Session,
+) -> dict:
+    """
+    Setup performance review with period, template, and scorecards.
+
+    Returns dict with: period, employees, scorecards
+    """
+    period = create_evaluation_period(db, status="active")
+
+    employees = []
+    scorecards = []
+    for i in range(3):
+        emp = create_employee(db, name=f"Review Employee {i + 1}")
+        employees.append(emp)
+
+        scorecard = create_employee_scorecard(
+            db,
+            employee_id=emp.id,
+            period_id=period.id,
+            status="pending",
+        )
+        scorecards.append(scorecard)
+
+    return {
+        "period": period,
+        "employees": employees,
+        "scorecards": scorecards,
+    }

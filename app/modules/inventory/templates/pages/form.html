@@ -1,0 +1,178 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form
+        method="POST"
+        action="{% if warehouse %}/inventory/{{ warehouse.id }}{% else %}/inventory{% endif %}"
+        class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
+        data-testid="warehouse-form"
+        x-data="{ submitting: false }"
+        @submit="submitting = true"
+    >
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">
+                {% if warehouse %}Edit Warehouse{% else %}New Warehouse{% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if warehouse %}
+                Update the warehouse information below.
+                {% else %}
+                Fill in the details to create a new warehouse.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="px-6 py-6 space-y-6">
+            <!-- Warehouse Name -->
+            <div>
+                <label for="warehouse_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Warehouse Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="warehouse_name"
+                    id="warehouse_name"
+                    value="{{ warehouse.warehouse_name if warehouse else (form_data.warehouse_name if form_data else '') }}"
+                    required
+                    placeholder="e.g., Main Warehouse, Transit Store"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.warehouse_name else '' }}"
+                    data-testid="warehouse-name-input"
+                >
+                {% if errors.warehouse_name %}
+                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="name-error">{{ errors.warehouse_name }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Type and Parent row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Warehouse Type -->
+                <div>
+                    <label for="warehouse_type" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Warehouse Type
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="warehouse_type"
+                            id="warehouse_type"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="warehouse-type-select"
+                        >
+                            <option value="">Select type...</option>
+                            {% for opt in type_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (warehouse.warehouse_type if warehouse else (form_data.warehouse_type if form_data else '')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parent Warehouse -->
+                <div>
+                    <label for="parent_warehouse" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Parent Warehouse
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="parent_warehouse"
+                            id="parent_warehouse"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="parent-warehouse-select"
+                        >
+                            <option value="">None (Root level)</option>
+                            {% for parent in parent_warehouses %}
+                            <option
+                                value="{{ parent.warehouse_name }}"
+                                {{ 'selected' if (warehouse.parent_warehouse if warehouse else (form_data.parent_warehouse if form_data else '')) == parent.warehouse_name else '' }}
+                            >{{ parent.warehouse_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Company -->
+            <div>
+                <label for="company" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Company
+                </label>
+                <input
+                    type="text"
+                    name="company"
+                    id="company"
+                    value="{{ warehouse.company if warehouse else (form_data.company if form_data else '') }}"
+                    placeholder="Company name"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    data-testid="company-input"
+                >
+            </div>
+
+            <!-- Is Group checkbox -->
+            <div class="flex items-start gap-3">
+                <div class="flex items-center h-6">
+                    <input
+                        type="checkbox"
+                        name="is_group"
+                        id="is_group"
+                        {{ 'checked' if (warehouse.is_group if warehouse else (form_data.is_group if form_data else False)) else '' }}
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        data-testid="is-group-checkbox"
+                    >
+                </div>
+                <div>
+                    <label for="is_group" class="text-sm font-medium text-gray-700 font-body">
+                        Is Group Warehouse
+                    </label>
+                    <p class="text-sm text-gray-500 font-body">
+                        Group warehouses can contain child warehouses but cannot hold stock directly.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-between sm:justify-end gap-3">
+            <a
+                href="{% if warehouse %}/inventory/{{ warehouse.id }}{% else %}/inventory{% endif %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+                data-testid="cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200 disabled:opacity-50"
+                :class="{ 'pointer-events-none': submitting }"
+                data-testid="submit-button"
+            >
+                <span x-show="!submitting">
+                    {% if warehouse %}Save Changes{% else %}Create Warehouse{% endif %}
+                </span>
+                <svg x-show="!submitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

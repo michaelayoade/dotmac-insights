@@ -1,0 +1,30 @@
+{# Leave allocations table partial #}
+{% if allocations %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Leave Type</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Allocated</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Unused</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for alloc in allocations %}
+            <tr class="hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900">{{ alloc.employee_name or alloc.employee }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ alloc.leave_type }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ alloc.from_date }} - {{ alloc.to_date }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ alloc.total_leaves_allocated }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ alloc.unused_leaves }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No leave allocations found</h3>
+    <p class="text-sm text-gray-500">Leave allocations are synced from ERPNext.</p>
+</div>
+{% endif %}

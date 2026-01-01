@@ -10,7 +10,7 @@ Provides consistent context for all templates including:
 """
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, cast
 
 from fastapi import Request, Response
 
@@ -62,7 +62,7 @@ def get_base_context(
     }
 
 
-def build_breadcrumbs(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
+def build_breadcrumbs(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Build breadcrumb navigation items.
 
     Args:
@@ -118,16 +118,20 @@ def build_pagination_context(
 
 
 # Navigation structure for sidebar
-NAVIGATION_ITEMS = [
+# Note: Using "links" instead of "items" to avoid conflict with dict.items()
+# Section can have optional "href" for clickable module dashboards
+NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     {
         "section": "Main",
-        "items": [
+        "links": [
             {"label": "Dashboard", "href": "/", "icon": "home", "scope": None},
         ],
     },
     {
         "section": "CRM",
-        "items": [
+        "href": "/crm",
+        "scope": "crm:read",
+        "links": [
             {"label": "Contacts", "href": "/crm/contacts", "icon": "users", "scope": "crm:read"},
             {"label": "Opportunities", "href": "/crm/opportunities", "icon": "trending-up", "scope": "crm:read"},
             {"label": "Pipeline", "href": "/crm/pipeline", "icon": "git-branch", "scope": "crm:read"},
@@ -135,14 +139,18 @@ NAVIGATION_ITEMS = [
     },
     {
         "section": "Support",
-        "items": [
+        "href": "/support",
+        "scope": "support:read",
+        "links": [
             {"label": "Tickets", "href": "/support/tickets", "icon": "life-buoy", "scope": "support:read"},
             {"label": "Knowledge Base", "href": "/support/kb", "icon": "book-open", "scope": "support:read"},
         ],
     },
     {
         "section": "Finance",
-        "items": [
+        "href": "/finance",
+        "scope": "accounting:read",
+        "links": [
             {"label": "Invoices", "href": "/accounting/invoices", "icon": "file-text", "scope": "accounting:read"},
             {"label": "Payments", "href": "/accounting/payments", "icon": "credit-card", "scope": "accounting:read"},
             {"label": "Expenses", "href": "/expenses", "icon": "receipt", "scope": "expenses:read"},
@@ -150,7 +158,9 @@ NAVIGATION_ITEMS = [
     },
     {
         "section": "Operations",
-        "items": [
+        "href": "/operations",
+        "scope": "inventory:read",
+        "links": [
             {"label": "Inventory", "href": "/inventory", "icon": "package", "scope": "inventory:read"},
             {"label": "Projects", "href": "/projects", "icon": "folder", "scope": "projects:read"},
             {"label": "Field Service", "href": "/field-service", "icon": "truck", "scope": "field_service:read"},
@@ -158,10 +168,31 @@ NAVIGATION_ITEMS = [
     },
     {
         "section": "HR",
-        "items": [
+        "href": "/hr/",
+        "scope": "hr:read",
+        "links": [
             {"label": "Employees", "href": "/hr/employees", "icon": "users", "scope": "hr:read"},
             {"label": "Leave", "href": "/hr/leave", "icon": "calendar", "scope": "hr:read"},
             {"label": "Payroll", "href": "/hr/payroll", "icon": "dollar-sign", "scope": "hr:read"},
+        ],
+    },
+    {
+        "section": "Analytics",
+        "href": "/analytics",
+        "scope": "analytics:read",
+        "links": [
+            {"label": "Dashboard", "href": "/analytics", "icon": "chart-bar", "scope": "analytics:read"},
+            {"label": "Revenue", "href": "/analytics/revenue", "icon": "dollar-sign", "scope": "analytics:read"},
+            {"label": "Customers", "href": "/analytics/customers", "icon": "users", "scope": "analytics:read"},
+            {"label": "Support", "href": "/analytics/support", "icon": "life-buoy", "scope": "analytics:read"},
+            {"label": "Operations", "href": "/analytics/operations", "icon": "truck", "scope": "analytics:read"},
+            {"label": "Insights", "href": "/analytics/insights", "icon": "trending-up", "scope": "analytics:read"},
+        ],
+    },
+    {
+        "section": "Settings",
+        "links": [
+            {"label": "Settings", "href": "/settings", "icon": "cog", "scope": "settings:read"},
         ],
     },
 ]
@@ -170,23 +201,31 @@ NAVIGATION_ITEMS = [
 def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
     """Get filtered navigation based on user permissions.
 
-    Removes sections where user has no access to any items.
+    Removes sections where user has no access to any links.
+    Includes section href for clickable module dashboards.
     """
     if not user:
         return []
 
     result = []
     for section in NAVIGATION_ITEMS:
-        filtered_items = []
-        for item in section["items"]:
+        filtered_links = []
+        for link in section["links"]:
             # No scope required or user has scope
-            if item["scope"] is None or user.has_scope(item["scope"]):
-                filtered_items.append(item)
+            link_scope = cast(Optional[str], link.get("scope"))
+            if link_scope is None or user.has_scope(link_scope):
+                filtered_links.append(link)
 
-        if filtered_items:
-            result.append({
+        if filtered_links:
+            section_data = {
                 "section": section["section"],
-                "items": filtered_items,
-            })
+                "links": filtered_links,
+            }
+            # Include section href if user has permission
+            if section.get("href"):
+                section_scope = cast(Optional[str], section.get("scope"))
+                if section_scope is None or user.has_scope(section_scope):
+                    section_data["href"] = section["href"]
+            result.append(section_data)
 
     return result

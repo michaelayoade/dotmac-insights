@@ -1,0 +1,157 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Network Analytics</h1>
+            <p class="mt-1 text-sm text-gray-500">POP performance metrics and customer distribution analysis</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/network" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Dashboard
+            </a>
+            <a href="/network/pops" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium shadow-sm">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                View POPs
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total POPs</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ totals.pop_count | format_number }}</p>
+                </div>
+                <div class="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Active Customers</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ totals.active_customers | format_number }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ totals.assignment_rate }}% assigned to POPs</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total MRR</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ totals.total_mrr | format_currency }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Tickets (30d)</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ totals.total_tickets | format_number }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unassigned Alert -->
+    {% if totals.customers_without_pop > 0 %}
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-warm-sm ring-1 ring-amber-200/50 p-5">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-amber-900">{{ totals.customers_without_pop }} customers without POP assignment</h3>
+                <p class="text-sm text-amber-700 mt-0.5">These customers aren't assigned to any POP. Consider assigning them for better network management.</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- POP Performance Table -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">POP Performance</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Performance metrics for each Point of Presence</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide bg-surface-50/50">
+                        <th class="px-6 py-3">POP</th>
+                        <th class="px-6 py-3 text-right">Customers</th>
+                        <th class="px-6 py-3 text-right">MRR</th>
+                        <th class="px-6 py-3 text-right">Tickets (30d)</th>
+                        <th class="px-6 py-3 text-right">Churn Rate</th>
+                        <th class="px-6 py-3 text-right">Routers</th>
+                        <th class="px-6 py-3 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for pop in pop_performance %}
+                    <tr class="hover:bg-surface-50/50">
+                        <td class="px-6 py-4">
+                            <a href="/network/pops/{{ pop.id }}" class="group">
+                                <p class="font-medium text-gray-900 group-hover:text-primary-600">{{ pop.name }}</p>
+                                <p class="text-sm text-gray-500">{{ pop.city or 'No city' }}</p>
+                            </a>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <p class="font-medium text-gray-900">{{ pop.active_customers | format_number }}</p>
+                            <p class="text-xs text-gray-500">{{ pop.customer_percent }}% of total</p>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <p class="font-medium text-gray-900">{{ pop.mrr | format_currency }}</p>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="{% if pop.tickets_30d > 10 %}text-red-600 font-medium{% elif pop.tickets_30d > 5 %}text-amber-600{% else %}text-gray-600{% endif %}">
+                                {{ pop.tickets_30d }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="{% if pop.churn_rate > 10 %}text-red-600 font-medium{% elif pop.churn_rate > 5 %}text-amber-600{% else %}text-emerald-600{% endif %}">
+                                {{ pop.churn_rate }}%
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="{% if pop.router_count == 0 %}text-red-600 font-medium{% else %}text-gray-600{% endif %}">
+                                {{ pop.router_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            {% if pop.is_active %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Active</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600">Inactive</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <p>No POPs configured yet</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

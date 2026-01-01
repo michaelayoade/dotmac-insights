@@ -4,7 +4,7 @@ KPI Definitions API - KPI management and bindings
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime, date
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
@@ -298,29 +298,38 @@ async def delete_kpi(kpi_id: int, db: Session = Depends(get_db)):
 
 
 # ============= BINDINGS =============
-@router.get("/{kpi_id}/bindings", response_model=List[KPIBindingResponse], dependencies=[Depends(Require("performance:read"))])
-async def list_kpi_bindings(kpi_id: int, db: Session = Depends(get_db)):
+@router.get("/{kpi_id}/bindings", dependencies=[Depends(Require("performance:read"))])
+async def list_kpi_bindings(
+    kpi_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """List target bindings for a KPI."""
     kpi = db.query(KPIDefinition).filter(KPIDefinition.id == kpi_id).first()
     if not kpi:
         raise HTTPException(status_code=404, detail="KPI not found")
 
-    bindings = db.query(KPIBinding).filter(KPIBinding.kpi_id == kpi_id).all()
+    query = db.query(KPIBinding).filter(KPIBinding.kpi_id == kpi_id)
+    total = query.count()
+    bindings = query.offset(offset).limit(limit).all()
 
-    return [
-        KPIBindingResponse(
-            id=b.id,
-            kpi_id=b.kpi_id,
-            employee_id=b.employee_id,
-            department_id=b.department_id,
-            designation_id=b.designation_id,
-            target_override=float(b.target_override) if b.target_override else None,
-            effective_from=b.effective_from,
-            effective_to=b.effective_to,
-            created_at=b.created_at,
-        )
+    data = [
+        {
+            "id": b.id,
+            "kpi_id": b.kpi_id,
+            "employee_id": b.employee_id,
+            "department_id": b.department_id,
+            "designation_id": b.designation_id,
+            "target_override": float(b.target_override) if b.target_override else None,
+            "effective_from": b.effective_from.isoformat() if b.effective_from else None,
+            "effective_to": b.effective_to.isoformat() if b.effective_to else None,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
         for b in bindings
     ]
+
+    return {"total": total, "limit": limit, "offset": offset, "data": data}
 
 
 @router.post("/{kpi_id}/bindings", response_model=KPIBindingResponse, dependencies=[Depends(Require("performance:write"))])

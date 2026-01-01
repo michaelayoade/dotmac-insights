@@ -1,0 +1,12 @@
+{# Data Quality Partial - HTMX refreshable #}
+{% if completeness %}
+<div class="space-y-4">
+    <div class="flex items-center justify-between">
+        <span class="text-sm font-medium text-gray-700">Overall Completeness</span>
+        <span class="text-sm font-bold text-gray-900">{{ "{:.1f}%".format(completeness.overall_completeness | default(0)) }}</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3">
+        <div class="h-3 rounded-full {{ 'bg-green-500' if completeness.overall_completeness >= 80 else 'bg-yellow-500' if completeness.overall_completeness >= 60 else 'bg-red-500' }}" style="width: {{ completeness.overall_completeness | default(0) }}%"></div>
+    </div>
+</div>
+{% endif %}

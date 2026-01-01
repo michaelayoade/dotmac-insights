@@ -68,8 +68,14 @@ def get_accounting_dashboard(
 
     balance_map = {r.account: float(r.balance or 0) for r in balances}
 
-    # Get accounts with their types
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    # Get accounts with their types - filter to only active leaf accounts with balances
+    accounts = {
+        acc.erpnext_id: acc
+        for acc in db.query(Account).filter(
+            Account.disabled == False,
+            Account.is_group == False,  # Only leaf accounts have balances
+        ).all()
+    }
 
     # Calculate totals by effective root type (handles ERPNext misclassifications)
     total_assets = sum(

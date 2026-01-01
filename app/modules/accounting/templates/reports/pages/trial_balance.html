@@ -1,0 +1,120 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Trial Balance</h1>
+        <p class="mt-1.5 text-gray-500 font-body">As of {{ as_of_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <button
+            onclick="window.print()"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            </svg>
+            Print
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Report Navigation -->
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="/accounting/reports/trial-balance" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-100 text-primary-700">Trial Balance</a>
+    <a href="/accounting/reports/balance-sheet" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Balance Sheet</a>
+    <a href="/accounting/reports/income-statement" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Income Statement</a>
+    <a href="/accounting/reports/cash-flow" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Cash Flow</a>
+</div>
+
+<!-- Date Filter -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">As of Date:</label>
+        <input
+            type="date"
+            name="as_of"
+            value="{{ as_of_param or as_of_date.strftime('%Y-%m-%d') }}"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+        >
+        <button
+            type="submit"
+            class="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 transition-colors"
+        >
+            Update
+        </button>
+    </form>
+</div>
+
+<!-- Balance Status -->
+{% if is_balanced %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span class="text-sm font-medium text-emerald-800">Books are balanced - Total Debits equal Total Credits</span>
+</div>
+{% else %}
+<div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+    </svg>
+    <span class="text-sm font-medium text-red-800">Warning: Books are out of balance by {{ '{:,.2f}'.format((total_debit - total_credit)|abs) }}</span>
+</div>
+{% endif %}
+
+<!-- Trial Balance Table -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden print:shadow-none print:ring-0">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Account</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Type</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Debit</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Credit</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for row in accounts %}
+            <tr class="hover:bg-surface-50">
+                <td class="py-3.5 pl-6 pr-3">
+                    <div>
+                        <a href="/accounting/accounts/{{ row.account.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                            {{ row.account.account_name }}
+                        </a>
+                        {% if row.account.account_number %}
+                        <p class="text-xs text-gray-500">{{ row.account.account_number }}</p>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3.5 text-sm text-gray-600 hidden sm:table-cell">
+                    {{ row.account.root_type.value.title() if row.account.root_type else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono {{ 'text-blue-600 font-medium' if row.debit > 0 else 'text-gray-400' }}">
+                    {{ '{:,.2f}'.format(row.debit) if row.debit > 0 else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-3.5 pr-6 text-sm text-right font-mono {{ 'text-red-600 font-medium' if row.credit > 0 else 'text-gray-400' }}">
+                    {{ '{:,.2f}'.format(row.credit) if row.credit > 0 else '-' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">
+                    No accounts with balances found
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="bg-gray-100 font-semibold">
+            <tr>
+                <td class="py-4 pl-6 pr-3 text-sm text-gray-900">Total</td>
+                <td class="px-3 py-4 hidden sm:table-cell"></td>
+                <td class="px-3 py-4 text-sm text-right font-mono text-blue-700">{{ '{:,.2f}'.format(total_debit) }}</td>
+                <td class="px-3 py-4 pr-6 text-sm text-right font-mono text-red-700">{{ '{:,.2f}'.format(total_credit) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

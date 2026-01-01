@@ -1,0 +1,81 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">User Management</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage user accounts and role assignments</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Admin Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for tab in admin_tabs %}
+        <a
+            href="{{ tab.href }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ tab.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<!-- Search and Filters -->
+<div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="flex flex-col sm:flex-row gap-4">
+        <div class="flex-1 relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Search by email or name..."
+                class="block w-full pl-11 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                hx-get="/settings/admin/users"
+                hx-target="#users-table-container"
+                hx-trigger="input changed delay:300ms"
+                hx-include="[name='status']"
+            >
+        </div>
+        <div class="flex gap-3">
+            <select
+                name="status"
+                class="rounded-xl border-gray-300 text-sm focus:ring-primary-500 focus:border-primary-500"
+                hx-get="/settings/admin/users"
+                hx-target="#users-table-container"
+                hx-trigger="change"
+                hx-include="[name='q']"
+            >
+                <option value="">All Status</option>
+                <option value="active" {{ 'selected' if current_status == 'active' else '' }}>Active</option>
+                <option value="inactive" {{ 'selected' if current_status == 'inactive' else '' }}>Inactive</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div id="users-table-container">
+    {% include "modules/settings/templates/partials/users_table.html" %}
+</div>
+{% endblock %}

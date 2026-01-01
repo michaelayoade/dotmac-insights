@@ -1,0 +1,160 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-screen-2xl mx-auto">
+    {# Page Header #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Inbox</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Manage all customer conversations across channels</p>
+        </div>
+    </div>
+
+    {# Stats Cards #}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.open_count }}</p>
+                    <p class="text-xs text-gray-500 font-body">Open</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.pending_count }}</p>
+                    <p class="text-xs text-gray-500 font-body">Pending</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.resolved_count }}</p>
+                    <p class="text-xs text-gray-500 font-body">Resolved</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.urgent_count }}</p>
+                    <p class="text-xs text-gray-500 font-body">Urgent</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Filters and Search #}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm mb-6">
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex flex-col sm:flex-row gap-4">
+                {# Search #}
+                <div class="flex-1">
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ search_query }}"
+                            placeholder="Search conversations..."
+                            class="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-body"
+                            hx-get="/inbox/table"
+                            hx-trigger="input changed delay:300ms, search"
+                            hx-target="#conversations-container"
+                            hx-include="[name='status'], [name='channel'], [name='priority']"
+                            hx-push-url="true"
+                            data-testid="inbox-search"
+                        />
+                    </div>
+                </div>
+
+                {# Filters #}
+                <div class="flex gap-2">
+                    {# Status Filter #}
+                    <select
+                        name="status"
+                        class="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white"
+                        hx-get="/inbox/table"
+                        hx-trigger="change"
+                        hx-target="#conversations-container"
+                        hx-include="[name='q'], [name='channel'], [name='priority']"
+                        hx-push-url="true"
+                        data-testid="inbox-status-filter"
+                    >
+                        <option value="">All Status</option>
+                        {% for opt in status_options %}
+                        <option value="{{ opt.value }}" {% if current_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+
+                    {# Channel Filter #}
+                    <select
+                        name="channel"
+                        class="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white"
+                        hx-get="/inbox/table"
+                        hx-trigger="change"
+                        hx-target="#conversations-container"
+                        hx-include="[name='q'], [name='status'], [name='priority']"
+                        hx-push-url="true"
+                        data-testid="inbox-channel-filter"
+                    >
+                        <option value="">All Channels</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% if current_channel|string == ch.id|string %}selected{% endif %}>{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+
+                    {# Priority Filter #}
+                    <select
+                        name="priority"
+                        class="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white"
+                        hx-get="/inbox/table"
+                        hx-trigger="change"
+                        hx-target="#conversations-container"
+                        hx-include="[name='q'], [name='status'], [name='channel']"
+                        hx-push-url="true"
+                        data-testid="inbox-priority-filter"
+                    >
+                        <option value="">All Priority</option>
+                        {% for opt in priority_options %}
+                        <option value="{{ opt.value }}" {% if current_priority == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        {# Conversations List #}
+        <div id="conversations-container">
+            {% include "modules/omnichannel/templates/partials/conversations_list.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -7,8 +7,8 @@
 
 services:
   api:
-    # Override command to use uvicorn with --reload for development
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Use uvicorn without --reload (file watcher causes infinite loop)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       PYTHONDONTWRITEBYTECODE: "1"
     # Mount source code for hot-reload

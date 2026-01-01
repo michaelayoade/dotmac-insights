@@ -91,7 +91,7 @@ async def list_onboardings(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employee onboardings with filtering."""
@@ -374,7 +374,7 @@ async def list_separations(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employee separations with filtering."""
@@ -640,7 +640,7 @@ async def list_promotions(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employee promotions with filtering."""
@@ -837,7 +837,7 @@ async def list_transfers(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employee transfers with filtering."""

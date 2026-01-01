@@ -1,0 +1,212 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/projects/tasks" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div class="flex-1">
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-display font-bold text-gray-900">{{ task.subject }}</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    {% if task.status.value == 'completed' %}bg-emerald-50 text-emerald-700
+                    {% elif task.status.value == 'working' %}bg-blue-50 text-blue-700
+                    {% elif task.status.value == 'pending_review' %}bg-purple-50 text-purple-700
+                    {% elif task.status.value == 'cancelled' %}bg-gray-50 text-gray-700
+                    {% else %}bg-amber-50 text-amber-700{% endif %}">
+                    {{ task.status.value.replace('_', ' ').title() }}
+                </span>
+            </div>
+            {% if task.project %}
+            <a href="/projects/{{ task.project.id }}" class="mt-1 text-sm text-gray-500 hover:text-primary-600">{{ task.project.project_name }}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Description -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Description</h2>
+                {% if task.description %}
+                <div class="prose prose-sm max-w-none text-gray-600">
+                    {{ task.description }}
+                </div>
+                {% else %}
+                <p class="text-gray-500">No description provided</p>
+                {% endif %}
+            </div>
+
+            <!-- Progress -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Progress</h2>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700">Completion</span>
+                            <span class="text-sm font-bold text-gray-900">{{ task.progress|default(0) }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-primary-600 h-2.5 rounded-full" style="width: {{ task.progress|default(0) }}%"></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-sm text-gray-500">Expected Time</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ task.expected_time|default(0) }}h</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">Actual Time</p>
+                            <p class="text-lg font-semibold text-gray-900">{{ task.actual_time|default(0) }}h</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-Tasks -->
+            {% if sub_tasks %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Sub-Tasks</h2>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for subtask in sub_tasks %}
+                    <a href="/projects/tasks/{{ subtask.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-900">{{ subtask.subject }}</p>
+                        </div>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if subtask.status.value == 'completed' %}bg-emerald-50 text-emerald-700
+                            {% elif subtask.status.value == 'working' %}bg-blue-50 text-blue-700
+                            {% else %}bg-amber-50 text-amber-700{% endif %}">
+                            {{ subtask.status.value.replace('_', ' ').title() }}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Dependencies -->
+            {% if dependencies %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Dependencies</h2>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for dep in dependencies %}
+                    <div class="px-6 py-4 flex items-center justify-between">
+                        <div class="flex-1">
+                            {% if dep.dependent_task %}
+                            <a href="/projects/tasks/{{ dep.dependent_task.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ dep.dependent_task.subject }}</a>
+                            {% else %}
+                            <p class="font-medium text-gray-900">{{ dep.subject or dep.dependent_task_erpnext or 'Unknown task' }}</p>
+                            {% endif %}
+                        </div>
+                        {% if dep.dependent_task %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if dep.dependent_task.status.value == 'completed' %}bg-emerald-50 text-emerald-700
+                            {% else %}bg-amber-50 text-amber-700{% endif %}">
+                            {{ dep.dependent_task.status.value.replace('_', ' ').title() }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- Task Info -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Task Info</h3>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Priority</dt>
+                        <dd class="mt-1">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if task.priority.value == 'urgent' %}bg-red-50 text-red-700
+                                {% elif task.priority.value == 'high' %}bg-orange-50 text-orange-700
+                                {% elif task.priority.value == 'medium' %}bg-yellow-50 text-yellow-700
+                                {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                {{ task.priority.value.title() }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Assigned To</dt>
+                        <dd class="mt-1 text-gray-900">
+                            {% if assigned_employee %}
+                            <a href="/hr/employees/{{ assigned_employee.id }}" class="text-primary-600 hover:text-primary-500 font-medium">
+                                {{ assigned_employee.employee_name }}
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400 italic">Not assigned</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Task Type</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.task_type or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Department</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.department or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Dates -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Dates</h3>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Expected Start</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.exp_start_date.strftime('%b %d, %Y') if task.exp_start_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Expected End</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.exp_end_date.strftime('%b %d, %Y') if task.exp_end_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Actual Start</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.act_start_date.strftime('%b %d, %Y') if task.act_start_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Completed On</dt>
+                        <dd class="mt-1 text-gray-900">{{ task.completed_on.strftime('%b %d, %Y') if task.completed_on else '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    {% if task.status.value != 'completed' %}
+                    <form hx-post="/projects/tasks/{{ task.id }}/status" hx-swap="none">
+                        <input type="hidden" name="status" value="completed">
+                        <button type="submit" class="w-full px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium text-sm">
+                            Mark Complete
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if task.status.value == 'open' %}
+                    <form hx-post="/projects/tasks/{{ task.id }}/status" hx-swap="none">
+                        <input type="hidden" name="status" value="working">
+                        <button type="submit" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-sm text-gray-700">
+                            Start Working
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -84,7 +84,22 @@ async def require_session_user(
 
     For HTMX requests, returns 401 so client can handle redirect.
     For regular requests, returns 303 redirect to login page.
+
+    If AUTH_DISABLED is true, returns a mock superuser principal.
     """
+    # Development bypass - return mock superuser
+    if settings.auth_disabled:
+        return Principal(
+            type="user",
+            id=1,
+            external_id="dev-user",
+            email="dev@localhost",
+            name="Dev User",
+            is_superuser=True,
+            scopes={"*"},  # All permissions
+            raw_claims={},
+        )
+
     user = await get_session_user(request, response, db)
     if not user:
         login_url = build_login_url(request)

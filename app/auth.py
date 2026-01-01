@@ -346,6 +346,11 @@ async def verify_service_token(token: str, db: Session) -> ServiceToken:
         logger.warning("service_token_revoked", token_id=service_token.id)
         raise HTTPException(status_code=401, detail="Service token revoked")
 
+    # Check denylist (additional protection layer)
+    if await is_service_token_denylisted(prefix, db):
+        logger.warning("service_token_denylisted", token_id=service_token.id, prefix=prefix)
+        raise HTTPException(status_code=401, detail="Service token revoked")
+
     # Verify hash
     if not verify_service_token_hash(token, service_token.token_hash):
         logger.warning("service_token_hash_mismatch", token_id=service_token.id)
@@ -387,6 +392,31 @@ async def is_token_denylisted(jti: str, db: Session) -> bool:
 async def denylist_token(jti: str, expires_at: datetime, reason: str, db: Session) -> None:
     """Add a JWT to the denylist."""
     entry = TokenDenylist(jti=jti, expires_at=expires_at, reason=reason)
+    db.add(entry)
+    db.commit()
+
+
+async def is_service_token_denylisted(token_prefix: str, db: Session) -> bool:
+    """Check if a service token is in the denylist.
+
+    Service tokens use their prefix (prefixed with 'svc:') as the identifier
+    in the denylist to distinguish them from regular JWT JTIs.
+    """
+    if not token_prefix:
+        return False
+    denylist_id = f"svc:{token_prefix}"
+    return db.query(TokenDenylist).filter(TokenDenylist.jti == denylist_id).first() is not None
+
+
+async def denylist_service_token(token_prefix: str, reason: str, db: Session) -> None:
+    """Add a service token to the denylist."""
+    denylist_id = f"svc:{token_prefix}"
+    # Service tokens don't have built-in expiry in denylist, use far future
+    entry = TokenDenylist(
+        jti=denylist_id,
+        expires_at=datetime(2099, 12, 31),
+        reason=reason
+    )
     db.add(entry)
     db.commit()
 

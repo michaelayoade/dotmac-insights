@@ -1,0 +1,115 @@
+{# Invoices table partial - returned for HTMX updates #}
+
+{% if invoices %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="invoices-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/accounting/invoices/table?sort=invoice_number&dir={% if sort_key == 'invoice_number' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#invoices-table-container"
+                        hx-include="[name='q'], [name='status']"
+                        data-testid="sort-invoice-number"
+                    >
+                        Invoice #
+                        {% if sort_key == 'invoice_number' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Customer
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/accounting/invoices/table?sort=total_amount&dir={% if sort_key == 'total_amount' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#invoices-table-container"
+                        hx-include="[name='q'], [name='status']"
+                    >
+                        Amount
+                        {% if sort_key == 'total_amount' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Balance
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/accounting/invoices/table?sort=due_date&dir={% if sort_key == 'due_date' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#invoices-table-container"
+                        hx-include="[name='q'], [name='status']"
+                    >
+                        Due Date
+                        {% if sort_key == 'due_date' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Status
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for inv in invoices %}
+            {% include "modules/accounting/templates/invoices/partials/invoice_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="invoices-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No invoices found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_status %}
+        No invoices match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first invoice.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_status) %}
+    <a
+        href="/accounting/invoices/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        data-testid="empty-add-invoice-btn"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Your First Invoice
+    </a>
+    {% endif %}
+</div>
+{% endif %}

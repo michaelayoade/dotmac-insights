@@ -139,7 +139,31 @@ async def list_leads(
     if converted is not None:
         query = query.filter(ERPNextLead.converted == converted)
 
-    total = query.count()
+    # Use separate count query to avoid 2 full table scans
+    count_query = db.query(func.count(ERPNextLead.id))
+    if search:
+        search_term = f"%{search}%"
+        count_query = count_query.filter(
+            or_(
+                ERPNextLead.lead_name.ilike(search_term),
+                ERPNextLead.company_name.ilike(search_term),
+                ERPNextLead.email_id.ilike(search_term),
+            )
+        )
+    if status:
+        try:
+            status_enum = ERPNextLeadStatus(status.lower())
+            count_query = count_query.filter(ERPNextLead.status == status_enum)
+        except ValueError:
+            pass
+    if source:
+        count_query = count_query.filter(ERPNextLead.source == source)
+    if territory:
+        count_query = count_query.filter(ERPNextLead.territory == territory)
+    if converted is not None:
+        count_query = count_query.filter(ERPNextLead.converted == converted)
+    total = count_query.scalar()
+
     leads = query.order_by(ERPNextLead.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
     return LeadListResponse(

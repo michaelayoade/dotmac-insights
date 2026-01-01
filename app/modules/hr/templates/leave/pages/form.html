@@ -1,0 +1,58 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="/hr/leave" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">Apply for Leave</h3>
+            <p class="mt-1 text-sm text-gray-500">Submit a new leave application</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1.5">Employee <span class="text-red-500">*</span></label>
+                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">Select employee</option>
+                    {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if form_data and form_data.employee_id == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+                {% if errors.employee_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.employee_id }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="leave_type_id" class="block text-sm font-medium text-gray-700 mb-1.5">Leave Type <span class="text-red-500">*</span></label>
+                <select name="leave_type_id" id="leave_type_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">Select leave type</option>
+                    {% for opt in leave_type_options %}<option value="{{ opt.value }}" {{ 'selected' if form_data and form_data.leave_type_id == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+                {% if errors.leave_type_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.leave_type_id }}</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="from_date" class="block text-sm font-medium text-gray-700 mb-1.5">From Date <span class="text-red-500">*</span></label>
+                    <input type="date" name="from_date" id="from_date" required value="{{ form_data.from_date if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% if errors.from_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.from_date }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="to_date" class="block text-sm font-medium text-gray-700 mb-1.5">To Date <span class="text-red-500">*</span></label>
+                    <input type="date" name="to_date" id="to_date" required value="{{ form_data.to_date if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% if errors.to_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.to_date }}</p>{% endif %}
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <input type="checkbox" name="half_day" id="half_day" {{ 'checked' if form_data and form_data.half_day else '' }} class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 mt-0.5">
+                <label for="half_day" class="text-sm text-gray-700">Half Day</label>
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">Reason</label>
+                <textarea name="description" id="description" rows="3" placeholder="Enter reason for leave..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ form_data.description if form_data else '' }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/hr/leave" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">Submit Application</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -12,7 +12,7 @@ from email.header import decode_header
 from email.message import Message as EmailMessage
 import base64
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
@@ -35,6 +35,44 @@ import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from app.tasks.omni_email import poll_email_channel
+from app.core.crypto import encrypt_sensitive_value, decrypt_sensitive_value, is_encrypted
+
+
+def _sanitize_channel_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Sanitize channel config for API responses - mask sensitive values."""
+    if not config:
+        return {}
+    sanitized = config.copy()
+    # Replace sensitive fields with boolean indicators
+    if "smtp_password" in sanitized:
+        sanitized["smtp_configured"] = bool(sanitized["smtp_password"])
+        del sanitized["smtp_password"]
+    if "imap_password" in sanitized:
+        sanitized["imap_configured"] = bool(sanitized["imap_password"])
+        del sanitized["imap_password"]
+    if "api_key" in sanitized:
+        sanitized["api_key_configured"] = bool(sanitized["api_key"])
+        del sanitized["api_key"]
+    if "api_secret" in sanitized:
+        sanitized["api_secret_configured"] = bool(sanitized["api_secret"])
+        del sanitized["api_secret"]
+    return sanitized
+
+
+def _encrypt_channel_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Encrypt sensitive values in channel config before saving."""
+    if not config:
+        return {}
+    encrypted = config.copy()
+    sensitive_fields = ["smtp_password", "imap_password", "api_key", "api_secret"]
+    for field in sensitive_fields:
+        if field in encrypted and encrypted[field]:
+            value = encrypted[field]
+            # Only encrypt if not already encrypted
+            if not is_encrypted(value):
+                encrypted[field] = encrypt_sensitive_value(value)
+    return encrypted
+
 
 # Authenticated Omni endpoints
 router = APIRouter(prefix="/omni", tags=["omni"])
@@ -246,7 +284,9 @@ def _send_email_via_smtp(channel: OmniChannel, to_address: str, subject: Optiona
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
     username = cfg.get("smtp_username")
-    password = cfg.get("smtp_password")
+    # Support both encrypted and plaintext passwords (backwards compatibility)
+    raw_password = cfg.get("smtp_password")
+    password = decrypt_sensitive_value(raw_password) if raw_password else None
     use_tls = cfg.get("use_tls", True)
     from_address = cfg.get("from_address") or username
     if not host or not username or not password or not from_address:
@@ -417,7 +457,7 @@ async def list_channels(
                 "name": ch.name,
                 "type": ch.type,
                 "is_active": ch.is_active,
-                "config": ch.config,
+                "config": _sanitize_channel_config(ch.config),
                 "webhook_secret": bool(ch.webhook_secret),
             }
             for ch in channels
@@ -443,10 +483,12 @@ async def create_channel(
     if existing:
         raise HTTPException(status_code=400, detail="Channel name already exists")
 
+    # Encrypt sensitive values in config before saving
+    encrypted_config = _encrypt_channel_config(payload.get("config"))
     channel = OmniChannel(
         name=payload["name"],
         type=payload["type"],
-        config=payload.get("config") or {},
+        config=encrypted_config,
         webhook_secret=payload.get("webhook_secret"),
         is_active=payload.get("is_active", True),
     )
@@ -487,7 +529,8 @@ async def update_channel(
     if "type" in payload and payload["type"]:
         channel.type = payload["type"]
     if "config" in payload and payload["config"] is not None:
-        channel.config = payload["config"]
+        # Encrypt sensitive values before saving
+        channel.config = _encrypt_channel_config(payload["config"])
     if "webhook_secret" in payload:
         channel.webhook_secret = payload["webhook_secret"]
     if "is_active" in payload and payload["is_active"] is not None:
@@ -546,7 +589,7 @@ async def get_channel(
         "name": channel.name,
         "type": channel.type,
         "is_active": channel.is_active,
-        "config": channel.config,
+        "config": _sanitize_channel_config(channel.config),
         "webhook_secret_configured": bool(channel.webhook_secret),
         "webhook_url": f"/api/omni/webhooks/{channel.name}",
         "stats": {
@@ -566,7 +609,7 @@ async def list_channel_webhook_events(
     channel_id: int,
     processed: Optional[bool] = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List webhook events received for a specific channel."""
@@ -831,7 +874,7 @@ async def list_conversations(
     start: Optional[str] = None,
     end: Optional[str] = None,
     limit: int = 100,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     query = db.query(OmniConversation)
@@ -907,7 +950,7 @@ async def list_messages(
     direction: Optional[str] = None,
     delivery_status: Optional[str] = None,
     limit: int = 100,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     query = db.query(OmniMessage).filter(OmniMessage.conversation_id == conversation_id)

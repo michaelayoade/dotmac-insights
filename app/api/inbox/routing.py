@@ -83,7 +83,7 @@ async def list_routing_rules(
     is_active: Optional[bool] = None,
     action_type: Optional[str] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List routing rules."""

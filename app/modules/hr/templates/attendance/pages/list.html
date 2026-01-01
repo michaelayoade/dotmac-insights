@@ -1,0 +1,52 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Attendance</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Track employee attendance records</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/hr/attendance/shifts" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Shift Types
+        </a>
+        <a href="/hr/attendance/new" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Record Attendance
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="p-4 border-b border-gray-100">
+        <form hx-get="/hr/attendance/table" hx-target="#attendance-table-container" hx-push-url="true" hx-trigger="input changed delay:300ms from:#search-input, change from:select" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="search" name="q" id="search-input" value="{{ q or '' }}" placeholder="Search by employee..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div class="flex gap-3">
+                <select name="status" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">All Status</option>
+                    <option value="Present" {{ 'selected' if status == 'Present' else '' }}>Present</option>
+                    <option value="Absent" {{ 'selected' if status == 'Absent' else '' }}>Absent</option>
+                    <option value="Half Day" {{ 'selected' if status == 'Half Day' else '' }}>Half Day</option>
+                    <option value="On Leave" {{ 'selected' if status == 'On Leave' else '' }}>On Leave</option>
+                </select>
+                <input type="date" name="date" value="{{ date or '' }}" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="attendance-table-container">
+    {% include "modules/hr/templates/attendance/partials/attendance_table.html" %}
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" %}
+</div>
+{% endif %}
+{% endblock %}

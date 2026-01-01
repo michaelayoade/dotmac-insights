@@ -2,140 +2,31 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
 from app.models.employee import Employee, EmploymentStatus
 from app.models.hr import Department, Designation, ERPNextUser, HDTeam, HDTeamMember
+from .schemas import (
+    EmployeeCreateRequest,
+    EmployeeUpdateRequest,
+    DepartmentCreateRequest,
+    DepartmentUpdateRequest,
+    DesignationCreateRequest,
+    DesignationUpdateRequest,
+    ERPNextUserCreateRequest,
+    ERPNextUserUpdateRequest,
+    HDTeamCreateRequest,
+    HDTeamUpdateRequest,
+    HDTeamMemberCreateRequest,
+    HDTeamMemberUpdateRequest,
+)
 
 router = APIRouter()
-
-
-class EmployeeCreateRequest(BaseModel):
-    name: str
-    employee_number: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    designation: Optional[str] = None
-    department: Optional[str] = None
-    reports_to: Optional[str] = None
-    department_id: Optional[int] = None
-    designation_id: Optional[int] = None
-    reports_to_id: Optional[int] = None
-    status: Optional[str] = EmploymentStatus.ACTIVE.value
-    employment_type: Optional[str] = None
-    date_of_joining: Optional[datetime] = None
-    date_of_leaving: Optional[datetime] = None
-    salary: Optional[Decimal] = None
-    currency: Optional[str] = "NGN"
-
-    @field_validator("salary", mode="before")
-    def _to_decimal(cls, value):
-        return Decimal(str(value)) if value is not None else None
-
-
-class EmployeeUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    employee_number: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    designation: Optional[str] = None
-    department: Optional[str] = None
-    reports_to: Optional[str] = None
-    department_id: Optional[int] = None
-    designation_id: Optional[int] = None
-    reports_to_id: Optional[int] = None
-    status: Optional[str] = None
-    employment_type: Optional[str] = None
-    date_of_joining: Optional[datetime] = None
-    date_of_leaving: Optional[datetime] = None
-    salary: Optional[Decimal] = None
-    currency: Optional[str] = None
-
-    @field_validator("salary", mode="before")
-    def _to_decimal(cls, value):
-        return Decimal(str(value)) if value is not None else None
-
-
-class DepartmentCreateRequest(BaseModel):
-    department_name: str
-    parent_department: Optional[str] = None
-    company: Optional[str] = None
-    is_group: bool = False
-    lft: Optional[int] = None
-    rgt: Optional[int] = None
-
-
-class DepartmentUpdateRequest(BaseModel):
-    department_name: Optional[str] = None
-    parent_department: Optional[str] = None
-    company: Optional[str] = None
-    is_group: Optional[bool] = None
-    lft: Optional[int] = None
-    rgt: Optional[int] = None
-
-
-class DesignationCreateRequest(BaseModel):
-    designation_name: str
-    description: Optional[str] = None
-
-
-class DesignationUpdateRequest(BaseModel):
-    designation_name: Optional[str] = None
-    description: Optional[str] = None
-
-
-class ERPNextUserCreateRequest(BaseModel):
-    email: str
-    full_name: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    enabled: bool = True
-    user_type: Optional[str] = None
-    employee_id: Optional[int] = None
-
-
-class ERPNextUserUpdateRequest(BaseModel):
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    enabled: Optional[bool] = None
-    user_type: Optional[str] = None
-    employee_id: Optional[int] = None
-
-
-class HDTeamCreateRequest(BaseModel):
-    team_name: str
-    description: Optional[str] = None
-    assignment_rule: Optional[str] = None
-    ignore_restrictions: bool = False
-
-
-class HDTeamUpdateRequest(BaseModel):
-    team_name: Optional[str] = None
-    description: Optional[str] = None
-    assignment_rule: Optional[str] = None
-    ignore_restrictions: Optional[bool] = None
-
-
-class HDTeamMemberCreateRequest(BaseModel):
-    team_id: int
-    user: str
-    user_name: Optional[str] = None
-    employee_id: Optional[int] = None
-
-
-class HDTeamMemberUpdateRequest(BaseModel):
-    user: Optional[str] = None
-    user_name: Optional[str] = None
-    employee_id: Optional[int] = None
 
 
 @router.get("/employees", dependencies=[Depends(Require("hr:read"))])
@@ -143,7 +34,7 @@ def list_employees(
     include_deleted: bool = False,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employees."""
@@ -284,7 +175,7 @@ def delete_employee(
 def list_departments(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List departments."""
@@ -395,7 +286,7 @@ def delete_department(
 def list_designations(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List designations."""
@@ -495,7 +386,7 @@ def list_erpnext_users(
     include_disabled: bool = False,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List ERPNext users."""
@@ -611,7 +502,7 @@ def delete_erpnext_user(
 def list_hd_teams(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List HD teams."""
@@ -716,7 +607,7 @@ def delete_hd_team(
 def list_hd_team_members(
     team_id: Optional[int] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List HD team members."""

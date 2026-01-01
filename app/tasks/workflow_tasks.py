@@ -47,6 +47,13 @@ def on_approval_requested(event: Event, db: "Session") -> None:
     amount = payload.get("amount")
     submitted_by_id = payload.get("submitted_by_id")
 
+    if not isinstance(approval_id, int):
+        logger.warning(
+            "approval_task_missing_id",
+            approval_id=approval_id,
+        )
+        return
+
     # Determine module based on doctype
     module = _get_module_for_doctype(doctype)
 
@@ -139,6 +146,13 @@ def on_perf_review_requested(event: Event, db: "Session") -> None:
 
     if not reviewer_user_id:
         reviewer_user_id = event.user_ids[0] if event.user_ids else None
+
+    if not isinstance(scorecard_id, int):
+        logger.warning(
+            "scorecard_task_missing_id",
+            scorecard_id=scorecard_id,
+        )
+        return
 
     if not reviewer_user_id:
         logger.warning(

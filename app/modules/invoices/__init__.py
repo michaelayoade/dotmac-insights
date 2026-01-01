@@ -1,0 +1,1 @@
+"""Invoices web module."""

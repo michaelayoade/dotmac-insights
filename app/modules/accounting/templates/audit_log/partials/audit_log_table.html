@@ -1,0 +1,115 @@
+{% set action_colors = {
+    'CREATE': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'UPDATE': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+    'DELETE': 'text-red-700 bg-red-50 ring-red-600/20',
+    'APPROVE': 'text-purple-700 bg-purple-50 ring-purple-600/20',
+    'REJECT': 'text-orange-700 bg-orange-50 ring-orange-600/20',
+    'POST': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'SUBMIT': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+    'CANCEL': 'text-gray-700 bg-gray-50 ring-gray-600/20'
+} %}
+
+{% if entries %}
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Timestamp</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">User</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Action</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell pr-6">Details</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50">
+                <td class="whitespace-nowrap py-3.5 pl-6 pr-3 text-sm">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ entry.created_at.strftime('%b %d, %Y') if entry.created_at else '-' }}</p>
+                        <p class="text-xs text-gray-500">{{ entry.created_at.strftime('%H:%M:%S') if entry.created_at else '' }}</p>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3.5 text-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-medium">
+                            {{ (entry.user.full_name[:2] if entry.user and entry.user.full_name else (entry.username[:2] if entry.username else 'SY')).upper() }}
+                        </span>
+                        <span class="text-gray-600">{{ entry.user.full_name if entry.user else (entry.username or 'System') }}</span>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3.5 text-sm">
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ action_colors.get(entry.action.upper() if entry.action else 'UPDATE', action_colors['UPDATE']) }}">
+                        {{ entry.action.title() if entry.action else '-' }}
+                    </span>
+                </td>
+                <td class="px-3 py-3.5 text-sm">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ entry.document_type or '-' }}</p>
+                        {% if entry.document_id or entry.reference %}
+                        <p class="text-xs text-gray-500 font-mono">{{ entry.reference or ('ID: ' ~ entry.document_id) }}</p>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="px-3 py-3.5 pr-6 text-sm text-gray-600 hidden lg:table-cell">
+                    {% if entry.changes %}
+                    <div class="max-w-xs">
+                        {% if entry.changes is mapping %}
+                        <details class="group">
+                            <summary class="cursor-pointer text-primary-600 hover:text-primary-700 text-xs font-medium">
+                                View {{ entry.changes|length }} change{{ 's' if entry.changes|length > 1 else '' }}
+                            </summary>
+                            <div class="mt-2 p-2 bg-gray-50 rounded-lg text-xs space-y-1">
+                                {% for field, values in entry.changes.items() %}
+                                <div>
+                                    <span class="font-medium text-gray-700">{{ field }}:</span>
+                                    {% if values is mapping and values.old is defined %}
+                                    <span class="text-red-600 line-through">{{ values.old }}</span>
+                                    <span class="text-gray-400">→</span>
+                                    <span class="text-emerald-600">{{ values.new }}</span>
+                                    {% else %}
+                                    <span class="text-gray-600">{{ values }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% else %}
+                        <span class="text-xs text-gray-500 truncate">{{ entry.changes[:100] }}{{ '...' if entry.changes|length > 100 else '' }}</span>
+                        {% endif %}
+                    </div>
+                    {% elif entry.description %}
+                    <span class="truncate max-w-xs block">{{ entry.description }}</span>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No audit entries found</h3>
+    <p class="text-sm text-gray-500 font-body">
+        {% if current_search or current_doc_type or current_action %}
+        No entries match your filter criteria. Try adjusting your filters.
+        {% else %}
+        Audit log entries will appear here as changes are made to accounting records.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

@@ -13,7 +13,7 @@ import json
 import secrets
 from typing import Optional, Dict, Any
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.config import settings
@@ -80,7 +80,10 @@ async def validate_csrf(request: Request) -> None:
         except Exception:
             pass
 
-    submitted_token = header_token or form_token
+    submitted_token_raw = header_token or form_token
+    submitted_token: Optional[str] = None
+    if isinstance(submitted_token_raw, str):
+        submitted_token = submitted_token_raw
 
     if not cookie_token:
         raise HTTPException(status_code=403, detail="CSRF token cookie missing")
@@ -146,12 +149,40 @@ def get_login_redirect_url(request: Request) -> str:
     """Get URL to redirect to after successful login.
 
     Checks for 'next' query parameter, defaults to dashboard.
+    Implements strict validation to prevent open redirect attacks.
     """
+    from urllib.parse import unquote
+
     next_url = request.query_params.get("next")
-    # Only allow relative URLs to prevent open redirect
-    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
-        return next_url
-    return "/"
+    if not next_url:
+        return "/"
+
+    # Must start with single forward slash (relative path)
+    if not next_url.startswith("/"):
+        return "/"
+
+    # Block protocol-relative URLs (//evil.com)
+    if next_url.startswith("//"):
+        return "/"
+
+    # Block backslash variants (/\evil.com - some browsers interpret as //)
+    if next_url.startswith("/\\"):
+        return "/"
+
+    # Block null bytes and newlines (header injection)
+    if "\x00" in next_url or "\n" in next_url or "\r" in next_url:
+        return "/"
+
+    # URL decode and re-check for bypass attempts
+    decoded = unquote(next_url)
+    if decoded.startswith("//") or decoded.startswith("/\\"):
+        return "/"
+
+    # Block URLs with embedded credentials or authority
+    if "@" in next_url or ":" in next_url.split("/")[1] if len(next_url.split("/")) > 1 else False:
+        return "/"
+
+    return next_url
 
 
 def build_login_url(request: Request) -> str:
@@ -207,15 +238,19 @@ def htmx_trigger(response: Response, event: str, data: Optional[Dict[str, Any]] 
     response.headers["HX-Trigger"] = trigger_value
 
 
-def htmx_toast(response: Response, message: str, type: str = "info") -> None:
+def htmx_toast(response: Response, message: str, toast_type: str = "info") -> None:
     """Trigger a toast notification on the client.
+
+    Uses custom headers that the frontend JavaScript reads after HTMX swaps.
 
     Args:
         response: FastAPI response object
         message: Message to display
-        type: Toast type (success, error, warning, info)
+        toast_type: Toast type (success, error, warning, info)
     """
-    htmx_trigger(response, "showToast", {"message": message, "type": type})
+    from urllib.parse import quote
+    response.headers["HX-Toast"] = quote(message)
+    response.headers["HX-Toast-Type"] = toast_type
 
 
 def htmx_close_modal(response: Response) -> None:

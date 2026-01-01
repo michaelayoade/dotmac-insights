@@ -1,0 +1,109 @@
+{# Single customer row partial #}
+<tr
+    class="group hover:bg-surface-50 transition-colors"
+    id="customer-row-{{ customer.id }}"
+    data-testid="customer-row-{{ customer.id }}"
+>
+    <td class="py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                {% set type_colors = {
+                    'residential': 'from-blue-100 to-blue-200 ring-blue-200/50',
+                    'business': 'from-purple-100 to-purple-200 ring-purple-200/50',
+                    'enterprise': 'from-amber-100 to-amber-200 ring-amber-200/50'
+                } %}
+                {% set type_text_colors = {
+                    'residential': 'text-blue-700',
+                    'business': 'text-purple-700',
+                    'enterprise': 'text-amber-700'
+                } %}
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ type_colors.get(customer.customer_type.value, 'from-gray-100 to-gray-200 ring-gray-200/50') }} ring-2">
+                    <span class="text-sm font-semibold {{ type_text_colors.get(customer.customer_type.value, 'text-gray-600') }}">
+                        {{ customer.name[:2] | upper }}
+                    </span>
+                </span>
+            </div>
+            <div class="min-w-0 flex-1">
+                <a
+                    href="/customers/{{ customer.id }}"
+                    class="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors truncate block"
+                    data-testid="customer-name-{{ customer.id }}"
+                >
+                    {{ customer.name }}
+                </a>
+                {% if customer.account_number %}
+                <p class="text-xs text-gray-500 font-body mt-0.5">
+                    {{ customer.account_number }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td class="px-3 py-4 hidden sm:table-cell">
+        <div class="text-sm text-gray-700 font-body">
+            {% if customer.email %}
+            <a href="mailto:{{ customer.email }}" class="hover:text-primary-600 transition-colors block truncate">
+                {{ customer.email }}
+            </a>
+            {% endif %}
+            {% if customer.phone %}
+            <span class="text-gray-500 block">{{ customer.phone }}</span>
+            {% endif %}
+        </div>
+    </td>
+    <td class="px-3 py-4 hidden md:table-cell">
+        {% set type_styles = {
+            'residential': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'business': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            'enterprise': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ type_styles.get(customer.customer_type.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}">
+            {{ customer.customer_type.value | title }}
+        </span>
+    </td>
+    <td class="px-3 py-4 hidden lg:table-cell">
+        <span class="text-sm text-gray-700 font-body">
+            {% if customer.city %}
+            {{ customer.city }}{% if customer.state %}, {{ customer.state }}{% endif %}
+            {% else %}
+            <span class="text-gray-400 italic">Not set</span>
+            {% endif %}
+        </span>
+    </td>
+    <td class="px-3 py-4">
+        {% set status_styles = {
+            'active': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'inactive': 'bg-gray-50 text-gray-600 ring-gray-500/20',
+            'suspended': 'bg-red-50 text-red-700 ring-red-600/20',
+            'prospect': 'bg-blue-50 text-blue-700 ring-blue-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(customer.status.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="customer-status-{{ customer.id }}">
+            {{ customer.status.value | title }}
+        </span>
+    </td>
+    <td class="py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/customers/{{ customer.id }}"
+                class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                title="View details"
+                data-testid="view-customer-{{ customer.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/customers/{{ customer.id }}/edit"
+                class="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                title="Edit"
+                data-testid="edit-customer-{{ customer.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+        </div>
+    </td>
+</tr>

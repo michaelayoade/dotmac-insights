@@ -179,7 +179,7 @@ def list_tax_regions(
     active_only: bool = True,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List tax regions."""
@@ -388,7 +388,7 @@ def list_tax_categories(
     active_only: bool = True,
     category_type: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List tax categories for a region."""
@@ -635,7 +635,7 @@ def list_tax_transactions(
     transaction_type: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List tax transactions with filtering."""

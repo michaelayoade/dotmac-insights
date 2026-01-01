@@ -1,0 +1,88 @@
+{# Stock entries table partial #}
+
+{% if entries %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="stock-entries-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Entry ID
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Type
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    From
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    To
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Date
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Value
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50 transition-colors">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <span class="font-mono text-sm text-gray-900">{{ entry.erpnext_id or entry.id }}</span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    {% set type_styles = {
+                        'Material Issue': 'bg-red-50 text-red-700 ring-red-600/20',
+                        'Material Receipt': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                        'Material Transfer': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'Manufacture': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                        'Repack': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ type_styles.get(entry.stock_entry_type, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ entry.stock_entry_type or 'Unknown' }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden sm:table-cell">
+                    {{ entry.from_warehouse or '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden sm:table-cell">
+                    {{ entry.to_warehouse or '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden md:table-cell">
+                    {{ entry.posting_date | format_date if entry.posting_date else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 font-body text-right font-medium">
+                    {{ entry.total_amount | format_currency if entry.total_amount else '-' }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="stock-entries-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No stock entries found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_type %}
+        No stock entries match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Stock entries will appear here when inventory transactions are made.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

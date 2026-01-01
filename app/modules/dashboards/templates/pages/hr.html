@@ -1,0 +1,186 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ page_title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Employee management, leave, and payroll overview</p>
+    </div>
+    <div class="flex gap-3">
+        <a
+            href="/hr/employees/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all"
+            data-testid="new-employee-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>Add Employee</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" data-testid="stats-grid">
+    {% for stat in stats %}
+    {% set title = stat.title %}
+    {% set value = stat.value %}
+    {% set icon = stat.icon %}
+    {% set color = stat.color %}
+    {% set href = stat.get('href') %}
+    {% set trend = stat.get('trend') %}
+    {% include "components/dashboard/stat_card.html" %}
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column - 2/3 width -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Department Breakdown -->
+        {% if department_breakdown %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="department-breakdown">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Employees by Department</h3>
+                <a href="/hr/employees" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View All</a>
+            </div>
+            <div class="p-5">
+                <div class="space-y-4">
+                    {% set dept_colors = ['bg-primary-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500'] %}
+                    {% set total = department_breakdown.values() | sum %}
+                    {% for dept, count in department_breakdown.items() %}
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-700 font-medium">{{ dept }}</span>
+                            <span class="text-gray-500">{{ count }} employees</span>
+                        </div>
+                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full {{ dept_colors[loop.index0 % dept_colors | length] }} rounded-full" style="width: {{ (count / (total or 1) * 100) | round }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Recent Employees -->
+        {% set title = "Recent Employees" %}
+        {% set view_all_href = "/hr/employees" %}
+        {% set empty_message = "No employees yet" %}
+        {% set items = [] %}
+        {% for emp in recent_employees %}
+        {% set items = items + [{
+            "title": emp.name or emp.full_name,
+            "subtitle": emp.department or emp.position or "No department",
+            "href": "/hr/employees/" ~ emp.id,
+            "avatar": (emp.name or emp.full_name or "?")[:2] | upper,
+            "badge": emp.status | default('Active') | title,
+            "badge_class": "bg-emerald-50 text-emerald-700" if emp.status == 'active' else "bg-gray-50 text-gray-700"
+        }] %}
+        {% endfor %}
+        {% include "components/dashboard/recent_items.html" %}
+
+        <!-- Leave Requests -->
+        {% if leave_requests %}
+        {% set title = "Pending Leave Requests" %}
+        {% set view_all_href = "/hr/leave" %}
+        {% set empty_message = "No pending requests" %}
+        {% set items = [] %}
+        {% for req in leave_requests %}
+        {% set items = items + [{
+            "title": req.employee_name,
+            "subtitle": req.leave_type | default('Leave') ~ " (" ~ req.days ~ " days)",
+            "href": "/hr/leave/" ~ req.id,
+            "avatar": (req.employee_name or "?")[:2] | upper,
+            "badge": req.status | title,
+            "badge_class": "bg-amber-50 text-amber-700" if req.status == 'pending' else "bg-emerald-50 text-emerald-700"
+        }] %}
+        {% endfor %}
+        {% include "components/dashboard/recent_items.html" %}
+        {% endif %}
+    </div>
+
+    <!-- Right Column - 1/3 width -->
+    <div class="space-y-6">
+        <!-- Quick Links -->
+        {% set title = "Quick Links" %}
+        {% set links = quick_links %}
+        {% include "components/dashboard/quick_links.html" %}
+
+        <!-- Today's Attendance -->
+        {% if hr.attendance %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Today's Attendance</h3>
+            </div>
+            <div class="p-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center p-4 rounded-xl bg-emerald-50">
+                        <p class="text-2xl font-bold text-emerald-700">{{ hr.attendance.present | default(0) }}</p>
+                        <p class="text-sm text-emerald-600 mt-1">Present</p>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-red-50">
+                        <p class="text-2xl font-bold text-red-700">{{ hr.attendance.absent | default(0) }}</p>
+                        <p class="text-sm text-red-600 mt-1">Absent</p>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-amber-50">
+                        <p class="text-2xl font-bold text-amber-700">{{ hr.attendance.late | default(0) }}</p>
+                        <p class="text-sm text-amber-600 mt-1">Late</p>
+                    </div>
+                    <div class="text-center p-4 rounded-xl bg-blue-50">
+                        <p class="text-2xl font-bold text-blue-700">{{ hr.attendance.on_leave | default(leave.on_leave_today | default(0)) }}</p>
+                        <p class="text-sm text-blue-600 mt-1">On Leave</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Upcoming Birthdays -->
+        {% if hr.upcoming_birthdays %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Upcoming Birthdays</h3>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for emp in hr.upcoming_birthdays[:5] %}
+                <div class="flex items-center gap-3 px-5 py-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center">
+                        <span class="text-sm font-semibold text-pink-700">{{ emp.name[:2] | upper }}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">{{ emp.name }}</p>
+                        <p class="text-xs text-gray-500">{{ emp.birthday | date_format('%b %d') if emp.birthday else 'Soon' }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Work Anniversaries -->
+        {% if hr.anniversaries %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Work Anniversaries</h3>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for emp in hr.anniversaries[:5] %}
+                <div class="flex items-center gap-3 px-5 py-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                        <span class="text-sm font-semibold text-primary-700">{{ emp.years }}y</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">{{ emp.name }}</p>
+                        <p class="text-xs text-gray-500">{{ emp.years }} year{{ 's' if emp.years != 1 else '' }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

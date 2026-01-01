@@ -1,0 +1,75 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ '/hr/recruitment/' ~ opening.id if opening else '/hr/recruitment' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        {% if opening %}<input type="hidden" name="_method" value="PUT">{% endif %}
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Job Opening' if opening else 'New Job Opening' }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ 'Update job opening details' if opening else 'Create a new job vacancy' }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="job_title" class="block text-sm font-medium text-gray-700 mb-1.5">Job Title <span class="text-red-500">*</span></label>
+                <input type="text" name="job_title" id="job_title" required value="{{ opening.job_title if opening else (form_data.job_title if form_data else '') }}" placeholder="e.g., Senior Software Engineer" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.job_title %}<p class="mt-1.5 text-sm text-red-600">{{ errors.job_title }}</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="department" class="block text-sm font-medium text-gray-700 mb-1.5">Department</label>
+                    <select name="department" id="department" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select department</option>
+                        {% for opt in department_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and opening.department == opt.value) or (form_data and form_data.department == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="designation" class="block text-sm font-medium text-gray-700 mb-1.5">Designation</label>
+                    <select name="designation" id="designation" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select designation</option>
+                        {% for opt in designation_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and opening.designation == opt.value) or (form_data and form_data.designation == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="employment_type" class="block text-sm font-medium text-gray-700 mb-1.5">Employment Type</label>
+                    <select name="employment_type" id="employment_type" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select type</option>
+                        {% for t in ['Full-time', 'Part-time', 'Contract', 'Intern', 'Temporary'] %}
+                        <option value="{{ t }}" {{ 'selected' if (opening and opening.employment_type == t) or (form_data and form_data.employment_type == t) else '' }}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="vacancies" class="block text-sm font-medium text-gray-700 mb-1.5">Number of Vacancies</label>
+                    <input type="number" name="vacancies" id="vacancies" min="1" value="{{ opening.vacancies if opening else (form_data.vacancies if form_data else '1') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+            </div>
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                <select name="status" id="status" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% for s in ['Open', 'Closed', 'On Hold'] %}
+                    <option value="{{ s }}" {{ 'selected' if (opening and opening.status == s) or (form_data and form_data.status == s) else '' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="closes_on" class="block text-sm font-medium text-gray-700 mb-1.5">Application Deadline</label>
+                <input type="date" name="closes_on" id="closes_on" value="{{ opening.closes_on if opening else (form_data.closes_on if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">Job Description</label>
+                <textarea name="description" id="description" rows="6" placeholder="Describe the role, responsibilities, and requirements..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ opening.description if opening else (form_data.description if form_data else '') }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/hr/recruitment" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ 'Update Opening' if opening else 'Create Opening' }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

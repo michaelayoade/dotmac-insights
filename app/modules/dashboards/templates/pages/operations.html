@@ -1,0 +1,225 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ page_title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Inventory, projects, and field service overview</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" data-testid="stats-grid">
+    {% for stat in stats %}
+    {% set title = stat.title %}
+    {% set value = stat.value %}
+    {% set icon = stat.icon %}
+    {% set color = stat.color %}
+    {% set href = stat.get('href') %}
+    {% set trend = stat.get('trend') %}
+    {% include "components/dashboard/stat_card.html" %}
+    {% endfor %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column - 2/3 width -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Low Stock Alert -->
+        {% if low_stock_items %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="low-stock-alert">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <h3 class="font-semibold text-gray-900">Low Stock Alert</h3>
+                </div>
+                <a href="/inventory?filter=low-stock" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View All</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for item in low_stock_items %}
+                <div class="flex items-center justify-between px-5 py-3 hover:bg-surface-50 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ item.name }}</p>
+                            <p class="text-xs text-gray-500">SKU: {{ item.sku or 'N/A' }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-medium {{ 'text-red-600' if item.quantity <= item.reorder_point * 0.5 else 'text-amber-600' }}">{{ item.quantity }} left</p>
+                        <p class="text-xs text-gray-500">Reorder at {{ item.reorder_point }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Active Projects -->
+        {% if recent_projects %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="active-projects">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Active Projects</h3>
+                <a href="/projects" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View All</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for project in recent_projects %}
+                <a href="/projects/{{ project.id }}" class="flex items-center gap-4 px-5 py-4 hover:bg-surface-50 transition-colors group">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <p class="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors truncate">{{ project.name }}</p>
+                            {% if project.priority == 'high' %}
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-50 text-red-700">High</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center gap-4 mt-1">
+                            <span class="text-xs text-gray-500">{{ project.client or 'No client' }}</span>
+                            {% if project.due_date %}
+                            <span class="text-xs text-gray-500">Due: {{ project.due_date | date_format('%b %d') }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 w-32">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">Progress</span>
+                            <span class="font-medium text-gray-900">{{ project.progress | default(0) }}%</span>
+                        </div>
+                        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary-500 rounded-full" style="width: {{ project.progress | default(0) }}%"></div>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Upcoming Service Orders -->
+        {% if upcoming_service %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="upcoming-service">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900">Upcoming Service Orders</h3>
+                <a href="/field-service" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View All</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for order in upcoming_service %}
+                <a href="/field-service/{{ order.id }}" class="flex items-center gap-4 px-5 py-3 hover:bg-surface-50 transition-colors group">
+                    <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors truncate">{{ order.title or order.customer_name }}</p>
+                        <p class="text-xs text-gray-500">{{ order.scheduled_date | date_format('%b %d, %I:%M %p') if order.scheduled_date else 'Not scheduled' }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium {{ 'bg-blue-50 text-blue-700' if order.status == 'scheduled' else 'bg-amber-50 text-amber-700' }}">
+                        {{ order.status | title }}
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Column - 1/3 width -->
+    <div class="space-y-6">
+        <!-- Quick Links -->
+        {% set title = "Quick Links" %}
+        {% set links = quick_links %}
+        {% include "components/dashboard/quick_links.html" %}
+
+        <!-- Inventory Summary -->
+        {% if inventory %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Inventory Summary</h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Total SKUs</span>
+                    <span class="text-sm font-medium text-gray-900">{{ inventory.total_skus | default(0) | format_number }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Total Value</span>
+                    <span class="text-sm font-medium text-gray-900">${{ inventory.total_value | default(0) | round(0) | int | format_number }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Low Stock</span>
+                    <span class="text-sm font-medium {{ 'text-amber-600' if inventory.low_stock_count else 'text-emerald-600' }}">{{ inventory.low_stock_count | default(0) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600">Out of Stock</span>
+                    <span class="text-sm font-medium {{ 'text-red-600' if inventory.out_of_stock_count else 'text-emerald-600' }}">{{ inventory.out_of_stock_count | default(0) }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Project Status -->
+        {% if projects.by_status %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Projects by Status</h3>
+            </div>
+            <div class="p-5 space-y-3">
+                {% set status_colors = {
+                    'active': 'bg-blue-500',
+                    'completed': 'bg-emerald-500',
+                    'on_hold': 'bg-amber-500',
+                    'cancelled': 'bg-gray-400'
+                } %}
+                {% for status, count in projects.by_status.items() %}
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full {{ status_colors.get(status, 'bg-gray-400') }}"></div>
+                        <span class="text-sm text-gray-600">{{ status | replace('_', ' ') | title }}</span>
+                    </div>
+                    <span class="text-sm font-medium text-gray-900">{{ count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Field Service Stats -->
+        {% if field_service %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h3 class="font-semibold text-gray-900">Field Service Today</h3>
+            </div>
+            <div class="p-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="text-center p-3 rounded-xl bg-blue-50">
+                        <p class="text-xl font-bold text-blue-700">{{ field_service.scheduled_today | default(0) }}</p>
+                        <p class="text-xs text-blue-600 mt-1">Scheduled</p>
+                    </div>
+                    <div class="text-center p-3 rounded-xl bg-emerald-50">
+                        <p class="text-xl font-bold text-emerald-700">{{ field_service.completed_today | default(0) }}</p>
+                        <p class="text-xs text-emerald-600 mt-1">Completed</p>
+                    </div>
+                    <div class="text-center p-3 rounded-xl bg-amber-50">
+                        <p class="text-xl font-bold text-amber-700">{{ field_service.in_progress | default(0) }}</p>
+                        <p class="text-xs text-amber-600 mt-1">In Progress</p>
+                    </div>
+                    <div class="text-center p-3 rounded-xl bg-purple-50">
+                        <p class="text-xl font-bold text-purple-700">{{ field_service.technicians_active | default(0) }}</p>
+                        <p class="text-xs text-purple-600 mt-1">Technicians</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

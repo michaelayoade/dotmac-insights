@@ -143,8 +143,10 @@ def list_operators() -> List[Dict[str, str]]:
 def list_rules(
     trigger: Optional[str] = None,
     active_only: bool = False,
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """List automation rules."""
     query = db.query(AutomationRule)
 
@@ -153,25 +155,31 @@ def list_rules(
     if active_only:
         query = query.filter(AutomationRule.is_active == True)
 
-    rules = query.order_by(AutomationRule.priority, AutomationRule.name).all()
+    total = query.count()
+    rules = query.order_by(AutomationRule.priority, AutomationRule.name).offset(offset).limit(limit).all()
 
-    return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "trigger": r.trigger,
-            "conditions": r.conditions,
-            "actions": r.actions,
-            "is_active": r.is_active,
-            "priority": r.priority,
-            "stop_processing": r.stop_processing,
-            "execution_count": r.execution_count,
-            "last_executed_at": r.last_executed_at.isoformat() if r.last_executed_at else None,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rules
-    ]
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "description": r.description,
+                "trigger": r.trigger,
+                "conditions": r.conditions,
+                "actions": r.actions,
+                "is_active": r.is_active,
+                "priority": r.priority,
+                "stop_processing": r.stop_processing,
+                "execution_count": r.execution_count,
+                "last_executed_at": r.last_executed_at.isoformat() if r.last_executed_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rules
+        ],
+    }
 
 
 @router.post("/rules", dependencies=[Depends(Require("support:automation:write"))], status_code=201)
@@ -400,7 +408,7 @@ def list_logs(
     success: Optional[bool] = None,
     days: int = Query(default=7, le=30),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List automation execution logs."""

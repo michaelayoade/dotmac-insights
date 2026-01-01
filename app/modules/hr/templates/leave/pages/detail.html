@@ -1,0 +1,58 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Leave Application</h1>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            {% set status_styles = {'open': 'bg-blue-50 text-blue-700', 'approved': 'bg-emerald-50 text-emerald-700', 'rejected': 'bg-red-50 text-red-700', 'cancelled': 'bg-gray-100 text-gray-600'} %}
+            <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium {{ status_styles.get(application.status.value, 'bg-gray-100 text-gray-600') }}">{{ application.status.value | title }}</span>
+        </div>
+    </div>
+    {% if application.status.value == 'open' %}
+    <div class="flex items-center gap-2">
+        <button type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-500" hx-post="/hr/leave/{{ application.id }}/approve" hx-confirm="Approve this leave application?">Approve</button>
+        <button type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500" hx-post="/hr/leave/{{ application.id }}/reject" hx-confirm="Reject this leave application?">Reject</button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-base font-display font-semibold text-gray-900">Leave Details</h3>
+            </div>
+            <div class="px-6 py-5">
+                <dl class="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+                    <div><dt class="text-sm font-medium text-gray-500">Employee</dt><dd class="mt-1.5 text-sm text-gray-900">{{ application.employee_name or application.employee }}</dd></div>
+                    <div><dt class="text-sm font-medium text-gray-500">Leave Type</dt><dd class="mt-1.5 text-sm text-gray-900">{{ application.leave_type }}</dd></div>
+                    <div><dt class="text-sm font-medium text-gray-500">From Date</dt><dd class="mt-1.5 text-sm text-gray-900">{{ application.from_date }}</dd></div>
+                    <div><dt class="text-sm font-medium text-gray-500">To Date</dt><dd class="mt-1.5 text-sm text-gray-900">{{ application.to_date }}</dd></div>
+                    <div><dt class="text-sm font-medium text-gray-500">Total Days</dt><dd class="mt-1.5 text-sm text-gray-900">{{ application.total_leave_days }}</dd></div>
+                    <div><dt class="text-sm font-medium text-gray-500">Half Day</dt><dd class="mt-1.5 text-sm text-gray-900">{{ 'Yes' if application.half_day else 'No' }}</dd></div>
+                </dl>
+            </div>
+        </div>
+        {% if application.description %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100"><h3 class="text-base font-display font-semibold text-gray-900">Reason</h3></div>
+            <div class="px-6 py-5"><p class="text-sm text-gray-700 whitespace-pre-wrap">{{ application.description }}</p></div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100"><h3 class="text-base font-display font-semibold text-gray-900">Activity</h3></div>
+            <div class="px-6 py-5">
+                <dl class="space-y-4">
+                    <div><dt class="text-xs font-medium text-gray-500 uppercase">Created</dt><dd class="mt-0.5 text-sm text-gray-900">{{ application.created_at | format_date }}</dd></div>
+                    <div><dt class="text-xs font-medium text-gray-500 uppercase">Last Updated</dt><dd class="mt-0.5 text-sm text-gray-900">{{ application.updated_at | format_date if application.updated_at else 'Never' }}</dd></div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

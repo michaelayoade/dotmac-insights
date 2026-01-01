@@ -39,10 +39,14 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dotmac}:${POSTGRES_PASSWORD:-dotmac_dev_password}@db:5432/${POSTGRES_DB:-dotmac_insights}
       REDIS_URL: redis://redis:6379/0
+      AUTH_DISABLED: "true"  # DEV ONLY - disable auth for SSR testing
     env_file:
       - .env
     ports:
       - "8000:8000"
+    volumes:
+      # Mount source code for hot-reloading in development
+      - ./app:/app/app
     depends_on:
       db:
         condition: service_healthy
@@ -54,13 +58,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    command: >
-      gunicorn app.main:app
-      --workers 4
-      --worker-class uvicorn.workers.UvicornWorker
-      --bind 0.0.0.0:8000
-      --access-logfile -
-      --error-logfile -
+    # Use uvicorn with --reload for hot-reloading in development
+    # NOTE: Hot-reload temporarily disabled due to file watcher issues
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
   celery_worker:

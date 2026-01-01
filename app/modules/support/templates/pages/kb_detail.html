@@ -1,0 +1,164 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-2">
+                {% if article.category %}
+                <span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700">
+                    {% if article.category.icon %}
+                    <span>{{ article.category.icon }}</span>
+                    {% endif %}
+                    {{ article.category.name }}
+                </span>
+                {% endif %}
+                {% set status_styles = {
+                    'published': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                    'draft': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                    'archived': 'bg-gray-50 text-gray-600 ring-gray-500/20'
+                } %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(article.status, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}">
+                    {{ article.status | title }}
+                </span>
+                {% set visibility_styles = {
+                    'public': 'bg-blue-50 text-blue-700',
+                    'internal': 'bg-purple-50 text-purple-700',
+                    'restricted': 'bg-red-50 text-red-700'
+                } %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium {{ visibility_styles.get(article.visibility, 'bg-gray-50 text-gray-600') }}">
+                    {{ article.visibility | title }}
+                </span>
+            </div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">{{ article.title }}</h1>
+            <div class="mt-2 flex items-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    {{ article.view_count | default(0) }} views
+                </span>
+                <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Updated {{ article.updated_at.strftime('%b %d, %Y') if article.updated_at else '-' }}
+                </span>
+                {% if article.version > 1 %}
+                <span class="text-gray-400">v{{ article.version }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a
+                href="/support/kb/{{ article.id }}/edit"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <form action="/support/kb/{{ article.id }}/delete" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to delete this article?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 bg-white border border-gray-200 shadow-sm hover:bg-red-50 hover:border-red-200 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Article Content -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="prose prose-gray max-w-none">
+                    {# Render markdown content - for now just display as preformatted #}
+                    {{ article.content | safe }}
+                </div>
+            </div>
+
+            <!-- Helpfulness -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700">Was this article helpful?</span>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-500">
+                            <span class="text-emerald-600 font-medium">{{ article.helpful_count | default(0) }}</span> helpful
+                            &middot;
+                            <span class="text-red-600 font-medium">{{ article.not_helpful_count | default(0) }}</span> not helpful
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Article Info -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Article Info</h3>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Slug</dt>
+                        <dd class="text-gray-900 font-mono text-xs">{{ article.slug }}</dd>
+                    </div>
+                    {% if article.published_at %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Published</dt>
+                        <dd class="text-gray-900">{{ article.published_at.strftime('%b %d, %Y') }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Created</dt>
+                        <dd class="text-gray-900">{{ article.created_at.strftime('%b %d, %Y') if article.created_at else '-' }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Version</dt>
+                        <dd class="text-gray-900">{{ article.version }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Search Keywords -->
+            {% if article.search_keywords %}
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Search Keywords</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for keyword in article.search_keywords.split(',') %}
+                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-surface-100 text-gray-700">
+                        {{ keyword.strip() }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Related Articles -->
+            {% if related_articles %}
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Related Articles</h3>
+                <ul class="space-y-3">
+                    {% for related in related_articles %}
+                    <li>
+                        <a href="/support/kb/{{ related.id }}" class="text-sm text-primary-600 hover:text-primary-700 hover:underline">
+                            {{ related.title }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

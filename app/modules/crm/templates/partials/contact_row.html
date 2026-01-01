@@ -1,6 +1,17 @@
 {# Single contact row - used in table and for HTMX row updates #}
-<tr id="contact-row-{{ contact.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="contact-row-{{ contact.id }}">
-    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+<tr id="contact-row-{{ contact.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="contact-row-{{ contact.id }}" data-row-id="{{ contact.id }}" data-bulk-id="{{ contact.id }}">
+    {# Bulk select checkbox #}
+    <td class="whitespace-nowrap py-4 pl-6 pr-2">
+        <input
+            type="checkbox"
+            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            @change="toggleOne('{{ contact.id }}', $event.target.checked)"
+            :checked="isSelected('{{ contact.id }}')"
+            data-bulk-checkbox
+            data-testid="select-{{ contact.id }}"
+        >
+    </td>
+    <td class="whitespace-nowrap py-4 pr-3">
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
                 <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 ring-1 ring-primary-200/50 group-hover:from-primary-100 group-hover:to-primary-200 transition-all">

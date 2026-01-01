@@ -1,0 +1,78 @@
+{# Single department row #}
+<tr id="department-row-{{ department.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="department-row-{{ department.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 ring-1 ring-blue-200/50 group-hover:from-blue-100 group-hover:to-blue-200 transition-all">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                </span>
+            </div>
+            <div>
+                <a
+                    href="/hr/departments/{{ department.id }}"
+                    class="font-medium text-gray-900 hover:text-primary-600 transition-colors font-body"
+                    data-testid="department-name-{{ department.id }}"
+                >
+                    {{ department.department_name }}
+                </a>
+                {% if department.is_group %}
+                <span class="ml-2 inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                    GROUP
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden sm:table-cell">
+        {{ department.parent_department or '-' }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden md:table-cell">
+        {{ department.company or '-' }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm font-medium text-gray-700">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            {{ employee_counts.get(department.id, 0) }}
+        </span>
+    </td>
+    <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/hr/departments/{{ department.id }}"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="View"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/hr/departments/{{ department.id }}/edit"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                title="Edit"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+            <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete"
+                hx-delete="/hr/departments/{{ department.id }}"
+                hx-target="#department-row-{{ department.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to delete '{{ department.department_name }}'?"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </div>
+    </td>
+</tr>

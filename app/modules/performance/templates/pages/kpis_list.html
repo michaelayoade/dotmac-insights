@@ -1,0 +1,54 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/performance" class="hover:text-primary-600">Performance</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">Key Performance Indicators</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Key Performance Indicators (KPIs)</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Define measurable KPIs for performance tracking</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if kpis %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">KPI</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Code</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Data Source</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Scoring</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden xl:table-cell">Target</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for kpi in kpis %}
+            <tr class="hover:bg-surface-50">
+                <td class="py-4 pl-6 pr-3">
+                    <span class="font-medium text-gray-900">{{ kpi.name }}</span>
+                    {% if kpi.description %}<p class="text-xs text-gray-500 mt-0.5 max-w-md truncate">{{ kpi.description }}</p>{% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ kpi.code }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-surface-100 text-gray-700">
+                        {{ kpi.data_source.value|replace('_', ' ')|title if kpi.data_source else '-' }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ kpi.scoring_method.value|title if kpi.scoring_method else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">{{ kpi.target_value|round(2) if kpi.target_value else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No KPIs defined</h3>
+    <p class="text-sm text-gray-500">Key Performance Indicators will appear here when configured.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Customers</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage your customer accounts and subscriptions</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/customers/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 transition-all duration-200"
+            data-testid="new-customer-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Customer</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Summary -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide font-body">Total Customers</p>
+        <p class="mt-1 text-2xl font-display font-bold text-gray-900" data-testid="stat-total">{{ stats.total_count }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide font-body">Active</p>
+        <p class="mt-1 text-2xl font-display font-bold text-emerald-600" data-testid="stat-active">{{ stats.active_count }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide font-body">Monthly Revenue</p>
+        <p class="mt-1 text-2xl font-display font-bold text-primary-600" data-testid="stat-mrr">{{ stats.total_mrr | currency }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide font-body">Suspended</p>
+        <p class="mt-1 text-2xl font-display font-bold text-amber-600" data-testid="stat-suspended">{{ stats.suspended_count }}</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-4">
+        <!-- Search -->
+        <div class="flex-1">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ search_query }}"
+                    placeholder="Search by name, email, or phone..."
+                    class="block w-full pl-10 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                    hx-get="/customers/table"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-target="#customers-table-container"
+                    hx-include="[name='status'], [name='type']"
+                    data-testid="customer-search"
+                >
+            </div>
+        </div>
+
+        <!-- Status Filter -->
+        <div class="relative">
+            <select
+                name="status"
+                class="block w-full sm:w-40 px-4 py-2.5 pr-10 text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                hx-get="/customers/table"
+                hx-trigger="change"
+                hx-target="#customers-table-container"
+                hx-include="[name='q'], [name='type']"
+                data-testid="status-filter"
+            >
+                <option value="">All Statuses</option>
+                {% for opt in status_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Type Filter -->
+        <div class="relative">
+            <select
+                name="type"
+                class="block w-full sm:w-40 px-4 py-2.5 pr-10 text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                hx-get="/customers/table"
+                hx-trigger="change"
+                hx-target="#customers-table-container"
+                hx-include="[name='q'], [name='status']"
+                data-testid="type-filter"
+            >
+                <option value="">All Types</option>
+                {% for opt in type_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_type == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div id="customers-table-container">
+    {% include "modules/customers/templates/partials/customers_table.html" %}
+</div>
+{% endblock %}

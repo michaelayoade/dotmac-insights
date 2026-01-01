@@ -1,0 +1,138 @@
+{# Single invoice row partial #}
+<tr
+    class="group hover:bg-surface-50 transition-colors"
+    id="invoice-row-{{ inv.id }}"
+    data-testid="invoice-row-{{ inv.id }}"
+>
+    <td class="py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                {% set status_icon_colors = {
+                    'draft': 'from-gray-100 to-gray-200 ring-gray-200/50',
+                    'pending': 'from-blue-100 to-blue-200 ring-blue-200/50',
+                    'paid': 'from-emerald-100 to-emerald-200 ring-emerald-200/50',
+                    'partially_paid': 'from-amber-100 to-amber-200 ring-amber-200/50',
+                    'overdue': 'from-red-100 to-red-200 ring-red-200/50',
+                    'cancelled': 'from-gray-100 to-gray-200 ring-gray-200/50'
+                } %}
+                {% set status_text_colors = {
+                    'draft': 'text-gray-600',
+                    'pending': 'text-blue-700',
+                    'paid': 'text-emerald-700',
+                    'partially_paid': 'text-amber-700',
+                    'overdue': 'text-red-700',
+                    'cancelled': 'text-gray-500'
+                } %}
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ status_icon_colors.get(inv.status.value, 'from-gray-100 to-gray-200 ring-gray-200/50') }} ring-2">
+                    <svg class="w-5 h-5 {{ status_text_colors.get(inv.status.value, 'text-gray-600') }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </span>
+            </div>
+            <div class="min-w-0 flex-1">
+                <a
+                    href="/accounting/invoices/{{ inv.id }}"
+                    class="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors truncate block"
+                    data-testid="invoice-number-{{ inv.id }}"
+                >
+                    {{ inv.invoice_number or 'INV-' ~ inv.id }}
+                </a>
+                <p class="text-xs text-gray-500 font-body mt-0.5">
+                    {{ inv.invoice_date | format_date }}
+                </p>
+            </div>
+        </div>
+    </td>
+    <td class="px-3 py-4 hidden sm:table-cell">
+        {% if inv.customer %}
+        <a href="/customers/{{ inv.customer.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
+            {{ inv.customer.name }}
+        </a>
+        {% elif inv.contact %}
+        <a href="/crm/contacts/{{ inv.contact.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
+            {{ inv.contact.name }}
+        </a>
+        {% else %}
+        <span class="text-sm text-gray-400 italic font-body">No customer</span>
+        {% endif %}
+    </td>
+    <td class="px-3 py-4">
+        <span class="text-sm font-semibold text-gray-900 font-body" data-testid="invoice-amount-{{ inv.id }}">
+            {{ inv.total_amount | currency }}
+        </span>
+    </td>
+    <td class="px-3 py-4 hidden md:table-cell">
+        {% if inv.balance and inv.balance > 0 %}
+        <span class="text-sm font-medium text-amber-600 font-body">
+            {{ inv.balance | currency }}
+        </span>
+        {% else %}
+        <span class="text-sm text-gray-400 font-body">-</span>
+        {% endif %}
+    </td>
+    <td class="px-3 py-4 hidden lg:table-cell">
+        {% if inv.due_date %}
+        <span class="text-sm text-gray-700 font-body {% if inv.is_overdue %}text-red-600 font-medium{% endif %}">
+            {{ inv.due_date | format_date }}
+            {% if inv.is_overdue %}
+            <span class="text-xs text-red-500">({{ inv.days_overdue }}d overdue)</span>
+            {% endif %}
+        </span>
+        {% else %}
+        <span class="text-sm text-gray-400 italic font-body">Not set</span>
+        {% endif %}
+    </td>
+    <td class="px-3 py-4">
+        {% set status_styles = {
+            'draft': 'bg-gray-50 text-gray-600 ring-gray-500/20',
+            'pending': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'paid': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'partially_paid': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+            'overdue': 'bg-red-50 text-red-700 ring-red-600/20',
+            'cancelled': 'bg-gray-50 text-gray-500 ring-gray-400/20',
+            'refunded': 'bg-purple-50 text-purple-700 ring-purple-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(inv.status.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="invoice-status-{{ inv.id }}">
+            {{ inv.status.value | replace('_', ' ') | title }}
+        </span>
+    </td>
+    <td class="py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/accounting/invoices/{{ inv.id }}"
+                class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                title="View details"
+                data-testid="view-invoice-{{ inv.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            {% if inv.status.value in ['pending', 'partially_paid', 'overdue'] %}
+            <a
+                href="/accounting/payments/new?invoice_id={{ inv.id }}"
+                class="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                title="Record Payment"
+                data-testid="pay-invoice-{{ inv.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+            </a>
+            {% endif %}
+            {% if inv.status.value == 'draft' %}
+            <a
+                href="/accounting/invoices/{{ inv.id }}/edit"
+                class="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                title="Edit"
+                data-testid="edit-invoice-{{ inv.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+            {% endif %}
+        </div>
+    </td>
+</tr>

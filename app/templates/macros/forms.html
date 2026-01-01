@@ -330,3 +330,188 @@ Usage:
     {{ caller() }}
 </div>
 {% endmacro %}
+
+
+{# ==========================================================================
+   HTMX INLINE EDITING COMPONENTS
+   ========================================================================== #}
+
+{# Inline Edit Text - Click to edit a text field #}
+{% macro inline_text(id, field, value, endpoint, placeholder="Click to edit", testid=none) %}
+<div
+    class="inline-edit-wrapper group relative"
+    x-data="{ editing: false }"
+    data-testid="{{ testid or ('inline-' ~ field ~ '-' ~ id) }}"
+>
+    {# Display mode #}
+    <span
+        class="display-value cursor-pointer hover:bg-surface-100 px-2 py-1 -mx-2 -my-1 rounded-lg transition-colors"
+        x-show="!editing"
+        @click="editing = true; $nextTick(() => $refs.input.focus())"
+    >
+        {{ value or placeholder }}
+        <svg class="w-3 h-3 text-gray-400 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+        </svg>
+    </span>
+
+    {# Edit mode #}
+    <form
+        class="edit-input inline-flex items-center gap-1"
+        x-show="editing"
+        x-cloak
+        hx-patch="{{ endpoint }}"
+        hx-target="closest .inline-edit-wrapper"
+        hx-swap="outerHTML"
+        @submit="editing = false"
+        @keydown.escape="editing = false"
+    >
+        <input
+            type="text"
+            name="{{ field }}"
+            value="{{ value }}"
+            x-ref="input"
+            class="text-sm border-gray-300 rounded-lg px-2 py-1 focus:ring-primary-500 focus:border-primary-500"
+            @blur="if (!$event.relatedTarget?.closest('form')) editing = false"
+        >
+        <button type="submit" class="p-1 text-primary-600 hover:bg-primary-50 rounded transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </button>
+        <button type="button" @click="editing = false" class="p-1 text-gray-400 hover:bg-gray-100 rounded transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </form>
+</div>
+{% endmacro %}
+
+
+{# Inline Edit Select - Click to change from dropdown #}
+{% macro inline_select(id, field, value, options, endpoint, testid=none) %}
+<div
+    class="inline-edit-wrapper group relative"
+    x-data="{ editing: false }"
+    data-testid="{{ testid or ('inline-' ~ field ~ '-' ~ id) }}"
+>
+    {# Display mode #}
+    <span
+        class="display-value cursor-pointer hover:bg-surface-100 px-2 py-1 -mx-2 -my-1 rounded-lg transition-colors inline-flex items-center gap-1"
+        x-show="!editing"
+        @click="editing = true; $nextTick(() => $refs.select.focus())"
+    >
+        {% for opt in options %}{% if opt.value == value %}{{ opt.label }}{% endif %}{% endfor %}
+        <svg class="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </span>
+
+    {# Edit mode #}
+    <form
+        class="edit-input"
+        x-show="editing"
+        x-cloak
+        hx-patch="{{ endpoint }}"
+        hx-target="closest .inline-edit-wrapper"
+        hx-swap="outerHTML"
+    >
+        <select
+            name="{{ field }}"
+            x-ref="select"
+            class="text-sm border-gray-300 rounded-lg px-2 py-1 pr-8 focus:ring-primary-500 focus:border-primary-500"
+            @change="$el.form.requestSubmit(); editing = false"
+            @blur="editing = false"
+            @keydown.escape="editing = false"
+        >
+            {% for opt in options %}
+            <option value="{{ opt.value }}" {% if opt.value == value %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endmacro %}
+
+
+{# Inline Status Badge - Clickable status that opens dropdown #}
+{% macro inline_status(id, field, value, options, endpoint, styles=none, testid=none) %}
+{% set default_styles = {
+    'active': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    'inactive': 'bg-gray-50 text-gray-600 ring-gray-500/20',
+    'pending': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    'open': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+    'closed': 'bg-gray-50 text-gray-600 ring-gray-500/20',
+    'resolved': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+} %}
+{% set badge_styles = styles or default_styles %}
+<div
+    class="inline-edit-wrapper relative"
+    x-data="{ open: false }"
+    @click.outside="open = false"
+    data-testid="{{ testid or ('inline-status-' ~ id) }}"
+>
+    {# Current status badge #}
+    <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset cursor-pointer hover:opacity-80 transition-opacity {{ badge_styles.get(value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}"
+        @click="open = !open"
+    >
+        {{ value | replace('_', ' ') | title }}
+        <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+
+    {# Dropdown #}
+    <div
+        x-show="open"
+        x-cloak
+        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        class="absolute z-10 mt-1 left-0 w-40 origin-top-left rounded-xl bg-white shadow-lg ring-1 ring-gray-100 py-1"
+    >
+        {% for opt in options %}
+        <button
+            type="button"
+            class="w-full text-left px-3 py-2 text-sm hover:bg-surface-50 flex items-center gap-2 {{ 'font-medium text-primary-600' if opt.value == value else 'text-gray-700' }}"
+            hx-patch="{{ endpoint }}"
+            hx-vals='{"{{ field }}": "{{ opt.value }}"}'
+            hx-target="closest .inline-edit-wrapper"
+            hx-swap="outerHTML"
+            @click="open = false"
+        >
+            <span class="w-2 h-2 rounded-full {{ badge_styles.get(opt.value, 'bg-gray-400') | replace('bg-', 'bg-') | replace('-50', '-500') | replace('text-', '') | replace('ring-', '') }}"></span>
+            {{ opt.label }}
+        </button>
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
+
+
+{# Delete Button with Modal Confirmation #}
+{% macro delete_button(endpoint, item_name, size="sm", testid=none) %}
+<button
+    type="button"
+    class="inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors
+           {% if size == 'sm' %}w-8 h-8{% else %}px-3 py-2 gap-2{% endif %}"
+    title="Delete"
+    hx-delete="{{ endpoint }}"
+    hx-confirm="Are you sure?"
+    hx-target="closest tr, closest .card, closest [data-deletable]"
+    hx-swap="outerHTML swap:0.3s"
+    data-item-name="{{ item_name }}"
+    data-delete-id="{{ endpoint | replace('/', '-') }}"
+    {% if testid %}data-testid="{{ testid }}"{% endif %}
+>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+    </svg>
+    {% if size != 'sm' %}<span>Delete</span>{% endif %}
+</button>
+{% endmacro %}

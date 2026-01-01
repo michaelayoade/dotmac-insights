@@ -1,0 +1,103 @@
+{# Single project row - used in table and for HTMX row updates #}
+<tr id="project-row-{{ project.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="project-row-{{ project.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 ring-1 ring-blue-200/50 group-hover:from-blue-100 group-hover:to-blue-200 transition-all">
+                    <svg class="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                </span>
+            </div>
+            <div>
+                <a
+                    href="/projects/{{ project.id }}"
+                    class="font-medium text-gray-900 hover:text-primary-600 transition-colors font-body"
+                    data-testid="project-name-{{ project.id }}"
+                >
+                    {{ project.project_name }}
+                </a>
+                {% if project.project_type %}
+                <p class="text-xs text-gray-500 font-body">{{ project.project_type | title }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden sm:table-cell">
+        {% set status_styles = {
+            'open': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'completed': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'cancelled': 'bg-red-50 text-red-700 ring-red-600/20',
+            'on_hold': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(project.status.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="project-status-{{ project.id }}">
+            {{ project.status.value | replace('_', ' ') | title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden md:table-cell">
+        {% set priority_styles = {
+            'low': 'bg-gray-100 text-gray-600',
+            'medium': 'bg-blue-50 text-blue-700',
+            'high': 'bg-red-50 text-red-700'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium {{ priority_styles.get(project.priority.value, 'bg-gray-100 text-gray-600') }}" data-testid="project-priority-{{ project.id }}">
+            {{ project.priority.value | title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell">
+        <div class="flex items-center gap-2">
+            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-primary-500 rounded-full" style="width: {{ project.percent_complete }}%"></div>
+            </div>
+            <span class="text-xs text-gray-600 font-body">{{ project.percent_complete | int }}%</span>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden lg:table-cell" data-testid="project-due-{{ project.id }}">
+        {% if project.expected_end_date %}
+        <span class="{{ 'text-red-600' if project.is_overdue else '' }}">
+            {{ project.expected_end_date | format_date }}
+        </span>
+        {% else %}
+        <span class="text-gray-400">-</span>
+        {% endif %}
+    </td>
+    <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/projects/{{ project.id }}"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="View"
+                data-testid="project-view-{{ project.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/projects/{{ project.id }}/edit"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                title="Edit"
+                data-testid="project-edit-{{ project.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+            <button
+                type="button"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete"
+                hx-delete="/projects/{{ project.id }}"
+                hx-target="#project-row-{{ project.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to delete '{{ project.project_name }}'? This cannot be undone."
+                data-testid="project-delete-{{ project.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </div>
+    </td>
+</tr>

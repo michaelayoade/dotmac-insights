@@ -1,10 +1,14 @@
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, Response
+from fastapi import FastAPI, Depends, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from fastapi.exceptions import HTTPException
 from contextlib import asynccontextmanager
 import structlog
+
+from app.templates.environment import get_template_env
 
 from app.api import api_router, public_api_router
 from app.web.routes import web_router
@@ -15,6 +19,7 @@ from app.observability.otel import setup_otel, shutdown_otel
 from app.middleware.license import enforce_license
 from app.services.rbac_sync import ensure_admin_has_all_permissions
 from app.services.platform_client import init_platform_client, close_platform_client
+from app.events import register_subscription_events
 
 # Configure structured logging
 structlog.configure(
@@ -63,6 +68,10 @@ async def lifespan(app: FastAPI):
 
     ensure_admin_has_all_permissions()
 
+    # Register SQLAlchemy event handlers for provisioning
+    register_subscription_events()
+    logger.info("subscription_events_registered")
+
     yield
 
     # Shutdown
@@ -87,8 +96,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Restrict to specific methods instead of wildcard
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    # Restrict to specific headers instead of wildcard
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-CSRF-Token",
+        "HX-Request",
+        "HX-Current-URL",
+        "HX-Target",
+        "HX-Trigger",
+        "HX-Boosted",
+    ],
 )
 logger.info("cors_configured", origins=settings.cors_origins_list)
 
@@ -118,6 +138,48 @@ if STATIC_DIR.exists():
 # This provides HTML pages rendered server-side with HTMX
 app.include_router(web_router)
 logger.info("web_router_mounted")
+
+
+# Custom exception handlers for SSR error pages
+templates = get_template_env()
+
+
+@app.exception_handler(403)
+async def forbidden_handler(request: Request, exc: HTTPException):
+    """Render 403 error page for web requests, JSON for API requests."""
+    if request.url.path.startswith("/api/"):
+        return Response(
+            content='{"detail": "' + str(exc.detail or "Forbidden") + '"}',
+            status_code=403,
+            media_type="application/json",
+        )
+
+    template = templates.get_template("errors/403.html")
+    context = {
+        "csrf_token": "",
+        "product_name": "DotMac BOS",
+        "detail": exc.detail,
+    }
+    return HTMLResponse(template.render(context), status_code=403)
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc: HTTPException):
+    """Render 404 error page for web requests, JSON for API requests."""
+    if request.url.path.startswith("/api/"):
+        return Response(
+            content='{"detail": "' + str(exc.detail or "Not Found") + '"}',
+            status_code=404,
+            media_type="application/json",
+        )
+
+    template = templates.get_template("errors/404.html")
+    context = {
+        "csrf_token": "",
+        "product_name": "DotMac BOS",
+        "detail": exc.detail,
+    }
+    return HTMLResponse(template.render(context), status_code=404)
 
 
 @app.get("/health")

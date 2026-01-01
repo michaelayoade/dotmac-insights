@@ -1,0 +1,43 @@
+{# Attendance records table partial #}
+{% if records %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="?sort=employee_name&dir={{ 'desc' if sort == 'employee_name' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/hr/attendance/table?sort=employee_name&dir={{ 'desc' if sort == 'employee_name' and dir == 'asc' else 'asc' }}" hx-target="#attendance-table-container" hx-push-url="true">
+                    Employee
+                    {% if sort == 'employee_name' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="?sort=attendance_date&dir={{ 'desc' if sort == 'attendance_date' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/hr/attendance/table?sort=attendance_date&dir={{ 'desc' if sort == 'attendance_date' and dir == 'asc' else 'asc' }}" hx-target="#attendance-table-container" hx-push-url="true">
+                    Date
+                    {% if sort == 'attendance_date' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Status</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">In Time</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Out Time</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden xl:table-cell">Hours</th>
+            <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for record in records %}
+            {% include "modules/hr/templates/attendance/partials/attendance_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No attendance records found</h3>
+    <p class="text-sm text-gray-500 mb-6">Get started by recording employee attendance.</p>
+    <a href="/hr/attendance/new" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Record Attendance
+    </a>
+</div>
+{% endif %}

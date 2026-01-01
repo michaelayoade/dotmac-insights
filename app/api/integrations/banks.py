@@ -63,10 +63,10 @@ def get_client(provider: Optional[str] = None):
         if provider == "flutterwave":
             return FlutterwaveClient()
         return PaystackClient()
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Payment provider not configured: {str(e)}"
+            detail="Payment provider not configured"
         )
 
 
@@ -102,10 +102,10 @@ async def list_banks(
             for bank in banks
         ]
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch banks: {str(e)}",
+            detail="Failed to fetch banks",
         )
     finally:
         await client.close()
@@ -138,10 +138,10 @@ async def resolve_account(
             bank_name=result.bank_name,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to resolve account",
         )
     finally:
         await client.close()
@@ -180,10 +180,10 @@ async def search_banks(
 
         return {"results": matches, "count": len(matches)}
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to search banks: {str(e)}",
+            detail="Failed to search banks",
         )
     finally:
         await client.close()
@@ -221,10 +221,10 @@ async def get_bank(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch bank: {str(e)}",
+            detail="Failed to fetch bank",
         )
     finally:
         await client.close()

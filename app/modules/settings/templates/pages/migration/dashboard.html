@@ -1,0 +1,201 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Data Migration</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Import data from CSV, JSON, and Excel files</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/migration/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+            data-testid="new-migration-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Migration
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" data-testid="migration-stats">
+    <!-- Total Jobs -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-purple-200 flex items-center justify-center ring-2 ring-violet-200/50">
+                <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.total) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Jobs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Running -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center ring-2 ring-amber-200/50">
+                <svg class="w-6 h-6 text-amber-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ stats.running }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Running</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completed -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center ring-2 ring-emerald-200/50">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.completed) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br {{ 'from-red-100 to-rose-200 ring-red-200/50' if stats.failed > 0 else 'from-gray-100 to-slate-200 ring-gray-200/50' }} flex items-center justify-center ring-2">
+                <svg class="w-6 h-6 {{ 'text-red-600' if stats.failed > 0 else 'text-gray-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold {{ 'text-red-600' if stats.failed > 0 else 'text-gray-900' }} tabular-nums">{{ stats.failed }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Failed</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="flex items-center gap-2 mb-6">
+    <a href="/settings/migration"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if not status_filter else 'text-gray-600 hover:bg-gray-100' }}">
+        All
+    </a>
+    <a href="/settings/migration?status_filter=pending"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if status_filter == 'pending' else 'text-gray-600 hover:bg-gray-100' }}">
+        Pending
+    </a>
+    <a href="/settings/migration?status_filter=running"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if status_filter == 'running' else 'text-gray-600 hover:bg-gray-100' }}">
+        Running
+    </a>
+    <a href="/settings/migration?status_filter=completed"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if status_filter == 'completed' else 'text-gray-600 hover:bg-gray-100' }}">
+        Completed
+    </a>
+    <a href="/settings/migration?status_filter=failed"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if status_filter == 'failed' else 'text-gray-600 hover:bg-gray-100' }}">
+        Failed
+    </a>
+</div>
+
+<!-- Jobs Table -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="migration-jobs-table">
+    <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+        <h2 class="text-lg font-display font-semibold text-gray-900">Migration Jobs</h2>
+    </div>
+
+    {% if jobs %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead>
+                <tr class="bg-surface-50">
+                    <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Name</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Entity</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Progress</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Created</th>
+                    <th scope="col" class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for job in jobs %}
+                <tr class="hover:bg-surface-50/50 transition-colors">
+                    <td class="py-4 pl-6 pr-3">
+                        <a href="/settings/migration/jobs/{{ job.id }}" class="text-sm font-medium text-gray-900 hover:text-primary-600">
+                            {{ job.name }}
+                        </a>
+                    </td>
+                    <td class="px-3 py-4">
+                        <span class="text-sm text-gray-600">{{ job.entity_type.value | replace('_', ' ') | title }}</span>
+                    </td>
+                    <td class="px-3 py-4">
+                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ status_colors.get(job.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                            {{ job.status.value | title }}
+                        </span>
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if job.total_rows > 0 %}
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                <div class="bg-primary-600 h-2 rounded-full" style="width: {{ job.progress_percent }}%"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 tabular-nums">{{ job.progress_percent }}%</span>
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        <span class="text-sm text-gray-500">{{ job.created_at.strftime('%d %b %Y %H:%M') }}</span>
+                    </td>
+                    <td class="px-3 py-4 text-right">
+                        <a href="/settings/migration/jobs/{{ job.id }}" class="text-sm text-primary-600 hover:text-primary-500 font-medium">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.total > pagination.per_page %}
+    <div class="px-6 py-4 border-t border-gray-100">
+        {% include "components/ui/pagination.html" %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="p-12 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-200 flex items-center justify-center mb-6 ring-2 ring-violet-200/50">
+            <svg class="w-8 h-8 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No migration jobs yet</h3>
+        <p class="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+            Create a new migration job to import data from CSV, JSON, or Excel files.
+        </p>
+        <a href="/settings/migration/new" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-500 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Migration
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

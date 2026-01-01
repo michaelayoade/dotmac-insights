@@ -1,0 +1,79 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ '/hr/training/' ~ event.id if event else '/hr/training' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        {% if event %}<input type="hidden" name="_method" value="PUT">{% endif %}
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Training Event' if event else 'New Training Event' }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ 'Update event details' if event else 'Create a new training event' }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="event_name" class="block text-sm font-medium text-gray-700 mb-1.5">Event Name <span class="text-red-500">*</span></label>
+                <input type="text" name="event_name" id="event_name" required value="{{ event.event_name if event else (form_data.event_name if form_data else '') }}" placeholder="e.g., Safety Training Q1" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.event_name %}<p class="mt-1.5 text-sm text-red-600">{{ errors.event_name }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="training_program" class="block text-sm font-medium text-gray-700 mb-1.5">Training Program</label>
+                <select name="training_program" id="training_program" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">Select program</option>
+                    {% for opt in program_options %}<option value="{{ opt.value }}" {{ 'selected' if (event and event.training_program == opt.value) or (form_data and form_data.training_program == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="type" class="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+                    <select name="type" id="type" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select type</option>
+                        {% for t in ['Seminar', 'Workshop', 'Conference', 'Lecture', 'Webinar'] %}
+                        <option value="{{ t }}" {{ 'selected' if (event and event.type == t) or (form_data and form_data.type == t) else '' }}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="level" class="block text-sm font-medium text-gray-700 mb-1.5">Level</label>
+                    <select name="level" id="level" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select level</option>
+                        {% for l in ['Beginner', 'Intermediate', 'Expert'] %}
+                        <option value="{{ l }}" {{ 'selected' if (event and event.level == l) or (form_data and form_data.level == l) else '' }}>{{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label for="trainer_name" class="block text-sm font-medium text-gray-700 mb-1.5">Trainer</label>
+                <input type="text" name="trainer_name" id="trainer_name" value="{{ event.trainer_name if event else (form_data.trainer_name if form_data else '') }}" placeholder="Trainer name" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="start_time" class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" name="start_time" id="start_time" required value="{{ event.start_time if event else (form_data.start_time if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% if errors.start_time %}<p class="mt-1.5 text-sm text-red-600">{{ errors.start_time }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="end_time" class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" name="end_time" id="end_time" required value="{{ event.end_time if event else (form_data.end_time if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% if errors.end_time %}<p class="mt-1.5 text-sm text-red-600">{{ errors.end_time }}</p>{% endif %}
+                </div>
+            </div>
+            <div>
+                <label for="location" class="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                <input type="text" name="location" id="location" value="{{ event.location if event else (form_data.location if form_data else '') }}" placeholder="e.g., Conference Room A" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div>
+                <label for="introduction" class="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                <textarea name="introduction" id="introduction" rows="4" placeholder="Event description..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ event.introduction if event else (form_data.introduction if form_data else '') }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/hr/training" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ 'Update Event' if event else 'Create Event' }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

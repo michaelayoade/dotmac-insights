@@ -1,0 +1,177 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/vehicles" class="hover:text-primary-600">Fleet Management</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ vehicle.license_plate }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ vehicle.license_plate }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ vehicle.make }} {{ vehicle.model }} {% if vehicle.model_year %}({{ vehicle.model_year }}){% endif %}</p>
+    </div>
+    <div>
+        {% if vehicle.is_active %}
+        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Active</span>
+        {% else %}
+        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ring-1 ring-inset bg-gray-50 text-gray-700 ring-gray-600/20">Inactive</span>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Vehicle Details</h3>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">License Plate</dt>
+                        <dd class="mt-1.5 text-gray-900 font-medium">{{ vehicle.license_plate }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Make / Model</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.make or '-' }} {{ vehicle.model or '' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Model Year</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.model_year or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Color</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.color or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Chassis Number</dt>
+                        <dd class="mt-1.5 text-gray-900 font-mono text-sm">{{ vehicle.chassis_no or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Doors / Wheels</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.doors or '-' }} doors / {{ vehicle.wheels or '-' }} wheels</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Fuel Type</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.fuel_type or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Location</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.location or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Odometer & Usage</h3>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Current Odometer</dt>
+                        <dd class="mt-1.5 text-gray-900 text-2xl font-bold">{{ vehicle.odometer_value|round(0)|int }} <span class="text-sm font-normal text-gray-500">{{ vehicle.uom or 'km' }}</span></dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Last Odometer Update</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.last_odometer_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Acquisition Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.acquisition_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Vehicle Value</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.vehicle_value|round(2) if vehicle.vehicle_value else '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Insurance</h3>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Insurance Company</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.insurance_company or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Policy Number</dt>
+                        <dd class="mt-1.5 text-gray-900 font-mono text-sm">{{ vehicle.policy_no or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Insurance Start</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.insurance_start_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Insurance End</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ vehicle.insurance_end_date or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Odometer</h3>
+                <p class="mt-4 text-4xl font-bold">{{ vehicle.odometer_value|round(0)|int }}</p>
+                <p class="text-sm opacity-75">{{ vehicle.uom or 'km' }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Assigned Driver</h3>
+            </div>
+            <div class="px-6 py-6">
+                {% if vehicle.assigned_driver %}
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-900">{{ vehicle.assigned_driver.employee_name }}</p>
+                        <p class="text-sm text-gray-500">{{ vehicle.assigned_driver.designation or 'Driver' }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm">No driver assigned</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Timeline</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ vehicle.created_at.strftime('%b %d, %Y %H:%M') if vehicle.created_at else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ vehicle.updated_at.strftime('%b %d, %Y %H:%M') if vehicle.updated_at else '-' }}</dd>
+                </div>
+                {% if vehicle.last_synced_at %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Synced</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ vehicle.last_synced_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

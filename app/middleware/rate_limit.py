@@ -136,6 +136,14 @@ auth_rate_limiter = InMemoryRateLimiter(
     block_seconds=300,
 )
 
+# Webhook rate limiter - more permissive but still protective
+# 100 requests/minute per IP, 5-minute block on excess
+webhook_rate_limiter = InMemoryRateLimiter(
+    requests_per_window=100,
+    window_seconds=60,
+    block_seconds=300,
+)
+
 
 def get_client_ip(request: Request) -> str:
     """
@@ -197,3 +205,29 @@ async def clear_auth_rate_limit(request: Request) -> None:
     """Clear rate limit after successful authentication."""
     client_ip = get_client_ip(request)
     await auth_rate_limiter.clear(client_ip)
+
+
+async def check_webhook_rate_limit(request: Request) -> None:
+    """
+    Rate limiting dependency for webhook endpoints.
+
+    Raises HTTPException 429 if rate limited.
+
+    Usage:
+        @router.post("/paystack", dependencies=[Depends(check_webhook_rate_limit)])
+    """
+    client_ip = get_client_ip(request)
+
+    is_limited, retry_after = await webhook_rate_limiter.is_rate_limited(client_ip)
+
+    if is_limited:
+        logger.warning(
+            "webhook_rate_limited",
+            client_ip=client_ip,
+            retry_after=retry_after,
+        )
+        raise HTTPException(
+            status_code=429,
+            detail="Too many webhook requests. Please try again later.",
+            headers={"Retry-After": str(retry_after)} if retry_after else None,
+        )

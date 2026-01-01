@@ -71,6 +71,18 @@ class Subscription(Base):
     # Router/NAS assignment
     router_id: Mapped[Optional[int]] = mapped_column(ForeignKey("routers.id"), nullable=True, index=True)
 
+    # Access method (for MikroTik provisioning)
+    access_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # Values: "pppoe", "hotspot", "dhcp", "ipoe", "static"
+
+    # PPPoE/Hotspot credentials
+    ppp_username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    ppp_password: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Provisioning state
+    provisioned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    provisioning_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Status
     status: Mapped[SubscriptionStatus] = mapped_column(Enum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE, index=True)
 

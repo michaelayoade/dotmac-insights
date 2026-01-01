@@ -1,0 +1,115 @@
+<div class="grid grid-cols-7 divide-x divide-gray-100">
+    <!-- Day Headers -->
+    {% for day in date_range %}
+    <div class="py-3 px-3 text-center border-b border-gray-100 {% if day.is_today %}bg-primary-50{% else %}bg-surface-50{% endif %}">
+        <div class="text-xs font-medium text-gray-500 uppercase">{{ day.day_name }}</div>
+        <div class="mt-1 text-lg font-semibold {% if day.is_today %}text-primary-600{% else %}text-gray-900{% endif %}">{{ day.day_number }}</div>
+        {% if day.summary %}
+        <div class="flex items-center justify-center gap-1 mt-1">
+            {% if day.summary.total > 0 %}
+            <span class="text-xs text-gray-500">{{ day.summary.total }} orders</span>
+            {% if day.summary.urgent > 0 %}
+            <span class="w-2 h-2 bg-red-500 rounded-full" title="{{ day.summary.urgent }} urgent"></span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Time Grid -->
+<div class="grid grid-cols-7 divide-x divide-gray-100" style="min-height: 600px;">
+    {% for day in date_range %}
+    <div class="relative p-2 space-y-1 {% if day.is_today %}bg-primary-50/30{% endif %}">
+        {% if day.orders %}
+            {% for order in day.orders %}
+            <a
+                href="/field-service/{{ order.id }}"
+                class="block p-2 rounded-lg text-xs transition-all hover:shadow-md
+                    {% if order.priority == 'emergency' %}
+                    bg-red-100 border-l-4 border-red-500 hover:bg-red-200
+                    {% elif order.priority == 'urgent' %}
+                    bg-orange-100 border-l-4 border-orange-500 hover:bg-orange-200
+                    {% elif order.status == 'completed' %}
+                    bg-green-100 border-l-4 border-green-500 hover:bg-green-200
+                    {% elif order.status == 'in_progress' %}
+                    bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-200
+                    {% elif order.status == 'en_route' or order.status == 'on_site' %}
+                    bg-cyan-100 border-l-4 border-cyan-500 hover:bg-cyan-200
+                    {% else %}
+                    bg-gray-100 border-l-4 border-gray-400 hover:bg-gray-200
+                    {% endif %}
+                "
+            >
+                <div class="font-semibold text-gray-900 truncate" title="{{ order.title }}">
+                    {{ order.order_number }}
+                </div>
+                {% if order.scheduled_start_time %}
+                <div class="text-gray-600 mt-0.5">
+                    {{ order.scheduled_start_time[:5] }}
+                    {% if order.estimated_duration_hours %}
+                    <span class="text-gray-400">({{ order.estimated_duration_hours }}h)</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if order.customer_name %}
+                <div class="text-gray-500 truncate mt-0.5" title="{{ order.customer_name }}">
+                    {{ order.customer_name }}
+                </div>
+                {% endif %}
+                {% if order.technician_name %}
+                <div class="flex items-center gap-1 mt-1">
+                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    <span class="text-gray-600 truncate">{{ order.technician_name }}</span>
+                </div>
+                {% endif %}
+            </a>
+            {% endfor %}
+        {% else %}
+            <div class="flex items-center justify-center h-full">
+                <span class="text-xs text-gray-300">No orders</span>
+            </div>
+        {% endif %}
+
+        <!-- Add button -->
+        <a
+            href="/field-service/new?date={{ day.date_iso }}"
+            class="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-primary-600 hover:bg-white rounded-lg transition-all opacity-0 group-hover:opacity-100"
+            title="Add order"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Legend -->
+<div class="px-4 py-3 border-t border-gray-100 bg-surface-50 flex flex-wrap items-center gap-4 text-xs">
+    <span class="font-medium text-gray-700">Priority:</span>
+    <span class="flex items-center gap-1.5">
+        <span class="w-3 h-3 bg-red-500 rounded"></span>
+        <span class="text-gray-600">Emergency</span>
+    </span>
+    <span class="flex items-center gap-1.5">
+        <span class="w-3 h-3 bg-orange-500 rounded"></span>
+        <span class="text-gray-600">Urgent</span>
+    </span>
+    <span class="border-l border-gray-300 pl-4 font-medium text-gray-700">Status:</span>
+    <span class="flex items-center gap-1.5">
+        <span class="w-3 h-3 bg-blue-500 rounded"></span>
+        <span class="text-gray-600">In Progress</span>
+    </span>
+    <span class="flex items-center gap-1.5">
+        <span class="w-3 h-3 bg-cyan-500 rounded"></span>
+        <span class="text-gray-600">En Route</span>
+    </span>
+    <span class="flex items-center gap-1.5">
+        <span class="w-3 h-3 bg-green-500 rounded"></span>
+        <span class="text-gray-600">Completed</span>
+    </span>
+</div>

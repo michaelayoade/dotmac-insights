@@ -1,0 +1,241 @@
+{% extends "layouts/app.html" %}
+
+{% set is_edit = supplier is defined and supplier.id %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <!-- Page Header -->
+    <div class="flex items-center gap-3 mb-8">
+        <a
+            href="{{ '/accounting/suppliers/' ~ supplier.id if is_edit else '/accounting/suppliers' }}"
+            class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Supplier' if is_edit else 'New Supplier' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update supplier information' if is_edit else 'Add a new supplier to your system' }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/accounting/suppliers/' ~ supplier.id if is_edit else '/accounting/suppliers' }}"
+        method="POST"
+        class="space-y-6"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Basic Information -->
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="sm:col-span-2">
+                    <label for="supplier_name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Supplier Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="supplier_name"
+                        name="supplier_name"
+                        value="{{ form_data.supplier_name or (supplier.supplier_name if is_edit else '') }}"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.supplier_name else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                    >
+                    {% if errors and errors.supplier_name %}
+                    <p class="mt-1 text-sm text-red-600">{{ errors.supplier_name }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="supplier_group" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Supplier Group
+                    </label>
+                    <select
+                        id="supplier_group"
+                        name="supplier_group"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select Group</option>
+                        {% for opt in group_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if (form_data.supplier_group if form_data else (supplier.supplier_group if is_edit else '')) == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="tax_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Tax ID / VAT Number
+                    </label>
+                    <input
+                        type="text"
+                        id="tax_id"
+                        name="tax_id"
+                        value="{{ form_data.tax_id or (supplier.tax_id if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm font-mono"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Contact Information</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label for="email_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        id="email_id"
+                        name="email_id"
+                        value="{{ form_data.email_id or (supplier.email_id if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="mobile_no" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Phone
+                    </label>
+                    <input
+                        type="tel"
+                        id="mobile_no"
+                        name="mobile_no"
+                        value="{{ form_data.mobile_no or (supplier.mobile_no if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="address" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Address
+                    </label>
+                    <textarea
+                        id="address"
+                        name="address"
+                        rows="3"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >{{ form_data.address or (supplier.address if is_edit else '') }}</textarea>
+                </div>
+
+                <div>
+                    <label for="country" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Country
+                    </label>
+                    <input
+                        type="text"
+                        id="country"
+                        name="country"
+                        value="{{ form_data.country or (supplier.country if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Settings -->
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Payment Settings</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label for="default_currency" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Default Currency
+                    </label>
+                    <select
+                        id="default_currency"
+                        name="default_currency"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select Currency</option>
+                        {% for opt in currency_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if (form_data.default_currency if form_data else (supplier.default_currency if is_edit else '')) == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="payment_terms" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Payment Terms
+                    </label>
+                    <select
+                        id="payment_terms"
+                        name="payment_terms"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select Terms</option>
+                        <option value="Due on Receipt" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Due on Receipt' else '' }}>Due on Receipt</option>
+                        <option value="Net 15" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Net 15' else '' }}>Net 15</option>
+                        <option value="Net 30" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Net 30' else '' }}>Net 30</option>
+                        <option value="Net 45" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Net 45' else '' }}>Net 45</option>
+                        <option value="Net 60" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Net 60' else '' }}>Net 60</option>
+                        <option value="Net 90" {{ 'selected' if (form_data.payment_terms if form_data else (supplier.payment_terms if is_edit else '')) == 'Net 90' else '' }}>Net 90</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank Details -->
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Bank Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label for="bank_name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Bank Name
+                    </label>
+                    <input
+                        type="text"
+                        id="bank_name"
+                        name="bank_name"
+                        value="{{ form_data.bank_name or (supplier.bank_name if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="bank_account" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Account Number
+                    </label>
+                    <input
+                        type="text"
+                        id="bank_account"
+                        name="bank_account"
+                        value="{{ form_data.bank_account or (supplier.bank_account if is_edit else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm font-mono"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="flex items-center justify-end gap-4">
+            <a
+                href="{{ '/accounting/suppliers/' ~ supplier.id if is_edit else '/accounting/suppliers' }}"
+                class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                {{ 'Save Changes' if is_edit else 'Create Supplier' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

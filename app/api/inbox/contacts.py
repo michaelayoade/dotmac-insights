@@ -87,7 +87,7 @@ async def list_contacts(
     sort_by: str = "last_contact_at",
     sort_order: str = "desc",
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List contacts with filtering and pagination."""
@@ -296,7 +296,7 @@ async def delete_contact(
 async def list_companies(
     search: Optional[str] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List unique companies from contacts."""

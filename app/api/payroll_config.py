@@ -143,7 +143,7 @@ def list_regions(
     active_only: bool = True,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List payroll regions."""
@@ -354,7 +354,7 @@ def list_rules(
     statutory_only: bool = False,
     calc_date: Optional[date] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List deduction rules for a region."""

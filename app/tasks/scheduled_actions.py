@@ -134,7 +134,7 @@ def auto_close_ticket(
         Result summary
     """
     try:
-        from app.models.ticket import Ticket
+        from app.models.ticket import Ticket, TicketStatus
 
         with SessionLocal() as db:
             ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
@@ -145,10 +145,10 @@ def auto_close_ticket(
                 return result
 
             # Only close if still open
-            if ticket.status in ["open", "pending", "on_hold"]:
-                ticket.status = "closed"
+            if ticket.status in [TicketStatus.OPEN, TicketStatus.ON_HOLD, TicketStatus.REPLIED]:
+                ticket.status = TicketStatus.CLOSED
                 ticket.resolution = reason
-                ticket.closed_at = datetime.utcnow()
+                ticket.resolution_date = datetime.utcnow()
                 db.commit()
 
                 result = {
@@ -286,7 +286,7 @@ def followup_lead(
                 _update_scheduled_task_status(self.request.id, result=result)
                 return result
 
-            contact_name = contact.display_name or contact.name or f"Contact #{contact_id}"
+            contact_name = contact.full_name or contact.name or f"Contact #{contact_id}"
 
             # Send notification
             notification_service = NotificationService(db)

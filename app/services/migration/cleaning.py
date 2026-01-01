@@ -121,7 +121,7 @@ class PhoneNormalizer:
             return CleaningResult(value=None, original=phone)
 
         original = phone
-        warnings = []
+        warnings: list[str] = []
 
         # Remove all non-digit characters except leading +
         phone = phone.strip()
@@ -209,7 +209,7 @@ class EmailNormalizer:
             return CleaningResult(value=None, original=email)
 
         original = email
-        warnings = []
+        warnings: list[str] = []
 
         # Strip whitespace
         email = email.strip()
@@ -253,7 +253,7 @@ class NameNormalizer:
             return CleaningResult(value=None, original=name)
 
         original = name
-        warnings = []
+        warnings: list[str] = []
 
         # Trim
         if trim:
@@ -402,7 +402,7 @@ class AddressNormalizer:
             return CleaningResult(value=None, original=value)
 
         original = value
-        warnings = []
+        warnings: list[str] = []
 
         # Trim and clean
         value = value.strip()
@@ -449,7 +449,7 @@ class CurrencyNormalizer:
             return CleaningResult(value=None, original=value)
 
         original = value
-        warnings = []
+        warnings: list[str] = []
 
         # Handle numeric types directly
         if isinstance(value, (int, float, Decimal)):
@@ -511,7 +511,7 @@ class DateNormalizer:
             return CleaningResult(value=None, original=value)
 
         original = value
-        warnings = []
+        warnings: list[str] = []
 
         # Handle date/datetime objects
         if isinstance(value, datetime):
@@ -564,13 +564,19 @@ class DataCleaningPipeline:
             rules: Cleaning rules configuration
         """
         self.rules = rules or CleaningRules()
+        self.phone_normalizer = PhoneNormalizer()
+        self.email_normalizer = EmailNormalizer()
+        self.name_normalizer = NameNormalizer()
+        self.address_normalizer = AddressNormalizer()
+        self.currency_normalizer = CurrencyNormalizer()
+        self.date_normalizer = DateNormalizer()
         self.normalizers = {
-            "phone": PhoneNormalizer(),
-            "email": EmailNormalizer(),
-            "name": NameNormalizer(),
-            "address": AddressNormalizer(),
-            "currency": CurrencyNormalizer(),
-            "date": DateNormalizer(),
+            "phone": self.phone_normalizer,
+            "email": self.email_normalizer,
+            "name": self.name_normalizer,
+            "address": self.address_normalizer,
+            "currency": self.currency_normalizer,
+            "date": self.date_normalizer,
         }
 
     def clean_value(self, value: Any, normalizer: str) -> CleaningResult:
@@ -590,37 +596,37 @@ class DataCleaningPipeline:
             return CleaningResult(value=None, original=value, warnings=["Treated as null"])
 
         if normalizer == "phone" and self.rules.phone_enabled:
-            return self.normalizers["phone"].normalize(
+            return self.phone_normalizer.normalize(
                 value,
                 country_code=self.rules.phone_country_code,
                 output_format=self.rules.phone_format
             )
         elif normalizer == "email" and self.rules.email_enabled:
-            return self.normalizers["email"].normalize(
+            return self.email_normalizer.normalize(
                 value,
                 lowercase=self.rules.email_lowercase,
                 fix_typos=self.rules.email_fix_typos
             )
         elif normalizer == "name" and self.rules.name_enabled:
-            return self.normalizers["name"].normalize(
+            return self.name_normalizer.normalize(
                 value,
                 case=self.rules.name_case,
                 trim=self.rules.name_trim,
                 remove_extra_spaces=self.rules.name_remove_extra_spaces
             )
         elif normalizer == "address" and self.rules.address_enabled:
-            return self.normalizers["address"].normalize(
+            return self.address_normalizer.normalize(
                 value,
                 standardize_states=self.rules.address_standardize_states
             )
         elif normalizer == "currency" and self.rules.currency_enabled:
-            return self.normalizers["currency"].normalize(
+            return self.currency_normalizer.normalize(
                 value,
                 remove_symbols=self.rules.currency_remove_symbols,
                 decimal_places=self.rules.currency_decimal_places
             )
         elif normalizer == "date" and self.rules.date_enabled:
-            return self.normalizers["date"].normalize(
+            return self.date_normalizer.normalize(
                 value,
                 input_formats=self.rules.date_input_formats,
                 output_format=self.rules.date_output_format
@@ -633,7 +639,7 @@ class DataCleaningPipeline:
         self,
         row: dict[str, Any],
         field_normalizers: dict[str, str]
-    ) -> tuple[dict[str, Any], list[dict]]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Clean a row of data.
 
         Args:
@@ -643,8 +649,8 @@ class DataCleaningPipeline:
         Returns:
             Tuple of (cleaned_row, warnings)
         """
-        cleaned = {}
-        all_warnings = []
+        cleaned: dict[str, Any] = {}
+        all_warnings: list[dict[str, Any]] = []
 
         for field, value in row.items():
             normalizer = field_normalizers.get(field)

@@ -566,7 +566,7 @@ class PeriodManager:
             PeriodError: If fiscal year not found
         """
         from calendar import monthrange
-        from dateutil.relativedelta import relativedelta
+        from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 
         fiscal_year = (
             self.db.query(FiscalYear)

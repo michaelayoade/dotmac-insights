@@ -1,0 +1,172 @@
+{# Networks table partial - for HTMX updates #}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="networks-table">
+        <thead>
+            <tr class="bg-gradient-to-r from-surface-50 to-surface-100/50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Network
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell">
+                    Type
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell">
+                    Usage
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Used
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden lg:table-cell">
+                    Utilization
+                </th>
+                <th class="py-3.5 pl-3 pr-6 w-24">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+            {% if networks %}
+                {% for network in networks %}
+                <tr class="group hover:bg-surface-50 transition-all duration-200" data-testid="network-row-{{ network.id }}">
+                    <td class="py-4 pl-6 pr-3">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-cyan-50 to-blue-100 rounded-xl flex items-center justify-center ring-1 ring-cyan-200/50 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <code class="text-sm font-mono font-semibold text-gray-900">{{ network.cidr }}</code>
+                                {% if network.title %}
+                                <p class="text-[11px] text-gray-400 font-body truncate max-w-[200px]">{{ network.title }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-4 hidden sm:table-cell">
+                        {% if network.network_type == 'rootnet' %}
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-100 text-violet-700">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2"/>
+                            </svg>
+                            Root
+                        </span>
+                        {% elif network.network_type == 'endnet' %}
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-700">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            End
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4 hidden md:table-cell">
+                        {% if network.type_of_usage %}
+                        {% set colors = {
+                            'pool': 'bg-blue-100 text-blue-700',
+                            'static': 'bg-emerald-100 text-emerald-700',
+                            'management': 'bg-amber-100 text-amber-700',
+                            'infrastructure': 'bg-violet-100 text-violet-700'
+                        } %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ colors.get(network.type_of_usage, 'bg-gray-100 text-gray-700') }} capitalize">
+                            {{ network.type_of_usage }}
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        <span class="text-sm font-semibold text-gray-900 font-display tabular-nums">{{ network.used or 0 }}</span>
+                        <span class="text-xs text-gray-400 ml-1">IPs</span>
+                    </td>
+                    <td class="px-3 py-4 hidden lg:table-cell">
+                        {% set total = 2 ** (32 - network.mask) - 2 %}
+                        {% set pct = (network.used / total * 100) if total > 0 and network.used else 0 %}
+                        <div class="flex items-center gap-2">
+                            <div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full" style="width: {{ [pct, 100] | min | round(1) }}%"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 tabular-nums min-w-[40px]">{{ pct | round(1) }}%</span>
+                        </div>
+                    </td>
+                    <td class="py-4 pl-3 pr-6 text-right">
+                        <a
+                            href="/network/ip/addresses?q={{ network.network }}"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                            View IPs
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-16 text-center">
+                    <div class="mx-auto w-20 h-20 bg-gradient-to-br from-cyan-50 to-blue-100 rounded-2xl flex items-center justify-center mb-5 ring-1 ring-cyan-200/50">
+                        <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                        </svg>
+                    </div>
+                    {% if search_query %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No matching networks</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        No networks match your search criteria.
+                    </p>
+                    {% else %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No networks configured</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        IPv4 networks will appear here once synced from Splynx.
+                    </p>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+{% if pagination.total_pages > 1 %}
+<div class="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-surface-50/50 to-transparent">
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-500 font-body">
+            Showing <span class="font-semibold text-gray-700 tabular-nums">{{ (pagination.page - 1) * pagination.per_page + 1 }}</span> to <span class="font-semibold text-gray-700 tabular-nums">{{ [pagination.page * pagination.per_page, pagination.total]|min }}</span> of <span class="font-semibold text-gray-700 tabular-nums">{{ pagination.total }}</span>
+        </p>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400 font-medium">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+            <div class="flex gap-1">
+                {% if pagination.page > 1 %}
+                <button
+                    hx-get="/network/ip/networks/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_network_type %}&network_type={{ current_network_type }}{% endif %}{% if current_usage_type %}&usage_type={{ current_usage_type }}{% endif %}"
+                    hx-target="#networks-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Previous
+                </button>
+                {% endif %}
+                {% if pagination.page < pagination.total_pages %}
+                <button
+                    hx-get="/network/ip/networks/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_network_type %}&network_type={{ current_network_type }}{% endif %}{% if current_usage_type %}&usage_type={{ current_usage_type }}{% endif %}"
+                    hx-target="#networks-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    Next
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

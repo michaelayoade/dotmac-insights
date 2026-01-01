@@ -61,7 +61,7 @@ def get_journal_entries(
     end_date: Optional[str] = None,
     voucher_type: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get journal entries list.

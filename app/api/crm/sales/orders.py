@@ -25,6 +25,7 @@ router = APIRouter(prefix="/orders", tags=["crm-sales-orders"])
 class SalesOrderBase(BaseModel):
     """Base schema for sales orders."""
     contact_id: Optional[int] = None
+    customer_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_date: Optional[datetime] = None
     delivery_date: Optional[datetime] = None
@@ -96,7 +97,7 @@ def _serialize_order(order: SalesOrder) -> Dict[str, Any]:
     return {
         "id": order.id,
         "erpnext_id": order.erpnext_id,
-        "contact_id": order.contact_id,
+        "contact_id": None,
         "customer_id": order.customer_id,
         "customer_name": order.customer_name,
         "status": order.status.value if order.status else None,
@@ -122,7 +123,7 @@ async def list_orders(
     contact_id: Optional[int] = None,
     customer_id: Optional[int] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List sales orders with filtering."""
@@ -134,7 +135,10 @@ async def list_orders(
             query = query.filter(SalesOrder.status == status_enum)
 
     if contact_id:
-        query = query.filter(SalesOrder.contact_id == contact_id)
+        contact = db.query(Contact).filter(Contact.id == contact_id).first()
+        if not contact:
+            raise HTTPException(status_code=400, detail="Contact not found")
+        query = query.filter(SalesOrder.customer_name == contact.display_name)
 
     if customer_id:
         query = query.filter(SalesOrder.customer_id == customer_id)
@@ -166,15 +170,16 @@ async def create_order(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new sales order."""
-    # Validate contact if provided
+    customer_name = payload.customer_name
     if payload.contact_id:
         contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
         if not contact:
             raise HTTPException(status_code=400, detail="Contact not found")
+        customer_name = contact.display_name
 
     order = SalesOrder(
-        contact_id=payload.contact_id,
-        customer_name=payload.customer_name,
+        customer_id=payload.customer_id,
+        customer_name=customer_name,
         transaction_date=payload.order_date,
         delivery_date=payload.delivery_date,
         currency=payload.currency,
@@ -203,6 +208,14 @@ async def update_order(
         raise HTTPException(status_code=404, detail="Sales order not found")
 
     update_data = payload.model_dump(exclude_unset=True)
+
+    if "contact_id" in update_data:
+        contact_id = update_data.pop("contact_id")
+        if contact_id:
+            contact = db.query(Contact).filter(Contact.id == contact_id).first()
+            if not contact:
+                raise HTTPException(status_code=400, detail="Contact not found")
+            update_data["customer_name"] = contact.display_name
 
     # Handle status conversion
     if "status" in update_data and update_data["status"]:
@@ -250,7 +263,7 @@ async def submit_order(order_id: int, db: Session = Depends(get_db)) -> Dict[str
     if order.status != SalesOrderStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Only draft orders can be submitted")
 
-    order.status = SalesOrderStatus.SUBMITTED
+    order.status = SalesOrderStatus.TO_DELIVER_AND_BILL
     order.docstatus = 1
     db.commit()
     db.refresh(order)

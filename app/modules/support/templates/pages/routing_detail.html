@@ -1,0 +1,222 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a href="/support/routing" class="inline-flex items-center justify-center w-10 h-10 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-gray-50">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900">{{ rule.name }}</h1>
+                    {% if rule.description %}
+                    <p class="mt-1 text-sm text-gray-500">{{ rule.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            {% if rule.is_active %}
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Active
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Inactive
+            </span>
+            {% endif %}
+            <form
+                hx-post="/support/routing/{{ rule.id }}/toggle"
+                hx-swap="none"
+                class="inline"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 {% if rule.is_active %}bg-gray-100 text-gray-700 hover:bg-gray-200{% else %}bg-primary-600 text-white hover:bg-primary-700{% endif %} rounded-xl font-medium">
+                    {% if rule.is_active %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    Disable
+                    {% else %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Enable
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Strategy Info -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Routing Strategy</h2>
+                </div>
+                <div class="p-6">
+                    <div class="flex items-center gap-4 p-4 bg-blue-50 rounded-xl">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            {% if rule.strategy == 'round_robin' %}
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            {% elif rule.strategy == 'least_busy' %}
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            {% elif rule.strategy == 'skill_based' %}
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            {% elif rule.strategy == 'load_balanced' %}
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                            {% else %}
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="font-semibold text-blue-900">{{ strategy_labels.get(rule.strategy, rule.strategy) }}</p>
+                            <p class="text-sm text-blue-700 mt-0.5">
+                                {% if rule.strategy == 'round_robin' %}
+                                Assigns tickets to agents in rotation order
+                                {% elif rule.strategy == 'least_busy' %}
+                                Assigns to the agent with fewest open tickets
+                                {% elif rule.strategy == 'skill_based' %}
+                                Matches ticket type to agent skills and expertise
+                                {% elif rule.strategy == 'load_balanced' %}
+                                Distributes based on agent capacity percentage
+                                {% elif rule.strategy == 'manual' %}
+                                No automatic assignment - requires manual selection
+                                {% else %}
+                                Custom routing strategy
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conditions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Matching Conditions</h2>
+                </div>
+                <div class="p-6">
+                    {% if rule.conditions %}
+                    <div class="space-y-3">
+                        {% for condition in rule.conditions %}
+                        <div class="flex items-center gap-3 p-4 bg-surface-50 rounded-xl">
+                            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
+                                <span class="text-sm font-medium text-purple-700">{{ loop.index }}</span>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                        {{ condition.field }}
+                                    </span>
+                                    <span class="text-sm text-gray-500">
+                                        {% if condition.operator == 'equals' %}equals
+                                        {% elif condition.operator == 'not_equals' %}does not equal
+                                        {% elif condition.operator == 'contains' %}contains
+                                        {% elif condition.operator == 'in_list' %}is one of
+                                        {% elif condition.operator == 'is_empty' %}is empty
+                                        {% elif condition.operator == 'is_not_empty' %}is not empty
+                                        {% else %}{{ condition.operator }}{% endif %}
+                                    </span>
+                                    {% if condition.value is not none %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">
+                                        {% if condition.value is iterable and condition.value is not string %}
+                                        {{ condition.value | join(', ') }}
+                                        {% else %}
+                                        {{ condition.value }}
+                                        {% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="mt-4 text-sm text-gray-500">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        All conditions must match for this rule to apply (AND logic)
+                    </p>
+                    {% else %}
+                    <div class="text-center py-6">
+                        <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        </div>
+                        <p class="font-medium text-gray-900">No conditions defined</p>
+                        <p class="text-sm text-gray-500 mt-1">This rule matches all tickets</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Team Assignment -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-base font-display font-semibold text-gray-900">Team Assignment</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Primary Team</p>
+                        {% if rule.team %}
+                        <div class="flex items-center gap-2 mt-1">
+                            <div class="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            </div>
+                            <p class="font-medium text-gray-900">{{ rule.team.name }}</p>
+                        </div>
+                        {% else %}
+                        <p class="font-medium text-gray-500 mt-1">No team assigned</p>
+                        {% endif %}
+                    </div>
+                    {% if rule.fallback_team %}
+                    <div>
+                        <p class="text-sm text-gray-500">Fallback Team</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            </div>
+                            <p class="font-medium text-gray-900">{{ rule.fallback_team.name }}</p>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Used when primary team has no available agents</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Rule Details -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-base font-display font-semibold text-gray-900">Details</h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <p class="text-sm text-gray-500">Priority</p>
+                        <p class="font-medium text-gray-900 mt-0.5">{{ rule.priority }}</p>
+                        <p class="text-xs text-gray-500">Lower numbers are evaluated first</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Status</p>
+                        <p class="font-medium text-gray-900 mt-0.5 capitalize">{{ 'Active' if rule.is_active else 'Inactive' }}</p>
+                    </div>
+                    {% if rule.created_at %}
+                    <div>
+                        <p class="text-sm text-gray-500">Created</p>
+                        <p class="font-medium text-gray-900 mt-0.5">{{ rule.created_at.strftime('%b %d, %Y %H:%M') }}</p>
+                    </div>
+                    {% endif %}
+                    {% if rule.updated_at %}
+                    <div>
+                        <p class="text-sm text-gray-500">Last Updated</p>
+                        <p class="font-medium text-gray-900 mt-0.5">{{ rule.updated_at.strftime('%b %d, %Y %H:%M') }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

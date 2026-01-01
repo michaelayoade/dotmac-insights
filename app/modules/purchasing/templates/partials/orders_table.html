@@ -1,0 +1,76 @@
+{% if orders %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="#" class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                   hx-get="/purchasing/table?sort=erpnext_id&dir={% if sort == 'erpnext_id' and dir == 'asc' %}desc{% else %}asc{% endif %}"
+                   hx-target="#table-container" hx-include="[name='q'], [name='status']" hx-push-url="true">
+                    Order #
+                    {% if sort == 'erpnext_id' %}
+                    <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    {% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">
+                <a href="#" class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                   hx-get="/purchasing/table?sort=supplier_name&dir={% if sort == 'supplier_name' and dir == 'asc' %}desc{% else %}asc{% endif %}"
+                   hx-target="#table-container" hx-include="[name='q'], [name='status']" hx-push-url="true">
+                    Supplier
+                    {% if sort == 'supplier_name' %}
+                    <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    {% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">
+                <a href="#" class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                   hx-get="/purchasing/table?sort=transaction_date&dir={% if sort == 'transaction_date' and dir == 'asc' %}desc{% else %}asc{% endif %}"
+                   hx-target="#table-container" hx-include="[name='q'], [name='status']" hx-push-url="true">
+                    Date
+                    {% if sort == 'transaction_date' %}
+                    <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    {% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">
+                <a href="#" class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                   hx-get="/purchasing/table?sort=grand_total&dir={% if sort == 'grand_total' and dir == 'asc' %}desc{% else %}asc{% endif %}"
+                   hx-target="#table-container" hx-include="[name='q'], [name='status']" hx-push-url="true">
+                    Amount
+                    {% if sort == 'grand_total' %}
+                    <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    {% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for order in orders %}
+            {% include "purchasing/partials/order_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-500">Showing {{ ((page - 1) * per_page) + 1 }} to {{ [page * per_page, total]|min }} of {{ total }} orders</p>
+    <div class="flex gap-2">
+        {% if page > 1 %}
+        <button hx-get="/purchasing/table?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
+        {% endif %}
+        {% if page < total_pages %}
+        <button hx-get="/purchasing/table?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No purchase orders found</h3>
+    <p class="text-sm text-gray-500">{% if q or status_filter %}Try adjusting your search or filters.{% else %}Purchase orders will appear here when created.{% endif %}</p>
+</div>
+{% endif %}

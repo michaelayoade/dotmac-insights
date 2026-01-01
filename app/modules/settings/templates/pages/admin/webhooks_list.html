@@ -1,0 +1,61 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block settings_content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Webhooks</h1>
+            <p class="mt-1 text-sm text-gray-500">Configure webhooks to receive event notifications</p>
+        </div>
+        {% if can_create %}
+        <a href="/settings/admin/webhooks/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            New Webhook
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Admin Tabs -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+            {% for tab in admin_tabs %}
+            <a href="{{ tab.href }}"
+               class="{% if tab.id == current_tab %}border-primary-500 text-primary-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                {{ tab.label }}
+            </a>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form hx-get="/settings/admin/webhooks" hx-target="#table-container" hx-push-url="true" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search webhooks..."
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div class="flex gap-3">
+                <select name="status" class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                    <option value="">All Status</option>
+                    <option value="active" {{ 'selected' if current_status == 'active' else '' }}>Active</option>
+                    <option value="inactive" {{ 'selected' if current_status == 'inactive' else '' }}>Inactive</option>
+                </select>
+                <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                    Search
+                </button>
+                {% if search_query or current_status %}
+                <a href="/settings/admin/webhooks" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                    Clear
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+        {% include "modules/settings/templates/partials/webhooks_table.html" %}
+    </div>
+</div>
+{% endblock %}

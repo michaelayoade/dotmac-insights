@@ -1,0 +1,81 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/hr/lifecycle/separation" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div class="flex-1">
+            <h1 class="text-2xl font-display font-bold text-gray-900">{{ separation.employee_name or 'Separation' }}</h1>
+            <p class="mt-1 text-sm text-gray-500">Employee separation details</p>
+        </div>
+        {% set status = separation.boarding_status.value if separation.boarding_status else 'pending' %}
+        {% if status == 'completed' %}
+        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Completed</span>
+        {% elif status == 'in_progress' %}
+        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20">In Progress</span>
+        {% else %}
+        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ring-1 ring-inset bg-yellow-50 text-yellow-700 ring-yellow-600/20">Pending</span>
+        {% endif %}
+    </div>
+
+    <!-- Details -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Separation Details</h2>
+        <dl class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Employee</dt>
+                <dd class="mt-1 text-gray-900">{{ separation.employee_name or separation.employee or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Separation Date</dt>
+                <dd class="mt-1 text-gray-900">{{ separation.separation_date.strftime('%B %d, %Y') if separation.separation_date else '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Reason for Leaving</dt>
+                <dd class="mt-1 text-gray-900">{{ separation.reason_for_leaving or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Company</dt>
+                <dd class="mt-1 text-gray-900">{{ separation.company or '-' }}</dd>
+            </div>
+            {% if separation.exit_interview_held %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Exit Interview</dt>
+                <dd class="mt-1 text-gray-900">Conducted</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <!-- Activities -->
+    {% if separation.activities %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Separation Activities</h2>
+        <div class="space-y-3">
+            {% for activity in separation.activities %}
+            <div class="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
+                {% if activity.status == 'Completed' %}
+                <span class="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </span>
+                {% else %}
+                <span class="w-6 h-6 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+                {% endif %}
+                <div class="flex-1">
+                    <p class="font-medium text-gray-900">{{ activity.activity_name }}</p>
+                    {% if activity.user %}
+                    <p class="text-sm text-gray-500">Assigned to: {{ activity.user }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

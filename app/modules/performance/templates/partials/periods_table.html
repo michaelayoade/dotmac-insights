@@ -1,0 +1,39 @@
+{% if periods %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Type</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Date Range</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for period in periods %}
+            {% include "performance/partials/period_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-500">Showing {{ ((page - 1) * per_page) + 1 }} to {{ [page * per_page, total]|min }} of {{ total }} periods</p>
+    <div class="flex gap-2">
+        {% if page > 1 %}
+        <button hx-get="/performance/table?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
+        {% endif %}
+        {% if page < total_pages %}
+        <button hx-get="/performance/table?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No evaluation periods found</h3>
+    <p class="text-sm text-gray-500">{% if q or status_filter %}Try adjusting your search or filters.{% else %}Evaluation periods will appear here when created.{% endif %}</p>
+</div>
+{% endif %}

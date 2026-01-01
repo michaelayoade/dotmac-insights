@@ -1,0 +1,49 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Employee Transfers</h1>
+            <p class="mt-1 text-sm text-gray-500">Track employee department and location transfers</p>
+        </div>
+    </div>
+
+    <!-- Lifecycle Navigation -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+            <a href="/hr/lifecycle/onboarding" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Onboarding
+            </a>
+            <a href="/hr/lifecycle/separation" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Separation
+            </a>
+            <a href="/hr/lifecycle/promotions" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Promotions
+            </a>
+            <a href="/hr/lifecycle/transfers" class="border-primary-500 text-primary-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                Transfers
+            </a>
+        </nav>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form hx-get="/hr/lifecycle/transfers" hx-target="#table-container" hx-push-url="true" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by employee name..."
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                Search
+            </button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+        {% include "modules/hr/templates/lifecycle/partials/transfers_table.html" %}
+    </div>
+</div>
+{% endblock %}

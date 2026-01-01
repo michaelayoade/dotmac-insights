@@ -101,10 +101,10 @@ def get_payment_client(provider: Optional[str] = None):
         if provider == "flutterwave":
             return FlutterwaveClient()
         return PaystackClient()  # Default
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Payment provider not configured: {str(e)}"
+            detail="Payment provider not configured"
         )
 
 
@@ -190,10 +190,10 @@ async def initialize_payment(
             provider=result.provider.value,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to initialize payment",
         )
     finally:
         await client.close()
@@ -259,10 +259,10 @@ async def verify_payment(
             customer_email=verification.customer_email,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to verify payment",
         )
     finally:
         await client.close()

@@ -1,0 +1,162 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/hr/appraisal" class="hover:text-primary-600">Appraisals</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ appraisal.employee_name or appraisal.employee }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ appraisal.employee_name or appraisal.employee }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Performance appraisal for {{ appraisal.start_date }} - {{ appraisal.end_date }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if appraisal.status == 'Draft' %}
+        <a href="/hr/appraisal/{{ appraisal.id }}/edit" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit
+        </a>
+        <form method="POST" action="/hr/appraisal/{{ appraisal.id }}/submit" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Submit
+            </button>
+        </form>
+        {% elif appraisal.status == 'Submitted' %}
+        <form method="POST" action="/hr/appraisal/{{ appraisal.id }}/complete" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 rounded-xl shadow-lg shadow-green-600/25 hover:from-green-500 hover:to-green-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Complete
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Appraisal Details</h3>
+                {% set status_colors = {
+                    'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'Submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'Completed': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(appraisal.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ appraisal.status or 'Draft' }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Employee</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.employee_name or appraisal.employee }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Department</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.department or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Designation</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.designation or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Template</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.appraisal_template or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Appraisal Period</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.start_date }} - {{ appraisal.end_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Company</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ appraisal.company or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if goals %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Goals & Objectives</h3>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for goal in goals %}
+                <div class="px-6 py-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h4 class="font-medium text-gray-900">{{ goal.kra or goal.goal }}</h4>
+                            <p class="mt-1 text-sm text-gray-500">Weight: {{ goal.per_weightage or goal.weight }}%</p>
+                        </div>
+                        {% if goal.score %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-sm font-medium {{ 'bg-green-50 text-green-700' if goal.score >= 4 else ('bg-yellow-50 text-yellow-700' if goal.score >= 3 else 'bg-red-50 text-red-700') }}">
+                            {{ goal.score }}/5
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if appraisal.remarks or appraisal.feedback %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Feedback & Remarks</h3>
+            </div>
+            <div class="px-6 py-6">
+                <p class="text-gray-700 whitespace-pre-wrap">{{ appraisal.remarks or appraisal.feedback }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        {% if appraisal.total_score %}
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Overall Score</h3>
+                <p class="mt-4 text-5xl font-bold">{{ appraisal.total_score|round(1) }}<span class="text-2xl opacity-75">/5</span></p>
+                <p class="mt-2 text-sm opacity-75">
+                    {% if appraisal.total_score >= 4.5 %}Exceptional
+                    {% elif appraisal.total_score >= 4 %}Exceeds Expectations
+                    {% elif appraisal.total_score >= 3 %}Meets Expectations
+                    {% elif appraisal.total_score >= 2 %}Needs Improvement
+                    {% else %}Unsatisfactory
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Appraisal Info</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Appraiser</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ appraisal.appraiser_name or appraisal.appraiser or '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ appraisal.created_at.strftime('%b %d, %Y') if appraisal.created_at else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ appraisal.updated_at.strftime('%b %d, %Y') if appraisal.updated_at else '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

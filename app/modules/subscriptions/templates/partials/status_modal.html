@@ -1,0 +1,138 @@
+{# Status change confirmation modal #}
+<div
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-data="{ open: true }"
+    x-show="open"
+    x-transition:enter="ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+>
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="open = false; setTimeout(() => $el.parentElement.remove(), 200)"></div>
+
+    <!-- Modal -->
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div
+            class="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all"
+            x-show="open"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            @click.away="open = false; setTimeout(() => $el.parentElement.parentElement.remove(), 200)"
+        >
+            <form
+                method="POST"
+                action="/subscriptions/{{ subscription.id }}/status"
+                hx-patch="/subscriptions/{{ subscription.id }}/status"
+                hx-swap="none"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="status" value="{{ target_status }}">
+
+                <div class="px-6 py-5">
+                    <div class="flex items-start gap-4">
+                        {% set status_icons = {
+                            'active': {'bg': 'bg-emerald-100', 'text': 'text-emerald-600', 'icon': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'},
+                            'suspended': {'bg': 'bg-amber-100', 'text': 'text-amber-600', 'icon': 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z'},
+                            'cancelled': {'bg': 'bg-red-100', 'text': 'text-red-600', 'icon': 'M6 18L18 6M6 6l12 12'}
+                        } %}
+                        {% set icon_config = status_icons.get(target_status, {'bg': 'bg-gray-100', 'text': 'text-gray-600', 'icon': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'}) %}
+
+                        <div class="flex-shrink-0 w-12 h-12 rounded-xl {{ icon_config.bg }} flex items-center justify-center">
+                            <svg class="w-6 h-6 {{ icon_config.text }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_config.icon }}"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-display font-semibold text-gray-900">
+                                {{ target_status_label }} Subscription
+                            </h3>
+                            <p class="mt-1.5 text-sm text-gray-500 font-body">
+                                {% if target_status == 'active' %}
+                                This will activate the subscription and enable service for the customer.
+                                {% elif target_status == 'suspended' %}
+                                This will suspend the subscription. The customer will lose access to services but can be reactivated later.
+                                {% elif target_status == 'cancelled' %}
+                                This will cancel the subscription. This action cannot be undone.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Subscription info -->
+                    <div class="mt-5 p-4 bg-surface-50 rounded-xl">
+                        <dl class="space-y-2">
+                            <div class="flex justify-between">
+                                <dt class="text-sm text-gray-500">Subscription</dt>
+                                <dd class="text-sm font-medium text-gray-900">{{ subscription.plan_name }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-sm text-gray-500">Customer</dt>
+                                <dd class="text-sm font-medium text-gray-900">{{ subscription.customer.name if subscription.customer else '-' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-sm text-gray-500">Current Status</dt>
+                                <dd class="text-sm font-medium text-gray-900 capitalize">{{ subscription.status.value }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-sm text-gray-500">New Status</dt>
+                                <dd class="text-sm font-medium capitalize
+                                    {% if target_status == 'active' %}text-emerald-600{% elif target_status == 'suspended' %}text-amber-600{% elif target_status == 'cancelled' %}text-red-600{% else %}text-gray-900{% endif %}
+                                ">{{ target_status_label }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 flex items-center justify-end gap-3">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 hover:border-gray-300 transition-all"
+                        @click="open = false; setTimeout(() => $el.closest('#modal-container').innerHTML = '', 200)"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl shadow-lg transition-all
+                            {% if target_status == 'active' %}
+                            bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/25
+                            {% elif target_status == 'suspended' %}
+                            bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 shadow-amber-600/25
+                            {% elif target_status == 'cancelled' %}
+                            bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-red-600/25
+                            {% else %}
+                            bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 shadow-primary-600/25
+                            {% endif %}
+                        "
+                    >
+                        {% if target_status == 'active' %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Activate
+                        {% elif target_status == 'suspended' %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Suspend
+                        {% elif target_status == 'cancelled' %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Cancel Subscription
+                        {% else %}
+                        Confirm
+                        {% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -10,9 +10,10 @@ import uuid
 from decimal import Decimal
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models.transfer import Transfer, TransferStatus, TransferType
@@ -122,7 +123,7 @@ def list_transfers(
     provider: Optional[str] = None,
     transfer_type: Optional[str] = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     """List transfers with optional filters."""
@@ -202,7 +203,7 @@ async def initiate_transfer(
     reference = request.reference or generate_transfer_reference()
 
     # Check for duplicate reference
-    existing = await db.execute(
+    existing = db.execute(
         select(Transfer).where(Transfer.reference == reference)
     )
     if existing.scalar_one_or_none():
@@ -287,7 +288,7 @@ async def initiate_transfer(
             metadata=request.metadata,
         )
         db.add(transfer)
-        await db.commit()
+        db.commit()
 
         return TransferResponse(
             reference=result.reference,
@@ -299,10 +300,10 @@ async def initiate_transfer(
             fee=result.fee,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to initiate transfer",
         )
     finally:
         await client.close()
@@ -322,7 +323,7 @@ async def pay_pending_payroll_transfers(
             detail="No transfer IDs supplied",
         )
 
-    transfers_result = await db.execute(
+    transfers_result = db.execute(
         select(Transfer).where(Transfer.id.in_(request.transfer_ids))
     )
     transfers = transfers_result.scalars().all()
@@ -394,7 +395,7 @@ async def pay_pending_payroll_transfers(
             matched_transfer.fee = result.fee
             matched_transfer.raw_response = result.raw_response
 
-        await db.commit()
+        db.commit()
 
         return {
             "count": len(results),
@@ -444,7 +445,7 @@ async def initiate_bulk_transfers(
                 detail="Duplicate references in bulk payload",
             )
 
-        existing_refs = await db.execute(
+        existing_refs = db.execute(
             select(Transfer.reference).where(Transfer.reference.in_(references))
         )
         if existing_refs.scalars().all():
@@ -524,7 +525,7 @@ async def initiate_bulk_transfers(
             )
 
         db.add_all(transfer_records)
-        await db.commit()
+        db.commit()
 
         return [
             TransferResponse(
@@ -541,10 +542,10 @@ async def initiate_bulk_transfers(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to initiate bulk transfers",
         )
     finally:
         await client.close()
@@ -556,7 +557,7 @@ async def verify_transfer(
     db: Session = Depends(get_db),
 ):
     """Verify a transfer status."""
-    result = await db.execute(
+    result = db.execute(
         select(Transfer).where(Transfer.reference == reference)
     )
     transfer = result.scalar_one_or_none()
@@ -585,7 +586,7 @@ async def verify_transfer(
         )
         transfer.provider_reference = verification.provider_reference
 
-        await db.commit()
+        db.commit()
 
         return {
             "reference": verification.reference,
@@ -596,10 +597,10 @@ async def verify_transfer(
             "fee": verification.fee,
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to verify transfer",
         )
     finally:
         await client.close()
@@ -611,7 +612,7 @@ async def get_transfer(
     db: Session = Depends(get_db),
 ):
     """Get transfer details by reference."""
-    result = await db.execute(
+    result = db.execute(
         select(Transfer).where(Transfer.reference == reference)
     )
     transfer = result.scalar_one_or_none()
@@ -647,7 +648,7 @@ async def list_transfers_basic(
     status_filter: Optional[str] = None,
     transfer_type: Optional[str] = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
     """List transfers with optional filters."""
@@ -661,7 +662,7 @@ async def list_transfers_basic(
     query = query.order_by(Transfer.created_at.desc())
     query = query.offset(offset).limit(limit)
 
-    result = await db.execute(query)
+    result = db.execute(query)
     transfers = result.scalars().all()
 
     return {

@@ -1,0 +1,31 @@
+{# Single evaluation period row #}
+<tr class="group hover:bg-surface-50" id="period-row-{{ period.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <a href="/performance/{{ period.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ period.name }}</a>
+        <p class="text-xs text-gray-500 mt-0.5">{{ period.code }}</p>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+        {{ period.period_type.value|replace('_', ' ')|title if period.period_type else '-' }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ period.start_date }} - {{ period.end_date }}</td>
+    <td class="whitespace-nowrap px-3 py-4">
+        {% set status_colors = {
+            'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+            'active': 'bg-green-50 text-green-700 ring-green-600/20',
+            'scoring': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+            'review': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'finalized': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            'archived': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+        } %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(period.status.value if period.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+            {{ (period.status.value if period.status else 'draft')|replace('_', ' ')|title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a href="/performance/{{ period.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

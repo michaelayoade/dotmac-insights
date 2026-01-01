@@ -22,6 +22,7 @@ from .helpers import (
     parse_date,
     get_fiscal_year_dates,
     get_effective_root_type,
+    get_accounts_by_erpnext_id,
     is_cogs_account,
     is_finance_income_account,
     is_finance_cost_account,
@@ -228,7 +229,7 @@ def get_trial_balance(
     results = query.all()
 
     # Get account details
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     trial_balance = []
     total_debit = Decimal("0")
@@ -335,7 +336,7 @@ def get_balance_sheet(
         return {r.account: r.balance or Decimal("0") for r in results if r.account}
 
     # Get account details
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     current_balances = get_balances(end_date)
     comparative_balances = get_balances(comp_date) if comp_date else {}
@@ -837,7 +838,7 @@ def get_income_statement(
     ytd_start = date(period_end.year, 1, 1)
 
     # Get account details
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     def get_period_data(p_start: date, p_end: date, cc: Optional[str] = None) -> Dict[str, tuple[Decimal, Account]]:
         """Get account totals for a period."""
@@ -1509,7 +1510,7 @@ def get_cash_flow(
         period_start = parse_date(start_date, "start_date") or date(period_end.year, 1, 1)
 
     # Get all accounts
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     # Get bank/cash accounts
     cash_accounts = db.query(Account).filter(
@@ -1939,7 +1940,7 @@ def get_financial_ratios(
         period_end = end_date
 
     # Get all accounts
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     # Get cumulative balances for balance sheet items
     balances = db.query(
@@ -2322,7 +2323,7 @@ def get_equity_statement(
     prior_start, prior_end = calculate_prior_period(period_start, period_end)
 
     # Get all accounts
-    accounts: Dict[str, Account] = {acc.erpnext_id: acc for acc in db.query(Account).all() if acc.erpnext_id}
+    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
 
     def classify_equity_account(acc: Account) -> str:
         """Classify an equity account into its component type."""

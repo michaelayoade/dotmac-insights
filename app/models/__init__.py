@@ -350,6 +350,11 @@ from app.models.migration import (
     RecordAction,
     EntityType,
 )
+from app.models.provisioning_log import (
+    ProvisioningLog,
+    ProvisioningAction,
+    ProvisioningStatus,
+)
 
 __all__ = [
     "Customer",
@@ -680,4 +685,8 @@ __all__ = [
     "DedupStrategy",
     "RecordAction",
     "EntityType",
+    # Provisioning models
+    "ProvisioningLog",
+    "ProvisioningAction",
+    "ProvisioningStatus",
 ]

@@ -1,0 +1,274 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form
+        method="POST"
+        action="{% if opportunity %}/crm/opportunities/{{ opportunity.id }}{% else %}/crm/opportunities{% endif %}"
+        class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
+        data-testid="opportunity-form"
+        x-data="{ submitting: false }"
+        @submit="submitting = true"
+    >
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">
+                {% if opportunity %}Edit Opportunity{% else %}New Opportunity{% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if opportunity %}
+                Update the opportunity details below.
+                {% else %}
+                Fill in the details to create a new deal.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="px-6 py-6 space-y-6">
+            <!-- Name -->
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Opportunity Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="name"
+                    id="name"
+                    value="{{ opportunity.name if opportunity else (form_data.name if form_data else '') }}"
+                    required
+                    placeholder="e.g., Enterprise Software Deal"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.name else '' }}"
+                    data-testid="opportunity-name-input"
+                >
+                {% if errors.name %}
+                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="name-error">{{ errors.name }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Contact Selection -->
+            <div>
+                <label for="unified_contact_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Contact
+                </label>
+                <div class="relative">
+                    <select
+                        name="unified_contact_id"
+                        id="unified_contact_id"
+                        class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        data-testid="opportunity-contact-select"
+                    >
+                        <option value="">Select a contact...</option>
+                        {% for contact in contacts %}
+                        <option
+                            value="{{ contact.id }}"
+                            {{ 'selected' if opportunity and opportunity.unified_contact_id == contact.id else '' }}
+                        >{{ contact.name }} {% if contact.email %}({{ contact.email }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deal Value and Probability -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="deal_value" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Deal Value <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm font-body">{{ base_currency }}</span>
+                        </div>
+                        <input
+                            type="number"
+                            name="deal_value"
+                            id="deal_value"
+                            value="{{ opportunity.deal_value if opportunity else (form_data.deal_value if form_data else '') }}"
+                            required
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            class="block w-full pl-14 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                            data-testid="opportunity-value-input"
+                        >
+                    </div>
+                </div>
+                <div>
+                    <label for="probability" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Probability (%)
+                    </label>
+                    <div class="relative">
+                        <input
+                            type="number"
+                            name="probability"
+                            id="probability"
+                            value="{{ opportunity.probability if opportunity else (form_data.probability if form_data else '50') }}"
+                            min="0"
+                            max="100"
+                            placeholder="50"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                            data-testid="opportunity-probability-input"
+                        >
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <span class="text-gray-400 sm:text-sm font-body">%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage and Status -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="stage_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Pipeline Stage
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="stage_id"
+                            id="stage_id"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="opportunity-stage-select"
+                        >
+                            <option value="">Select stage...</option>
+                            {% for stage in stages %}
+                            <option
+                                value="{{ stage.id }}"
+                                {{ 'selected' if opportunity and opportunity.stage_id == stage.id else '' }}
+                            >{{ stage.name }} ({{ stage.probability }}%)</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Status <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="status"
+                            id="status"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                            data-testid="opportunity-status-select"
+                        >
+                            {% for opt in status_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (opportunity.status.value if opportunity else (form_data.status if form_data else 'open')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expected Close Date -->
+            <div>
+                <label for="expected_close_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Expected Close Date
+                </label>
+                <input
+                    type="date"
+                    name="expected_close_date"
+                    id="expected_close_date"
+                    value="{{ opportunity.expected_close_date | format_date('%Y-%m-%d') if opportunity and opportunity.expected_close_date else '' }}"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    data-testid="opportunity-close-date-input"
+                >
+            </div>
+
+            <!-- Source and Campaign -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="source" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Source
+                    </label>
+                    <input
+                        type="text"
+                        name="source"
+                        id="source"
+                        value="{{ opportunity.source if opportunity else (form_data.source if form_data else '') }}"
+                        placeholder="e.g., Website, Referral, Cold Call"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                        data-testid="opportunity-source-input"
+                    >
+                </div>
+                <div>
+                    <label for="campaign" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Campaign
+                    </label>
+                    <input
+                        type="text"
+                        name="campaign"
+                        id="campaign"
+                        value="{{ opportunity.campaign if opportunity else (form_data.campaign if form_data else '') }}"
+                        placeholder="e.g., Q4 2024 Promo"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                        data-testid="opportunity-campaign-input"
+                    >
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Description
+                </label>
+                <textarea
+                    name="description"
+                    id="description"
+                    rows="4"
+                    placeholder="Add notes about this opportunity..."
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm resize-none"
+                    data-testid="opportunity-description-textarea"
+                >{{ opportunity.description if opportunity else (form_data.description if form_data else '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-between sm:justify-end gap-3">
+            <a
+                href="{% if opportunity %}/crm/opportunities/{{ opportunity.id }}{% else %}/crm/opportunities{% endif %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+                data-testid="cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200 disabled:opacity-50"
+                :class="{ 'pointer-events-none': submitting }"
+                data-testid="submit-button"
+            >
+                <span x-show="!submitting">
+                    {% if opportunity %}Save Changes{% else %}Create Opportunity{% endif %}
+                </span>
+                <svg x-show="!submitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

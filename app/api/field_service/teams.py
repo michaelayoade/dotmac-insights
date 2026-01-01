@@ -99,7 +99,7 @@ async def list_teams(
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
     limit: int = Query(default=50, le=100),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List field teams."""
@@ -330,7 +330,7 @@ async def list_technicians(
     is_available: Optional[bool] = None,
     search: Optional[str] = None,
     limit: int = Query(default=50, le=100),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List field technicians."""

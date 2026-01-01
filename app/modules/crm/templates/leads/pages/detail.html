@@ -1,0 +1,228 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3 mb-2">
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ lead.lead_name }}</h1>
+            {% set status_colors = {
+                'lead': 'bg-blue-100 text-blue-800',
+                'open': 'bg-yellow-100 text-yellow-800',
+                'replied': 'bg-cyan-100 text-cyan-800',
+                'opportunity': 'bg-amber-100 text-amber-800',
+                'quotation': 'bg-purple-100 text-purple-800',
+                'interested': 'bg-indigo-100 text-indigo-800',
+                'converted': 'bg-green-100 text-green-800',
+                'do_not_contact': 'bg-red-100 text-red-800',
+            } %}
+            {% set status_val = lead.status.value if lead.status else 'lead' %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ status_colors.get(status_val, 'bg-gray-100 text-gray-800') }}">
+                {{ status_val | replace('_', ' ') | title }}
+            </span>
+            {% if lead.converted %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                Converted
+            </span>
+            {% endif %}
+        </div>
+        {% if lead.company_name %}
+        <p class="text-gray-500 font-body">{{ lead.company_name }}</p>
+        {% endif %}
+    </div>
+    <div class="flex items-center gap-3">
+        {% if not lead.converted %}
+        <a
+            href="/crm/leads/{{ lead.id }}/convert"
+            class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-500 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+            </svg>
+            Convert to Customer
+        </a>
+        {% endif %}
+        <a
+            href="/crm/leads/{{ lead.id }}/edit"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Edit
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Contact Information -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h2>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% if lead.email_id %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Email</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        <a href="mailto:{{ lead.email_id }}" class="text-primary-600 hover:text-primary-500">{{ lead.email_id }}</a>
+                    </dd>
+                </div>
+                {% endif %}
+                {% if lead.phone %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        <a href="tel:{{ lead.phone }}" class="text-primary-600 hover:text-primary-500">{{ lead.phone }}</a>
+                    </dd>
+                </div>
+                {% endif %}
+                {% if lead.mobile_no %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Mobile</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        <a href="tel:{{ lead.mobile_no }}" class="text-primary-600 hover:text-primary-500">{{ lead.mobile_no }}</a>
+                    </dd>
+                </div>
+                {% endif %}
+                {% if lead.website %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Website</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        <a href="{{ lead.website }}" target="_blank" rel="noopener" class="text-primary-600 hover:text-primary-500">{{ lead.website }}</a>
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        <!-- Lead Details -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Lead Details</h2>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% if lead.source %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Source</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.source | replace('_', ' ') | title }}</dd>
+                </div>
+                {% endif %}
+                {% if lead.territory %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Territory</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.territory | replace('_', ' ') | title }}</dd>
+                </div>
+                {% endif %}
+                {% if lead.industry %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Industry</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.industry | replace('_', ' ') | title }}</dd>
+                </div>
+                {% endif %}
+                {% if lead.market_segment %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Market Segment</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.market_segment | replace('_', ' ') | title }}</dd>
+                </div>
+                {% endif %}
+                {% if lead.lead_owner %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Lead Owner</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.lead_owner }}</dd>
+                </div>
+                {% endif %}
+                {% if lead.qualification_status %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Qualification</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ lead.qualification_status | title }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        <!-- Location -->
+        {% if lead.city or lead.state or lead.country %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Location</h2>
+            <p class="text-sm text-gray-900">
+                {% if lead.city %}{{ lead.city }}{% endif %}
+                {% if lead.city and lead.state %}, {% endif %}
+                {% if lead.state %}{{ lead.state }}{% endif %}
+                {% if (lead.city or lead.state) and lead.country %}, {% endif %}
+                {% if lead.country %}{{ lead.country }}{% endif %}
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Notes -->
+        {% if lead.notes %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ lead.notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Quick Actions -->
+        {% if not lead.converted %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div class="space-y-3">
+                <form action="/crm/leads/{{ lead.id }}/qualify" method="POST">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <button
+                        type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-all duration-200"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Mark as Qualified
+                    </button>
+                </form>
+                <form action="/crm/leads/{{ lead.id }}/disqualify" method="POST" x-data="{ showReason: false }">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <div x-show="showReason" x-cloak class="mb-2">
+                        <input
+                            type="text"
+                            name="reason"
+                            placeholder="Reason for disqualification..."
+                            class="block w-full px-3 py-2 text-sm text-gray-900 bg-surface-50 border-0 rounded-lg focus:bg-white focus:ring-2 focus:ring-red-100"
+                        >
+                    </div>
+                    <button
+                        type="button"
+                        @click="if (showReason) { $el.closest('form').submit(); } else { showReason = true; }"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-100 transition-all duration-200"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span x-text="showReason ? 'Confirm Disqualify' : 'Disqualify Lead'"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Timestamps -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Timeline</h3>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-xs font-medium text-gray-500">Created</dt>
+                    <dd class="mt-0.5 text-sm text-gray-900">{{ lead.created_at | datetimeformat if lead.created_at else '-' }}</dd>
+                </div>
+                {% if lead.updated_at %}
+                <div>
+                    <dt class="text-xs font-medium text-gray-500">Last Updated</dt>
+                    <dd class="mt-0.5 text-sm text-gray-900">{{ lead.updated_at | datetimeformat }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

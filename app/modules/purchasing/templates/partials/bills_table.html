@@ -1,0 +1,122 @@
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide bg-surface-50/50">
+                    <th class="px-6 py-3">Bill ID</th>
+                    <th class="px-6 py-3">Supplier</th>
+                    <th class="px-6 py-3 text-right">Amount</th>
+                    <th class="px-6 py-3 text-right">Outstanding</th>
+                    <th class="px-6 py-3">Posting Date</th>
+                    <th class="px-6 py-3">Due Date</th>
+                    <th class="px-6 py-3 text-center">Status</th>
+                    <th class="px-6 py-3 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for bill in bills %}
+                {% set is_overdue = bill.due_date and bill.outstanding_amount and bill.outstanding_amount > 0 and bill.due_date.date() < today %}
+                <tr class="hover:bg-surface-50/50">
+                    <td class="px-6 py-4">
+                        <a href="/purchasing/bills/{{ bill.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                            {{ bill.erpnext_id or ('#' ~ bill.id) }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-gray-900">{{ bill.supplier_name or bill.supplier or '-' }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <span class="font-medium text-gray-900">{{ bill.grand_total | format_currency }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        {% if bill.outstanding_amount and bill.outstanding_amount > 0 %}
+                        <span class="font-medium {% if is_overdue %}text-red-600{% else %}text-amber-600{% endif %}">
+                            {{ bill.outstanding_amount | format_currency }}
+                        </span>
+                        {% else %}
+                        <span class="text-emerald-600">Paid</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-600">
+                            {% if bill.posting_date %}
+                            {{ bill.posting_date.strftime('%b %d, %Y') }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if bill.due_date %}
+                        <span class="text-sm {% if is_overdue %}text-red-600 font-medium{% else %}text-gray-600{% endif %}">
+                            {{ bill.due_date.strftime('%b %d, %Y') }}
+                            {% if is_overdue %}
+                            <span class="text-xs">({{ (today - bill.due_date.date()).days }}d overdue)</span>
+                            {% endif %}
+                        </span>
+                        {% else %}
+                        <span class="text-sm text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% set status_val = bill.status.value if bill.status else 'unknown' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if status_val == 'paid' %}bg-emerald-50 text-emerald-700
+                            {% elif status_val == 'overdue' %}bg-red-50 text-red-700
+                            {% elif status_val == 'unpaid' %}bg-amber-50 text-amber-700
+                            {% elif status_val == 'submitted' %}bg-blue-50 text-blue-700
+                            {% elif status_val == 'cancelled' %}bg-gray-100 text-gray-600
+                            {% else %}bg-gray-50 text-gray-600{% endif %}">
+                            {{ status_val | title }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <a href="/purchasing/bills/{{ bill.id }}" class="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg font-medium">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <p class="font-medium">No bills found</p>
+                        <p class="text-sm mt-1">Try adjusting your search or filter criteria</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <p class="text-sm text-gray-500">
+            Showing {{ ((page - 1) * per_page) + 1 }} to {{ [page * per_page, total] | min }} of {{ total }} bills
+        </p>
+        <div class="flex items-center gap-2">
+            {% if page > 1 %}
+            <button hx-get="/purchasing/bills/table?page={{ page - 1 }}&q={{ q }}&status={{ status_filter }}&overdue={{ overdue_filter }}"
+                    hx-target="#bills-table"
+                    class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-surface-100 rounded-lg">
+                Previous
+            </button>
+            {% endif %}
+
+            <span class="px-3 py-1.5 text-sm font-medium text-gray-900">
+                Page {{ page }} of {{ total_pages }}
+            </span>
+
+            {% if page < total_pages %}
+            <button hx-get="/purchasing/bills/table?page={{ page + 1 }}&q={{ q }}&status={{ status_filter }}&overdue={{ overdue_filter }}"
+                    hx-target="#bills-table"
+                    class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-surface-100 rounded-lg">
+                Next
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

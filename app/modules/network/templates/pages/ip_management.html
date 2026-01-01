@@ -1,0 +1,350 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-screen-2xl mx-auto">
+    {# Page Header #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
+        <div class="relative">
+            <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-cyan-500 to-blue-600 rounded-full"></div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">IP Management</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">IPv4 network allocation and address assignments</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/network/ip/networks" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
+                <svg class="w-4 h-4 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                </svg>
+                View Networks
+            </a>
+            <a href="/network/ip/addresses" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl hover:from-cyan-600 hover:to-blue-700 transition-all shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                </svg>
+                View Addresses
+            </a>
+        </div>
+    </div>
+
+    {# Stats Cards #}
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8 animate-fade-up" style="animation-delay: 100ms">
+        {# Total Networks #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-cyan-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.total_networks }}</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">Networks</p>
+            </div>
+        </div>
+
+        {# Root Networks #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-violet-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-violet-50 to-violet-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.root_networks }}</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">Root Nets</p>
+            </div>
+        </div>
+
+        {# End Networks #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.end_networks }}</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">End Nets</p>
+            </div>
+        </div>
+
+        {# Total IPs #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ "{:,}".format(stats.total_ips) }}</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">Total IPs</p>
+            </div>
+        </div>
+
+        {# Used IPs #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ "{:,}".format(stats.used_ips) }}</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">Used</p>
+            </div>
+        </div>
+
+        {# Utilization #}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-warm p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-amber-100 to-transparent rounded-bl-[3rem] opacity-50"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.utilization }}%</p>
+                <p class="text-[11px] text-gray-500 font-body uppercase tracking-wide">Utilization</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {# Utilization Chart #}
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-warm animate-fade-up" style="animation-delay: 150ms">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-surface-50 to-white rounded-t-2xl">
+                <h2 class="text-base font-semibold text-gray-900 font-display flex items-center gap-2">
+                    <svg class="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                    </svg>
+                    IP Utilization
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center gap-8 mb-6">
+                    {# Circular Progress #}
+                    <div class="relative w-36 h-36 flex-shrink-0">
+                        <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" stroke-width="12"/>
+                            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#utilization-gradient)" stroke-width="12"
+                                stroke-dasharray="{{ stats.utilization * 2.51 }} 251"
+                                stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="utilization-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#06b6d4"/>
+                                    <stop offset="100%" stop-color="#3b82f6"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center">
+                                <span class="text-3xl font-bold text-gray-900 font-display tabular-nums">{{ stats.utilization }}</span>
+                                <span class="text-lg text-gray-500">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full"></span>
+                                <span class="text-sm text-gray-600 font-body">Used Addresses</span>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-900 font-display tabular-nums">{{ "{:,}".format(stats.used_ips) }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-gray-200 rounded-full"></span>
+                                <span class="text-sm text-gray-600 font-body">Available Addresses</span>
+                            </div>
+                            <span class="text-sm font-semibold text-gray-900 font-display tabular-nums">{{ "{:,}".format(stats.available_ips) }}</span>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-gray-700 font-body">Total Capacity</span>
+                                <span class="text-sm font-bold text-gray-900 font-display tabular-nums">{{ "{:,}".format(stats.total_ips) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Utilization Bar #}
+                <div class="mt-4">
+                    <div class="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-500" style="width: {{ stats.utilization }}%"></div>
+                    </div>
+                    <div class="flex justify-between mt-2">
+                        <span class="text-xs text-gray-400 font-body">0%</span>
+                        <span class="text-xs text-gray-400 font-body">100%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Networks by Usage Type #}
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-warm animate-fade-up" style="animation-delay: 200ms">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-surface-50 to-white rounded-t-2xl">
+                <h2 class="text-base font-semibold text-gray-900 font-display flex items-center gap-2">
+                    <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                    </svg>
+                    Networks by Usage
+                </h2>
+            </div>
+            <div class="p-6">
+                {% if networks_by_usage %}
+                <div class="space-y-4">
+                    {% for usage in networks_by_usage %}
+                    {% set colors = {
+                        'pool': {'bg': 'bg-blue-100', 'text': 'text-blue-700', 'bar': 'bg-blue-500'},
+                        'static': {'bg': 'bg-emerald-100', 'text': 'text-emerald-700', 'bar': 'bg-emerald-500'},
+                        'management': {'bg': 'bg-amber-100', 'text': 'text-amber-700', 'bar': 'bg-amber-500'},
+                        'infrastructure': {'bg': 'bg-violet-100', 'text': 'text-violet-700', 'bar': 'bg-violet-500'}
+                    } %}
+                    {% set color = colors.get(usage[0], {'bg': 'bg-gray-100', 'text': 'text-gray-700', 'bar': 'bg-gray-500'}) %}
+                    <div class="group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ color.bg }} {{ color.text }} capitalize">
+                                    {{ usage[0] or 'Other' }}
+                                </span>
+                            </div>
+                            <span class="text-sm font-bold text-gray-900 font-display tabular-nums">{{ usage[1] }}</span>
+                        </div>
+                        <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            {% set max_count = networks_by_usage|map(attribute=1)|max if networks_by_usage else 1 %}
+                            {% set pct = (usage[1] / max_count * 100) if max_count > 0 else 0 %}
+                            <div class="h-full {{ color.bar }} rounded-full transition-all duration-300 group-hover:opacity-80" style="width: {{ pct }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-500 font-body">No usage data available</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Top Networks #}
+    <div class="mt-6 bg-white rounded-2xl border border-gray-100 shadow-warm animate-fade-up" style="animation-delay: 250ms">
+        <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-surface-50 to-white rounded-t-2xl flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900 font-display flex items-center gap-2">
+                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                Top Networks by Usage
+            </h2>
+            <a href="/network/ip/networks" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                View All
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-gray-50/50">
+                        <th class="py-3 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">Network</th>
+                        <th class="px-3 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell">Usage Type</th>
+                        <th class="px-3 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">Used IPs</th>
+                        <th class="px-3 py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell">Utilization</th>
+                        <th class="py-3 pl-3 pr-6 w-20"><span class="sr-only">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% if top_networks %}
+                        {% for network in top_networks %}
+                        <tr class="group hover:bg-surface-50 transition-colors">
+                            <td class="py-3.5 pl-6 pr-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 bg-gradient-to-br from-cyan-50 to-blue-100 rounded-lg flex items-center justify-center ring-1 ring-cyan-200/50">
+                                        <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <code class="text-sm font-mono font-semibold text-gray-900">{{ network.cidr }}</code>
+                                        {% if network.title %}
+                                        <p class="text-xs text-gray-500 font-body truncate max-w-[200px]">{{ network.title }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-3 py-3.5 hidden sm:table-cell">
+                                {% if network.type_of_usage %}
+                                {% set colors = {
+                                    'pool': 'bg-blue-100 text-blue-700',
+                                    'static': 'bg-emerald-100 text-emerald-700',
+                                    'management': 'bg-amber-100 text-amber-700',
+                                    'infrastructure': 'bg-violet-100 text-violet-700'
+                                } %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ colors.get(network.type_of_usage, 'bg-gray-100 text-gray-700') }} capitalize">
+                                    {{ network.type_of_usage }}
+                                </span>
+                                {% else %}
+                                <span class="text-xs text-gray-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-3.5">
+                                <span class="text-sm font-semibold text-gray-900 font-display tabular-nums">{{ network.used or 0 }}</span>
+                            </td>
+                            <td class="px-3 py-3.5 hidden md:table-cell">
+                                {% set total = 2 ** (32 - network.mask) - 2 %}
+                                {% set pct = (network.used / total * 100) if total > 0 and network.used else 0 %}
+                                <div class="flex items-center gap-2">
+                                    <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full" style="width: {{ pct | round(1) }}%"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500 tabular-nums">{{ pct | round(1) }}%</span>
+                                </div>
+                            </td>
+                            <td class="py-3.5 pl-3 pr-6 text-right">
+                                <a href="/network/ip/addresses?network={{ network.network }}" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 opacity-0 group-hover:opacity-100 transition-all">
+                                    View
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-12 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7"/>
+                                </svg>
+                            </div>
+                            <p class="text-sm text-gray-500 font-body">No networks configured</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

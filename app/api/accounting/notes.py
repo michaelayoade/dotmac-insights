@@ -85,7 +85,7 @@ def list_credit_notes(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List credit notes with filters."""
@@ -270,7 +270,7 @@ def list_debit_notes(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List debit notes with filters."""

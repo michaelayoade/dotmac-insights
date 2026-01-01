@@ -1,0 +1,119 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Service Calendar</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Week of {{ start_date.strftime('%B %d') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <div class="flex items-center rounded-xl bg-surface-50 p-1">
+            <a
+                href="/field-service/calendar?start={{ prev_week }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}"
+                class="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                title="Previous Week"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <a
+                href="/field-service/calendar?start={{ today }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}"
+                class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+            >
+                Today
+            </a>
+            <a
+                href="/field-service/calendar?start={{ next_week }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}"
+                class="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                title="Next Week"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+        <a
+            href="/field-service/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Order</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- View Mode Tabs -->
+<div class="flex items-center gap-2 mb-6">
+    <a href="/field-service" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        List
+    </a>
+    <a href="/field-service/calendar?start={{ start_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg">
+        Calendar
+    </a>
+    <a href="/field-service/dispatch" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        Dispatch
+    </a>
+    <a href="/field-service/map" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        Map
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <form class="flex flex-wrap gap-4" method="get" action="/field-service/calendar">
+        <input type="hidden" name="start" value="{{ start_date.isoformat() }}">
+
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Technician</label>
+            <select
+                name="technician_id"
+                class="block w-full px-3 py-2.5 text-sm text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100"
+                onchange="this.form.submit()"
+            >
+                <option value="">All Technicians</option>
+                {% for opt in technician_options %}
+                <option value="{{ opt.value }}" {% if technician_id == opt.value | int %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Team</label>
+            <select
+                name="team_id"
+                class="block w-full px-3 py-2.5 text-sm text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100"
+                onchange="this.form.submit()"
+            >
+                <option value="">All Teams</option>
+                {% for opt in team_options %}
+                <option value="{{ opt.value }}" {% if team_id == opt.value | int %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Zone</label>
+            <select
+                name="zone_id"
+                class="block w-full px-3 py-2.5 text-sm text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100"
+                onchange="this.form.submit()"
+            >
+                <option value="">All Zones</option>
+                {% for opt in zone_options %}
+                <option value="{{ opt.value }}" {% if zone_id == opt.value | int %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Calendar Grid -->
+<div id="calendar-container" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    {% include "field_service/partials/calendar_grid.html" %}
+</div>
+{% endblock %}

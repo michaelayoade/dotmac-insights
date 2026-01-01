@@ -149,7 +149,7 @@ class TemplateRenderer:
         """Render a template by name."""
         template = self.env.get_template(template_name)
         ctx = {**(context or {}), **kwargs}
-        return template.render(ctx)
+        return str(template.render(ctx))
 
     def render_string(
         self,
@@ -160,7 +160,7 @@ class TemplateRenderer:
         """Render a template string."""
         template = self.env.from_string(template_str)
         ctx = {**(context or {}), **kwargs}
-        return template.render(ctx)
+        return str(template.render(ctx))
 
     def exists(self, template_name: str) -> bool:
         """Check if a template exists."""

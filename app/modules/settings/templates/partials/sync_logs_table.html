@@ -1,0 +1,110 @@
+{# Sync logs table partial - for HTMX updates #}
+
+{% if logs %}
+<table class="min-w-full divide-y divide-gray-100">
+    <thead>
+        <tr class="bg-surface-50">
+            <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Status
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Type
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Records
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Duration
+            </th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Started
+            </th>
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+        {% for log in logs %}
+        <tr class="hover:bg-surface-50/50 transition-colors">
+            <!-- Status -->
+            <td class="py-4 pl-6 pr-3">
+                {% set status_colors = {
+                    'completed': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                    'failed': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'started': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'partial': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                } %}
+                <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ status_colors.get(log.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ log.status.value | title }}
+                </span>
+            </td>
+
+            <!-- Type -->
+            <td class="px-3 py-4">
+                <span class="text-sm text-gray-900">{{ log.sync_type | title }}</span>
+            </td>
+
+            <!-- Records -->
+            <td class="px-3 py-4">
+                <div class="flex items-center gap-3 text-xs">
+                    <span class="text-emerald-600" title="Created">+{{ log.records_created }}</span>
+                    <span class="text-blue-600" title="Updated">{{ log.records_updated }}</span>
+                    {% if log.records_failed > 0 %}
+                    <span class="text-red-600" title="Failed">{{ log.records_failed }}</span>
+                    {% endif %}
+                </div>
+            </td>
+
+            <!-- Duration -->
+            <td class="px-3 py-4">
+                {% if log.duration_seconds %}
+                <span class="text-sm text-gray-600 tabular-nums">{{ log.duration_seconds }}s</span>
+                {% elif log.status.value == 'started' %}
+                <span class="inline-flex items-center gap-1 text-sm text-blue-600">
+                    <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Running
+                </span>
+                {% else %}
+                <span class="text-sm text-gray-400">-</span>
+                {% endif %}
+            </td>
+
+            <!-- Started -->
+            <td class="px-3 py-4">
+                <div>
+                    <p class="text-sm text-gray-900">{{ log.started_at.strftime('%d %b %Y') }}</p>
+                    <p class="text-xs text-gray-500">{{ log.started_at.strftime('%H:%M:%S') }}</p>
+                </div>
+            </td>
+        </tr>
+
+        {% if log.error_message %}
+        <tr class="bg-red-50/50">
+            <td colspan="5" class="px-6 py-3">
+                <p class="text-sm text-red-600">{{ log.error_message }}</p>
+                {% if log.error_details %}
+                <details class="mt-2">
+                    <summary class="text-xs text-red-500 cursor-pointer hover:text-red-700">Show details</summary>
+                    <pre class="mt-2 p-3 bg-red-100 rounded-lg text-xs text-red-800 overflow-x-auto">{{ log.error_details }}</pre>
+                </details>
+                {% endif %}
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="px-6 py-4 border-t border-gray-100">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="p-8 text-center">
+    <p class="text-sm text-gray-500">No sync logs recorded yet for this entity.</p>
+</div>
+{% endif %}

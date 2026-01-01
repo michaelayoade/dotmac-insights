@@ -1,0 +1,203 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Projects Dashboard</h1>
+            <p class="mt-1 text-sm text-gray-500">Overview of projects, tasks, and milestones</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/projects/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                New Project
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Active Projects</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ stats.total_active }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Completed</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ stats.total_completed }}</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Overdue Projects</p>
+                    <p class="text-3xl font-bold text-red-600 mt-1">{{ stats.overdue_projects }}</p>
+                </div>
+                <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Open Tasks</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.open_tasks }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Overdue Tasks</p>
+                    <p class="text-3xl font-bold text-orange-600 mt-1">{{ stats.overdue_tasks }}</p>
+                </div>
+                <div class="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Recent Projects -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Recent Projects</h2>
+                    <a href="/projects" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                {% if recent_projects %}
+                <div class="divide-y divide-gray-100">
+                    {% for project in recent_projects %}
+                    <a href="/projects/{{ project.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900 truncate">{{ project.project_name }}</p>
+                            <p class="text-sm text-gray-500">{{ project.project_type or 'No type' }}</p>
+                        </div>
+                        <div class="flex items-center gap-3 ml-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if project.status == 'completed' %}bg-emerald-50 text-emerald-700
+                                {% elif project.status in ['open', 'working', 'in_progress'] %}bg-blue-50 text-blue-700
+                                {% elif project.status == 'cancelled' %}bg-gray-50 text-gray-700
+                                {% else %}bg-amber-50 text-amber-700{% endif %}">
+                                {{ project.status.replace('_', ' ').title() }}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-6 py-12 text-center text-gray-500">
+                    <p>No projects yet</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Overdue Tasks -->
+            {% if overdue_task_list %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Overdue Tasks</h2>
+                    <a href="/projects/tasks?status=overdue" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for task in overdue_task_list %}
+                    <a href="/projects/tasks/{{ task.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900 truncate">{{ task.subject }}</p>
+                            <p class="text-sm text-gray-500">
+                                {% if task.project %}{{ task.project.project_name }}{% else %}No project{% endif %}
+                            </p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
+                                Due {{ task.exp_end_date.strftime('%b %d') if task.exp_end_date else 'N/A' }}
+                            </span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- Status Distribution -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Projects by Status</h3>
+                <div class="space-y-3">
+                    {% for item in status_distribution %}
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600 capitalize">{{ item.status.replace('_', ' ') }}</span>
+                        <span class="text-sm font-medium text-gray-900">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Upcoming Milestones -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Upcoming Milestones</h3>
+                    <a href="/projects/milestones" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                {% if upcoming_milestones %}
+                <div class="space-y-3">
+                    {% for milestone in upcoming_milestones %}
+                    <a href="/projects/milestones/{{ milestone.id }}" class="block p-3 rounded-xl hover:bg-surface-50">
+                        <div class="flex items-center justify-between mb-1">
+                            <p class="font-medium text-gray-900 text-sm">{{ milestone.title }}</p>
+                            <span class="text-xs text-gray-500">{{ milestone.due_date.strftime('%b %d') if milestone.due_date else '-' }}</span>
+                        </div>
+                        {% if milestone.project %}
+                        <p class="text-xs text-gray-500">{{ milestone.project.project_name }}</p>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">No upcoming milestones this week</p>
+                {% endif %}
+            </div>
+
+            <!-- Quick Links -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Quick Links</h3>
+                <div class="space-y-2">
+                    <a href="/projects" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span class="text-sm font-medium">All Projects</span>
+                    </a>
+                    <a href="/projects/tasks" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                        <span class="text-sm font-medium">All Tasks</span>
+                    </a>
+                    <a href="/projects/milestones" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                        <span class="text-sm font-medium">All Milestones</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

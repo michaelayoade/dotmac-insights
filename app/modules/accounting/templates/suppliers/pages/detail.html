@@ -1,0 +1,245 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/accounting/suppliers"
+                    class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                        {{ supplier.supplier_name }}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500 font-body">
+                        {{ supplier.supplier_group or 'Supplier' }}
+                        {% if supplier.tax_id %} &bull; {{ supplier.tax_id }}{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a
+                href="/accounting/suppliers/{{ supplier.id }}/edit"
+                class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <a
+                href="/accounting/purchase-invoices/new?supplier_id={{ supplier.id }}"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                New Bill
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Bills</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900">{{ '{:,}'.format(stats.total_bills) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Total Billed</p>
+            <p class="mt-1 text-2xl font-bold text-blue-600 font-mono">{{ '{:,.2f}'.format(stats.total_billed or 0) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Total Paid</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(stats.total_paid or 0) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Outstanding</p>
+            <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(stats.outstanding or 0) }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Supplier Details -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Supplier Details</h2>
+                <dl class="grid grid-cols-2 gap-6">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Name</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ supplier.supplier_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Group</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ supplier.supplier_group or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Tax ID</dt>
+                        <dd class="mt-1 text-sm font-mono text-gray-900">{{ supplier.tax_id or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Country</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ supplier.country or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Default Currency</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ supplier.default_currency or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Terms</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ supplier.payment_terms or '-' }}</dd>
+                    </div>
+                </dl>
+
+                <!-- Contact Information -->
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Contact Information</h3>
+                    <dl class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Email</dt>
+                            <dd class="mt-1 text-gray-900">
+                                {% if supplier.email_id %}
+                                <a href="mailto:{{ supplier.email_id }}" class="text-primary-600 hover:text-primary-700">
+                                    {{ supplier.email_id }}
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</dt>
+                            <dd class="mt-1 text-gray-900">{{ supplier.mobile_no or '-' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <!-- Bank Details -->
+                {% if supplier.bank_account or supplier.bank_name %}
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Bank Details</h3>
+                    <dl class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Bank Name</dt>
+                            <dd class="mt-1 text-gray-900">{{ supplier.bank_name or '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Account Number</dt>
+                            <dd class="mt-1 text-gray-900 font-mono">{{ supplier.bank_account or '-' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    <a
+                        href="/accounting/purchase-invoices?supplier_id={{ supplier.id }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">View Bills</span>
+                    </a>
+                    <a
+                        href="/accounting/payments?supplier_id={{ supplier.id }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">View Payments</span>
+                    </a>
+                    <a
+                        href="/accounting/general-ledger?party_type=Supplier&party={{ supplier.id }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">Ledger History</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Bills -->
+    {% if bills %}
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Recent Bills</h2>
+            <a href="/accounting/purchase-invoices?supplier_id={{ supplier.id }}" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+                View all
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Bill #</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Outstanding</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for bill in bills[:10] %}
+                    {% set status_colors = {
+                        'DRAFT': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+                        'SUBMITTED': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+                        'APPROVED': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+                        'PAID': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+                        'PARTIALLY_PAID': 'text-orange-700 bg-orange-50 ring-orange-600/20',
+                        'CANCELLED': 'text-red-700 bg-red-50 ring-red-600/20'
+                    } %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="py-3.5 pl-6 pr-3">
+                            <a href="/accounting/purchase-invoices/{{ bill.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                {{ bill.bill_number or bill.invoice_number or 'BILL-' ~ bill.id }}
+                            </a>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-gray-600">
+                            {{ bill.posting_date.strftime('%b %d, %Y') if bill.posting_date else '-' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono text-gray-900">
+                            {{ '{:,.2f}'.format(bill.grand_total or bill.total_amount or 0) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono {{ 'text-red-600 font-medium' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-gray-400' }}">
+                            {{ '{:,.2f}'.format(bill.outstanding_amount or 0) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 pr-6 text-sm">
+                            <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(bill.status.value if bill.status else 'DRAFT', status_colors['DRAFT']) }}">
+                                {{ bill.status.value.replace('_', ' ').title() if bill.status else 'Draft' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

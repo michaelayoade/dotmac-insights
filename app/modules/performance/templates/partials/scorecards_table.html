@@ -1,0 +1,68 @@
+{% if scorecards %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Score</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Rating</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for sc in scorecards %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <a href="/performance/scorecards/{{ sc.id }}" class="font-medium text-gray-900 hover:text-primary-600">Employee #{{ sc.employee_id }}</a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">Period #{{ sc.evaluation_period_id }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900 hidden md:table-cell">{{ sc.total_weighted_score|round(1) if sc.total_weighted_score else '-' }}%</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ sc.final_rating or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4">
+                    {% set status_colors = {
+                        'pending': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                        'computing': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                        'computed': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'in_review': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                        'approved': 'bg-green-50 text-green-700 ring-green-600/20',
+                        'disputed': 'bg-red-50 text-red-700 ring-red-600/20',
+                        'finalized': 'bg-green-50 text-green-700 ring-green-600/20'
+                    } %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(sc.status.value if sc.status else 'pending', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ (sc.status.value if sc.status else 'pending')|replace('_', ' ')|title }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="/performance/scorecards/{{ sc.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-500">Showing {{ ((page - 1) * per_page) + 1 }} to {{ [page * per_page, total]|min }} of {{ total }} scorecards</p>
+    <div class="flex gap-2">
+        {% if page > 1 %}
+        <button hx-get="/performance/scorecards?page={{ page - 1 }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
+        {% endif %}
+        {% if page < total_pages %}
+        <button hx-get="/performance/scorecards?page={{ page + 1 }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No scorecards found</h3>
+    <p class="text-sm text-gray-500">{% if status_filter %}Try adjusting your filters.{% else %}Employee scorecards will appear here when generated.{% endif %}</p>
+</div>
+{% endif %}

@@ -1,0 +1,55 @@
+{# Reusable report filters #}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <form id="report-filters" class="flex flex-col lg:flex-row gap-4 items-end">
+        {% if report_type in ['trial-balance', 'balance-sheet', 'receivables-aging', 'payables-aging', 'financial-ratios', 'customer-balances', 'supplier-balances'] %}
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">As of Date</label>
+            <input type="date" name="as_of" value="{{ as_of }}"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+        {% endif %}
+
+        {% if report_type in ['income-statement', 'cash-flow', 'general-ledger', 'revenue-analysis'] %}
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+        <div class="flex-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+        {% endif %}
+
+        {% if report_type in ['balance-sheet', 'income-statement'] %}
+        <div class="flex items-center gap-2">
+            <input type="checkbox" name="comparative" id="comparative" value="true" {{ 'checked' if comparative else '' }}
+                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500">
+            <label for="comparative" class="text-sm text-gray-700">Show Comparative</label>
+        </div>
+        {% endif %}
+
+        <div class="flex gap-2">
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                Generate
+            </button>
+            <div class="relative" x-data="{ open: false }">
+                <button type="button" @click="open = !open" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-700 inline-flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Export
+                </button>
+                <div x-show="open" @click.away="open = false" x-transition
+                    class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg ring-1 ring-gray-100 py-1 z-10">
+                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50">Export as PDF</a>
+                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50">Export as Excel</a>
+                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-surface-50">Export as CSV</a>
+                </div>
+            </div>
+            <button type="button" onclick="window.print()" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-700 inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print
+            </button>
+        </div>
+    </form>
+</div>

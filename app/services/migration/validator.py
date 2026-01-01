@@ -22,6 +22,7 @@ from app.services.migration.registry import (
     get_fk_fields,
     get_dependencies,
     FieldType,
+    FieldConfig,
     ENTITY_REGISTRY,
 )
 
@@ -196,7 +197,7 @@ class MigrationValidator:
         field_name: str,
         value: Any,
         field_type: FieldType,
-        field_config: dict,
+        field_config: FieldConfig,
         row_num: int
     ) -> ValidationResult:
         """Validate a field value against its type.
@@ -343,13 +344,11 @@ class MigrationValidator:
         Returns:
             Dict with duplicate info
         """
-        duplicates = {
-            "in_file": [],  # Duplicates within the file
-            "field_counts": {}  # Count of duplicates per field
-        }
+        in_file: list[dict[str, Any]] = []  # Duplicates within the file
+        field_counts: dict[str, int] = {}  # Count of duplicates per field
 
         for field in dedup_fields:
-            seen = {}
+            seen: dict[str, int] = {}
             field_duplicates = []
 
             for i, row in enumerate(rows):
@@ -370,10 +369,13 @@ class MigrationValidator:
                     seen[key] = i + 1
 
             if field_duplicates:
-                duplicates["in_file"].extend(field_duplicates)
-                duplicates["field_counts"][field] = len(field_duplicates)
+                in_file.extend(field_duplicates)
+                field_counts[field] = len(field_duplicates)
 
-        return duplicates
+        return {
+            "in_file": in_file,
+            "field_counts": field_counts,
+        }
 
     def validate_relationships(
         self,
@@ -400,6 +402,12 @@ class MigrationValidator:
         # Check each FK field
         for field_name, fk_config in fk_fields_config.items():
             fk_entity = fk_config.get("fk_entity")
+            if not isinstance(fk_entity, str) or not fk_entity:
+                result.add_warning(
+                    field_name,
+                    "Missing FK target entity configuration"
+                )
+                continue
             lookup_fields = fk_config.get("fk_lookup_fields", ["id"])
             is_required = fk_config.get("required", False)
 

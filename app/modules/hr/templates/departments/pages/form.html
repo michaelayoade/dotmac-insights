@@ -1,0 +1,136 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form
+        method="POST"
+        action="{% if department %}/hr/departments/{{ department.id }}{% else %}/hr/departments{% endif %}"
+        class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
+        data-testid="department-form"
+        x-data="{ submitting: false }"
+        @submit="submitting = true"
+    >
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">
+                {% if department %}Edit Department{% else %}New Department{% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if department %}
+                Update the department information below.
+                {% else %}
+                Fill in the details to create a new department.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="px-6 py-6 space-y-6">
+            <!-- Department Name -->
+            <div>
+                <label for="department_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Department Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="department_name"
+                    id="department_name"
+                    value="{{ department.department_name if department else (form_data.department_name if form_data else '') }}"
+                    required
+                    placeholder="e.g., Engineering, Sales, HR"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.department_name else '' }}"
+                    data-testid="department-name-input"
+                >
+                {% if errors.department_name %}
+                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="department-name-error">{{ errors.department_name }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Parent Department -->
+            <div>
+                <label for="parent_department" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Parent Department
+                </label>
+                <input
+                    type="text"
+                    name="parent_department"
+                    id="parent_department"
+                    value="{{ department.parent_department if department else (form_data.parent_department if form_data else '') }}"
+                    placeholder="Enter parent department name"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    data-testid="parent-department-input"
+                >
+                <p class="mt-1.5 text-xs text-gray-500 font-body">Leave empty for top-level department</p>
+            </div>
+
+            <!-- Company -->
+            <div>
+                <label for="company" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Company
+                </label>
+                <input
+                    type="text"
+                    name="company"
+                    id="company"
+                    value="{{ department.company if department else (form_data.company if form_data else '') }}"
+                    placeholder="Company name"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    data-testid="company-input"
+                >
+            </div>
+
+            <!-- Is Group -->
+            <div class="flex items-start gap-3">
+                <div class="flex h-6 items-center">
+                    <input
+                        type="checkbox"
+                        name="is_group"
+                        id="is_group"
+                        {{ 'checked' if (department.is_group if department else (form_data.is_group if form_data else False)) else '' }}
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        data-testid="is-group-checkbox"
+                    >
+                </div>
+                <div>
+                    <label for="is_group" class="text-sm font-medium text-gray-700 font-body cursor-pointer">
+                        Group Department
+                    </label>
+                    <p class="text-xs text-gray-500 font-body">
+                        Group departments can contain other departments
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-between sm:justify-end gap-3">
+            <a
+                href="{% if department %}/hr/departments/{{ department.id }}{% else %}/hr/departments{% endif %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+                data-testid="cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200 disabled:opacity-50"
+                :class="{ 'pointer-events-none': submitting }"
+                data-testid="submit-button"
+            >
+                <span x-show="!submitting">
+                    {% if department %}Save Changes{% else %}Create Department{% endif %}
+                </span>
+                <svg x-show="!submitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

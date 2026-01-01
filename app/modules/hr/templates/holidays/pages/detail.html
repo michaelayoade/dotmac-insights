@@ -1,0 +1,98 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/hr/holidays" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div class="flex-1">
+            <h1 class="text-2xl font-display font-bold text-gray-900">{{ holiday_list.holiday_list_name }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ holiday_list.total_holidays or 0 }} holiday(s)</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/holidays/{{ holiday_list.id }}/edit" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                Edit
+            </a>
+            <button hx-delete="/hr/holidays/{{ holiday_list.id }}" hx-confirm="Are you sure you want to delete this holiday list and all its holidays?"
+                class="px-4 py-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl font-medium">
+                Delete
+            </button>
+        </div>
+    </div>
+
+    <!-- Details -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Holiday List Details</h2>
+        <dl class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Holiday List Name</dt>
+                <dd class="mt-1 text-gray-900">{{ holiday_list.holiday_list_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">From Date</dt>
+                <dd class="mt-1 text-gray-900">{{ holiday_list.from_date.strftime('%B %d, %Y') if holiday_list.from_date else '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">To Date</dt>
+                <dd class="mt-1 text-gray-900">{{ holiday_list.to_date.strftime('%B %d, %Y') if holiday_list.to_date else '-' }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Holidays -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Holidays</h2>
+        </div>
+
+        <!-- Add Holiday Form -->
+        <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+            <form method="post" action="/hr/holidays/{{ holiday_list.id }}/holidays" class="flex flex-col sm:flex-row gap-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="flex-1">
+                    <input type="date" name="holiday_date" required
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <div class="flex-1">
+                    <input type="text" name="description" placeholder="Holiday description (e.g., Christmas Day)"
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                </div>
+                <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                    Add Holiday
+                </button>
+            </form>
+        </div>
+
+        <!-- Holidays List -->
+        {% if holidays %}
+        <div class="divide-y divide-gray-100">
+            {% for holiday in holidays %}
+            <div class="px-6 py-4 flex items-center justify-between group hover:bg-surface-50">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-purple-50 rounded-xl flex flex-col items-center justify-center">
+                        <span class="text-xs font-medium text-purple-600">{{ holiday.holiday_date.strftime('%b') if holiday.holiday_date else '' }}</span>
+                        <span class="text-lg font-bold text-purple-700">{{ holiday.holiday_date.strftime('%d') if holiday.holiday_date else '' }}</span>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-900">{{ holiday.description or 'Holiday' }}</p>
+                        <p class="text-sm text-gray-500">{{ holiday.holiday_date.strftime('%A, %B %d, %Y') if holiday.holiday_date else '-' }}</p>
+                    </div>
+                </div>
+                <button hx-delete="/hr/holidays/{{ holiday_list.id }}/holidays/{{ holiday.id }}" hx-target="closest div" hx-swap="outerHTML"
+                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" title="Remove">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-12 text-center text-gray-500">
+            <p class="mb-2">No holidays in this list yet</p>
+            <p class="text-sm">Use the form above to add holidays</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

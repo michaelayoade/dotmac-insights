@@ -1,0 +1,134 @@
+{% set docstatus_colors = {
+    0: 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    1: 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    2: 'text-red-700 bg-red-50 ring-red-600/20'
+} %}
+{% set docstatus_labels = {
+    0: 'Draft',
+    1: 'Posted',
+    2: 'Cancelled'
+} %}
+{% set voucher_type_icons = {
+    'journal_entry': 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    'bank_entry': 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+    'cash_entry': 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+    'opening_entry': 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4',
+    'closing_entry': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    'depreciation_entry': 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6',
+    'write_off_entry': 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'
+} %}
+
+{% if entries %}
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Voucher</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Type</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center bg-primary-50 text-primary-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ voucher_type_icons.get(entry.voucher_type.value if entry.voucher_type else 'journal_entry', voucher_type_icons['journal_entry']) }}"/>
+                            </svg>
+                        </span>
+                        <div>
+                            <a href="/accounting/journal-entries/{{ entry.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                {{ entry.voucher_no or 'JE-' ~ entry.id }}
+                            </a>
+                            {% if entry.user_remark %}
+                            <p class="text-xs text-gray-500 truncate max-w-[200px]">{{ entry.user_remark }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                    {{ entry.posting_date.strftime('%b %d, %Y') if entry.posting_date else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+                    {{ entry.voucher_type.value.replace('_', ' ').title() if entry.voucher_type else 'Journal Entry' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-right font-medium font-mono">
+                    {{ '{:,.2f}'.format(entry.total_debit or 0) }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ docstatus_colors.get(entry.docstatus, docstatus_colors[0]) }}">
+                        {{ docstatus_labels.get(entry.docstatus, 'Draft') }}
+                    </span>
+                </td>
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/accounting/journal-entries/{{ entry.id }}"
+                            class="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                            title="View"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </a>
+                        {% if entry.docstatus == 0 %}
+                        <a
+                            href="/accounting/journal-entries/{{ entry.id }}/edit"
+                            class="p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                            title="Edit"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No journal entries found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6">
+        {% if search_query or current_voucher_type or current_docstatus %}
+        No entries match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first journal entry.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_voucher_type or current_docstatus) %}
+    <a
+        href="/accounting/journal-entries/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 transition-colors"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create First Entry
+    </a>
+    {% endif %}
+</div>
+{% endif %}

@@ -431,7 +431,7 @@ def list_bank_transactions(
     sort_by: Optional[str] = Query(default="date", description="date,deposit,withdrawal,unallocated_amount"),
     sort_dir: Optional[str] = Query(default="desc"),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List bank transactions with filtering.

@@ -1,0 +1,149 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration/jobs/{{ job.id }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Migration Records</h1>
+            <p class="mt-1.5 text-gray-500 font-body">{{ job.name }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Filter Tabs -->
+<div class="flex items-center gap-2 mb-6">
+    <a href="/settings/migration/jobs/{{ job.id }}/records"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-primary-100 text-primary-700' if not action_filter else 'text-gray-600 hover:bg-gray-100' }}">
+        All ({{ "{:,}".format(action_counts.created + action_counts.updated + action_counts.skipped + action_counts.failed) }})
+    </a>
+    <a href="/settings/migration/jobs/{{ job.id }}/records?action=created"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-emerald-100 text-emerald-700' if action_filter == 'created' else 'text-gray-600 hover:bg-gray-100' }}">
+        Created ({{ "{:,}".format(action_counts.created) }})
+    </a>
+    <a href="/settings/migration/jobs/{{ job.id }}/records?action=updated"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-blue-100 text-blue-700' if action_filter == 'updated' else 'text-gray-600 hover:bg-gray-100' }}">
+        Updated ({{ "{:,}".format(action_counts.updated) }})
+    </a>
+    <a href="/settings/migration/jobs/{{ job.id }}/records?action=skipped"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-gray-100 text-gray-700' if action_filter == 'skipped' else 'text-gray-600 hover:bg-gray-100' }}">
+        Skipped ({{ "{:,}".format(action_counts.skipped) }})
+    </a>
+    <a href="/settings/migration/jobs/{{ job.id }}/records?action=failed"
+       class="px-4 py-2 text-sm font-medium rounded-lg transition-colors {{ 'bg-red-100 text-red-700' if action_filter == 'failed' else 'text-gray-600 hover:bg-gray-100' }}">
+        Failed ({{ "{:,}".format(action_counts.failed) }})
+    </a>
+</div>
+
+<!-- Records Table -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    {% if records %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead>
+                <tr class="bg-surface-50">
+                    <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Row</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Action</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Source Data</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Transformed</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Error</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for record in records %}
+                <tr class="hover:bg-surface-50/50 transition-colors">
+                    <td class="py-4 pl-6 pr-3">
+                        <span class="text-sm font-medium text-gray-900 tabular-nums">#{{ record.row_number }}</span>
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.action %}
+                        {% set action_colors = {
+                            'created': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                            'updated': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                            'skipped': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                            'failed': 'bg-red-50 text-red-700 ring-red-600/20'
+                        } %}
+                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ action_colors.get(record.action.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                            {{ record.action.value | title }}
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.source_data %}
+                        <div class="max-w-xs">
+                            {% for key, value in (record.source_data.items() | list)[:3] %}
+                            <div class="text-xs text-gray-600 truncate">
+                                <span class="text-gray-400">{{ key }}:</span> {{ value or '-' }}
+                            </div>
+                            {% endfor %}
+                            {% if record.source_data | length > 3 %}
+                            <span class="text-xs text-gray-400">+{{ record.source_data | length - 3 }} more</span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.transformed_data %}
+                        <div class="max-w-xs">
+                            {% for key, value in (record.transformed_data.items() | list)[:3] %}
+                            <div class="text-xs text-gray-600 truncate">
+                                <span class="text-gray-400">{{ key }}:</span> {{ value or '-' }}
+                            </div>
+                            {% endfor %}
+                            {% if record.transformed_data | length > 3 %}
+                            <span class="text-xs text-gray-400">+{{ record.transformed_data | length - 3 }} more</span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.error_message %}
+                        <span class="text-xs text-red-600">{{ record.error_message | truncate(50) }}</span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.total > pagination.per_page %}
+    <div class="px-6 py-4 border-t border-gray-100">
+        {% include "components/ui/pagination.html" %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="p-12 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-slate-200 flex items-center justify-center mb-6 ring-2 ring-gray-200/50">
+            <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No records found</h3>
+        <p class="text-sm text-gray-500 max-w-sm mx-auto">
+            {% if action_filter %}
+            No records with action "{{ action_filter }}" in this migration.
+            {% else %}
+            This migration has no records yet.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -29,6 +29,7 @@ celery_app = Celery(
         "app.tasks.event_tasks",
         "app.tasks.workflow_tasks",
         "app.tasks.scheduled_actions",
+        "app.tasks.provisioning_tasks",
     ],
 )
 

@@ -1,0 +1,31 @@
+{# Single attendance record row #}
+<tr class="group hover:bg-surface-50" id="attendance-row-{{ record.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <a href="/hr/attendance/{{ record.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ record.employee_name or record.employee_id }}</a>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ record.attendance_date }}</td>
+    <td class="whitespace-nowrap px-3 py-4 hidden sm:table-cell">
+        {% set status_colors = {
+            'Present': 'bg-green-50 text-green-700 ring-green-600/20',
+            'Absent': 'bg-red-50 text-red-700 ring-red-600/20',
+            'Half Day': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+            'On Leave': 'bg-blue-50 text-blue-700 ring-blue-600/20'
+        } %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(record.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+            {{ record.status }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ record.in_time or '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ record.out_time or '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">{{ record.working_hours or '-' }}</td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a href="/hr/attendance/{{ record.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </a>
+            <a href="/hr/attendance/{{ record.id }}/edit" class="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

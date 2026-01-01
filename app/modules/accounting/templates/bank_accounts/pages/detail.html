@@ -1,0 +1,158 @@
+{% extends "layouts/app.html" %}
+
+{% set status_colors = {
+    'pending': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+    'settled': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+    'unreconciled': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    'reconciled': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'cancelled': 'text-red-700 bg-red-50 ring-red-600/20'
+} %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/accounting/bank-accounts"
+                    class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                        {{ account.account_name }}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500 font-body">
+                        {{ account.bank or 'Bank Account' }}
+                        {% if account.bank_account_no %}
+                        &middot; {{ account.bank_account_no }}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <a
+            href="/accounting/bank-accounts/{{ account.id }}/reconcile"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Reconcile
+        </a>
+    </div>
+
+    <!-- Balance Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Total Deposits</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(total_deposits) }}</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Withdrawals</p>
+            <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(total_withdrawals) }}</p>
+        </div>
+        <div class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-4">
+            <p class="text-xs font-medium text-primary-700 uppercase tracking-wider">Balance</p>
+            <p class="mt-1 text-2xl font-bold text-primary-800 font-mono">{{ '{:,.2f}'.format(balance) }}</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex items-center gap-4">
+            <label class="text-sm font-medium text-gray-700">Status:</label>
+            <select
+                name="status"
+                class="rounded-xl border-0 py-2 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                onchange="window.location.href='/accounting/bank-accounts/{{ account.id }}?status=' + this.value"
+            >
+                <option value="">All Status</option>
+                {% for opt in status_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Transactions Table -->
+    {% if transactions %}
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Transactions</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Description</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Reference</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Deposit</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Withdrawal</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for txn in transactions %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3.5 pl-6 pr-3 text-sm text-gray-600">
+                            {{ txn.date.strftime('%b %d, %Y') if txn.date else '-' }}
+                        </td>
+                        <td class="px-3 py-3.5 text-sm">
+                            <div class="max-w-xs truncate">
+                                <span class="text-gray-900">{{ txn.description or txn.payee_name or '-' }}</span>
+                            </div>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-gray-600 font-mono hidden sm:table-cell">
+                            {{ txn.reference_number or txn.transaction_id or '-' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono {{ 'text-emerald-600 font-medium' if txn.deposit and txn.deposit > 0 else 'text-gray-400' }}">
+                            {{ '{:,.2f}'.format(txn.deposit) if txn.deposit and txn.deposit > 0 else '-' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 text-sm text-right font-mono {{ 'text-red-600 font-medium' if txn.withdrawal and txn.withdrawal > 0 else 'text-gray-400' }}">
+                            {{ '{:,.2f}'.format(txn.withdrawal) if txn.withdrawal and txn.withdrawal > 0 else '-' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3.5 pr-6 text-sm">
+                            <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(txn.status.value if txn.status else 'pending', status_colors['pending']) }}">
+                                {{ txn.status.value.replace('_', ' ').title() if txn.status else 'Pending' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.total > pagination.per_page %}
+    <div class="mt-6">
+        {% include "components/ui/pagination.html" with context %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No transactions found</h3>
+        <p class="text-sm text-gray-500 font-body">
+            {% if current_status %}
+            No transactions with this status. Try a different filter.
+            {% else %}
+            Transactions will appear here once imported from bank statements.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

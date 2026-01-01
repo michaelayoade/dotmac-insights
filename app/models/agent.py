@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.employee import Employee
 
 
 class Agent(Base):
@@ -34,6 +37,7 @@ class Agent(Base):
 
     # Relationships
     team_memberships: Mapped[List["TeamMember"]] = relationship(back_populates="agent", cascade="all, delete-orphan")
+    employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])
 
     def __repr__(self) -> str:
         return f"<Agent {self.display_name or self.email or self.id}>"

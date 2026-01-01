@@ -171,7 +171,7 @@ async def list_conversations(
     sort_by: str = "last_message_at",
     sort_order: str = "desc",
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List conversations with filtering and pagination."""

@@ -1,0 +1,61 @@
+{% if onboardings %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Department</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Joining Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for onboarding in onboardings %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <a href="/hr/lifecycle/onboarding/{{ onboarding.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ onboarding.employee_name or 'Unknown' }}</a>
+                    {% if onboarding.designation %}
+                    <p class="text-xs text-gray-500">{{ onboarding.designation }}</p>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ onboarding.department or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ onboarding.date_of_joining.strftime('%b %d, %Y') if onboarding.date_of_joining else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4">
+                    {% set status = onboarding.boarding_status.value if onboarding.boarding_status else 'pending' %}
+                    {% if status == 'completed' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Completed</span>
+                    {% elif status == 'in_progress' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20">In Progress</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-yellow-50 text-yellow-700 ring-yellow-600/20">Pending</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <a href="/hr/lifecycle/onboarding/{{ onboarding.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total_pages > 1 %}
+<div class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-500">Showing {{ pagination.start }} to {{ pagination.end }} of {{ pagination.total }}</p>
+    <div class="flex gap-2">
+        {% if pagination.page > 1 %}
+        <button hx-get="/hr/lifecycle/onboarding?page={{ pagination.page - 1 }}&q={{ search_query }}&status={{ current_status }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
+        {% endif %}
+        {% if pagination.page < pagination.total_pages %}
+        <button hx-get="/hr/lifecycle/onboarding?page={{ pagination.page + 1 }}&q={{ search_query }}&status={{ current_status }}" hx-target="#table-container" hx-push-url="true"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No onboarding records found</h3>
+    <p class="text-sm text-gray-500">{% if search_query or current_status %}Try adjusting your filters.{% else %}No onboarding processes have been started yet.{% endif %}</p>
+</div>
+{% endif %}

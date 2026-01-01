@@ -1,0 +1,42 @@
+<tr class="group hover:bg-surface-50" id="milestone-row-{{ milestone.id }}">
+    <td class="py-4 pl-6 pr-3">
+        <a href="/projects/milestones/{{ milestone.id }}" class="block">
+            <p class="font-medium text-gray-900 hover:text-primary-600">{{ milestone.title }}</p>
+            {% if milestone.description %}
+            <p class="text-sm text-gray-500 truncate max-w-md">{{ milestone.description[:60] }}{% if milestone.description|length > 60 %}...{% endif %}</p>
+            {% endif %}
+        </a>
+    </td>
+    <td class="px-3 py-4 text-sm text-gray-600">
+        {% if milestone.project %}
+        <a href="/projects/{{ milestone.project.id }}" class="hover:text-primary-600">{{ milestone.project.project_name[:25] }}{% if milestone.project.project_name|length > 25 %}...{% endif %}</a>
+        {% else %}
+        <span class="text-gray-400">No project</span>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm">
+        {% if milestone.due_date %}
+        <span class="{% if milestone.due_date < today and milestone.status.value != 'completed' %}text-red-600 font-medium{% else %}text-gray-600{% endif %}">
+            {{ milestone.due_date.strftime('%b %d, %Y') }}
+        </span>
+        {% else %}
+        <span class="text-gray-400">-</span>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+            {% if milestone.status.value == 'completed' %}bg-emerald-50 text-emerald-700
+            {% elif milestone.status.value == 'in_progress' %}bg-blue-50 text-blue-700
+            {% elif milestone.status.value == 'cancelled' %}bg-gray-50 text-gray-700
+            {% else %}bg-amber-50 text-amber-700{% endif %}">
+            {{ milestone.status.value.replace('_', ' ').title() }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a href="/projects/milestones/{{ milestone.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

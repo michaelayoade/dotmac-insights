@@ -1,0 +1,109 @@
+{% if suppliers %}
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Supplier</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Group</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Contact</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Outstanding</th>
+                <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for supplier in suppliers %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center font-medium text-sm">
+                            {{ supplier.supplier_name[:2].upper() if supplier.supplier_name else 'S' }}
+                        </span>
+                        <div>
+                            <a href="/accounting/suppliers/{{ supplier.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                {{ supplier.supplier_name }}
+                            </a>
+                            {% if supplier.tax_id %}
+                            <p class="text-xs text-gray-500 font-mono">{{ supplier.tax_id }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+                    {{ supplier.supplier_group or '-' }}
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+                    <div class="max-w-[200px]">
+                        {% if supplier.email_id %}
+                        <p class="truncate text-gray-600">{{ supplier.email_id }}</p>
+                        {% endif %}
+                        {% if supplier.mobile_no %}
+                        <p class="text-xs text-gray-500">{{ supplier.mobile_no }}</p>
+                        {% endif %}
+                        {% if not supplier.email_id and not supplier.mobile_no %}
+                        <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-right">
+                    {% if supplier.outstanding_balance and supplier.outstanding_balance > 0 %}
+                    <span class="font-mono font-medium text-red-600">{{ '{:,.2f}'.format(supplier.outstanding_balance) }}</span>
+                    {% else %}
+                    <span class="font-mono text-gray-400">0.00</span>
+                    {% endif %}
+                </td>
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/accounting/suppliers/{{ supplier.id }}"
+                            class="text-sm font-medium text-primary-600 hover:text-primary-700"
+                        >
+                            View
+                        </a>
+                        <a
+                            href="/accounting/suppliers/{{ supplier.id }}/edit"
+                            class="text-sm font-medium text-gray-600 hover:text-gray-700"
+                        >
+                            Edit
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" %}
+</div>
+{% endif %}
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No suppliers found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6">
+        {% if current_search or current_group %}
+        No suppliers match your search criteria.
+        {% else %}
+        Get started by adding your first supplier.
+        {% endif %}
+    </p>
+    {% if not current_search and not current_group %}
+    <a
+        href="/accounting/suppliers/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+        Add Supplier
+    </a>
+    {% endif %}
+</div>
+{% endif %}

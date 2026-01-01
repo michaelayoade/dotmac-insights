@@ -1,0 +1,128 @@
+{# Messages thread partial - for HTMX updates #}
+{% if messages %}
+    {% for message in messages %}
+    <div
+        class="flex {{ 'justify-end' if message.direction == 'outbound' else 'justify-start' }}"
+        id="message-{{ message.id }}"
+        data-testid="message-{{ message.id }}"
+    >
+        <div class="max-w-[85%] {{ 'order-1' if message.direction == 'outbound' else '' }}">
+            {% if message.direction == 'inbound' %}
+            {# Inbound message #}
+            <div class="flex items-start gap-3">
+                <div class="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-3">
+                        {% if message.subject and loop.first %}
+                        <p class="text-xs font-semibold text-gray-500 mb-1">{{ message.subject }}</p>
+                        {% endif %}
+                        <p class="text-sm text-gray-800 font-body whitespace-pre-wrap">{{ message.body or '(No content)' }}</p>
+                        {% if message.attachments %}
+                        <div class="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                            {% for att in message.attachments %}
+                            <a href="{{ att.url }}" target="_blank" class="flex items-center gap-2 text-xs text-gray-600 hover:text-primary-600 font-body">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                </svg>
+                                {{ att.filename or 'Attachment' }}
+                                {% if att.size_bytes %}
+                                <span class="text-gray-400">({{ (att.size_bytes / 1024) | round(1) }}KB)</span>
+                                {% endif %}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 px-1">
+                        <span class="text-xs text-gray-400 font-body">
+                            {{ message.created_at | format_date('time') }}
+                        </span>
+                        {% if message.delivery_status %}
+                        <span class="text-xs text-gray-400 font-body">
+                            {{ message.delivery_status }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            {# Outbound message #}
+            <div class="flex items-start gap-3 flex-row-reverse">
+                <div class="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                    {% if message.agent_id %}
+                    <span class="text-xs font-bold text-primary-600">{{ (agent_name or 'A')[:1] | upper }}</span>
+                    {% else %}
+                    <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="bg-primary-600 text-white rounded-2xl rounded-tr-md px-4 py-3">
+                        {% if message.subject %}
+                        <p class="text-xs font-semibold text-primary-200 mb-1">{{ message.subject }}</p>
+                        {% endif %}
+                        <p class="text-sm font-body whitespace-pre-wrap">{{ message.body or '(No content)' }}</p>
+                        {% if message.attachments %}
+                        <div class="mt-2 pt-2 border-t border-primary-500 space-y-1">
+                            {% for att in message.attachments %}
+                            <a href="{{ att.url }}" target="_blank" class="flex items-center gap-2 text-xs text-primary-200 hover:text-white font-body">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                </svg>
+                                {{ att.filename or 'Attachment' }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-end gap-2 mt-1 px-1">
+                        <span class="text-xs text-gray-400 font-body">
+                            {{ message.created_at | format_date('time') }}
+                        </span>
+                        {% set delivery_icons = {
+                            'pending': '<svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                            'sent': '<svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+                            'delivered': '<svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>',
+                            'failed': '<svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+                        } %}
+                        {% if message.delivery_status %}
+                        <span title="{{ message.delivery_status }}">
+                            {{ delivery_icons.get(message.delivery_status, '')|safe }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Date separator #}
+    {% if not loop.last %}
+        {% set current_date = message.created_at.date() %}
+        {% set next_date = messages[loop.index].created_at.date() %}
+        {% if current_date != next_date %}
+        <div class="flex items-center gap-4 py-2">
+            <div class="flex-1 h-px bg-gray-200"></div>
+            <span class="text-xs text-gray-400 font-body">{{ next_date | format_date('medium') }}</span>
+            <div class="flex-1 h-px bg-gray-200"></div>
+        </div>
+        {% endif %}
+    {% endif %}
+    {% endfor %}
+{% else %}
+<div class="text-center py-12">
+    <div class="mx-auto w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+    </div>
+    <h3 class="text-sm font-medium text-gray-900 mb-1">No messages yet</h3>
+    <p class="text-xs text-gray-500 font-body">Start the conversation by sending a message</p>
+</div>
+{% endif %}

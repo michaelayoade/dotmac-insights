@@ -1,0 +1,145 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/performance" class="hover:text-primary-600">Performance Reviews</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ period.code }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ period.name }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ period.start_date }} to {{ period.end_date }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Period Details</h3>
+                {% set status_colors = {
+                    'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'active': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'scoring': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'review': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'finalized': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                    'archived': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(period.status.value if period.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ (period.status.value if period.status else 'draft')|replace('_', ' ')|title }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Period Code</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.code }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Period Type</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.period_type.value|replace('_', ' ')|title if period.period_type else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Start Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.start_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">End Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.end_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Scoring Deadline</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.scoring_deadline or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Review Deadline</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ period.review_deadline or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if scorecards %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Employee Scorecards</h3>
+                <a href="/performance/scorecards?period_id={{ period.id }}" class="text-sm text-primary-600 hover:text-primary-700">View all</a>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for sc in scorecards %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">
+                            <a href="/performance/scorecards/{{ sc.id }}" class="hover:text-primary-600">Employee #{{ sc.employee_id }}</a>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900">{{ sc.total_weighted_score|round(1) if sc.total_weighted_score else '-' }}%</td>
+                        <td class="whitespace-nowrap px-3 py-3">
+                            {% set sc_status_colors = {
+                                'pending': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                                'computing': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                                'computed': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                                'in_review': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                                'approved': 'bg-green-50 text-green-700 ring-green-600/20',
+                                'disputed': 'bg-red-50 text-red-700 ring-red-600/20',
+                                'finalized': 'bg-green-50 text-green-700 ring-green-600/20'
+                            } %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset {{ sc_status_colors.get(sc.status.value if sc.status else 'pending', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                                {{ (sc.status.value if sc.status else 'pending')|replace('_', ' ')|title }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-12 px-6 text-center">
+            <p class="text-gray-500">No scorecards generated for this period yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Quick Links</h3>
+            </div>
+            <div class="px-6 py-4 space-y-2">
+                <a href="/performance/scorecards?period_id={{ period.id }}" class="block p-3 rounded-xl hover:bg-surface-50 text-sm text-gray-700">
+                    View All Scorecards
+                </a>
+                <a href="/performance/kras" class="block p-3 rounded-xl hover:bg-surface-50 text-sm text-gray-700">
+                    KRA Definitions
+                </a>
+                <a href="/performance/kpis" class="block p-3 rounded-xl hover:bg-surface-50 text-sm text-gray-700">
+                    KPI Definitions
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Timeline</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ period.created_at.strftime('%b %d, %Y %H:%M') if period.created_at else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ period.updated_at.strftime('%b %d, %Y %H:%M') if period.updated_at else '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

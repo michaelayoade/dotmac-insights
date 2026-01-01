@@ -1,0 +1,112 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration/jobs/{{ job.id }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Duplicate Records</h1>
+            <p class="mt-1.5 text-gray-500 font-body">{{ job.name }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Info Banner -->
+<div class="rounded-xl bg-gray-50 border border-gray-200 p-4 mb-6">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-gray-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-gray-800">Skipped Records</p>
+            <p class="text-sm text-gray-600 mt-0.5">
+                These records were skipped during migration because they matched existing records based on the duplicate detection settings
+                {% if job.dedup_fields %}(checked fields: {{ job.dedup_fields | join(', ') }}){% endif %}.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Duplicates Table -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    {% if duplicates %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead>
+                <tr class="bg-surface-50">
+                    <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Row</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Source Data</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Match Reason</th>
+                    <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Matched With</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for record in duplicates %}
+                <tr class="hover:bg-surface-50/50 transition-colors">
+                    <td class="py-4 pl-6 pr-3">
+                        <span class="text-sm font-medium text-gray-900 tabular-nums">#{{ record.row_number }}</span>
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.source_data %}
+                        <div class="max-w-xs">
+                            {% for key, value in (record.source_data.items() | list)[:3] %}
+                            <div class="text-xs text-gray-600 truncate">
+                                <span class="text-gray-400">{{ key }}:</span> {{ value or '-' }}
+                            </div>
+                            {% endfor %}
+                            {% if record.source_data | length > 3 %}
+                            <span class="text-xs text-gray-400">+{{ record.source_data | length - 3 }} more</span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-600/20">
+                            Duplicate detected
+                        </span>
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if record.target_record_id %}
+                        <span class="text-xs text-gray-600">Matched ID: {{ record.target_record_id }}</span>
+                        {% elif record.error_message %}
+                        <span class="text-xs text-gray-500">{{ record.error_message | truncate(40) }}</span>
+                        {% else %}
+                        <span class="text-xs text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.total > pagination.per_page %}
+    <div class="px-6 py-4 border-t border-gray-100">
+        {% include "components/ui/pagination.html" %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="p-12 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-200 flex items-center justify-center mb-6 ring-2 ring-emerald-200/50">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No duplicates found</h3>
+        <p class="text-sm text-gray-500 max-w-sm mx-auto">
+            All records in this migration were unique and imported successfully.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

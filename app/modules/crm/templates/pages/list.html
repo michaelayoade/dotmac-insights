@@ -236,8 +236,19 @@
     {% endif %}
 </div>
 
-<!-- Contacts Table -->
-<div id="contacts-table-container">
+<!-- Contacts Table with Bulk Selection -->
+<div x-data="bulkSelect()" id="contacts-table-container">
     {% include "modules/crm/templates/partials/contacts_table.html" %}
+
+    {# Bulk Actions Bar #}
+    {% set bulk_delete_url = "/crm/contacts/bulk" %}
+    {% set bulk_export_url = "/crm/contacts/export" %}
+    {% set item_name = "contacts" %}
+    {% include "components/ui/bulk_actions.html" %}
+</div>
+
+<!-- Keyboard shortcut hint -->
+<div class="mt-4 text-center">
+    <span class="text-xs text-gray-400">Press <kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600 font-mono">?</kbd> for keyboard shortcuts</span>
 </div>
 {% endblock %}

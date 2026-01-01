@@ -1,0 +1,185 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration/jobs/{{ job.id }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Field Mapping</h1>
+            <p class="mt-1.5 text-gray-500 font-body">{{ job.name }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<form action="/settings/migration/jobs/{{ job.id }}/mapping" method="POST" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <!-- Sample Data Preview -->
+    {% if job.sample_rows %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+            <h3 class="text-base font-display font-semibold text-gray-900">Sample Data Preview</h3>
+            <p class="text-sm text-gray-500 mt-1">First {{ job.sample_rows | length }} rows from your file</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        {% for col in job.source_columns %}
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for row in job.sample_rows[:3] %}
+                    <tr>
+                        {% for col in job.source_columns %}
+                        <td class="px-4 py-3 text-gray-600 whitespace-nowrap truncate max-w-xs">{{ row.get(col, '') or '-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Field Mapping -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+            <h3 class="text-base font-display font-semibold text-gray-900">Field Mapping</h3>
+            <p class="text-sm text-gray-500 mt-1">Map source columns to target fields</p>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for col in job.source_columns %}
+            {% set current_mapping = job.field_mapping.get(col) if job.field_mapping else suggestions.get(col) %}
+            <div class="px-6 py-4 flex items-center gap-4">
+                <!-- Source Column -->
+                <div class="flex-1 min-w-0">
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-surface-100 text-sm font-medium text-gray-700">
+                        {{ col }}
+                    </span>
+                    {% if job.sample_rows and job.sample_rows[0].get(col) %}
+                    <span class="ml-2 text-xs text-gray-400">e.g., "{{ job.sample_rows[0].get(col) | truncate(20) }}"</span>
+                    {% endif %}
+                </div>
+
+                <!-- Arrow -->
+                <div class="flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </div>
+
+                <!-- Target Field Dropdown -->
+                <div class="flex-1">
+                    <select name="mapping_{{ col }}" class="block w-full rounded-lg border-gray-200 text-sm focus:border-primary-500 focus:ring-primary-500">
+                        <option value="">-- Don't import --</option>
+                        {% for field in target_fields %}
+                        <option value="{{ field.name }}" {{ 'selected' if current_mapping == field.name else '' }}>
+                            {{ field.name }}
+                            {% if field.required %}*{% endif %}
+                            ({{ field.type }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Required Indicator -->
+                <div class="flex-shrink-0 w-20">
+                    {% for field in target_fields if field.name == current_mapping and field.required %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700">Required</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Data Cleaning Rules -->
+    {% if cleaning_rules_options %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900 mb-4">Data Cleaning</h3>
+        <p class="text-sm text-gray-500 mb-4">Apply transformations to clean up imported data</p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {% for rule in cleaning_rules_options %}
+            <label class="relative flex cursor-pointer rounded-lg border border-gray-200 bg-white p-3 hover:border-primary-300 transition-colors">
+                <input type="checkbox" name="cleaning_rules" value="{{ rule.key }}"
+                       class="peer sr-only"
+                       {{ 'checked' if job.cleaning_rules and rule.key in job.cleaning_rules.get('global', []) else '' }}>
+                <div class="flex-1">
+                    <span class="text-sm font-medium text-gray-900 peer-checked:text-primary-600">{{ rule.label }}</span>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ rule.description }}</p>
+                </div>
+                <span class="pointer-events-none absolute -inset-px rounded-lg border-2 border-transparent peer-checked:border-primary-500" aria-hidden="true"></span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Duplicate Handling -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900 mb-4">Duplicate Handling</h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <!-- Strategy -->
+            <div>
+                <label for="dedup_strategy" class="block text-sm font-medium text-gray-700 mb-2">Strategy</label>
+                <select name="dedup_strategy" id="dedup_strategy" class="block w-full rounded-lg border-gray-200 text-sm focus:border-primary-500 focus:ring-primary-500">
+                    {% for strategy in dedup_strategies %}
+                    <option value="{{ strategy.value }}" {{ 'selected' if job.dedup_strategy and job.dedup_strategy.value == strategy.value else '' }}>
+                        {{ strategy.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="mt-1 text-xs text-gray-500">What to do when a duplicate is found</p>
+            </div>
+
+            <!-- Check Fields -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Check Fields</label>
+                <div class="flex flex-wrap gap-2">
+                    {% for field in target_fields %}
+                    {% if field.unique or field.name in ['email', 'phone', 'name', 'employee_name', 'customer_name', 'customer_id', 'employee_id', 'code', 'sku'] %}
+                    <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-primary-300 cursor-pointer transition-colors">
+                        <input type="checkbox" name="dedup_fields" value="{{ field.name }}"
+                               class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                               {{ 'checked' if job.dedup_fields and field.name in job.dedup_fields else '' }}>
+                        <span class="text-sm text-gray-700">{{ field.name }}</span>
+                        {% if field.unique %}
+                        <span class="text-xs text-amber-600">(unique)</span>
+                        {% endif %}
+                    </label>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Fields to check for duplicates</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-end gap-3">
+        <a href="/settings/migration/jobs/{{ job.id }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors">
+            Cancel
+        </a>
+        <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Save Mapping
+        </button>
+    </div>
+</form>
+{% endblock %}

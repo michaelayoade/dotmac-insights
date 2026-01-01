@@ -1,0 +1,32 @@
+{# HR Dashboard Partial - HTMX refreshable #}
+{% if dashboard %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {% if dashboard.leave %}
+    <div class="p-4 rounded-xl bg-gray-50">
+        <h4 class="font-medium text-gray-900 mb-3">Leave Status</h4>
+        <div class="grid grid-cols-2 gap-3">
+            {% for status, count in dashboard.leave.items() %}
+            <div class="text-center p-2 rounded-lg bg-white">
+                <div class="text-lg font-bold text-gray-900">{{ count }}</div>
+                <div class="text-xs text-gray-500 capitalize">{{ status | replace("_", " ") }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if dashboard.attendance %}
+    <div class="p-4 rounded-xl bg-gray-50">
+        <h4 class="font-medium text-gray-900 mb-3">Attendance</h4>
+        <div class="grid grid-cols-2 gap-3">
+            {% for status, count in dashboard.attendance.items() %}
+            <div class="text-center p-2 rounded-lg bg-white">
+                <div class="text-lg font-bold text-gray-900">{{ count }}</div>
+                <div class="text-xs text-gray-500 capitalize">{{ status | replace("_", " ") }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

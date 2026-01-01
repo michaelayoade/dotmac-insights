@@ -428,7 +428,11 @@ async def report_usage_async(db: Session) -> None:
     invoices_count = db.execute(select(func.count(Invoice.id))).scalar() or 0
     dual_write_failures = 0
     try:
-        dual_write_failures = int(CONTACTS_DUAL_WRITE_FAILURES.get())
+        counter_value = getattr(CONTACTS_DUAL_WRITE_FAILURES, "_value", None)
+        if counter_value is not None and hasattr(counter_value, "get"):
+            dual_write_failures = int(counter_value.get())
+        elif hasattr(CONTACTS_DUAL_WRITE_FAILURES, "get"):
+            dual_write_failures = int(CONTACTS_DUAL_WRITE_FAILURES.get())
     except Exception:
         dual_write_failures = 0
 

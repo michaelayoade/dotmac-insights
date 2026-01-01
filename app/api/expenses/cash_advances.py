@@ -1,7 +1,7 @@
 """Cash advance endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,14 +23,14 @@ from app.services.cash_advance_service import CashAdvanceService
 router = APIRouter()
 
 
-@router.get("/", response_model=List[CashAdvanceRead], dependencies=[Depends(Require("expenses:read"))])
+@router.get("/", dependencies=[Depends(Require("expenses:read"))])
 async def list_advances(
     status: Optional[CashAdvanceStatus] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
-):
+) -> Dict[str, Any]:
     query = db.query(CashAdvance).order_by(CashAdvance.created_at.desc())
     query = apply_employee_scope(
         query,
@@ -41,8 +41,41 @@ async def list_advances(
     )
     if status:
         query = query.filter(CashAdvance.status == status)
+
+    total = query.count()
     advances = query.offset(offset).limit(limit).all()
-    return advances
+
+    def serialize(adv: CashAdvance) -> Dict[str, Any]:
+        return {
+            "id": adv.id,
+            "advance_number": adv.advance_number,
+            "employee_id": adv.employee_id,
+            "purpose": adv.purpose,
+            "request_date": adv.request_date.isoformat() if adv.request_date else None,
+            "required_by_date": adv.required_by_date.isoformat() if adv.required_by_date else None,
+            "project_id": adv.project_id,
+            "trip_start_date": adv.trip_start_date.isoformat() if adv.trip_start_date else None,
+            "trip_end_date": adv.trip_end_date.isoformat() if adv.trip_end_date else None,
+            "destination": adv.destination,
+            "requested_amount": float(adv.requested_amount) if adv.requested_amount is not None else 0.0,
+            "approved_amount": float(adv.approved_amount) if adv.approved_amount is not None else 0.0,
+            "disbursed_amount": float(adv.disbursed_amount) if adv.disbursed_amount is not None else 0.0,
+            "settled_amount": float(adv.settled_amount) if adv.settled_amount is not None else 0.0,
+            "outstanding_amount": float(adv.outstanding_amount) if adv.outstanding_amount is not None else 0.0,
+            "refund_amount": float(adv.refund_amount) if adv.refund_amount is not None else 0.0,
+            "currency": adv.currency,
+            "base_currency": adv.base_currency,
+            "conversion_rate": float(adv.conversion_rate) if adv.conversion_rate is not None else 1.0,
+            "status": adv.status.value if adv.status else None,
+            "company": adv.company,
+        }
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [serialize(adv) for adv in advances],
+    }
 
 
 @router.get("/{advance_id}", response_model=CashAdvanceRead, dependencies=[Depends(Require("expenses:read"))])

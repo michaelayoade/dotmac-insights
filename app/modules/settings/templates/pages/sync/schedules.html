@@ -1,0 +1,187 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3 mb-2">
+            <a href="/settings/sync" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Sync Schedules</h1>
+        </div>
+        <p class="mt-1.5 text-gray-500 font-body">Manage automated sync schedules</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Schedules List -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="sync-schedules">
+    {% if schedules %}
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Schedule
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Cron
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Status
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Last Run
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Next Run
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for schedule in schedules %}
+            <tr class="group hover:bg-surface-50/50 transition-colors">
+                <!-- Schedule Info -->
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0 w-9 h-9 rounded-lg {{ 'bg-primary-100' if schedule.is_enabled else 'bg-gray-100' }} flex items-center justify-center">
+                            {% if schedule.is_system %}
+                            <svg class="w-4.5 h-4.5 {{ 'text-primary-600' if schedule.is_enabled else 'text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-4.5 h-4.5 {{ 'text-primary-600' if schedule.is_enabled else 'text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900">{{ schedule.name }}</p>
+                            <p class="text-xs text-gray-500 truncate">{{ schedule.task_name }}</p>
+                        </div>
+                    </div>
+                </td>
+
+                <!-- Cron Expression -->
+                <td class="px-3 py-4">
+                    <code class="text-xs bg-surface-100 px-2 py-1 rounded text-gray-700">{{ schedule.cron_expression }}</code>
+                </td>
+
+                <!-- Status -->
+                <td class="px-3 py-4">
+                    {% set status_colors = {
+                        'success': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                        'failed': 'bg-red-50 text-red-700 ring-red-600/20',
+                        'running': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'disabled': 'bg-gray-50 text-gray-500 ring-gray-400/20',
+                        'pending': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                    } %}
+                    <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ status_colors.get(schedule.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ schedule.status | title }}
+                    </span>
+                </td>
+
+                <!-- Last Run -->
+                <td class="px-3 py-4">
+                    {% if schedule.last_run_at %}
+                    <div>
+                        <p class="text-sm text-gray-900">{{ schedule.last_run_at.strftime('%d %b %Y') }}</p>
+                        <p class="text-xs text-gray-500">{{ schedule.last_run_at.strftime('%H:%M') }}</p>
+                    </div>
+                    {% else %}
+                    <span class="text-sm text-gray-400">Never</span>
+                    {% endif %}
+                </td>
+
+                <!-- Next Run -->
+                <td class="px-3 py-4">
+                    {% if schedule.is_enabled and schedule.next_run_at %}
+                    <div>
+                        <p class="text-sm text-gray-900">{{ schedule.next_run_at.strftime('%d %b %Y') }}</p>
+                        <p class="text-xs text-gray-500">{{ schedule.next_run_at.strftime('%H:%M') }}</p>
+                    </div>
+                    {% elif not schedule.is_enabled %}
+                    <span class="text-sm text-gray-400">Disabled</span>
+                    {% else %}
+                    <span class="text-sm text-gray-400">-</span>
+                    {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-all
+                                {{ 'text-amber-700 bg-amber-50 hover:bg-amber-100' if schedule.is_enabled else 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100' }}"
+                            hx-patch="/settings/sync/schedules/{{ schedule.id }}/toggle"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                        >
+                            {% if schedule.is_enabled %}
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Disable
+                            {% else %}
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Enable
+                            {% endif %}
+                        </button>
+                    </div>
+                </td>
+            </tr>
+
+            {% if schedule.last_error %}
+            <tr class="bg-red-50/50">
+                <td colspan="6" class="px-6 py-3">
+                    <p class="text-sm text-red-600">{{ schedule.last_error }}</p>
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="p-12 text-center">
+        <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-gray-100 to-slate-200 flex items-center justify-center mb-6 ring-2 ring-gray-200/50">
+            <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No schedules configured</h3>
+        <p class="text-sm text-gray-500 max-w-sm mx-auto">
+            Sync schedules are configured through Celery beat. Check the task scheduler settings.
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Info Card -->
+<div class="mt-6 bg-blue-50 rounded-2xl ring-1 ring-blue-100 p-6">
+    <div class="flex gap-4">
+        <div class="flex-shrink-0">
+            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <div>
+            <h3 class="text-sm font-semibold text-blue-800">About Sync Schedules</h3>
+            <p class="mt-1 text-sm text-blue-700">
+                Sync schedules are managed by the Celery beat scheduler. System schedules run automatically based on their cron expression.
+                You can temporarily disable a schedule without removing it from the system.
+            </p>
+            <p class="mt-2 text-sm text-blue-600">
+                <strong>Tip:</strong> Use the "Sync Now" button on each entity's detail page to trigger an immediate sync outside of the schedule.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

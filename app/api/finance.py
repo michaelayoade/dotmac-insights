@@ -201,7 +201,7 @@ async def list_invoices(
     sort_by: Optional[str] = Query(default=None, description="invoice_date,due_date,total_amount,amount_paid,customer_id,status"),
     sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List invoices with filtering, search, sort, and pagination (single-currency only)."""
@@ -365,7 +365,7 @@ async def list_payments(
     sort_by: Optional[str] = Query(default=None, description="payment_date,amount,customer_id,invoice_id,status"),
     sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List payments with filtering, search, sort, and pagination (single-currency only)."""
@@ -527,7 +527,7 @@ async def list_credit_notes(
     sort_by: Optional[str] = Query(default=None, description="issue_date,amount,customer_id,invoice_id,status"),
     sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List credit notes with filtering, search, sort, and pagination (single-currency only)."""

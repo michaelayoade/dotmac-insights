@@ -1,0 +1,41 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/performance" class="hover:text-primary-600">Performance</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">Scorecards</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Employee Scorecards</h1>
+        <p class="mt-1.5 text-gray-500 font-body">View and manage employee performance scorecards</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <select name="status"
+                    class="w-full px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/performance/scorecards"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-push-url="true">
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if status_filter == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="table-container">
+        {% include "performance/partials/scorecards_table.html" %}
+    </div>
+</div>
+{% endblock %}

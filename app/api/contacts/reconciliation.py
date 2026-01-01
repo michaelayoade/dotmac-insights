@@ -4,7 +4,7 @@ Contacts Reconciliation Dashboard Endpoints
 Provides API endpoints for viewing reconciliation status,
 drift reports, and triggering manual reconciliation runs.
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -188,7 +188,7 @@ async def get_sync_log(
     status: Optional[str] = None,
     target_system: Optional[str] = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db)
 ):
     """

@@ -26,6 +26,7 @@ from app.services.migration.registry import (
     get_migration_order,
     get_dependencies,
     check_dependencies_migrated,
+    FieldType,
 )
 
 
@@ -169,7 +170,7 @@ def _job_to_response(job) -> JobResponse:
         skipped_records=job.skipped_records,
         failed_records=job.failed_records,
         progress_percent=job.progress_percent,
-        created_at=job.created_at.isoformat() if job.created_at else None,
+        created_at=job.created_at.isoformat() if job.created_at else "",
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None,
         error_message=job.error_message,
@@ -191,7 +192,7 @@ def _job_to_detail_response(job) -> JobDetailResponse:
         skipped_records=job.skipped_records,
         failed_records=job.failed_records,
         progress_percent=job.progress_percent,
-        created_at=job.created_at.isoformat() if job.created_at else None,
+        created_at=job.created_at.isoformat() if job.created_at else "",
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None,
         error_message=job.error_message,
@@ -209,11 +210,15 @@ def _job_to_detail_response(job) -> JobDetailResponse:
 # Entity Registry Endpoints
 # ============================================================================
 
-@router.get("/entities", response_model=List[EntityInfo])
-def list_supported_entities() -> List[EntityInfo]:
+@router.get("/entities")
+def list_supported_entities() -> Dict[str, Any]:
     """List all supported entity types for migration."""
     entities = list_entities()
-    return [EntityInfo(**e) for e in entities]
+    data = [EntityInfo(**e).model_dump() for e in entities]
+    return {
+        "total": len(data),
+        "data": data,
+    }
 
 
 @router.get("/migration-order")
@@ -276,9 +281,14 @@ def get_entity_schema(entity_type: str) -> EntitySchemaResponse:
     fields_config = config.get("fields", {})
     fields = []
     for name, cfg in fields_config.items():
+        field_type = cfg.get("type", "string")
+        if isinstance(field_type, FieldType):
+            field_type_value = field_type.value
+        else:
+            field_type_value = str(field_type)
         fields.append(FieldInfo(
             name=name,
-            type=cfg.get("type", "string").value if hasattr(cfg.get("type"), "value") else str(cfg.get("type", "string")),
+            type=field_type_value,
             required=cfg.get("required", False),
             unique=cfg.get("unique", False),
             description=cfg.get("description"),
@@ -485,18 +495,26 @@ def validate_migration(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/jobs/{job_id}/preview", response_model=List[PreviewRow])
+@router.get("/jobs/{job_id}/preview")
 def get_preview(
     job_id: int,
-    limit: int = Query(100, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> List[PreviewRow]:
+) -> Dict[str, Any]:
     """Get preview of transformed data."""
     service = MigrationService(db)
     try:
+        job = service.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
         preview = service.get_preview(job_id, limit, offset)
-        return [PreviewRow(**p) for p in preview]
+        return {
+            "total": job.total_rows,
+            "limit": limit,
+            "offset": offset,
+            "data": [PreviewRow(**p).model_dump() for p in preview],
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

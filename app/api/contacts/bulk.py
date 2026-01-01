@@ -6,6 +6,10 @@ Import, bulk update, merge duplicates, bulk assign
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import List, Optional, Any
 from datetime import datetime, timezone
 
@@ -128,27 +132,33 @@ async def bulk_tag_operation(payload: BulkTagRequest, db: Session = Depends(get_
     if len(payload.contact_ids) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 contacts per batch")
 
-    contacts = db.query(UnifiedContact).filter(
-        UnifiedContact.id.in_(payload.contact_ids)
-    ).all()
+    try:
+        # Use row-level locking to prevent race conditions
+        contacts = db.query(UnifiedContact).filter(
+            UnifiedContact.id.in_(payload.contact_ids)
+        ).with_for_update().all()
 
-    for contact in contacts:
-        current_tags = contact.tags or []
+        for contact in contacts:
+            current_tags = contact.tags or []
 
-        if payload.operation == "add":
-            contact.tags = list(set(current_tags + payload.tags))
-        elif payload.operation == "remove":
-            contact.tags = [t for t in current_tags if t not in payload.tags]
-        elif payload.operation == "set":
-            contact.tags = list(set(payload.tags))
+            if payload.operation == "add":
+                contact.tags = list(set(current_tags + payload.tags))
+            elif payload.operation == "remove":
+                contact.tags = [t for t in current_tags if t not in payload.tags]
+            elif payload.operation == "set":
+                contact.tags = list(set(payload.tags))
 
-    db.commit()
+        db.commit()
 
-    return {
-        "success": True,
-        "updated_count": len(contacts),
-        "operation": payload.operation,
-    }
+        return {
+            "success": True,
+            "updated_count": len(contacts),
+            "operation": payload.operation,
+        }
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.exception("bulk_tags_failed")
+        raise HTTPException(status_code=500, detail="Bulk tag operation failed")
 
 
 @router.post(

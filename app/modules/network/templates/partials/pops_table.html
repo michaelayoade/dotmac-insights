@@ -1,0 +1,168 @@
+{# POPs table partial - for HTMX updates #}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="pops-table">
+        <thead>
+            <tr class="bg-gradient-to-r from-surface-50 to-surface-100/50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    POP
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell">
+                    Location
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Customers
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell">
+                    Routers
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Status
+                </th>
+                <th class="py-3.5 pl-3 pr-6 w-24">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+            {% if pops %}
+                {% for row in pops %}
+                {% set pop = row.Pop %}
+                <tr class="group hover:bg-surface-50 transition-all duration-200" data-testid="pop-row-{{ pop.id }}">
+                    <td class="py-4 pl-6 pr-3">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl flex items-center justify-center ring-1 ring-primary-200/50 group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <a href="/network/pops/{{ pop.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors font-display">
+                                    {{ pop.name }}
+                                </a>
+                                {% if pop.code %}
+                                <p class="text-[11px] text-gray-400 font-body uppercase tracking-wide">{{ pop.code }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-4 hidden md:table-cell">
+                        <div class="text-sm text-gray-700 font-body">{{ pop.city or '—' }}</div>
+                        {% if pop.state %}
+                        <div class="text-xs text-gray-400 font-body">{{ pop.state }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg font-bold text-gray-900 font-display tabular-nums">{{ row.customer_count }}</span>
+                            {% if row.customer_count > 0 %}
+                            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden hidden sm:block">
+                                {% set max_count = 100 %}
+                                {% set pct = [(row.customer_count / max_count * 100), 100] | min %}
+                                <div class="h-full bg-gradient-to-r from-primary-400 to-primary-600 rounded-full" style="width: {{ pct }}%"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-3 py-4 hidden sm:table-cell">
+                        <div class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                            </svg>
+                            <span class="text-sm font-semibold text-gray-700 tabular-nums">{{ row.router_count }}</span>
+                        </div>
+                    </td>
+                    <td class="px-3 py-4">
+                        {% if pop.is_active %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 ring-1 ring-emerald-300/50">
+                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            Active
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gray-100 text-gray-500 ring-1 ring-gray-300/50">
+                            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                            Inactive
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="py-4 pl-3 pr-6 text-right">
+                        <a
+                            href="/network/pops/{{ pop.id }}"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                            View
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-16 text-center">
+                    <div class="mx-auto w-20 h-20 bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl flex items-center justify-center mb-5 ring-1 ring-primary-200/50">
+                        <svg class="w-10 h-10 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+                    {% if search_query %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No matching POPs</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        No POPs match your search criteria.
+                    </p>
+                    {% else %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No POPs configured</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        Points of Presence will appear here once synced from Splynx.
+                    </p>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+{% if pagination.total_pages > 1 %}
+<div class="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-surface-50/50 to-transparent">
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-500 font-body">
+            Showing <span class="font-semibold text-gray-700 tabular-nums">{{ (pagination.page - 1) * pagination.per_page + 1 }}</span> to <span class="font-semibold text-gray-700 tabular-nums">{{ [pagination.page * pagination.per_page, pagination.total]|min }}</span> of <span class="font-semibold text-gray-700 tabular-nums">{{ pagination.total }}</span>
+        </p>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400 font-medium">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+            <div class="flex gap-1">
+                {% if pagination.page > 1 %}
+                <button
+                    hx-get="/network/pops/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}"
+                    hx-target="#pops-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Previous
+                </button>
+                {% endif %}
+                {% if pagination.page < pagination.total_pages %}
+                <button
+                    hx-get="/network/pops/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}"
+                    hx-target="#pops-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    Next
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

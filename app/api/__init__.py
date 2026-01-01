@@ -1,14 +1,13 @@
 from fastapi import APIRouter
 from app.api import (
     sync,
-    customers,  # Legacy customers endpoints (still used by E2E tests)
+    customers,  # Refactored to package
     analytics,
     data_explorer,
     admin,
     insights,
     finance,
     hr,
-    sales,  # TODO: Migrate remaining endpoints to /crm/sales and /accounting
     support,
     network,
     zoho_import,
@@ -19,9 +18,10 @@ from app.api import (
     support_settings,
     settings,
     inventory,
-    projects,
+    projects,  # Refactored to package
     entitlements,
 )
+from app.api.sales_pkg import router as sales_router  # Refactored to package
 from app.api import auth as auth_router
 from app.api import expenses
 from app.api.tax import router as tax_router
@@ -50,7 +50,7 @@ api_router = APIRouter()
 # Legacy customers module (ISP-specific) - still exposed for compatibility
 api_router.include_router(customers.router, prefix="/customers", tags=["customers"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
-api_router.include_router(sales.router, tags=["sales"])
+api_router.include_router(sales_router, tags=["sales"])
 api_router.include_router(accounting.router, prefix="/accounting", tags=["accounting"])
 api_router.include_router(purchasing.router, prefix="/purchasing", tags=["purchasing"])
 api_router.include_router(tax_router, prefix="/tax", tags=["tax"])
@@ -60,7 +60,7 @@ api_router.include_router(support_settings.router, tags=["support-settings"])
 api_router.include_router(settings.router, tags=["settings"])
 api_router.include_router(expenses.router, tags=["expenses"])
 # Versioned prefixes (v1) for newer clients
-api_router.include_router(sales.router, prefix="/v1", tags=["sales"])
+api_router.include_router(sales_router, prefix="/v1", tags=["sales"])
 api_router.include_router(accounting.router, prefix="/v1/accounting", tags=["accounting"])
 api_router.include_router(purchasing.router, prefix="/v1/purchasing", tags=["purchasing"])
 api_router.include_router(customers.router, prefix="/v1/customers", tags=["customers"])

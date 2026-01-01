@@ -157,6 +157,9 @@ class PaymentSubscription(Base):
         ForeignKey("users.id"), nullable=True
     )
 
+    # Relationships
+    customer: Mapped[Optional["Customer"]] = relationship(back_populates="payment_subscriptions")
+
     __table_args__ = (
         Index("ix_payment_sub_customer_status", "customer_id", "status"),
         Index("ix_payment_sub_next_billing", "next_billing_date", "status"),

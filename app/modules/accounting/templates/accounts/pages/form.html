@@ -1,0 +1,205 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Account' if account else 'New Account' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update account details' if account else 'Add a new account to the chart of accounts' }}
+            </p>
+        </div>
+        <a
+            href="{{ '/accounting/accounts/' ~ account.id if account else '/accounting/accounts' }}"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/accounting/accounts/' ~ account.id if account else '/accounting/accounts' }}"
+        method="POST"
+        class="max-w-2xl"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-6">
+            <!-- Account Name -->
+            <div>
+                <label for="account_name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Account Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="account_name"
+                    name="account_name"
+                    value="{{ form_data.account_name if form_data else (account.account_name if account else '') }}"
+                    required
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('account_name') else 'ring-gray-200 focus:ring-primary-500' }} placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    placeholder="e.g., Cash on Hand, Accounts Receivable"
+                >
+                {% if errors.get('account_name') %}
+                <p class="mt-1.5 text-sm text-red-600">{{ errors.account_name }}</p>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Account Number -->
+                <div>
+                    <label for="account_number" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Account Number
+                    </label>
+                    <input
+                        type="text"
+                        id="account_number"
+                        name="account_number"
+                        value="{{ form_data.account_number if form_data else (account.account_number if account else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors font-mono"
+                        placeholder="e.g., 1100, 2000"
+                    >
+                </div>
+
+                <!-- Root Type -->
+                <div>
+                    <label for="root_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Root Type <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="root_type"
+                        name="root_type"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('root_type') else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">Select type</option>
+                        {% for opt in root_type_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.root_type if form_data else (account.root_type.value if account and account.root_type else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.get('root_type') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.root_type }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Account Type -->
+                <div>
+                    <label for="account_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Account Type
+                    </label>
+                    <select
+                        id="account_type"
+                        name="account_type"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">Select type (optional)</option>
+                        {% for opt in account_type_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.account_type if form_data else (account.account_type if account else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Parent Account -->
+                <div>
+                    <label for="parent_account" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Parent Account
+                    </label>
+                    <select
+                        id="parent_account"
+                        name="parent_account"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">None (Root Level)</option>
+                        {% for opt in parent_options %}
+                        {% set current_parent = form_data.parent_account if form_data else '' %}
+                        {% if not current_parent and account and account.parent_account %}
+                            {% for p in parent_options %}
+                                {% if p.label.startswith(account.parent_account) %}
+                                    {% set current_parent = p.value %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if current_parent == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Checkboxes -->
+            <div class="space-y-4 pt-2">
+                <!-- Is Group -->
+                <div class="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        id="is_group"
+                        name="is_group"
+                        {{ 'checked' if (form_data.is_group if form_data else (account.is_group if account else False)) else '' }}
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    >
+                    <label for="is_group" class="text-sm font-medium text-gray-700">
+                        Is Group Account
+                    </label>
+                    <span class="text-sm text-gray-500">
+                        (Group accounts can contain child accounts)
+                    </span>
+                </div>
+
+                <!-- Disabled (only for edit) -->
+                {% if account %}
+                <div class="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        id="disabled"
+                        name="disabled"
+                        {{ 'checked' if (form_data.disabled if form_data else (account.disabled if account else False)) else '' }}
+                        class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    >
+                    <label for="disabled" class="text-sm font-medium text-gray-700">
+                        Disabled
+                    </label>
+                    <span class="text-sm text-gray-500">
+                        (Disabled accounts cannot be used in transactions)
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <a
+                href="{{ '/accounting/accounts/' ~ account.id if account else '/accounting/accounts' }}"
+                class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                {{ 'Update Account' if account else 'Create Account' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

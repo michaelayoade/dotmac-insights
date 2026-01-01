@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.customer_usage import CustomerUsage
     from app.models.unified_contact import UnifiedContact
+    from app.models.payment_subscription import PaymentSubscription
 
 
 class CustomerStatus(enum.Enum):
@@ -144,6 +145,7 @@ class Customer(SoftDeleteMixin, Base):
     pop: Mapped[Optional[Pop]] = relationship(back_populates="customers")
     unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
     subscriptions: Mapped[List[Subscription]] = relationship(back_populates="customer")
+    payment_subscriptions: Mapped[List["PaymentSubscription"]] = relationship(back_populates="customer")
     invoices: Mapped[List[Invoice]] = relationship(back_populates="customer")
     payments: Mapped[List[Payment]] = relationship(back_populates="customer")
     conversations: Mapped[List[Conversation]] = relationship(back_populates="customer")

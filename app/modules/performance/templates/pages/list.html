@@ -1,0 +1,67 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Performance Reviews</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage evaluation periods and employee scorecards</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/performance/scorecards" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            Scorecards
+        </a>
+        <a href="/performance/templates" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            Templates
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="search" name="q" value="{{ q }}" placeholder="Search periods..."
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm"
+                    hx-get="/performance/table"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-target="#table-container"
+                    hx-include="[name='status'], [name='period_type']"
+                    hx-push-url="true">
+            </div>
+            <div class="flex gap-3">
+                <select name="status"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/performance/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='period_type']"
+                    hx-push-url="true">
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if status_filter == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="period_type"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/performance/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='status']"
+                    hx-push-url="true">
+                    <option value="">All Types</option>
+                    {% for opt in period_type_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if period_type_filter == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="table-container">
+        {% include "performance/partials/periods_table.html" %}
+    </div>
+</div>
+{% endblock %}

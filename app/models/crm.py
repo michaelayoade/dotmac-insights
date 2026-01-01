@@ -14,6 +14,7 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.contact import Contact
     from app.models.customer import Customer
     from app.models.sales import ERPNextLead, Quotation, SalesOrder, SalesPerson
     from app.models.employee import Employee

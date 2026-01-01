@@ -71,21 +71,13 @@ from app.models.sales import (
     SalesPerson,
     ItemGroup,
 )
-# Auth/RBAC models
-from app.models.auth import (
-    User,
-    Role,
-    Permission,
-    UserRole,
-    RolePermission,
-    ServiceToken,
-    TokenDenylist,
-)
+# Note: Auth/RBAC models NOT exposed in data explorer for security
 from app.auth import Require
 
 router = APIRouter()
 
 # Table categories for organization
+# Note: "auth" category excluded for security - contains sensitive auth data
 TABLE_CATEGORIES = {
     "core_business": "Core Business Data",
     "people": "People & Contacts",
@@ -94,7 +86,6 @@ TABLE_CATEGORIES = {
     "accounting": "Accounting & Finance",
     "hr": "HR & Teams",
     "sales": "Sales & CRM",
-    "auth": "Authentication & RBAC",
     "system": "System & Logs",
 }
 
@@ -155,14 +146,7 @@ TABLES = {
     "territories": Territory,
     "sales_persons": SalesPerson,
     "item_groups": ItemGroup,
-    # Auth/RBAC
-    "auth_users": User,
-    "auth_roles": Role,
-    "auth_permissions": Permission,
-    "auth_user_roles": UserRole,
-    "auth_role_permissions": RolePermission,
-    "auth_service_tokens": ServiceToken,
-    "auth_token_denylist": TokenDenylist,
+    # Note: Auth/RBAC tables excluded for security
     # System
     "sync_logs": SyncLog,
 }
@@ -216,13 +200,7 @@ TABLE_TO_CATEGORY = {
     "territories": "sales",
     "sales_persons": "sales",
     "item_groups": "sales",
-    "auth_users": "auth",
-    "auth_roles": "auth",
-    "auth_permissions": "auth",
-    "auth_user_roles": "auth",
-    "auth_role_permissions": "auth",
-    "auth_service_tokens": "auth",
-    "auth_token_denylist": "auth",
+    # Note: Auth tables excluded for security
     "sync_logs": "system",
 }
 
@@ -287,7 +265,7 @@ async def list_tables(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("/tables/{table_name}", dependencies=[Depends(Require("explorer:read"))])
 async def explore_table(
     table_name: str,
-    limit: int = Query(default=100, ge=1, le=1000),
+    limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     order_by: Optional[str] = None,
     order_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
@@ -302,6 +280,25 @@ async def explore_table(
         raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
 
     model = TABLES[table_name]
+
+    # Security: Whitelist allowed columns for ordering and date filtering
+    # This prevents potential SQL injection via column names
+    allowed_order_columns = {"id", "created_at", "updated_at", "name", "status", "created", "modified"}
+    allowed_date_columns = {"created_at", "updated_at", "created", "modified", "posting_date", "due_date", "start_date", "end_date", "date"}
+
+    # Validate order_by against whitelist
+    if order_by and order_by not in allowed_order_columns:
+        # Also allow if column exists on model (but not arbitrary strings)
+        if not hasattr(model, order_by):
+            raise HTTPException(status_code=400, detail=f"Invalid order_by column: {order_by}")
+
+    # Validate date_column against whitelist
+    if date_column and date_column not in allowed_date_columns:
+        # Also allow if it's an actual date column on the model
+        actual_date_cols = _get_date_columns(model)
+        if date_column not in actual_date_cols:
+            raise HTTPException(status_code=400, detail=f"Invalid date_column: {date_column}")
+
     query = db.query(model)
 
     # Apply date filtering

@@ -285,7 +285,7 @@ def list_articles(
     visibility: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List knowledge base articles."""
@@ -645,7 +645,7 @@ def search_public_articles(
     category_slug: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(default=20, le=50),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Search public articles (no auth required)."""

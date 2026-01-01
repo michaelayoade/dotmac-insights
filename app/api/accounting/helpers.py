@@ -246,6 +246,63 @@ def get_fiscal_year_dates(db: Session, fiscal_year: Optional[str] = None) -> Tup
 
 
 # =============================================================================
+# Cached Account Lookups (Performance Optimization)
+# =============================================================================
+
+# Module-level cache for accounts (cleared on write operations)
+_accounts_cache: Optional[Dict[str, "Account"]] = None
+_accounts_cache_time: Optional[datetime] = None
+_ACCOUNTS_CACHE_TTL_SECONDS = 300  # 5 minutes
+
+
+def get_accounts_by_erpnext_id(db: Session, force_refresh: bool = False) -> Dict[str, "Account"]:
+    """Get all accounts indexed by erpnext_id with caching.
+
+    This function caches the Account table lookup to avoid repeated full table scans
+    in report generation. The cache is module-level and refreshes every 5 minutes
+    or when force_refresh is True.
+
+    Args:
+        db: Database session
+        force_refresh: If True, bypass cache and reload from database
+
+    Returns:
+        Dict mapping erpnext_id to Account objects
+    """
+    global _accounts_cache, _accounts_cache_time
+
+    now = datetime.now()
+
+    # Check if cache is valid
+    if (
+        not force_refresh
+        and _accounts_cache is not None
+        and _accounts_cache_time is not None
+        and (now - _accounts_cache_time).total_seconds() < _ACCOUNTS_CACHE_TTL_SECONDS
+    ):
+        return _accounts_cache
+
+    # Refresh cache
+    _accounts_cache = {
+        acc.erpnext_id: acc
+        for acc in db.query(Account).all()
+        if acc.erpnext_id
+    }
+    _accounts_cache_time = now
+    return _accounts_cache
+
+
+def invalidate_accounts_cache() -> None:
+    """Invalidate the accounts cache.
+
+    Call this after any Account write operations (create, update, delete).
+    """
+    global _accounts_cache, _accounts_cache_time
+    _accounts_cache = None
+    _accounts_cache_time = None
+
+
+# =============================================================================
 # Currency Resolution
 # =============================================================================
 
@@ -604,7 +661,7 @@ def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:
     Returns:
         Dict with 'ar' and 'ap' totals
     """
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts = get_accounts_by_erpnext_id(db)
 
     entries = (
         db.query(

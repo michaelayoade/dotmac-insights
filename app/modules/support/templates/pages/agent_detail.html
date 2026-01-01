@@ -1,0 +1,198 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/support/agents" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold text-lg">
+            {{ (agent.display_name or agent.email or 'A')[0].upper() }}
+        </div>
+        <div class="flex-1">
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-display font-bold text-gray-900">{{ agent.display_name or agent.email }}</h1>
+                {% if agent.is_available %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Online
+                </span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-sm text-gray-500">{{ agent.email }}</p>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Open Tickets</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.open_tickets }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Resolved Today</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ stats.resolved_today }}</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Teams</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ stats.teams }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Team Memberships -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Team Memberships</h2>
+                </div>
+                {% if team_memberships %}
+                <div class="divide-y divide-gray-100">
+                    {% for membership in team_memberships %}
+                    <div class="px-6 py-4 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ membership.team.name if membership.team else 'Unknown Team' }}</p>
+                                <p class="text-sm text-gray-500">{{ membership.role or 'Member' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    <p>Not a member of any teams</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Open Tickets -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Open Tickets</h2>
+                    <a href="/support/tickets?assigned={{ agent.employee_id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                {% if open_tickets %}
+                <div class="divide-y divide-gray-100">
+                    {% for ticket in open_tickets %}
+                    <a href="/support/tickets/{{ ticket.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-600">{{ ticket.ticket_number }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if ticket.priority.value == 'urgent' %}bg-red-50 text-red-700
+                                    {% elif ticket.priority.value == 'high' %}bg-orange-50 text-orange-700
+                                    {% elif ticket.priority.value == 'medium' %}bg-yellow-50 text-yellow-700
+                                    {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                    {{ ticket.priority.value.title() }}
+                                </span>
+                            </div>
+                            <p class="font-medium text-gray-900 truncate">{{ ticket.subject }}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if ticket.status.value == 'open' %}bg-amber-50 text-amber-700
+                                {% elif ticket.status.value == 'in_progress' %}bg-blue-50 text-blue-700
+                                {% else %}bg-purple-50 text-purple-700{% endif %}">
+                                {{ ticket.status.value.replace('_', ' ').title() }}
+                            </span>
+                            <p class="text-sm text-gray-500 mt-1">{{ ticket.created_at.strftime('%b %d') }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    <p>No open tickets assigned</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- Agent Info -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Agent Info</h3>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Status</dt>
+                        <dd class="mt-1">
+                            {% if agent.is_active %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Active</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-700">Inactive</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dd class="mt-1 text-gray-900">{{ agent.email or '-' }}</dd>
+                    </div>
+                    {% if agent.employee %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Employee</dt>
+                        <dd class="mt-1">
+                            <a href="/hr/employees/{{ agent.employee.id }}" class="text-primary-600 hover:text-primary-700 font-medium">{{ agent.employee.name }}</a>
+                        </dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Max Concurrent</dt>
+                        <dd class="mt-1 text-gray-900">{{ agent.max_concurrent_tickets or 'Unlimited' }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Settings -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Settings</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Auto-assign tickets</span>
+                        {% if agent.auto_assign_enabled %}
+                        <span class="text-emerald-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></span>
+                        {% else %}
+                        <span class="text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Chat enabled</span>
+                        {% if agent.chat_enabled %}
+                        <span class="text-emerald-600"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></span>
+                        {% else %}
+                        <span class="text-gray-400"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

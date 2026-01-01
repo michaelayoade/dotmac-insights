@@ -1,0 +1,110 @@
+{% set status_colors = {
+    'DRAFT': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+    'PENDING': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    'APPROVED': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'REJECTED': 'text-red-700 bg-red-50 ring-red-600/20',
+    'CANCELLED': 'text-gray-700 bg-gray-50 ring-gray-600/20'
+} %}
+
+{% set doctype_labels = {
+    'journal_entry': 'Journal Entry',
+    'expense': 'Expense',
+    'payment': 'Payment',
+    'supplier_payment': 'Supplier Payment',
+    'invoice': 'Invoice',
+    'purchase_invoice': 'Purchase Invoice',
+    'credit_note': 'Credit Note',
+    'debit_note': 'Debit Note',
+    'bank_transaction': 'Bank Transaction'
+} %}
+
+{% if approvals %}
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Amount</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Submitted</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Step</th>
+                <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for approval in approvals %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </span>
+                        <div>
+                            <a href="/accounting/approvals/{{ approval.doctype }}/{{ approval.document_id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                {{ approval.document_name or (approval.doctype ~ '-' ~ approval.document_id) }}
+                            </a>
+                            {% if approval.submitted_by %}
+                            <p class="text-xs text-gray-500">by {{ approval.submitted_by.full_name if approval.submitted_by.full_name else approval.submitted_by.email }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                    {{ doctype_labels.get(approval.doctype, approval.doctype.replace('_', ' ').title()) }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-right font-mono text-gray-900 hidden sm:table-cell">
+                    {% if approval.amount %}
+                    {{ '{:,.2f}'.format(approval.amount) }}
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+                    {{ approval.submitted_at.strftime('%b %d, %Y') if approval.submitted_at else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                        Step {{ approval.current_step }}
+                    </span>
+                </td>
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <a
+                            href="/accounting/approvals/{{ approval.doctype }}/{{ approval.document_id }}"
+                            class="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-100 transition-colors"
+                        >
+                            Review
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+{% else %}
+<!-- Empty State -->
+<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-emerald-900 mb-2">All Caught Up!</h3>
+    <p class="text-sm text-emerald-700">
+        {% if current_doctype %}
+        No pending approvals for this document type.
+        {% else %}
+        You have no documents awaiting your approval.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

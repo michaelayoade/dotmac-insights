@@ -1,0 +1,37 @@
+{# Salary slips table partial #}
+{% if slips %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="?sort=employee_name&dir={{ 'desc' if sort == 'employee_name' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/hr/payroll/table?sort=employee_name&dir={{ 'desc' if sort == 'employee_name' and dir == 'asc' else 'asc' }}" hx-target="#slips-table-container" hx-push-url="true">
+                    Employee
+                    {% if sort == 'employee_name' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Gross Pay</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Net Pay</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for slip in slips %}
+            {% include "modules/hr/templates/payroll/partials/slip_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No salary slips found</h3>
+    <p class="text-sm text-gray-500 mb-6">Run a payroll to generate salary slips for employees.</p>
+    <a href="/hr/payroll/runs" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        View Payroll Runs
+    </a>
+</div>
+{% endif %}

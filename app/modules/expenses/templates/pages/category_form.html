@@ -1,0 +1,106 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Category' if category else 'New Expense Category' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update expense category details' if category else 'Create a new expense category for organizing claims' }}
+            </p>
+        </div>
+        <a
+            href="/expenses/categories"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/expenses/categories/' ~ category.id if category else '/expenses/categories' }}"
+        method="POST"
+        class="max-w-2xl"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-6">
+            <!-- Name -->
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Category Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value="{{ form_data.name if form_data else (category.name if category else '') }}"
+                    required
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('name') else 'ring-gray-200 focus:ring-primary-500' }} placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    placeholder="e.g., Travel, Meals, Office Supplies"
+                >
+                {% if errors.get('name') %}
+                <p class="mt-1.5 text-sm text-red-600">{{ errors.name }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Description
+                </label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="3"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    placeholder="Brief description of what expenses this category covers"
+                >{{ form_data.description if form_data else (category.description if category else '') }}</textarea>
+            </div>
+
+            <!-- Active Toggle -->
+            <div class="flex items-center gap-3">
+                <input
+                    type="checkbox"
+                    id="is_active"
+                    name="is_active"
+                    {{ 'checked' if (form_data.is_active if form_data else (category.is_active if category else True)) else '' }}
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                >
+                <label for="is_active" class="text-sm font-medium text-gray-700">
+                    Active
+                </label>
+                <span class="text-sm text-gray-500">
+                    (Inactive categories won't appear in expense claim forms)
+                </span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <a
+                href="/expenses/categories"
+                class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                {{ 'Update Category' if category else 'Create Category' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

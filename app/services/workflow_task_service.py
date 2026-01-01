@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import structlog
 from sqlalchemy import and_, case, func, or_
@@ -264,7 +264,8 @@ class WorkflowTaskService:
             WorkflowTask.created_at.desc(),
         )
 
-        return query.offset(offset).limit(limit).all()
+        tasks = cast(list[WorkflowTask], query.offset(offset).limit(limit).all())
+        return tasks
 
     def count_my_tasks(
         self,

@@ -37,7 +37,7 @@ router = APIRouter()
 async def list_shift_types(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List shift types."""
@@ -136,7 +136,7 @@ async def list_shift_assignments(
     end_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List shift assignments with filtering."""
@@ -348,7 +348,7 @@ async def list_attendances(
     late_entry: Optional[bool] = None,
     early_exit: Optional[bool] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List attendances with filtering."""
@@ -830,7 +830,7 @@ async def list_attendance_requests(
     to_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List attendance requests with filtering."""
