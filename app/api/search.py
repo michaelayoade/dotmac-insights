@@ -7,8 +7,7 @@ from typing import List, Dict, Any
 
 from app.database import get_db
 from app.auth import Principal, get_current_principal
-from app.models.contact import Contact
-from app.models.customer import Customer
+from app.models.party import Party
 from app.models.ticket import Ticket, TicketStatus
 from app.models.invoice import Invoice
 from app.models.employee import Employee
@@ -30,57 +29,38 @@ async def global_search(
     search_term = f"%{q.lower()}%"
     per_type_limit = max(5, limit // 4)
 
-    # Search Contacts
+    # Search Parties
     if principal.has_scope("crm:read"):
-        contacts = (
-            db.query(Contact)
+        parties = (
+            db.query(Party)
             .filter(
-                Contact.tenant_id == principal.tenant_id,
+                Party.tenant_id == principal.tenant_id,
                 or_(
-                    func.lower(Contact.first_name).like(search_term),
-                    func.lower(Contact.last_name).like(search_term),
-                    func.lower(Contact.email).like(search_term),
-                    func.lower(Contact.phone).like(search_term),
-                    func.lower(Contact.company).like(search_term),
+                    func.lower(Party.name).like(search_term),
+                    func.lower(Party.first_name).like(search_term),
+                    func.lower(Party.last_name).like(search_term),
+                    func.lower(Party.legal_name).like(search_term),
+                    func.lower(Party.trading_name).like(search_term),
+                    func.lower(Party.primary_email).like(search_term),
+                    func.lower(Party.primary_phone).like(search_term),
                 ),
             )
             .limit(per_type_limit)
             .all()
         )
-        for c in contacts:
-            name = f"{c.first_name or ''} {c.last_name or ''}".strip() or c.email
+        for p in parties:
+            display_name = p.name
+            if not display_name:
+                display_name = f"{p.first_name or ''} {p.last_name or ''}".strip()
+            if not display_name:
+                display_name = p.legal_name or p.trading_name or p.primary_email or ""
             results.append({
-                "id": str(c.id),
-                "type": "contact",
-                "title": name,
-                "subtitle": c.email or c.phone or "",
-                "url": f"/crm/contacts/{c.id}",
-                "status": c.status.value if c.status else None,
-            })
-
-    # Search Customers
-    if principal.has_scope("customers:read"):
-        customers = (
-            db.query(Customer)
-            .filter(
-                Customer.tenant_id == principal.tenant_id,
-                or_(
-                    func.lower(Customer.name).like(search_term),
-                    func.lower(Customer.email).like(search_term),
-                    func.lower(Customer.account_number).like(search_term),
-                ),
-            )
-            .limit(per_type_limit)
-            .all()
-        )
-        for c in customers:
-            results.append({
-                "id": str(c.id),
-                "type": "customer",
-                "title": c.name,
-                "subtitle": c.email or c.account_number or "",
-                "url": f"/customers/{c.id}",
-                "status": c.status.value if c.status else None,
+                "id": str(p.id),
+                "type": "party",
+                "title": display_name,
+                "subtitle": p.primary_email or p.primary_phone or "",
+                "url": f"/parties/{p.id}",
+                "status": p.status,
             })
 
     # Search Tickets

@@ -32,7 +32,7 @@ from app.models.field_service import (
 )
 
 # Models - Related
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.models.employee import Employee, EmploymentStatus
 
 # Permission dependencies
@@ -139,12 +139,16 @@ def get_type_options():
 # =============================================================================
 
 def get_customer_options(db):
-    """Get customers for service order dropdown."""
-    customers = db.query(Customer).filter(
-        Customer.is_deleted == False
-    ).order_by(Customer.customer_name).limit(100).all()
+    """Get customer accounts for service order dropdown."""
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
     return [
-        {"value": str(c.id), "label": c.customer_name}
+        {"value": str(c.id), "label": c.party.name if c.party else f"Account {c.id}"}
         for c in customers
     ]
 

@@ -2,27 +2,21 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
 from app.cache import cached
 from app.database import get_db
-from app.models.accounting import (
-    Account,
-    AccountType,
-    BankTransaction,
-    GLEntry,
-    PurchaseInvoice,
-    PurchaseInvoiceStatus,
+from app.services.accounting import AccountingSettingsService, DashboardService
+from app.services.accounting.dashboard_types import (
+    DashboardBundleFilters,
+    DashboardFilters,
 )
-from app.models.invoice import Invoice, InvoiceStatus
 
-from .helpers import parse_date, get_effective_root_type
+from .helpers import parse_date
 from .reports import get_balance_sheet, get_income_statement, get_cash_flow
 from .receivables import get_receivables_outstanding
 from .payables import get_payables_outstanding
@@ -31,11 +25,18 @@ from .banking import get_bank_accounts
 router = APIRouter()
 
 
+def _get_dashboard_service(db: Session, principal: Optional[Principal] = None) -> DashboardService:
+    """Factory to create DashboardService with dependencies."""
+    settings_service = AccountingSettingsService(db, principal)
+    return DashboardService(db, settings_service, principal)
+
+
 @router.get("/dashboard", dependencies=[Depends(Require("accounting:read"))])
 def get_accounting_dashboard(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get accounting dashboard overview.
 
@@ -54,135 +55,18 @@ def get_accounting_dashboard(
     Returns:
         Dashboard data with all key metrics
     """
-    end_dt = parse_date(end_date, "end_date") or date.today()
-    start_dt = parse_date(start_date, "start_date") or date(end_dt.year, 1, 1)
+    end_dt = parse_date(end_date, "end_date")
+    start_dt = parse_date(start_date, "start_date")
 
-    # Get account balances (cumulative to end_dt)
-    balances = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit - GLEntry.credit).label("balance"),
-    ).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date <= end_dt,
-    ).group_by(GLEntry.account).all()
-
-    balance_map = {r.account: float(r.balance or 0) for r in balances}
-
-    # Get accounts with their types - filter to only active leaf accounts with balances
-    accounts = {
-        acc.erpnext_id: acc
-        for acc in db.query(Account).filter(
-            Account.disabled == False,
-            Account.is_group == False,  # Only leaf accounts have balances
-        ).all()
-    }
-
-    # Calculate totals by effective root type (handles ERPNext misclassifications)
-    total_assets = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.ASSET
-    )
-    total_liabilities = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.LIABILITY
-    )
-    total_equity = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EQUITY
+    filters = DashboardFilters(
+        start_date=start_dt,
+        end_date=end_dt,
     )
 
-    # Period income/expenses (within date range)
-    period_entries = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit).label("debit"),
-        func.sum(GLEntry.credit).label("credit"),
-    ).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date >= start_dt,
-        GLEntry.posting_date <= end_dt,
-    ).group_by(GLEntry.account).all()
+    service = _get_dashboard_service(db, principal)
+    dashboard = service.get_dashboard(filters)
 
-    period_map = {
-        r.account: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)}
-        for r in period_entries
-    }
-
-    total_income = sum(
-        period_map.get(acc_id, {}).get("credit", 0) - period_map.get(acc_id, {}).get("debit", 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.INCOME
-    )
-    total_expenses = sum(
-        period_map.get(acc_id, {}).get("debit", 0) - period_map.get(acc_id, {}).get("credit", 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EXPENSE
-    )
-
-    # AR/AP summaries
-    total_receivable = db.query(func.sum(Invoice.balance)).filter(
-        Invoice.balance > 0,
-        Invoice.status.notin_([InvoiceStatus.CANCELLED, InvoiceStatus.REFUNDED]),
-    ).scalar() or Decimal("0")
-
-    total_payable = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
-        PurchaseInvoice.outstanding_amount > 0,
-        PurchaseInvoice.status.notin_([PurchaseInvoiceStatus.CANCELLED]),
-    ).scalar() or Decimal("0")
-
-    # Bank balances
-    bank_accounts_data = []
-    for acc_id, acc in accounts.items():
-        if acc.account_type == "Bank":
-            balance = balance_map.get(acc_id, 0)
-            if balance != 0:
-                bank_accounts_data.append({
-                    "account": acc.account_name,
-                    "balance": balance,
-                })
-
-    # Recent transactions count
-    recent_gl_count = db.query(func.count(GLEntry.id)).filter(
-        GLEntry.posting_date >= start_dt,
-        GLEntry.posting_date <= end_dt,
-        GLEntry.is_cancelled == False,
-    ).scalar() or 0
-
-    recent_bank_txn_count = db.query(func.count(BankTransaction.id)).filter(
-        BankTransaction.date >= start_dt,
-        BankTransaction.date <= end_dt,
-    ).scalar() or 0
-
-    return {
-        "period": {
-            "start_date": start_dt.isoformat(),
-            "end_date": end_dt.isoformat(),
-        },
-        "summary": {
-            "total_assets": total_assets,
-            "total_liabilities": total_liabilities,
-            "total_equity": total_equity,
-            "net_worth": total_assets - total_liabilities,
-        },
-        "performance": {
-            "total_income": total_income,
-            "total_expenses": total_expenses,
-            "net_profit": total_income - total_expenses,
-            "profit_margin": round((total_income - total_expenses) / total_income * 100, 2) if total_income else 0,
-        },
-        "receivables_payables": {
-            "total_receivable": float(total_receivable),
-            "total_payable": float(total_payable),
-            "net_position": float(total_receivable - total_payable),
-        },
-        "bank_balances": sorted(bank_accounts_data, key=lambda x: x["balance"], reverse=True),
-        "activity": {
-            "gl_entries_count": recent_gl_count,
-            "bank_transactions_count": recent_bank_txn_count,
-        },
-    }
+    return dashboard.to_dict()
 
 
 @router.get("/dashboard/bundle", dependencies=[Depends(Require("accounting:read"))])
@@ -201,10 +85,27 @@ async def get_accounting_dashboard_bundle(
     Returns dashboard, balance sheet, income statement, cash flow,
     bank accounts, and receivables/payables summaries in one call.
     """
-    _ = principal
     effective_as_of = as_of_date or end_date
 
-    dashboard = get_accounting_dashboard(start_date=start_date, end_date=end_date, db=db)
+    # Build filters for service
+    bundle_filters = DashboardBundleFilters(
+        currency=currency,
+        start_date=parse_date(start_date, "start_date"),
+        end_date=parse_date(end_date, "end_date"),
+        as_of_date=parse_date(effective_as_of, "as_of_date"),
+        top_n=top,
+    )
+
+    # Get dashboard from service
+    service = _get_dashboard_service(db, principal)
+    dashboard_filters = DashboardFilters(
+        start_date=bundle_filters.start_date,
+        end_date=bundle_filters.end_date,
+    )
+    dashboard = service.get_dashboard(dashboard_filters)
+
+    # Call existing route functions for other reports
+    # These will be migrated to services in future iterations
     balance_sheet = get_balance_sheet(
         as_of_date=effective_as_of,
         currency=currency,
@@ -221,13 +122,23 @@ async def get_accounting_dashboard_bundle(
         currency=currency,
         db=db,
     )
-    receivables = get_receivables_outstanding(currency=currency, top=top, db=db)
-    payables = get_payables_outstanding(currency=currency, top=top, db=db)
+    receivables = get_receivables_outstanding(
+        currency=currency,
+        top=top,
+        db=db,
+        principal=principal,
+    )
+    payables = get_payables_outstanding(
+        currency=currency,
+        top=top,
+        db=db,
+        principal=principal,
+    )
     bank_accounts = get_bank_accounts(as_of_date=effective_as_of, db=db)
 
     return {
         "currency": currency,
-        "dashboard": dashboard,
+        "dashboard": dashboard.to_dict(),
         "balance_sheet": balance_sheet,
         "income_statement": income_statement,
         "cash_flow": cash_flow,

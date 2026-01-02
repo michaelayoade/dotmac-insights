@@ -372,6 +372,207 @@ SETTING_SCHEMAS: dict[str, dict[int, dict[str, Any]]] = {
             "required": [],
         },
     },
+
+    "billing": {
+        1: {
+            "label": "Billing Configuration",
+            "description": "Subscription billing and payment settings",
+            "type": "object",
+            "properties": {
+                # General billing settings
+                "enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable automated billing",
+                },
+                "default_currency": {
+                    "type": "string",
+                    "default": "NGN",
+                    "description": "Default billing currency",
+                },
+                "supported_currencies": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "default": ["NGN", "USD"],
+                    "description": "Supported currencies for billing",
+                },
+                "tax_rate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 0,
+                    "description": "Default tax rate percentage",
+                },
+                "invoice_prefix": {
+                    "type": "string",
+                    "default": "INV",
+                    "description": "Invoice number prefix",
+                },
+                "invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "default": 7,
+                    "description": "Days until invoice is due",
+                },
+
+                # Daily billing settings
+                "daily_billing_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable daily billing automation",
+                },
+                "daily_billing_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 1,
+                    "description": "Hour to run daily billing (0-23)",
+                },
+                "daily_billing_minute": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59,
+                    "default": 0,
+                    "description": "Minute to run daily billing (0-59)",
+                },
+                "daily_billing_type": {
+                    "type": "string",
+                    "enum": ["fixed", "usage_based", "hybrid"],
+                    "default": "fixed",
+                    "description": "Default daily billing type",
+                },
+                "daily_usage_rate_per_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Rate per GB for usage-based billing",
+                },
+                "daily_included_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Free GB included per day",
+                },
+
+                # Monthly billing settings
+                "monthly_billing_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable monthly billing automation",
+                },
+                "monthly_billing_day": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 28,
+                    "default": 1,
+                    "description": "Day of month for billing (1-28)",
+                },
+                "monthly_billing_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 2,
+                    "description": "Hour to run monthly billing",
+                },
+
+                # Invoice overdue settings
+                "overdue_check_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable overdue invoice marking",
+                },
+                "overdue_check_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 6,
+                    "description": "Hour to check for overdue invoices",
+                },
+
+                # Retry settings
+                "charge_retry_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable failed charge retries",
+                },
+                "charge_retry_interval_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24,
+                    "default": 4,
+                    "description": "Hours between retry attempts",
+                },
+                "charge_max_retries": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Maximum retry attempts",
+                },
+                "charge_retry_backoff": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Use exponential backoff for retries",
+                },
+
+                # Auto-charge settings
+                "auto_charge_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable automatic charging via payment subscriptions",
+                },
+                "auto_charge_generate_invoice": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Generate invoice before auto-charging",
+                },
+
+                # Suspension settings
+                "auto_suspend_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Auto-suspend on failed payment",
+                },
+                "auto_suspend_grace_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30,
+                    "default": 3,
+                    "description": "Grace period before suspension",
+                },
+
+                # Notification settings
+                "send_invoice_email": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Email invoice to customer",
+                },
+                "send_payment_receipt": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Email payment receipt",
+                },
+                "send_payment_failed_alert": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Alert on payment failure",
+                },
+                "send_overdue_reminder": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send overdue invoice reminders",
+                },
+                "overdue_reminder_days": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "default": [1, 3, 7],
+                    "description": "Days after due date to send reminders",
+                },
+            },
+            "required": [],
+        },
+    },
 }
 
 

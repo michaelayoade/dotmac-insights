@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.models.field_service import (
         ServiceOrder, FieldTeam, FieldTeamMember, TechnicianSkill, ServiceTimeEntry
     )
+    from app.models.party import Party
 
 
 class EmploymentStatus(enum.Enum):
@@ -65,6 +66,9 @@ class Employee(Base):
     salary: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
     currency: Mapped[str] = mapped_column(String(10), default="NGN")
 
+    # Company (for multi-tenant support)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
@@ -77,7 +81,15 @@ class Employee(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
+    # Party integration (unified identity system)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Relationships
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys="[Employee.party_id]")
     tickets: Mapped[List[Ticket]] = relationship(
         back_populates="employee",
         foreign_keys="[Ticket.employee_id]"
@@ -110,12 +122,6 @@ class Employee(Base):
         back_populates="assigned_to",
         foreign_keys="[UnifiedTicket.assigned_to_id]"
     )
-    created_unified_tickets: Mapped[List["UnifiedTicket"]] = relationship(
-        "UnifiedTicket",
-        back_populates="created_by",
-        foreign_keys="[UnifiedTicket.created_by_id]"
-    )
-
     # Field service relationships
     service_orders: Mapped[List["ServiceOrder"]] = relationship(
         "ServiceOrder",

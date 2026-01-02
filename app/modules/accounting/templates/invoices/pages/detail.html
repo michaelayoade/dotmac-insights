@@ -142,9 +142,9 @@
                                 {{ invoice.customer.name }}
                             </a>
                             {% elif invoice.contact %}
-                            <a href="/crm/contacts/{{ invoice.contact.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
+                            <span class="text-gray-900 font-body">
                                 {{ invoice.contact.name }}
-                            </a>
+                            </span>
                             {% else %}
                             <span class="text-gray-400 italic">No customer</span>
                             {% endif %}

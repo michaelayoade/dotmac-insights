@@ -2,11 +2,20 @@
 Web router aggregation for SSR frontend.
 
 Mounts all module routers and provides common endpoints.
+
+Module System:
+- Modules with MODULE_CONFIG are auto-discovered via ModuleRegistry
+- Legacy modules are still manually imported below
+- Run ModuleRegistry.discover_modules() to register new-style modules
 """
 from __future__ import annotations
 
+import logging
+from typing import Optional
+
 from fastapi import APIRouter, Request, Response, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy import or_
 
 from app.web.dependencies import (
     SessionUser,
@@ -15,10 +24,29 @@ from app.web.dependencies import (
     DB,
     ensure_csrf_token,
 )
-from app.web.context import get_base_context, get_navigation_context
+from app.web.context import get_base_context, get_navigation_context, build_pagination_context
+from app.web.modules import ModuleRegistry
 from app.templates.environment import get_template_env
 
-# Web router - no /api prefix
+# Services imports
+from app.services.identity import party_service
+from app.services.support.tickets import TicketService
+from app.services.accounting.receivables import ReceivablesService
+from app.services.accounting.settings import AccountingSettingsService
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# MODULE AUTO-DISCOVERY
+# =============================================================================
+# Discover modules with MODULE_CONFIG exports (new modular system)
+# This runs at import time to register all properly configured modules
+_discovered_count = ModuleRegistry.discover_modules()
+logger.info(f"Auto-discovered {_discovered_count} modules")
+
+# =============================================================================
+# WEB ROUTER
+# =============================================================================
 web_router = APIRouter(tags=["web"])
 
 # Template environment
@@ -34,11 +62,9 @@ async def dashboard(
     db: DB,
 ):
     """Dashboard / home page."""
-    from datetime import datetime, date
-    from sqlalchemy import func
-    from app.models.contact import Contact
-    from app.models.unified_ticket import UnifiedTicket, TicketStatus
+    from datetime import datetime
     from app.models.invoice import Invoice, InvoiceStatus
+    from app.models.unified_ticket import UnifiedTicket
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -46,84 +72,8 @@ async def dashboard(
     now = datetime.utcnow()
     context["now"] = now
 
-    # Fetch dashboard stats
-    stats = []
-
-    # 1. Total Contacts
-    contact_count = db.query(func.count(Contact.id)).scalar() or 0
-    stats.append({
-        "key": "contacts",
-        "label": "Total Contacts",
-        "value": f"{contact_count:,}",
-        "subtext": "Leads & customers",
-        "icon": "users",
-        "icon_bg": "bg-primary-50",
-        "icon_color": "text-primary-600",
-        "accent_gradient": "from-primary-400 to-primary-600",
-    })
-
-    # 2. Open Tickets
-    open_tickets = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.status.in_([
-            "open",
-            "in_progress",
-            "waiting",
-            "reopened",
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "tickets",
-        "label": "Open Tickets",
-        "value": f"{open_tickets:,}",
-        "subtext": "Awaiting response",
-        "icon": "ticket",
-        "icon_bg": "bg-amber-50",
-        "icon_color": "text-amber-600",
-        "accent_gradient": "from-amber-400 to-amber-600",
-    })
-
-    # 3. Revenue MTD
-    today = date.today()
-    month_start = date(today.year, today.month, 1)
-    revenue_mtd = db.query(func.sum(Invoice.total_amount)).filter(
-        Invoice.invoice_date >= month_start,
-        Invoice.status.in_([
-            InvoiceStatus.PAID,
-            InvoiceStatus.PARTIALLY_PAID,
-            InvoiceStatus.PENDING,
-            InvoiceStatus.OVERDUE,
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "revenue",
-        "label": "Revenue (MTD)",
-        "value": f"${revenue_mtd:,.0f}",
-        "subtext": "This month",
-        "icon": "currency",
-        "icon_bg": "bg-emerald-50",
-        "icon_color": "text-emerald-600",
-        "accent_gradient": "from-emerald-400 to-emerald-600",
-    })
-
-    # 4. Pending Invoices
-    pending_invoices = db.query(func.count(Invoice.id)).filter(
-        Invoice.status.in_([
-            InvoiceStatus.PENDING,
-            InvoiceStatus.PARTIALLY_PAID,
-            InvoiceStatus.OVERDUE,
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "invoices",
-        "label": "Pending Invoices",
-        "value": f"{pending_invoices:,}",
-        "subtext": "Awaiting payment",
-        "icon": "invoice",
-        "icon_bg": "bg-red-50",
-        "icon_color": "text-red-600",
-        "accent_gradient": "from-red-400 to-red-600",
-    })
-
+    # Build dashboard stats using services
+    stats = _build_dashboard_stats(db)
     context["stats"] = stats
 
     # Fetch recent activities (mix of invoices, tickets)
@@ -176,6 +126,209 @@ async def dashboard(
     context["activities"] = activities[:6]
 
     template = templates.get_template("pages/dashboard.html")
+    return HTMLResponse(template.render(context))
+
+
+def _build_dashboard_stats(db):
+    """Build dashboard stats using services.
+
+    Uses:
+    - party_service.count_parties() for party count
+    - TicketService.get_dashboard_stats() for open ticket count
+    - ReceivablesService.get_invoice_stats() for revenue and pending invoices
+    """
+    # 1. Total Parties (via party service)
+    party_count = party_service.count_parties(db)
+
+    # 2. Open Tickets (via ticket service)
+    ticket_service = TicketService(db)
+    ticket_stats = ticket_service.get_dashboard_stats()
+    open_tickets = ticket_stats.get("total_open", 0)
+
+    # 3 & 4. Revenue MTD and Pending Invoices (via receivables service)
+    settings_service = AccountingSettingsService(db)
+    receivables_service = ReceivablesService(db, settings_service)
+    invoice_stats = receivables_service.get_invoice_stats()
+
+    stats = [
+        {
+            "key": "parties",
+            "label": "Total Parties",
+            "value": f"{party_count:,}",
+            "subtext": "People & organizations",
+            "icon": "users",
+            "icon_bg": "bg-primary-50",
+            "icon_color": "text-primary-600",
+            "accent_gradient": "from-primary-400 to-primary-600",
+        },
+        {
+            "key": "tickets",
+            "label": "Open Tickets",
+            "value": f"{open_tickets:,}",
+            "subtext": "Awaiting response",
+            "icon": "ticket",
+            "icon_bg": "bg-amber-50",
+            "icon_color": "text-amber-600",
+            "accent_gradient": "from-amber-400 to-amber-600",
+        },
+        {
+            "key": "revenue",
+            "label": "Revenue (MTD)",
+            "value": f"${float(invoice_stats.total_revenue):,.0f}",
+            "subtext": "This month",
+            "icon": "currency",
+            "icon_bg": "bg-emerald-50",
+            "icon_color": "text-emerald-600",
+            "accent_gradient": "from-emerald-400 to-emerald-600",
+        },
+        {
+            "key": "invoices",
+            "label": "Pending Invoices",
+            "value": f"{invoice_stats.pending_count:,}",
+            "subtext": "Awaiting payment",
+            "icon": "invoice",
+            "icon_bg": "bg-red-50",
+            "icon_color": "text-red-600",
+            "accent_gradient": "from-red-400 to-red-600",
+        },
+    ]
+
+    return stats
+
+
+@web_router.get("/dashboard/stats", response_class=HTMLResponse)
+async def dashboard_stats(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+):
+    """Dashboard stats partial for HTMX refresh."""
+    stats = _build_dashboard_stats(db)
+
+    # Build stats cards HTML
+    html_parts = []
+    for stat in stats:
+        icon_html = _get_stat_icon_html(stat.get("icon", "chart"))
+        change_html = ""
+        if stat.get("change"):
+            direction = "rotate-180" if stat["change"] < 0 else ""
+            change_class = "text-emerald-600" if stat["change"] > 0 else "text-red-600"
+            change_html = f'''
+                <span class="inline-flex items-center gap-0.5 text-sm font-medium {change_class}">
+                    <svg class="w-4 h-4 {direction}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                    </svg>
+                    {abs(stat["change"])}%
+                </span>
+            '''
+        subtext_html = f'<p class="mt-1 text-xs text-gray-400 font-body">{stat.get("subtext", "")}</p>' if stat.get("subtext") else ""
+
+        html_parts.append(f'''
+        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{stat.get('key', '')}">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <dt class="text-sm font-medium text-gray-500 font-body">{stat.get("label", "")}</dt>
+                    <dd class="mt-2 flex items-baseline gap-2">
+                        <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">{stat.get("value", "0")}</span>
+                        {change_html}
+                    </dd>
+                    {subtext_html}
+                </div>
+                <div class="flex-shrink-0 p-3 rounded-xl {stat.get("icon_bg", "bg-primary-50")} {stat.get("icon_color", "text-primary-600")} group-hover:scale-110 transition-transform duration-300">
+                    {icon_html}
+                </div>
+            </div>
+            <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r {stat.get("accent_gradient", "from-primary-400 to-primary-600")} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </div>
+        ''')
+
+    return HTMLResponse("".join(html_parts))
+
+
+def _get_stat_icon_html(icon_name: str) -> str:
+    """Generate SVG icon HTML for stat cards."""
+    icons = {
+        "users": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
+        "ticket": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
+        "currency": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+        "invoice": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>',
+    }
+    return icons.get(icon_name, '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>')
+
+
+@web_router.get("/parties/{party_id}", response_class=HTMLResponse)
+async def party_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    party_id: int,
+):
+    """Party detail page."""
+    from sqlalchemy.orm import joinedload
+    from app.models.party import Party
+
+    party = db.query(Party).options(joinedload(Party.roles)).filter(
+        Party.id == party_id
+    ).first()
+    if not party:
+        return HTMLResponse("Party not found", status_code=404)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = party.name or f"Party #{party.id}"
+    context["party"] = party
+
+    template = templates.get_template("pages/party_detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@web_router.get("/parties", response_class=HTMLResponse)
+async def parties_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = None,
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 25,
+):
+    """Party list page."""
+    from app.models.party import Party
+    from sqlalchemy import func
+
+    query = db.query(Party)
+    if type in {"person", "organization"}:
+        query = query.filter(Party.type == type)
+    if status in {"active", "inactive", "blocked"}:
+        query = query.filter(Party.status == status)
+    if q:
+        search = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Party.name.ilike(search),
+                Party.primary_email.ilike(search),
+                Party.primary_phone.ilike(search),
+            )
+        )
+
+    total = query.with_entities(func.count(Party.id)).scalar() or 0
+    offset = max(page - 1, 0) * per_page
+    parties = query.order_by(Party.name.asc()).offset(offset).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Parties"
+    context["parties"] = parties
+    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["filters"] = {"q": q or "", "type": type or "", "status": status or ""}
+
+    template = templates.get_template("pages/parties_list.html")
     return HTMLResponse(template.render(context))
 
 
@@ -312,12 +465,22 @@ async def health_check():
     return {"status": "ok"}
 
 
+@web_router.get("/crm", response_class=HTMLResponse)
+@web_router.get("/crm/{path:path}", response_class=HTMLResponse)
+async def crm_deprecated(request: Request):
+    """CRM UI is deprecated; direct users to the Party-based API."""
+    return HTMLResponse(
+        "<html><body><h1>CRM UI Deprecated</h1>"
+        "<p>The legacy CRM web UI has been removed.</p>"
+        "<p>Use the Party-based API: <code>/v1/crm/parties</code>.</p>"
+        "</body></html>",
+        status_code=410,
+    )
+
+
 # =============================================================================
 # MODULE ROUTERS - Consolidated Structure
 # =============================================================================
-
-# CRM module (includes contacts, customers redirect, opportunities, pipeline)
-from app.modules.crm import router as crm_router
 
 # Sales module (includes quotations, orders, invoices/subscriptions redirects)
 from app.modules.sales import router as sales_router
@@ -392,7 +555,6 @@ from app.modules.vehicles.routes import router as vehicles_router
 # =============================================================================
 
 # Core consolidated modules with landing pages
-web_router.include_router(crm_router)
 web_router.include_router(sales_router)
 web_router.include_router(accounting_router)
 web_router.include_router(hr_router)
@@ -441,3 +603,11 @@ web_router.include_router(field_service_router)
 web_router.include_router(field_service_calendar_router)
 web_router.include_router(assets_router)
 web_router.include_router(vehicles_router)
+
+# =============================================================================
+# AUTO-DISCOVERED MODULE ROUTERS
+# =============================================================================
+# Include routers from modules that have MODULE_CONFIG (new modular system)
+# These are in addition to the manual imports above - FastAPI handles duplicates
+for _router in ModuleRegistry.get_all_routers():
+    web_router.include_router(_router)

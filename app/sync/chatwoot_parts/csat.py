@@ -9,7 +9,7 @@ import structlog
 
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.support_csat import CSATResponse, CSATSurvey, SurveyType
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyExternalId
 from app.models.employee import Employee
 
 if TYPE_CHECKING:
@@ -94,16 +94,28 @@ async def sync_csat(
                 if rating is None:
                     continue  # No CSAT response for this conversation
 
-                # Find customer
-                customer_id = None
-                if conv.customer_id:
-                    customer_id = conv.customer_id
+                # Find party
+                party_id = None
+                if conv.customer_account_id:
+                    account = (
+                        sync_client.db.query(CustomerAccount)
+                        .filter(CustomerAccount.id == conv.customer_account_id)
+                        .first()
+                    )
+                    if account:
+                        party_id = account.party_id
                 elif csat_data.get("contact_id"):
-                    customer = sync_client.db.query(Customer).filter(
-                        Customer.chatwoot_contact_id == csat_data.get("contact_id")
-                    ).first()
-                    if customer:
-                        customer_id = customer.id
+                    party_ext = (
+                        sync_client.db.query(PartyExternalId)
+                        .filter(
+                            PartyExternalId.system == "chatwoot",
+                            PartyExternalId.external_id == str(csat_data.get("contact_id")),
+                            PartyExternalId.external_key_type == "contact_id",
+                        )
+                        .first()
+                    )
+                    if party_ext:
+                        party_id = party_ext.party_id
 
                 # Find agent
                 agent_id = None
@@ -118,7 +130,7 @@ async def sync_csat(
 
                 csat_response = CSATResponse(
                     survey_id=default_survey.id,
-                    customer_id=customer_id,
+                    party_id=party_id,
                     rating=rating,
                     feedback_text=csat_data.get("feedback_message"),
                     responded_at=datetime.now(timezone.utc),

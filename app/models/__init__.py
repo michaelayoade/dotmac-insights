@@ -58,6 +58,7 @@ from app.models.document_lines import (
 )
 from app.models.purchasing_order import PurchaseOrder, PurchaseOrderStatus
 from app.models.books_settings import DebitNote, DebitNoteStatus
+from app.models.accounting_operational_settings import AccountingOperationalSettings
 from app.models.customer_note import CustomerNote
 from app.models.administrator import Administrator
 from app.models.network_monitor import NetworkMonitor

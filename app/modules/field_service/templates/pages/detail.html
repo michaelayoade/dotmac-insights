@@ -163,9 +163,9 @@
                         <dt class="text-sm font-medium text-gray-500 font-body">Customer</dt>
                         <dd class="mt-1 text-sm text-gray-900 font-body">
                             {% if customer %}
-                            <a href="/crm/contacts?q={{ customer.email or customer.customer_name }}" class="text-primary-600 hover:text-primary-500 font-medium">
+                            <span class="font-medium">
                                 {{ customer.customer_name }}
-                            </a>
+                            </span>
                             {% else %}
                             <span class="text-gray-400 italic">Not linked</span>
                             {% endif %}

@@ -4,6 +4,8 @@ Omnichannel Routes - Unified Inbox & Conversations with SSR + HTMX.
 Permission Requirements:
 - support:read - View conversations and messages
 - support:write - Send messages, update status
+
+Refactored to use ConversationService and MessageService for all business logic.
 """
 from __future__ import annotations
 
@@ -31,6 +33,14 @@ from app.models.omni import (
     ConversationPriority,
 )
 from app.core.security import is_htmx_request, htmx_toast
+from app.services.support import (
+    ConversationService,
+    MessageService,
+    ConversationFilters,
+    OutboundMessageData,
+    ConversationNotFoundError,
+)
+from app.services.types import PaginationParams
 
 # Permission dependencies
 RequireSupportRead = Depends(require_scope("support:read"))
@@ -65,34 +75,14 @@ def get_priority_options():
     ]
 
 
-def get_inbox_stats(db) -> dict:
-    """Calculate inbox statistics."""
-    open_count = db.query(func.count(OmniConversation.id)).filter(
-        OmniConversation.status == ConversationStatus.OPEN.value
-    ).scalar() or 0
+def get_conversation_service(db, user) -> ConversationService:
+    """Get a ConversationService instance for web routes."""
+    return ConversationService(db, principal=user)
 
-    pending_count = db.query(func.count(OmniConversation.id)).filter(
-        OmniConversation.status == ConversationStatus.PENDING.value
-    ).scalar() or 0
 
-    resolved_count = db.query(func.count(OmniConversation.id)).filter(
-        OmniConversation.status == ConversationStatus.RESOLVED.value
-    ).scalar() or 0
-
-    urgent_count = db.query(func.count(OmniConversation.id)).filter(
-        OmniConversation.priority == ConversationPriority.URGENT.value,
-        OmniConversation.status.in_([
-            ConversationStatus.OPEN.value,
-            ConversationStatus.PENDING.value
-        ])
-    ).scalar() or 0
-
-    return {
-        "open_count": open_count,
-        "pending_count": pending_count,
-        "resolved_count": resolved_count,
-        "urgent_count": urgent_count,
-    }
+def get_message_service(db, user) -> MessageService:
+    """Get a MessageService instance for web routes."""
+    return MessageService(db, principal=user)
 
 
 @router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
@@ -110,44 +100,39 @@ async def inbox_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Inbox page - conversations list."""
-    # Build query
-    query = db.query(OmniConversation)
+    service = get_conversation_service(db, user)
 
-    # Search
-    if q:
-        search_filter = or_(
-            OmniConversation.subject.ilike(f"%{q}%"),
-            OmniConversation.contact_name.ilike(f"%{q}%"),
-            OmniConversation.contact_email.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if status:
-        query = query.filter(OmniConversation.status == status)
-    if channel:
-        query = query.filter(OmniConversation.channel_id == channel)
-    if priority:
-        query = query.filter(OmniConversation.priority == priority)
-
-    # Count total
-    total = query.count()
-
-    # Sort by last message, then created
-    query = query.order_by(
-        OmniConversation.last_message_at.desc().nullsfirst(),
-        OmniConversation.created_at.desc()
+    # Build filters
+    filters = ConversationFilters(
+        search=q,
+        status=status,
+        channel_id=channel,
+        priority=priority,
     )
 
-    # Paginate
-    offset = (page - 1) * per_page
-    conversations = query.offset(offset).limit(per_page).all()
+    # Get paginated results using service
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list(
+        filters=filters,
+        pagination=pagination,
+        sort_by="last_message_at",
+        sort_order="desc",
+    )
+
+    conversations = result.items
+    total = result.total
 
     # Get all channels for filter dropdown
     channels = db.query(OmniChannel).filter(OmniChannel.is_active == True).all()
 
-    # Get stats
-    stats = get_inbox_stats(db)
+    # Get stats using service
+    inbox_stats = service.get_stats()
+    stats = {
+        "open_count": inbox_stats.open_conversations,
+        "pending_count": inbox_stats.pending_conversations,
+        "resolved_count": inbox_stats.resolved_conversations,
+        "urgent_count": inbox_stats.unassigned_conversations,
+    }
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -209,27 +194,22 @@ async def conversation_detail(
     conversation_id: int,
 ):
     """Conversation detail page with message thread."""
-    conversation = db.query(OmniConversation).filter(
-        OmniConversation.id == conversation_id
-    ).first()
+    service = get_conversation_service(db, user)
 
-    if not conversation:
+    try:
+        conv_with_msgs = service.get_with_messages(conversation_id, limit=100)
+    except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Get messages
-    messages = db.query(OmniMessage).filter(
-        OmniMessage.conversation_id == conversation_id
-    ).order_by(OmniMessage.created_at.asc()).all()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = conversation.subject or "Conversation"
+    context["page_title"] = conv_with_msgs.conversation.subject or "Conversation"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "Inbox", "href": "/inbox"},
-        {"label": conversation.subject or f"Conversation #{conversation.id}"},
+        {"label": conv_with_msgs.conversation.subject or f"Conversation #{conv_with_msgs.conversation.id}"},
     ])
-    context["conversation"] = conversation
-    context["messages"] = messages
+    context["conversation"] = conv_with_msgs.conversation
+    context["messages"] = conv_with_msgs.messages
     context["status_options"] = get_status_options()
 
     template = templates.get_template("modules/omnichannel/templates/pages/conversation.html")
@@ -246,20 +226,16 @@ async def conversation_messages(
     conversation_id: int,
 ):
     """Messages thread partial for HTMX polling."""
-    conversation = db.query(OmniConversation).filter(
-        OmniConversation.id == conversation_id
-    ).first()
+    service = get_conversation_service(db, user)
 
-    if not conversation:
+    try:
+        conv_with_msgs = service.get_with_messages(conversation_id, limit=100)
+    except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    messages = db.query(OmniMessage).filter(
-        OmniMessage.conversation_id == conversation_id
-    ).order_by(OmniMessage.created_at.asc()).all()
-
     context = get_base_context(request, response, user, csrf_token)
-    context["conversation"] = conversation
-    context["messages"] = messages
+    context["conversation"] = conv_with_msgs.conversation
+    context["messages"] = conv_with_msgs.messages
 
     template = templates.get_template("modules/omnichannel/templates/partials/messages_thread.html")
     return HTMLResponse(template.render(context))
@@ -276,11 +252,12 @@ async def conversation_reply(
     _: CSRFProtect,
 ):
     """Send a reply to a conversation."""
-    conversation = db.query(OmniConversation).filter(
-        OmniConversation.id == conversation_id
-    ).first()
+    conv_service = get_conversation_service(db, user)
+    msg_service = get_message_service(db, user)
 
-    if not conversation:
+    try:
+        conversation = conv_service.get(conversation_id)
+    except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     form = await request.form()
@@ -290,25 +267,14 @@ async def conversation_reply(
         htmx_toast(response, "Message cannot be empty", "error")
         return await conversation_messages(request, response, user, csrf_token, db, conversation_id)
 
-    # Create outbound message
-    message = OmniMessage(
+    # Create outbound message using MessageService
+    message_data = OutboundMessageData(
         conversation_id=conversation_id,
-        direction="outbound",
         body=body,
         channel_id=conversation.channel_id,
-        delivery_status="pending",
-        created_at=datetime.now(timezone.utc),
+        agent_id=user.id if user else None,
     )
-    db.add(message)
-
-    # Update conversation
-    conversation.last_message_at = datetime.now(timezone.utc)
-    conversation.message_count = (conversation.message_count or 0) + 1
-
-    # Set first response time if not set
-    if not conversation.first_response_at:
-        conversation.first_response_at = datetime.now(timezone.utc)
-
+    msg_service.create_outbound(message_data)
     db.commit()
 
     htmx_toast(response, "Reply sent", "success")
@@ -320,33 +286,26 @@ async def update_conversation_status(
     request: Request,
     response: Response,
     user: SessionUser,
+    csrf: CSRFProtect,
     db: DB,
     conversation_id: int,
 ):
     """Update conversation status."""
-    conversation = db.query(OmniConversation).filter(
-        OmniConversation.id == conversation_id
-    ).first()
-
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    service = get_conversation_service(db, user)
 
     form = await request.form()
     new_status = _form_str(form, "status")
 
-    if new_status and new_status in [s.value for s in ConversationStatus]:
-        conversation.status = new_status
+    if not new_status or new_status not in [s.value for s in ConversationStatus]:
+        htmx_toast(response, "Invalid status", "error")
+        return Response(status_code=204)
 
-        # Track resolved time
-        if new_status == ConversationStatus.RESOLVED.value:
-            conversation.resolved_at = datetime.now(timezone.utc)
-        else:
-            conversation.resolved_at = None
-
+    try:
+        service.update_status(conversation_id, new_status)
         db.commit()
         htmx_toast(response, f"Status updated to {new_status}", "success")
-    else:
-        htmx_toast(response, "Invalid status", "error")
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
 
     return Response(status_code=204)
 
@@ -356,21 +315,23 @@ async def toggle_conversation_star(
     request: Request,
     response: Response,
     user: SessionUser,
+    csrf: CSRFProtect,
     db: DB,
     conversation_id: int,
 ):
     """Toggle conversation star."""
-    conversation = db.query(OmniConversation).filter(
-        OmniConversation.id == conversation_id
-    ).first()
+    service = get_conversation_service(db, user)
 
-    if not conversation:
+    try:
+        # Get current state to toggle
+        conversation = service.get(conversation_id)
+        new_starred = not conversation.is_starred
+        conversation = service.star(conversation_id, new_starred)
+        db.commit()
+
+        action = "starred" if new_starred else "unstarred"
+        htmx_toast(response, f"Conversation {action}", "success")
+    except ConversationNotFoundError:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
-    conversation.is_starred = not conversation.is_starred
-    db.commit()
-
-    action = "starred" if conversation.is_starred else "unstarred"
-    htmx_toast(response, f"Conversation {action}", "success")
 
     return Response(status_code=204)

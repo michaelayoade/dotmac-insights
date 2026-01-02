@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import structlog
 
 from app.models.ipv4_address import IPv4Address
-from app.models.customer import Customer
+from app.models.party import PartyExternalId
 from app.config import settings
 
 logger = structlog.get_logger()
@@ -32,12 +32,16 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
         )
         logger.info("splynx_ipv4_addresses_fetched", count=len(ips))
 
-        # Pre-fetch customer lookup by splynx_id
-        customer_map = {}
-        customers = sync_client.db.query(Customer.id, Customer.splynx_id).all()
-        for cust in customers:
-            if cust.splynx_id:
-                customer_map[cust.splynx_id] = cust.id
+        # Pre-fetch party lookup by splynx customer ID
+        party_map = {
+            mapping.external_id: mapping.party_id
+            for mapping in sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "customer_id",
+            )
+            .all()
+        }
 
         for i, ip_data in enumerate(ips, 1):
             splynx_id = ip_data.get("id")
@@ -47,7 +51,7 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
 
             # Map customer
             splynx_customer_id = ip_data.get("customer_id")
-            customer_id = customer_map.get(splynx_customer_id) if splynx_customer_id else None
+            party_id = party_map.get(str(splynx_customer_id)) if splynx_customer_id else None
 
             # Parse is_used
             is_used = ip_data.get("is_used")
@@ -67,7 +71,7 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
                 existing.host_category = ip_data.get("host_category")
                 existing.module = ip_data.get("module")
                 existing.module_item_id = ip_data.get("module_item_id")
-                existing.customer_id = customer_id
+                existing.party_id = party_id
                 existing.card_id = ip_data.get("card_id")
                 existing.location_id = ip_data.get("location_id")
                 existing.is_used = is_used
@@ -86,7 +90,7 @@ async def sync_ipv4_addresses(sync_client, client, full_sync: bool):
                     host_category=ip_data.get("host_category"),
                     module=ip_data.get("module"),
                     module_item_id=ip_data.get("module_item_id"),
-                    customer_id=customer_id,
+                    party_id=party_id,
                     card_id=ip_data.get("card_id"),
                     location_id=ip_data.get("location_id"),
                     is_used=is_used,

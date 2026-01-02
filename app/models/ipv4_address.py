@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import BigInteger, Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -36,7 +36,7 @@ class IPv4Address(Base):
     module_item_id = Column(Integer, nullable=True)
 
     # Assignment
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
+    party_id = Column(BigInteger, ForeignKey("parties.id"), nullable=True, index=True)
     card_id = Column(Integer, nullable=True)  # network card/interface ID
     location_id = Column(Integer, nullable=True, index=True)
 
@@ -55,7 +55,7 @@ class IPv4Address(Base):
     last_synced_at = Column(DateTime, nullable=True)
 
     # Relationships
-    customer = relationship("Customer", backref="ip_addresses")
+    party = relationship("Party", backref="ip_addresses")
 
     def __repr__(self):
         return f"<IPv4Address {self.ip} ({self.hostname or 'no hostname'})>"

@@ -19,8 +19,8 @@ class TicketMessage(Base):
     # Relationships
     ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True, index=True)
     splynx_ticket_id = Column(Integer, nullable=False, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
     splynx_customer_id = Column(Integer, nullable=True, index=True)
+    party_id = Column(Integer, ForeignKey("parties.id"), nullable=True, index=True)
     admin_id = Column(Integer, ForeignKey("administrators.id"), nullable=True, index=True)
     splynx_admin_id = Column(Integer, nullable=True, index=True)
 
@@ -50,7 +50,7 @@ class TicketMessage(Base):
 
     # Relationships
     ticket = relationship("Ticket", backref="messages")
-    customer = relationship("Customer", backref="ticket_messages")
+    party = relationship("Party", backref="ticket_messages")
     admin = relationship("Administrator", backref="ticket_messages")
 
     def __repr__(self):

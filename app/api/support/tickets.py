@@ -15,12 +15,28 @@ from app.models.ticket import (
     Ticket, TicketStatus, TicketPriority,
     HDTicketComment, HDTicketActivity, TicketCommunication, HDTicketDependency
 )
-from app.models.customer import Customer
+from app.models.party import Party, CustomerAccount
 from app.models.agent import Agent, Team, TeamMember
 from app.models.auth import User
 from app.models.support_tags import TicketTag, TicketCustomField, CustomFieldType
-from app.auth import Require, get_current_principal
+from app.auth import Principal, Require, get_current_principal
 from app.cache import cached, CACHE_TTL
+from app.services.errors import NotFoundError, ServiceError, ValidationError
+from app.services.support.ticket_types import (
+    ActivityData,
+    AssignmentData,
+    CommentData,
+    CommunicationData,
+    DependencyData,
+    MergeData,
+    SLAUpdateData,
+    SplitData,
+    TicketCreateData,
+    TicketFilters,
+    TicketUpdateData,
+)
+from app.services.support.tickets import TicketService
+from app.services.types import PaginationParams
 
 from .helpers import (
     parse_ticket_status, parse_ticket_priority, generate_local_ticket_number,
@@ -33,6 +49,19 @@ router = APIRouter()
 # Shared RBAC dependencies: accept either tickets:* or support:* scopes
 ticket_read_dep = Depends(Require("tickets:read", "support:read"))
 ticket_write_dep = Depends(Require("tickets:write", "support:write"))
+
+
+# ---------------------------------------------------------------------------
+# Dependency Injection
+# ---------------------------------------------------------------------------
+
+
+def get_ticket_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> TicketService:
+    """Dependency to get a TicketService instance."""
+    return TicketService(db, principal)
 
 
 # =============================================================================
@@ -182,7 +211,8 @@ class TicketBaseRequest(BaseModel):
     priority: Optional[str] = None
     ticket_type: Optional[str] = None
     issue_type: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
+    party_id: Optional[int] = None
     project_id: Optional[int] = None
     assigned_to: Optional[str] = None
     assigned_employee_id: Optional[int] = None
@@ -439,32 +469,22 @@ class TicketSplitRequest(BaseModel):
 @cached("support-dashboard", ttl=CACHE_TTL["short"])
 async def get_support_dashboard(
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Support dashboard with ticket and conversation metrics."""
     from app.models.conversation import Conversation, ConversationStatus
+    from sqlalchemy import and_
+    from datetime import timedelta
 
-    # Ticket counts by status
-    ticket_by_status = db.query(
-        Ticket.status,
-        func.count(Ticket.id).label("count")
-    ).filter(Ticket.is_deleted == False).group_by(Ticket.status).all()
+    # Get basic ticket stats from service
+    ticket_stats = service.get_dashboard_stats()
+    status_counts = ticket_stats["status_distribution"]
+    priority_counts = ticket_stats["priority_distribution"]
 
-    status_counts: Dict[str, int] = {row.status.value: int(getattr(row, "count", 0) or 0) for row in ticket_by_status}
     total_tickets: int = sum(status_counts.values())
-    open_tickets: int = status_counts.get("open", 0) + status_counts.get("replied", 0)
+    open_tickets: int = ticket_stats["total_open"]
 
-    # Open tickets by priority
-    by_priority = db.query(
-        Ticket.priority,
-        func.count(Ticket.id).label("count")
-    ).filter(
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
-        Ticket.is_deleted == False,
-    ).group_by(Ticket.priority).all()
-
-    priority_counts: Dict[str, int] = {row.priority.value: int(getattr(row, "count", 0) or 0) for row in by_priority}
-
-    # SLA metrics
+    # SLA metrics (complex analytics - keep as direct queries for now)
     sla_met = db.query(func.count(Ticket.id)).filter(
         Ticket.resolution_by.isnot(None),
         Ticket.resolution_date.isnot(None),
@@ -472,7 +492,6 @@ async def get_support_dashboard(
         Ticket.is_deleted == False,
     ).scalar() or 0
 
-    from sqlalchemy import and_
     sla_breached = db.query(func.count(Ticket.id)).filter(
         Ticket.resolution_by.isnot(None),
         or_(
@@ -489,7 +508,6 @@ async def get_support_dashboard(
     sla_attainment = round(sla_met / sla_total * 100, 1) if sla_total > 0 else 0
 
     # Average resolution time (last 30 days)
-    from datetime import timedelta
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     avg_resolution = db.query(
         func.avg(func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600)
@@ -561,7 +579,8 @@ async def get_support_dashboard(
 def list_tickets(
     status: Optional[str] = None,
     priority: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     ticket_type: Optional[str] = None,
     assigned_to: Optional[str] = None,
     search: Optional[str] = None,
@@ -571,122 +590,56 @@ def list_tickets(
     end_date: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """List tickets with filtering and pagination."""
-    query = db.query(Ticket).filter(Ticket.is_deleted == False)
+    # Build filters
+    filters = TicketFilters(
+        status=parse_ticket_status(status) if status else None,
+        priority=parse_ticket_priority(priority) if priority else None,
+        customer_account_id=customer_account_id,
+        party_id=party_id,
+        ticket_type=ticket_type,
+        assigned_to=assigned_to,
+        search=search,
+        overdue_only=overdue_only,
+        unassigned_only=unassigned_only,
+    )
 
-    if status:
-        status_enum = parse_ticket_status(status)
-        query = query.filter(Ticket.status == status_enum)
-
-    if priority:
-        priority_enum = parse_ticket_priority(priority)
-        query = query.filter(Ticket.priority == priority_enum)
-
-    if customer_id:
-        query = query.filter(Ticket.customer_id == customer_id)
-
-    if ticket_type:
-        query = query.filter(Ticket.ticket_type == ticket_type)
-
-    if assigned_to:
-        query = query.filter(Ticket.assigned_to.ilike(f"%{assigned_to}%"))
-
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Ticket.subject.ilike(search_term),
-                Ticket.ticket_number.ilike(search_term),
-                Ticket.customer_name.ilike(search_term),
-            )
-        )
-
-    if overdue_only:
-        query = query.filter(
-            Ticket.resolution_by.isnot(None),
-            Ticket.resolution_by < func.current_timestamp(),
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
-        )
-
-    if unassigned_only:
-        query = query.filter(
-            Ticket.assigned_to.is_(None),
-            Ticket.assigned_employee_id.is_(None),
-        )
-
+    # Parse dates
     if start_date:
-        query = query.filter(Ticket.created_at >= datetime.fromisoformat(start_date))
-
+        try:
+            filters.start_date = datetime.fromisoformat(start_date)
+        except ValueError:
+            pass
     if end_date:
-        query = query.filter(Ticket.created_at <= datetime.fromisoformat(end_date))
+        try:
+            filters.end_date = datetime.fromisoformat(end_date)
+        except ValueError:
+            pass
 
-    # Use separate count query to avoid 2 full table scans
-    total = db.query(func.count(Ticket.id)).filter(Ticket.is_deleted == False)
-    if status:
-        total = total.filter(Ticket.status == parse_ticket_status(status))
-    if priority:
-        total = total.filter(Ticket.priority == parse_ticket_priority(priority))
-    if customer_id:
-        total = total.filter(Ticket.customer_id == customer_id)
-    if ticket_type:
-        total = total.filter(Ticket.ticket_type == ticket_type)
-    if assigned_to:
-        total = total.filter(Ticket.assigned_to.ilike(f"%{assigned_to}%"))
-    if search:
-        search_term = f"%{search}%"
-        total = total.filter(
-            or_(
-                Ticket.subject.ilike(search_term),
-                Ticket.ticket_number.ilike(search_term),
-                Ticket.customer_name.ilike(search_term),
-            )
-        )
-    if overdue_only:
-        total = total.filter(
-            Ticket.resolution_by.isnot(None),
-            Ticket.resolution_by < func.current_timestamp(),
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
-        )
-    if unassigned_only:
-        total = total.filter(
-            Ticket.assigned_to.is_(None),
-            Ticket.assigned_employee_id.is_(None),
-        )
-    if start_date:
-        total = total.filter(Ticket.created_at >= datetime.fromisoformat(start_date))
-    if end_date:
-        total = total.filter(Ticket.created_at <= datetime.fromisoformat(end_date))
-    total_count = total.scalar()
-
-    tickets = query.order_by(Ticket.created_at.desc()).offset(offset).limit(limit).all()
+    # Get paginated results using service
+    pagination = PaginationParams(offset=offset, limit=limit)
+    result = service.list_tickets(filters=filters, pagination=pagination)
 
     return {
-        "total": total_count,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [serialize_ticket_brief(t) for t in tickets],
+        "data": [serialize_ticket_brief(t) for t in result.items],
     }
 
 
 @router.get("/tickets/{ticket_id}", dependencies=[ticket_read_dep])
 def get_ticket(
     ticket_id: int,
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Get detailed ticket information with all child tables."""
-    # Use eager loading to avoid N+1 queries (reduces 6+ queries to 1-2)
-    ticket = db.query(Ticket).options(
-        joinedload(Ticket.customer),
-        selectinload(Ticket.comments),
-        selectinload(Ticket.activities),
-        selectinload(Ticket.communications),
-        selectinload(Ticket.depends_on),
-        selectinload(Ticket.expenses),
-    ).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-
-    if not ticket:
+    try:
+        # Use service with eager loading for child tables
+        ticket = service.get_ticket(ticket_id, include_children=True)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     # Customer is now eagerly loaded
@@ -779,6 +732,7 @@ def get_ticket(
 async def get_ticket_full_detail(
     ticket_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """
     Get consolidated ticket detail with all related data in a single call.
@@ -794,22 +748,30 @@ async def get_ticket_full_detail(
     now = datetime.now(timezone.utc)
     today = date.today()
 
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-
-    if not ticket:
+    try:
+        ticket = service.get_ticket(ticket_id, include_children=True)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # Customer info
+    # Customer account info
     customer = None
-    if ticket.customer_id:
-        cust = db.query(Customer).filter(Customer.id == ticket.customer_id).first()
-        if cust:
+    if ticket.customer_account_id:
+        account = (
+            db.query(CustomerAccount)
+            .filter(CustomerAccount.id == ticket.customer_account_id)
+            .first()
+        )
+        if account:
+            party = None
+            if account.party_id:
+                party = db.query(Party).filter(Party.id == account.party_id).first()
             customer = {
-                "id": cust.id,
-                "name": cust.name,
-                "email": cust.email,
-                "phone": cust.phone,
-                "status": cust.status.value if cust.status else None,
+                "id": account.id,
+                "party_id": account.party_id,
+                "name": party.name if party else None,
+                "primary_email": party.primary_email if party else None,
+                "primary_phone": party.primary_phone if party else None,
+                "status": account.status,
             }
 
     # Assignee info
@@ -1029,50 +991,42 @@ async def get_ticket_full_detail(
 def create_ticket(
     payload: TicketCreateRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Create a ticket locally (no upstream ERP write-back)."""
-    valid_tags = _validate_tags(db, payload.tags)
-    valid_watchers = _validate_watchers(db, payload.watchers)
-    valid_custom_fields = _validate_custom_fields(db, payload.custom_fields)
-
-    ticket = Ticket(
-        ticket_number=generate_local_ticket_number(),
-        subject=payload.subject,
-        description=payload.description,
-        status=parse_ticket_status(payload.status) or TicketStatus.OPEN,
-        priority=parse_ticket_priority(payload.priority) or TicketPriority.MEDIUM,
-        ticket_type=payload.ticket_type,
-        issue_type=payload.issue_type,
-        customer_id=payload.customer_id,
-        project_id=payload.project_id,
-        assigned_to=payload.assigned_to,
-        assigned_employee_id=payload.assigned_employee_id,
-        resolution_by=payload.resolution_by,
-        response_by=payload.response_by,
-        resolution_team=payload.resolution_team,
-        customer_email=payload.customer_email,
-        customer_phone=payload.customer_phone,
-        customer_name=payload.customer_name,
-        region=payload.region,
-        base_station=payload.base_station,
-        tags=valid_tags,
-        watchers=valid_watchers,
-        custom_fields=valid_custom_fields,
-        parent_ticket_id=payload.parent_ticket_id,
-        merged_into_id=payload.merged_into_id,
-        origin_system="local",
-        write_back_status="pending",
-        created_by_id=getattr(principal, "id", None),
-        updated_by_id=getattr(principal, "id", None),
-        opening_date=datetime.now(timezone.utc),
-    )
-
-    db.add(ticket)
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "ticket_number": ticket.ticket_number}
+    try:
+        data = TicketCreateData(
+            subject=payload.subject,
+            description=payload.description,
+            status=parse_ticket_status(payload.status) or TicketStatus.OPEN,
+            priority=parse_ticket_priority(payload.priority) or TicketPriority.MEDIUM,
+            ticket_type=payload.ticket_type,
+            issue_type=payload.issue_type,
+            customer_account_id=payload.customer_account_id,
+            party_id=payload.party_id,
+            project_id=payload.project_id,
+            assigned_to=payload.assigned_to,
+            assigned_employee_id=payload.assigned_employee_id,
+            resolution_by=payload.resolution_by,
+            response_by=payload.response_by,
+            resolution_team=payload.resolution_team,
+            customer_email=payload.customer_email,
+            customer_phone=payload.customer_phone,
+            customer_name=payload.customer_name,
+            region=payload.region,
+            base_station=payload.base_station,
+            tags=payload.tags or [],
+            watchers=payload.watchers or [],
+            custom_fields=payload.custom_fields or {},
+            parent_ticket_id=payload.parent_ticket_id,
+        )
+        ticket = service.create_ticket(data)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "ticket_number": ticket.ticket_number}
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}", dependencies=[ticket_write_dep])
@@ -1080,80 +1034,63 @@ def update_ticket(
     ticket_id: int,
     payload: TicketUpdateRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update an existing ticket locally."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    status = parse_ticket_status(payload.status)
-    priority = parse_ticket_priority(payload.priority)
-
-    # Validate structured fields before applying
-    if payload.tags is not None:
-        new_tags = _validate_tags(db, payload.tags)
-        # Adjust usage counts
-        current_tags = ticket.tags or []
-        added = [t for t in new_tags if t not in current_tags]
-        removed = [t for t in current_tags if t not in new_tags]
-        if added:
-            for tag in db.query(TicketTag).filter(TicketTag.name.in_(added), TicketTag.is_active == True).all():
-                tag.usage_count = (tag.usage_count or 0) + 1
-        if removed:
-            for tag in db.query(TicketTag).filter(TicketTag.name.in_(removed)).all():
-                if tag.usage_count and tag.usage_count > 0:
-                    tag.usage_count = tag.usage_count - 1
-        ticket.tags = new_tags
-    if payload.watchers is not None:
-        ticket.watchers = _validate_watchers(db, payload.watchers)
-    if payload.custom_fields is not None:
-        ticket.custom_fields = _validate_custom_fields(db, payload.custom_fields)
-
-    for field in [
-        "subject", "description", "ticket_type", "issue_type", "customer_id",
-        "project_id", "assigned_to", "assigned_employee_id", "resolution_by",
-        "response_by", "resolution_team", "resolution", "resolution_details",
-        "resolution_date", "customer_email", "customer_phone",
-        "customer_name", "region", "base_station", "parent_ticket_id", "merged_into_id",
-    ]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(ticket, field, value)
-
-    if status:
-        ticket.status = status
-        if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED] and ticket.resolution_date is None:
-            ticket.resolution_date = datetime.now(timezone.utc)
-    if priority:
-        ticket.priority = priority
-
-    ticket.updated_by_id = getattr(principal, "id", None)
-    ticket.updated_at = datetime.now(timezone.utc)
-
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "ticket_number": ticket.ticket_number}
+    try:
+        data = TicketUpdateData(
+            subject=payload.subject,
+            description=payload.description,
+            status=parse_ticket_status(payload.status),
+            priority=parse_ticket_priority(payload.priority),
+            ticket_type=payload.ticket_type,
+            issue_type=payload.issue_type,
+            customer_account_id=payload.customer_account_id,
+            party_id=payload.party_id,
+            project_id=payload.project_id,
+            assigned_to=payload.assigned_to,
+            assigned_employee_id=payload.assigned_employee_id,
+            resolution_by=payload.resolution_by,
+            response_by=payload.response_by,
+            resolution_team=payload.resolution_team,
+            resolution=payload.resolution,
+            resolution_details=payload.resolution_details,
+            resolution_date=payload.resolution_date,
+            customer_email=payload.customer_email,
+            customer_phone=payload.customer_phone,
+            customer_name=payload.customer_name,
+            region=payload.region,
+            base_station=payload.base_station,
+            tags=payload.tags,
+            watchers=payload.watchers,
+            custom_fields=payload.custom_fields,
+            parent_ticket_id=payload.parent_ticket_id,
+            merged_into_id=payload.merged_into_id,
+        )
+        ticket = service.update_ticket(ticket_id, data)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "ticket_number": ticket.ticket_number}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}", dependencies=[ticket_write_dep])
 def delete_ticket(
     ticket_id: int,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Soft-delete a ticket locally."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    ticket.is_deleted = True
-    ticket.deleted_at = datetime.now(timezone.utc)
-    ticket.deleted_by_id = getattr(principal, "id", None)
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        service.delete_ticket(ticket_id)
+        db.commit()
+        return Response(status_code=204)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1165,27 +1102,24 @@ def add_ticket_comment(
     ticket_id: int,
     payload: TicketCommentRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add a comment to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    idx = len(ticket.comments or [])
-    comment = HDTicketComment(
-        ticket_id=ticket.id,
-        comment=payload.comment,
-        comment_type=payload.comment_type,
-        commented_by=payload.commented_by,
-        commented_by_name=payload.commented_by_name,
-        is_public=payload.is_public,
-        comment_date=payload.comment_date or datetime.now(timezone.utc),
-        idx=idx,
-    )
-    db.add(comment)
-    db.commit()
-    db.refresh(comment)
-    return {"id": comment.id}
+    try:
+        data = CommentData(
+            comment=payload.comment,
+            comment_type=payload.comment_type,
+            commented_by=payload.commented_by,
+            commented_by_name=payload.commented_by_name,
+            is_public=payload.is_public,
+            comment_date=payload.comment_date,
+        )
+        comment = service.add_comment(ticket_id, data)
+        db.commit()
+        db.refresh(comment)
+        return {"id": comment.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[ticket_write_dep])
@@ -1194,25 +1128,24 @@ def update_ticket_comment(
     comment_id: int,
     payload: TicketCommentUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a ticket comment."""
-    comment = (
-        db.query(HDTicketComment)
-        .join(Ticket, Ticket.id == HDTicketComment.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketComment.id == comment_id)
-        .first()
-    )
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-
-    for field in ["comment", "comment_type", "commented_by", "commented_by_name", "is_public", "comment_date"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(comment, field, value)
-
-    db.commit()
-    db.refresh(comment)
-    return {"id": comment.id}
+    try:
+        data = CommentData(
+            comment=payload.comment or "",
+            comment_type=payload.comment_type,
+            commented_by=payload.commented_by,
+            commented_by_name=payload.commented_by_name,
+            is_public=payload.is_public if payload.is_public is not None else True,
+            comment_date=payload.comment_date,
+        )
+        comment = service.update_comment(ticket_id, comment_id, data)
+        db.commit()
+        db.refresh(comment)
+        return {"id": comment.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/comments/{comment_id}", dependencies=[ticket_write_dep])
@@ -1220,19 +1153,15 @@ def delete_ticket_comment(
     ticket_id: int,
     comment_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Delete a ticket comment."""
-    comment = (
-        db.query(HDTicketComment)
-        .join(Ticket, Ticket.id == HDTicketComment.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketComment.id == comment_id)
-        .first()
-    )
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    db.delete(comment)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        service.delete_comment(ticket_id, comment_id)
+        db.commit()
+        return Response(status_code=204)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1244,27 +1173,24 @@ def add_ticket_activity(
     ticket_id: int,
     payload: TicketActivityRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add an activity to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    idx = len(ticket.activities or [])
-    activity = HDTicketActivity(
-        ticket_id=ticket.id,
-        activity_type=payload.activity_type,
-        activity=payload.activity,
-        owner=payload.owner,
-        from_status=payload.from_status,
-        to_status=payload.to_status,
-        activity_date=payload.activity_date or datetime.now(timezone.utc),
-        idx=idx,
-    )
-    db.add(activity)
-    db.commit()
-    db.refresh(activity)
-    return {"id": activity.id}
+    try:
+        data = ActivityData(
+            activity=payload.activity,
+            activity_type=payload.activity_type,
+            owner=payload.owner,
+            from_status=payload.from_status,
+            to_status=payload.to_status,
+            activity_date=payload.activity_date,
+        )
+        activity = service.add_activity(ticket_id, data)
+        db.commit()
+        db.refresh(activity)
+        return {"id": activity.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[ticket_write_dep])
@@ -1273,25 +1199,24 @@ def update_ticket_activity(
     activity_id: int,
     payload: TicketActivityUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a ticket activity."""
-    activity = (
-        db.query(HDTicketActivity)
-        .join(Ticket, Ticket.id == HDTicketActivity.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketActivity.id == activity_id)
-        .first()
-    )
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-
-    for field in ["activity_type", "activity", "owner", "from_status", "to_status", "activity_date"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(activity, field, value)
-
-    db.commit()
-    db.refresh(activity)
-    return {"id": activity.id}
+    try:
+        data = ActivityData(
+            activity=payload.activity or "",
+            activity_type=payload.activity_type,
+            owner=payload.owner,
+            from_status=payload.from_status,
+            to_status=payload.to_status,
+            activity_date=payload.activity_date,
+        )
+        activity = service.update_activity(ticket_id, activity_id, data)
+        db.commit()
+        db.refresh(activity)
+        return {"id": activity.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/activities/{activity_id}", dependencies=[ticket_write_dep])
@@ -1299,19 +1224,15 @@ def delete_ticket_activity(
     ticket_id: int,
     activity_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Delete a ticket activity."""
-    activity = (
-        db.query(HDTicketActivity)
-        .join(Ticket, Ticket.id == HDTicketActivity.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketActivity.id == activity_id)
-        .first()
-    )
-    if not activity:
-        raise HTTPException(status_code=404, detail="Activity not found")
-    db.delete(activity)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        service.delete_activity(ticket_id, activity_id)
+        db.commit()
+        return Response(status_code=204)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1323,29 +1244,25 @@ def add_ticket_dependency(
     ticket_id: int,
     payload: TicketDependencyRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add a blocking/depends-on relationship to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    if payload.depends_on_ticket_id:
-        target = db.query(Ticket.id).filter(Ticket.id == payload.depends_on_ticket_id, Ticket.is_deleted == False).first()
-        if not target:
-            raise HTTPException(status_code=400, detail="depends_on_ticket_id does not exist")
-
-    dependency = HDTicketDependency(
-        ticket_id=ticket.id,
-        depends_on_ticket_id=payload.depends_on_ticket_id,
-        depends_on_erpnext_id=payload.depends_on_erpnext_id,
-        depends_on_subject=payload.depends_on_subject,
-        depends_on_status=payload.depends_on_status,
-        idx=len(ticket.depends_on or []),
-    )
-    db.add(dependency)
-    db.commit()
-    db.refresh(dependency)
-    return {"id": dependency.id}
+    try:
+        data = DependencyData(
+            depends_on_ticket_id=payload.depends_on_ticket_id,
+            depends_on_erpnext_id=payload.depends_on_erpnext_id,
+            depends_on_subject=payload.depends_on_subject,
+            depends_on_status=payload.depends_on_status,
+        )
+        dependency = service.add_dependency(ticket_id, data)
+        db.commit()
+        db.refresh(dependency)
+        return {"id": dependency.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[ticket_write_dep])
@@ -1354,30 +1271,25 @@ def update_ticket_dependency(
     dependency_id: int,
     payload: TicketDependencyUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a blocking/depends-on relationship."""
-    dependency = (
-        db.query(HDTicketDependency)
-        .join(Ticket, Ticket.id == HDTicketDependency.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketDependency.id == dependency_id)
-        .first()
-    )
-    if not dependency:
-        raise HTTPException(status_code=404, detail="Dependency not found")
-
-    if payload.depends_on_ticket_id:
-        target = db.query(Ticket.id).filter(Ticket.id == payload.depends_on_ticket_id, Ticket.is_deleted == False).first()
-        if not target:
-            raise HTTPException(status_code=400, detail="depends_on_ticket_id does not exist")
-
-    for field in ["depends_on_ticket_id", "depends_on_erpnext_id", "depends_on_subject", "depends_on_status"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(dependency, field, value)
-
-    db.commit()
-    db.refresh(dependency)
-    return {"id": dependency.id}
+    try:
+        data = DependencyData(
+            depends_on_ticket_id=payload.depends_on_ticket_id,
+            depends_on_erpnext_id=payload.depends_on_erpnext_id,
+            depends_on_subject=payload.depends_on_subject,
+            depends_on_status=payload.depends_on_status,
+        )
+        dependency = service.update_dependency(ticket_id, dependency_id, data)
+        db.commit()
+        db.refresh(dependency)
+        return {"id": dependency.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/depends-on/{dependency_id}", dependencies=[ticket_write_dep])
@@ -1385,19 +1297,15 @@ def delete_ticket_dependency(
     ticket_id: int,
     dependency_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Remove a blocking/depends-on relationship."""
-    dependency = (
-        db.query(HDTicketDependency)
-        .join(Ticket, Ticket.id == HDTicketDependency.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, HDTicketDependency.id == dependency_id)
-        .first()
-    )
-    if not dependency:
-        raise HTTPException(status_code=404, detail="Dependency not found")
-    db.delete(dependency)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        service.delete_dependency(ticket_id, dependency_id)
+        db.commit()
+        return Response(status_code=204)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1409,32 +1317,31 @@ def add_ticket_communication(
     ticket_id: int,
     payload: TicketCommunicationRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add a communication log entry to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    comm = TicketCommunication(
-        ticket_id=ticket.id,
-        communication_type=payload.communication_type,
-        communication_medium=payload.communication_medium,
-        subject=payload.subject,
-        content=payload.content,
-        sender=payload.sender,
-        sender_full_name=payload.sender_full_name,
-        recipients=payload.recipients,
-        cc=payload.cc,
-        bcc=payload.bcc,
-        sent_or_received=payload.sent_or_received,
-        read_receipt=payload.read_receipt,
-        delivery_status=payload.delivery_status,
-        communication_date=payload.communication_date or datetime.now(timezone.utc),
-    )
-    db.add(comm)
-    db.commit()
-    db.refresh(comm)
-    return {"id": comm.id}
+    try:
+        data = CommunicationData(
+            communication_type=payload.communication_type,
+            communication_medium=payload.communication_medium,
+            subject=payload.subject,
+            content=payload.content,
+            sender=payload.sender,
+            sender_full_name=payload.sender_full_name,
+            recipients=payload.recipients,
+            cc=payload.cc,
+            bcc=payload.bcc,
+            sent_or_received=payload.sent_or_received,
+            read_receipt=payload.read_receipt,
+            delivery_status=payload.delivery_status,
+            communication_date=payload.communication_date,
+        )
+        comm = service.add_communication(ticket_id, data)
+        db.commit()
+        db.refresh(comm)
+        return {"id": comm.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[ticket_write_dep])
@@ -1443,29 +1350,31 @@ def update_ticket_communication(
     communication_id: int,
     payload: TicketCommunicationUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a communication log entry."""
-    comm = (
-        db.query(TicketCommunication)
-        .join(Ticket, Ticket.id == TicketCommunication.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, TicketCommunication.id == communication_id)
-        .first()
-    )
-    if not comm:
-        raise HTTPException(status_code=404, detail="Communication not found")
-
-    for field in [
-        "communication_type", "communication_medium", "subject", "content",
-        "sender", "sender_full_name", "recipients", "cc", "bcc",
-        "sent_or_received", "read_receipt", "delivery_status", "communication_date",
-    ]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(comm, field, value)
-
-    db.commit()
-    db.refresh(comm)
-    return {"id": comm.id}
+    try:
+        data = CommunicationData(
+            communication_type=payload.communication_type,
+            communication_medium=payload.communication_medium,
+            subject=payload.subject,
+            content=payload.content,
+            sender=payload.sender,
+            sender_full_name=payload.sender_full_name,
+            recipients=payload.recipients,
+            cc=payload.cc,
+            bcc=payload.bcc,
+            sent_or_received=payload.sent_or_received,
+            read_receipt=payload.read_receipt if payload.read_receipt is not None else False,
+            delivery_status=payload.delivery_status,
+            communication_date=payload.communication_date,
+        )
+        comm = service.update_communication(ticket_id, communication_id, data)
+        db.commit()
+        db.refresh(comm)
+        return {"id": comm.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/communications/{communication_id}", dependencies=[ticket_write_dep])
@@ -1473,19 +1382,15 @@ def delete_ticket_communication(
     ticket_id: int,
     communication_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Delete a communication log entry."""
-    comm = (
-        db.query(TicketCommunication)
-        .join(Ticket, Ticket.id == TicketCommunication.ticket_id)
-        .filter(Ticket.id == ticket_id, Ticket.is_deleted == False, TicketCommunication.id == communication_id)
-        .first()
-    )
-    if not comm:
-        raise HTTPException(status_code=404, detail="Communication not found")
-    db.delete(comm)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        service.delete_communication(ticket_id, communication_id)
+        db.commit()
+        return Response(status_code=204)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1497,57 +1402,31 @@ def assign_ticket(
     ticket_id: int,
     payload: TicketAssigneeRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Assign a ticket to an agent or team."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    team = None
-    if payload.team_id:
-        team = db.query(Team).filter(Team.id == payload.team_id).first()
-        if not team:
-            raise HTTPException(status_code=400, detail="team_id does not exist")
-
-    member = None
-    if payload.member_id:
-        member = db.query(TeamMember).filter(TeamMember.id == payload.member_id).first()
-        if not member:
-            raise HTTPException(status_code=400, detail="member_id does not exist")
-        if payload.team_id and member.team_id != payload.team_id:
-            raise HTTPException(status_code=400, detail="member does not belong to team_id")
-
-    agent = None
-    if payload.agent_id:
-        agent = db.query(Agent).filter(Agent.id == payload.agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=400, detail="agent_id does not exist")
-
-    if member and member.agent_id:
-        agent = db.query(Agent).filter(Agent.id == member.agent_id).first()
-
-    if agent and agent.employee_id:
-        ticket.assigned_employee_id = agent.employee_id
-    elif payload.employee_id:
-        ticket.assigned_employee_id = payload.employee_id
-
-    if agent:
-        ticket.assigned_to = payload.assigned_to or agent.display_name or agent.email
-    elif payload.assigned_to:
-        ticket.assigned_to = payload.assigned_to
-
-    if team:
-        ticket.resolution_team = team.name
-
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-    return {
-        "id": ticket.id,
-        "assigned_employee_id": ticket.assigned_employee_id,
-        "assigned_to": ticket.assigned_to,
-        "resolution_team": ticket.resolution_team,
-    }
+    try:
+        data = AssignmentData(
+            team_id=payload.team_id,
+            member_id=payload.member_id,
+            employee_id=payload.employee_id,
+            assigned_to=payload.assigned_to,
+            agent_id=payload.agent_id,
+        )
+        ticket = service.assign_ticket(ticket_id, data)
+        db.commit()
+        db.refresh(ticket)
+        return {
+            "id": ticket.id,
+            "assigned_employee_id": ticket.assigned_employee_id,
+            "assigned_to": ticket.assigned_to,
+            "resolution_team": ticket.resolution_team,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.patch("/tickets/{ticket_id}/sla", dependencies=[ticket_write_dep])
@@ -1555,30 +1434,25 @@ def update_ticket_sla(
     ticket_id: int,
     payload: TicketSLARequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update SLA dates (response/resolution) with optional reason note."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    if payload.response_by is not None:
-        ticket.response_by = payload.response_by
-    if payload.resolution_by is not None:
-        ticket.resolution_by = payload.resolution_by
-
-    if payload.reason:
-        existing = ticket.resolution_details or ""
-        note = f"[SLA override] {payload.reason}"
-        ticket.resolution_details = (existing + "\n" + note).strip() if existing else note
-
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-    return {
-        "id": ticket.id,
-        "response_by": ticket.response_by.isoformat() if ticket.response_by else None,
-        "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
-    }
+    try:
+        data = SLAUpdateData(
+            response_by=payload.response_by,
+            resolution_by=payload.resolution_by,
+            reason=payload.reason,
+        )
+        ticket = service.update_sla(ticket_id, data)
+        db.commit()
+        db.refresh(ticket)
+        return {
+            "id": ticket.id,
+            "response_by": ticket.response_by.isoformat() if ticket.response_by else None,
+            "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1860,30 +1734,19 @@ def add_ticket_tags(
     ticket_id: int,
     payload: TicketTagsRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add tags to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    validated_tags = _validate_tags(db, payload.tags)
-
-    current_tags = ticket.tags or []
-    new_tags = list(dict.fromkeys(current_tags + validated_tags))
-
-    # Validate tags exist and update usage counts
-    for tag_name in validated_tags:
-        if tag_name not in current_tags:
-            tag = db.query(TicketTag).filter(TicketTag.name == tag_name, TicketTag.is_active == True).first()
-            if tag:
-                tag.usage_count = (tag.usage_count or 0) + 1
-
-    ticket.tags = new_tags
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "tags": ticket.tags}
+    try:
+        ticket = service.add_tags(ticket_id, payload.tags)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "tags": ticket.tags}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/tags/{tag_name}", dependencies=[ticket_write_dep])
@@ -1891,27 +1754,16 @@ def remove_ticket_tag(
     ticket_id: int,
     tag_name: str,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Remove a tag from a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    current_tags = ticket.tags or []
-    if tag_name not in current_tags:
-        raise HTTPException(status_code=404, detail="Tag not found on this ticket")
-
-    # Update usage count
-    tag = db.query(TicketTag).filter(TicketTag.name == tag_name).first()
-    if tag and tag.usage_count and tag.usage_count > 0:
-        tag.usage_count = tag.usage_count - 1
-
-    ticket.tags = [t for t in current_tags if t != tag_name]
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "tags": ticket.tags}
+    try:
+        ticket = service.remove_tag(ticket_id, tag_name)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "tags": ticket.tags}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1923,23 +1775,19 @@ def add_ticket_watchers(
     ticket_id: int,
     payload: TicketWatchersRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Add watchers to a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    validated_watchers = _validate_watchers(db, payload.user_ids)
-
-    current_watchers = ticket.watchers or []
-    new_watchers = list(dict.fromkeys(current_watchers + validated_watchers))
-
-    ticket.watchers = new_watchers
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "watchers": ticket.watchers}
+    try:
+        ticket = service.add_watchers(ticket_id, payload.user_ids)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "watchers": ticket.watchers}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/tickets/{ticket_id}/watchers/{user_id}", dependencies=[ticket_write_dep])
@@ -1947,22 +1795,16 @@ def remove_ticket_watcher(
     ticket_id: int,
     user_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Remove a watcher from a ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    current_watchers = ticket.watchers or []
-    if user_id not in current_watchers:
-        raise HTTPException(status_code=404, detail="Watcher not found on this ticket")
-
-    ticket.watchers = [w for w in current_watchers if w != user_id]
-    ticket.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(ticket)
-
-    return {"id": ticket.id, "watchers": ticket.watchers}
+    try:
+        ticket = service.remove_watcher(ticket_id, user_id)
+        db.commit()
+        db.refresh(ticket)
+        return {"id": ticket.id, "watchers": ticket.watchers}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 # =============================================================================
@@ -1974,83 +1816,27 @@ def merge_tickets(
     ticket_id: int,
     payload: TicketMergeRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Merge source tickets into this target ticket."""
-    target = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Target ticket not found")
-
-    if target.status == TicketStatus.CLOSED:
-        raise HTTPException(status_code=400, detail="Cannot merge into a closed ticket")
-
-    merged_ids = target.merged_tickets or []
-    merged_count = 0
-
-    for source_id in payload.source_ticket_ids:
-        if source_id == ticket_id:
-            continue
-
-        source = db.query(Ticket).filter(Ticket.id == source_id, Ticket.is_deleted == False).first()
-        if not source:
-            continue
-
-        # Copy comments from source to target
-        for comment in source.comments:
-            new_comment = HDTicketComment(
-                ticket_id=target.id,
-                comment=f"[Merged from #{source.ticket_number}] {comment.comment}",
-                comment_type=comment.comment_type,
-                commented_by=comment.commented_by,
-                commented_by_name=comment.commented_by_name,
-                is_public=comment.is_public,
-                comment_date=comment.comment_date,
-                idx=len(target.comments or []),
-            )
-            db.add(new_comment)
-
-        # Merge tags
-        if source.tags:
-            target_tags = target.tags or []
-            target.tags = list(set(target_tags + source.tags))
-            # Update usage counts for newly added tags
-            added = [t for t in source.tags if t not in target_tags]
-            if added:
-                for tag in db.query(TicketTag).filter(TicketTag.name.in_(added), TicketTag.is_active == True).all():
-                    tag.usage_count = (tag.usage_count or 0) + 1
-
-        # Link source to target
-        source.merged_into_id = target.id
-
-        if payload.close_source_tickets:
-            source.status = TicketStatus.CLOSED
-            source.resolution = f"Merged into ticket #{target.ticket_number}"
-            source.resolution_date = datetime.now(timezone.utc)
-
-        merged_ids.append(source_id)
-        merged_count += 1
-
-        # Add activity
-        activity = HDTicketActivity(
-            ticket_id=target.id,
-            activity_type="merge",
-            activity=f"Merged ticket #{source.ticket_number} into this ticket",
-            owner=getattr(principal, "email", None),
-            activity_date=datetime.now(timezone.utc),
-            idx=len(target.activities or []),
+    try:
+        data = MergeData(
+            source_ticket_ids=payload.source_ticket_ids,
+            close_source_tickets=payload.close_source_tickets,
         )
-        db.add(activity)
-
-    target.merged_tickets = merged_ids
-    target.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(target)
-
-    return {
-        "id": target.id,
-        "merged_count": merged_count,
-        "merged_tickets": target.merged_tickets,
-    }
+        target = service.merge_tickets(ticket_id, data)
+        db.commit()
+        db.refresh(target)
+        return {
+            "id": target.id,
+            "merged_count": len(payload.source_ticket_ids),
+            "merged_tickets": target.merged_tickets,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.post("/tickets/{ticket_id}/split", dependencies=[ticket_write_dep], status_code=201)
@@ -2058,84 +1844,41 @@ def split_ticket(
     ticket_id: int,
     payload: TicketSplitRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Create a sub-ticket (child) from this ticket."""
-    parent = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not parent:
-        raise HTTPException(status_code=404, detail="Parent ticket not found")
-
-    child = Ticket(
-        ticket_number=generate_local_ticket_number(),
-        subject=payload.subject,
-        description=payload.description or f"Sub-ticket of #{parent.ticket_number}",
-        status=TicketStatus.OPEN,
-        priority=parent.priority,
-        ticket_type=parent.ticket_type,
-        issue_type=parent.issue_type,
-        customer_id=parent.customer_id,
-        project_id=parent.project_id,
-        resolution_team=parent.resolution_team,
-        customer_email=parent.customer_email,
-        customer_phone=parent.customer_phone,
-        customer_name=parent.customer_name,
-        region=parent.region,
-        base_station=parent.base_station,
-        parent_ticket_id=parent.id,
-        origin_system="local",
-        write_back_status="pending",
-        created_by_id=getattr(principal, "id", None),
-        updated_by_id=getattr(principal, "id", None),
-        opening_date=datetime.now(timezone.utc),
-    )
-
-    if payload.copy_tags and parent.tags:
-        child.tags = parent.tags.copy()
-
-    if payload.copy_custom_fields and parent.custom_fields:
-        child.custom_fields = parent.custom_fields.copy()
-
-    db.add(child)
-
-    # Add activity to parent
-    activity = HDTicketActivity(
-        ticket_id=parent.id,
-        activity_type="split",
-        activity=f"Created sub-ticket: {payload.subject}",
-        owner=getattr(principal, "email", None),
-        activity_date=datetime.now(timezone.utc),
-        idx=len(parent.activities or []),
-    )
-    db.add(activity)
-
-    parent.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(child)
-
-    return {
-        "id": child.id,
-        "ticket_number": child.ticket_number,
-        "parent_ticket_id": child.parent_ticket_id,
-    }
+    try:
+        data = SplitData(
+            subject=payload.subject,
+            description=payload.description,
+            copy_tags=payload.copy_tags,
+            copy_custom_fields=payload.copy_custom_fields,
+        )
+        child = service.split_ticket(ticket_id, data)
+        db.commit()
+        db.refresh(child)
+        return {
+            "id": child.id,
+            "ticket_number": child.ticket_number,
+            "parent_ticket_id": child.parent_ticket_id,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.get("/tickets/{ticket_id}/sub-tickets", dependencies=[ticket_read_dep])
 def list_sub_tickets(
     ticket_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """List all sub-tickets of a parent ticket."""
-    parent = db.query(Ticket).filter(Ticket.id == ticket_id, Ticket.is_deleted == False).first()
-    if not parent:
-        raise HTTPException(status_code=404, detail="Parent ticket not found")
-
-    sub_tickets = db.query(Ticket).filter(
-        Ticket.parent_ticket_id == ticket_id,
-        Ticket.is_deleted == False,
-    ).order_by(Ticket.created_at.desc()).all()
-
-    return {
-        "parent_ticket_id": ticket_id,
-        "total": len(sub_tickets),
-        "data": [serialize_ticket_brief(t) for t in sub_tickets],
-    }
+    try:
+        sub_tickets = service.list_sub_tickets(ticket_id)
+        return {
+            "parent_ticket_id": ticket_id,
+            "total": len(sub_tickets),
+            "data": [serialize_ticket_brief(t) for t in sub_tickets],
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)

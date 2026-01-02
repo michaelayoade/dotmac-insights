@@ -43,7 +43,7 @@ from app.models.support_sla import SLAPolicy, SLATarget, BusinessCalendar
 
 # Models - Related
 from app.models.employee import Employee, EmploymentStatus
-from app.models.contact import Contact
+from app.models.party import Party
 
 # Permission dependencies
 RequireSupportRead = Depends(require_scope("support:read"))
@@ -187,3 +187,35 @@ def get_teams(db):
     return db.query(Team).filter(
         Team.is_active == True
     ).order_by(Team.name).all()
+
+
+# =============================================================================
+# PARTY RESOLUTION FOR TICKETS
+# =============================================================================
+
+def resolve_party_for_ticket(db, email: str, phone: str = None, name: str = None) -> Optional[Party]:
+    """Resolve or create a Party record for ticket contact."""
+    if not email and not phone:
+        return None
+
+    party = None
+    if email:
+        party = db.query(Party).filter(Party.primary_email == email).first()
+    if not party and phone:
+        party = db.query(Party).filter(Party.primary_phone == phone).first()
+
+    if party:
+        return party
+
+    party = Party(
+        type="person",
+        status="active",
+        name=name or email or phone,
+        primary_email=email,
+        primary_phone=phone,
+        emails=[{"address": email, "is_primary": True}] if email else [],
+        phones=[{"number": phone, "is_primary": True}] if phone else [],
+    )
+    db.add(party)
+    db.flush()
+    return party

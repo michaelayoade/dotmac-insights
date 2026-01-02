@@ -7,7 +7,7 @@ from typing import Optional, TYPE_CHECKING
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import Party
     from app.models.subscription import Subscription
 
 
@@ -19,7 +19,7 @@ class CustomerUsage(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # Links
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False, index=True)
     subscription_id: Mapped[Optional[int]] = mapped_column(ForeignKey("subscriptions.id"), nullable=True, index=True)
 
     # Splynx reference
@@ -34,19 +34,19 @@ class CustomerUsage(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Customer] = relationship(back_populates="usage_records")
+    party: Mapped[Party] = relationship(back_populates="usage_records")
     subscription: Mapped[Optional[Subscription]] = relationship()
 
     # Indexes for analytics queries
     __table_args__ = (
-        Index("ix_usage_customer_date", "customer_id", "usage_date"),
+        Index("ix_usage_party_date", "party_id", "usage_date"),
         Index("ix_usage_date", "usage_date"),
         Index("ix_usage_service_date", "splynx_service_id", "usage_date", unique=True),
     )
 
     def __repr__(self) -> str:
         total_gb = (self.upload_bytes + self.download_bytes) / (1024 ** 3)
-        return f"<CustomerUsage customer={self.customer_id} date={self.usage_date} total={total_gb:.2f}GB>"
+        return f"<CustomerUsage party={self.party_id} date={self.usage_date} total={total_gb:.2f}GB>"
 
     @property
     def total_bytes(self) -> int:

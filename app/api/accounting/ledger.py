@@ -1,23 +1,51 @@
-"""Ledger endpoints: Chart of Accounts, Account Details, GL Entries."""
+"""Ledger endpoints: Chart of Accounts, Account Details, GL Entries.
+
+This module provides the REST API for ledger management.
+Business logic is delegated to LedgerService.
+"""
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
-from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
-from app.models.accounting import Account, AccountType, GLEntry
+from app.models.accounting import AccountType
+from app.services.accounting.ledger import LedgerService
+from app.services.accounting.ledger_types import (
+    AccountCreateData,
+    AccountFilters,
+    AccountLedgerFilters,
+    AccountUpdateData,
+    GLEntryCreateData,
+    GLEntryFilters,
+    GLEntryUpdateData,
+)
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate, serialize_account
+from .helpers import parse_date, serialize_account
 
 router = APIRouter()
 
+
+# ============= SERVICE DEPENDENCY =============
+
+def get_ledger_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> LedgerService:
+    """Create a LedgerService instance for dependency injection."""
+    return LedgerService(db, principal)
+
+
+# ============= PYDANTIC SCHEMAS =============
 
 class AccountCreateRequest(BaseModel):
     account_name: str
@@ -101,7 +129,21 @@ class GLEntryUpdateRequest(BaseModel):
         return Decimal(str(value))
 
 
-# ACCOUNTS LIST
+# ============= HELPER FUNCTIONS =============
+
+def _parse_root_type(root_type: Optional[str]) -> Optional[AccountType]:
+    """Parse root type string to enum."""
+    if not root_type:
+        return None
+    try:
+        return AccountType(root_type.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid root_type: {root_type}"
+        )
+
+
+# ============= ACCOUNTS LIST =============
 
 @router.get("/accounts", dependencies=[Depends(Require("accounting:read"))])
 def list_accounts(
@@ -112,231 +154,182 @@ def list_accounts(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """List all accounts with filtering and pagination.
+    """List all accounts with filtering and pagination."""
+    try:
+        filters = AccountFilters(
+            root_type=_parse_root_type(root_type),
+            account_type=account_type,
+            is_group=is_group,
+            include_disabled=include_disabled,
+            search=search,
+        )
+        pagination = PaginationParams(offset=offset, limit=limit)
 
-    Args:
-        root_type: Filter by root type (asset, liability, equity, income, expense)
-        account_type: Filter by account type (Bank, Cash, Receivable, Payable, etc.)
-        is_group: Filter group vs leaf accounts
-        include_disabled: Include disabled accounts
-        search: Search by account name
+        result = service.list_accounts(filters, pagination)
 
-    Returns:
-        Paginated list of accounts
-    """
-    query = db.query(Account)
-
-    if root_type:
-        try:
-            root_type_enum = AccountType(root_type.lower())
-            query = query.filter(Account.root_type == root_type_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid root_type: {root_type}")
-
-    if account_type:
-        query = query.filter(Account.account_type == account_type)
-
-    if is_group is not None:
-        query = query.filter(Account.is_group == is_group)
-
-    if not include_disabled:
-        query = query.filter(Account.disabled == False)
-
-    if search:
-        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
-        if len(search) < 2:
-            raise HTTPException(
-                status_code=400,
-                detail="Search query must be at least 2 characters"
-            )
-        query = query.filter(Account.account_name.ilike(f"%{search}%"))
-
-    query = query.order_by(Account.account_name)
-    total, accounts = paginate(query, offset, limit)
-
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "accounts": [serialize_account(acc) for acc in accounts],
-    }
+        return {
+            "total": result.total,
+            "limit": limit,
+            "offset": offset,
+            "accounts": [serialize_account(acc) for acc in result.items],
+        }
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# ACCOUNT DETAIL
+# ============= ACCOUNT DETAIL =============
 
-@router.get("/accounts/{account_id}", dependencies=[Depends(Require("accounting:read"))])
+@router.get(
+    "/accounts/{account_id}", dependencies=[Depends(Require("accounting:read"))]
+)
 def get_account_detail(
     account_id: int,
     include_ledger: bool = True,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """Get detailed account information with optional transaction ledger.
+    """Get detailed account information with optional transaction ledger."""
+    try:
+        account = service.get_account(account_id)
+        balance_info = service.get_account_balance(account)
 
-    Args:
-        account_id: Account ID
-        include_ledger: Include recent GL entries for this account
-        start_date: Filter ledger from date
-        end_date: Filter ledger to date
-        limit: Max ledger entries to return
+        result: Dict[str, Any] = {
+            "id": account.id,
+            "erpnext_id": account.erpnext_id,
+            "name": account.account_name,
+            "account_number": account.account_number,
+            "parent_account": account.parent_account,
+            "root_type": account.root_type.value if account.root_type else None,
+            "account_type": account.account_type,
+            "is_group": account.is_group,
+            "disabled": account.disabled,
+            "normal_balance": balance_info.normal_balance,
+            "total_debit": float(balance_info.total_debit),
+            "total_credit": float(balance_info.total_credit),
+            "balance": float(balance_info.balance),
+            "balance_type": balance_info.balance_type,
+        }
 
-    Returns:
-        Account details with optional ledger entries
-    """
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        if include_ledger:
+            ledger_filters = AccountLedgerFilters(
+                start_date=parse_date(start_date, "start_date") if start_date else None,
+                end_date=parse_date(end_date, "end_date") if end_date else None,
+            )
+            ledger_pagination = PaginationParams(offset=0, limit=limit)
+            ledger_result = service.get_account_ledger(
+                account_id, ledger_filters, ledger_pagination
+            )
 
-    # Calculate current balance
-    balance_result = db.query(
-        func.sum(GLEntry.debit).label("total_debit"),
-        func.sum(GLEntry.credit).label("total_credit"),
-    ).filter(
-        GLEntry.account == account.erpnext_id,
-        GLEntry.is_cancelled == False,
-    ).first()
+            result["ledger"] = [
+                {
+                    "id": e.id,
+                    "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+                    "party_type": e.party_type,
+                    "party": e.party,
+                    "debit": float(e.debit),
+                    "credit": float(e.credit),
+                    "voucher_type": e.voucher_type,
+                    "voucher_no": e.voucher_no,
+                    "cost_center": e.cost_center,
+                }
+                for e in ledger_result.entries
+            ]
+            result["ledger_count"] = len(ledger_result.entries)
 
-    totals = balance_result._mapping if balance_result else {}
-    total_debit = totals.get("total_debit") or Decimal("0")
-    total_credit = totals.get("total_credit") or Decimal("0")
-    balance = total_debit - total_credit
-
-    # Determine normal balance type
-    if account.root_type in [AccountType.ASSET, AccountType.EXPENSE]:
-        normal_balance = "debit"
-    else:
-        normal_balance = "credit"
-
-    result: Dict[str, Any] = {
-        "id": account.id,
-        "erpnext_id": account.erpnext_id,
-        "name": account.account_name,
-        "account_number": account.account_number,
-        "parent_account": account.parent_account,
-        "root_type": account.root_type.value if account.root_type else None,
-        "account_type": account.account_type,
-        "is_group": account.is_group,
-        "disabled": account.disabled,
-        "normal_balance": normal_balance,
-        "total_debit": float(total_debit),
-        "total_credit": float(total_credit),
-        "balance": float(balance),
-        "balance_type": "Dr" if balance >= 0 else "Cr",
-    }
-
-    if include_ledger:
-        ledger_query = db.query(GLEntry).filter(
-            GLEntry.account == account.erpnext_id,
-            GLEntry.is_cancelled == False,
-        )
-
-        if start_date:
-            ledger_query = ledger_query.filter(GLEntry.posting_date >= parse_date(start_date, "start_date"))
-        if end_date:
-            ledger_query = ledger_query.filter(GLEntry.posting_date <= parse_date(end_date, "end_date"))
-
-        entries = ledger_query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc()).limit(limit).all()
-
-        ledger_entries = [
-            {
-                "id": e.id,
-                "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-                "party_type": e.party_type,
-                "party": e.party,
-                "debit": float(e.debit),
-                "credit": float(e.credit),
-                "voucher_type": e.voucher_type,
-                "voucher_no": e.voucher_no,
-                "cost_center": e.cost_center,
-            }
-            for e in entries
-        ]
-        result["ledger"] = ledger_entries
-        result["ledger_count"] = len(entries)
-
-    return result
+        return result
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# ACCOUNT CRUD
+# ============= ACCOUNT CRUD =============
 
 @router.post("/accounts", dependencies=[Depends(Require("accounting:write"))])
 def create_account(
     payload: AccountCreateRequest,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Create a chart of accounts entry locally."""
-    root_type_enum = None
-    if payload.root_type:
-        try:
-            root_type_enum = AccountType(payload.root_type.lower())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid root_type: {payload.root_type}")
-
-    account = Account(
-        account_name=payload.account_name,
-        account_number=payload.account_number,
-        parent_account=payload.parent_account,
-        root_type=root_type_enum,
-        account_type=payload.account_type,
-        company=payload.company,
-        is_group=payload.is_group,
-        disabled=payload.disabled,
-        balance_must_be=payload.balance_must_be,
-    )
-    db.add(account)
-    db.commit()
-    db.refresh(account)
-    return {"id": account.id}
+    try:
+        data = AccountCreateData(
+            account_name=payload.account_name,
+            account_number=payload.account_number,
+            parent_account=payload.parent_account,
+            root_type=_parse_root_type(payload.root_type),
+            account_type=payload.account_type,
+            company=payload.company,
+            is_group=payload.is_group,
+            disabled=payload.disabled,
+            balance_must_be=payload.balance_must_be,
+        )
+        account = service.create_account(data)
+        db.commit()
+        db.refresh(account)
+        return {"id": account.id}
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.patch("/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))])
+@router.patch(
+    "/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))]
+)
 def update_account(
     account_id: int,
     payload: AccountUpdateRequest,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Update a chart of accounts entry locally."""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    try:
+        data = AccountUpdateData(
+            account_name=payload.account_name,
+            account_number=payload.account_number,
+            parent_account=payload.parent_account,
+            root_type=_parse_root_type(payload.root_type) if payload.root_type else None,
+            account_type=payload.account_type,
+            company=payload.company,
+            is_group=payload.is_group,
+            disabled=payload.disabled,
+            balance_must_be=payload.balance_must_be,
+        )
+        account = service.update_account(account_id, data)
+        db.commit()
+        db.refresh(account)
+        return {"id": account.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    update_data = payload.model_dump(exclude_unset=True)
-    if "root_type" in update_data and update_data["root_type"]:
-        try:
-            update_data["root_type"] = AccountType(update_data["root_type"].lower())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid root_type: {update_data['root_type']}")
 
-    for key, value in update_data.items():
-        setattr(account, key, value)
-
-    db.commit()
-    db.refresh(account)
-    return {"id": account.id}
-
-
-@router.delete("/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))])
+@router.delete(
+    "/accounts/{account_id}", dependencies=[Depends(Require("accounting:write"))]
+)
 def delete_account(
     account_id: int,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Disable a chart of accounts entry."""
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    try:
+        service.disable_account(account_id)
+        db.commit()
+        return {"status": "disabled", "account_id": account_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    account.disabled = True
-    db.commit()
-    return {"status": "disabled", "account_id": account_id}
 
+# ============= ACCOUNT LEDGER =============
 
-# ACCOUNT LEDGER (with running balance)
-
-@router.get("/accounts/{account_id}/ledger", dependencies=[Depends(Require("accounting:read"))])
+@router.get(
+    "/accounts/{account_id}/ledger",
+    dependencies=[Depends(Require("accounting:read"))],
+)
 def get_account_ledger(
     account_id: int,
     start_date: Optional[str] = None,
@@ -346,100 +339,57 @@ def get_account_ledger(
     voucher_type: Optional[str] = None,
     limit: int = Query(default=100, le=1000),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """Get ledger (GL entries) for a specific account with running balance.
+    """Get ledger (GL entries) for a specific account with running balance."""
+    try:
+        filters = AccountLedgerFilters(
+            start_date=parse_date(start_date, "start_date") if start_date else None,
+            end_date=parse_date(end_date, "end_date") if end_date else None,
+            party_type=party_type,
+            party=party,
+            voucher_type=voucher_type,
+        )
+        pagination = PaginationParams(offset=offset, limit=limit)
 
-    Args:
-        account_id: Account ID
-        start_date: Filter from date
-        end_date: Filter to date
-        party_type: Filter by party type
-        party: Filter by party name
-        voucher_type: Filter by voucher type
-        limit: Max entries per page
-        offset: Pagination offset
+        result = service.get_account_ledger(account_id, filters, pagination)
 
-    Returns:
-        Ledger entries with running balance
-    """
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    # Base query
-    query = db.query(GLEntry).filter(
-        GLEntry.account == account.erpnext_id,
-        GLEntry.is_cancelled == False,
-    )
-
-    # Calculate opening balance (before start_date)
-    opening_balance = Decimal("0")
-    start_dt = parse_date(start_date, "start_date")
-    end_dt = parse_date(end_date, "end_date")
-
-    if start_dt:
-        opening_result = db.query(
-            func.sum(GLEntry.debit - GLEntry.credit)
-        ).filter(
-            GLEntry.account == account.erpnext_id,
-            GLEntry.is_cancelled == False,
-            GLEntry.posting_date < start_dt,
-        ).scalar()
-        opening_balance = opening_result or Decimal("0")
-        query = query.filter(GLEntry.posting_date >= start_dt)
-
-    if end_dt:
-        query = query.filter(GLEntry.posting_date <= end_dt)
-
-    if party_type:
-        query = query.filter(GLEntry.party_type == party_type)
-    if party:
-        query = query.filter(GLEntry.party.ilike(f"%{party}%"))
-    if voucher_type:
-        query = query.filter(GLEntry.voucher_type == voucher_type)
-
-    total = query.count()
-    entries = query.order_by(GLEntry.posting_date.asc(), GLEntry.id.asc()).offset(offset).limit(limit).all()
-
-    # Calculate running balance
-    ledger = []
-    running_balance = opening_balance
-    for e in entries:
-        running_balance += e.debit - e.credit
-        ledger.append({
-            "id": e.id,
-            "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-            "party_type": e.party_type,
-            "party": e.party,
-            "debit": float(e.debit),
-            "credit": float(e.credit),
-            "balance": float(running_balance),
-            "voucher_type": e.voucher_type,
-            "voucher_no": e.voucher_no,
-            "cost_center": e.cost_center,
-        })
-
-    return {
-        "account": {
-            "id": account.id,
-            "name": account.account_name,
-            "root_type": account.root_type.value if account.root_type else None,
-        },
-        "period": {
-            "start_date": start_dt.isoformat() if start_dt else None,
-            "end_date": end_dt.isoformat() if end_dt else None,
-        },
-        "opening_balance": float(opening_balance),
-        "closing_balance": float(running_balance) if ledger else float(opening_balance),
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "entries": ledger,
-    }
+        return {
+            "account": {
+                "id": result.account_id,
+                "name": result.account_name,
+                "root_type": result.root_type,
+            },
+            "period": {
+                "start_date": result.start_date.isoformat() if result.start_date else None,
+                "end_date": result.end_date.isoformat() if result.end_date else None,
+            },
+            "opening_balance": float(result.opening_balance),
+            "closing_balance": float(result.closing_balance),
+            "total": result.total,
+            "limit": limit,
+            "offset": offset,
+            "entries": [
+                {
+                    "id": e.id,
+                    "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+                    "party_type": e.party_type,
+                    "party": e.party,
+                    "debit": float(e.debit),
+                    "credit": float(e.credit),
+                    "balance": float(e.balance),
+                    "voucher_type": e.voucher_type,
+                    "voucher_no": e.voucher_no,
+                    "cost_center": e.cost_center,
+                }
+                for e in result.entries
+            ],
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# CHART OF ACCOUNTS
+# ============= CHART OF ACCOUNTS =============
 
 @router.get("/chart-of-accounts", dependencies=[Depends(Require("accounting:read"))])
 def get_chart_of_accounts(
@@ -447,105 +397,45 @@ def get_chart_of_accounts(
     include_disabled: bool = False,
     include_balances: bool = True,
     as_of_date: Optional[str] = None,
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """Get chart of accounts as hierarchical tree with balances.
+    """Get chart of accounts as hierarchical tree with balances."""
+    root_type_enum = _parse_root_type(root_type) if root_type else None
+    cutoff = parse_date(as_of_date, "as_of_date") if as_of_date else None
 
-    Args:
-        root_type: Filter by root type (asset, liability, equity, income, expense)
-        include_disabled: Include disabled accounts
-        include_balances: Include account balances from GL entries (default: True)
-        as_of_date: Calculate balances as of this date (default: today)
+    result = service.get_chart_of_accounts(
+        root_type=root_type_enum,
+        include_disabled=include_disabled,
+        include_balances=include_balances,
+        as_of_date=cutoff,
+    )
 
-    Returns:
-        Chart of accounts in both flat and tree formats
-    """
-    query = db.query(Account)
-
-    if root_type:
-        try:
-            root_type_enum = AccountType(root_type.lower())
-            query = query.filter(Account.root_type == root_type_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid root_type: {root_type}")
-
-    if not include_disabled:
-        query = query.filter(Account.disabled == False)
-
-    accounts = query.order_by(Account.account_name).all()
-
-    # Calculate balances from GL entries if requested
-    account_balances: Dict[str, float] = {}
-    if include_balances:
-        cutoff = parse_date(as_of_date, "as_of_date") or date.today()
-        balance_query = db.query(
-            GLEntry.account,
-            func.sum(GLEntry.debit).label("total_debit"),
-            func.sum(GLEntry.credit).label("total_credit"),
-        ).filter(
-            GLEntry.is_cancelled == False,
-            GLEntry.posting_date <= cutoff,
-        ).group_by(GLEntry.account)
-
-        for row in balance_query.all():
-            debit = row.total_debit or Decimal("0")
-            credit = row.total_credit or Decimal("0")
-            account_balances[row.account] = float(debit - credit)
-
-    # Build tree structure
-    def build_tree(accs: List[Account], parent: Optional[str] = None) -> List[Dict]:
-        tree = []
-        for acc in accs:
-            if acc.parent_account == parent:
-                balance = account_balances.get(acc.erpnext_id or "", 0.0)
-                node = {
-                    "id": acc.id,
-                    "name": acc.account_name,
-                    "account_number": acc.account_number,
-                    "root_type": acc.root_type.value if acc.root_type else None,
-                    "account_type": acc.account_type,
-                    "is_group": acc.is_group,
-                    "disabled": acc.disabled,
-                    "balance": balance,
-                    "children": build_tree(accs, acc.erpnext_id) if acc.is_group else [],
-                }
-                tree.append(node)
-        return tree
-
-    # Also return flat list for easier processing
-    flat_list = [
-        {
-            "id": acc.id,
-            "erpnext_id": acc.erpnext_id,
-            "name": acc.account_name,
-            "account_number": acc.account_number,
-            "parent_account": acc.parent_account,
-            "root_type": acc.root_type.value if acc.root_type else None,
-            "account_type": acc.account_type,
-            "is_group": acc.is_group,
-            "disabled": acc.disabled,
-            "balance": account_balances.get(acc.erpnext_id or "", 0.0),
-        }
-        for acc in accounts
-    ]
-
-    # Group by root type
-    by_root_type: Dict[str, List[str]] = {}
-    for acc in accounts:
-        rt = acc.root_type.value if acc.root_type else "unknown"
-        if rt not in by_root_type:
-            by_root_type[rt] = []
-        by_root_type[rt].append(acc.account_name)
+    # Convert tree nodes to dicts
+    def tree_to_dict(nodes):
+        return [
+            {
+                "id": n.id,
+                "name": n.name,
+                "account_number": n.account_number,
+                "root_type": n.root_type,
+                "account_type": n.account_type,
+                "is_group": n.is_group,
+                "disabled": n.disabled,
+                "balance": n.balance,
+                "children": tree_to_dict(n.children) if n.children else [],
+            }
+            for n in nodes
+        ]
 
     return {
-        "total": len(accounts),
-        "by_root_type": {k: len(v) for k, v in by_root_type.items()},
-        "accounts": flat_list,
-        "tree": build_tree(accounts, None),
+        "total": result["total"],
+        "by_root_type": result["by_root_type"],
+        "accounts": result["accounts"],
+        "tree": tree_to_dict(result["tree"]),
     }
 
 
-# GL ENTRIES LIST
+# ============= GL ENTRIES LIST =============
 
 @router.get("/gl-entries", dependencies=[Depends(Require("accounting:read"))])
 def list_gl_entries(
@@ -558,177 +448,118 @@ def list_gl_entries(
     end_date: Optional[str] = None,
     is_cancelled: Optional[bool] = None,
     search: Optional[str] = None,
-    sort_by: Optional[str] = Query(default="posting_date", description="posting_date,account,debit,credit"),
+    sort_by: Optional[str] = Query(
+        default="posting_date",
+        description="posting_date,account,debit,credit",
+    ),
     sort_dir: Optional[str] = Query(default="desc"),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """List GL entries with filtering and sorting.
-
-    Args:
-        account: Filter by account name
-        voucher_type: Filter by voucher type
-        voucher_no: Filter by voucher number
-        party_type: Filter by party type
-        party: Filter by party name
-        start_date: Filter from date
-        end_date: Filter to date
-        is_cancelled: Filter by cancelled status
-        search: Search across account, voucher_no, party
-        sort_by: Field to sort by
-        sort_dir: Sort direction (asc/desc)
-        limit: Max entries per page
-        offset: Pagination offset
-
-    Returns:
-        Paginated GL entries
-    """
-    query = db.query(GLEntry)
-
-    if account:
-        query = query.filter(GLEntry.account.ilike(f"%{account}%"))
-
-    if voucher_type:
-        query = query.filter(GLEntry.voucher_type == voucher_type)
-
-    if voucher_no:
-        query = query.filter(GLEntry.voucher_no.ilike(f"%{voucher_no}%"))
-
-    if party_type:
-        query = query.filter(GLEntry.party_type == party_type)
-
-    if party:
-        query = query.filter(GLEntry.party.ilike(f"%{party}%"))
-
-    if start_date:
-        start_dt = parse_date(start_date, "start_date")
-        if start_dt:
-            query = query.filter(GLEntry.posting_date >= start_dt)
-
-    if end_date:
-        end_dt = parse_date(end_date, "end_date")
-        if end_dt:
-            query = query.filter(GLEntry.posting_date <= end_dt)
-
-    if is_cancelled is not None:
-        query = query.filter(GLEntry.is_cancelled == is_cancelled)
-
-    if search:
-        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
-        if len(search) < 2:
-            raise HTTPException(
-                status_code=400,
-                detail="Search query must be at least 2 characters"
-            )
-        query = query.filter(
-            or_(
-                GLEntry.account.ilike(f"%{search}%"),
-                GLEntry.voucher_no.ilike(f"%{search}%"),
-                GLEntry.party.ilike(f"%{search}%"),
-            )
+    """List GL entries with filtering and sorting."""
+    try:
+        filters = GLEntryFilters(
+            account=account,
+            voucher_type=voucher_type,
+            voucher_no=voucher_no,
+            party_type=party_type,
+            party=party,
+            start_date=parse_date(start_date, "start_date") if start_date else None,
+            end_date=parse_date(end_date, "end_date") if end_date else None,
+            is_cancelled=is_cancelled,
+            search=search,
+            sort_by=sort_by or "posting_date",
+            sort_dir=sort_dir or "desc",
         )
+        pagination = PaginationParams(offset=offset, limit=limit)
 
-    # Sorting - whitelist allowed columns to prevent injection via getattr
-    ALLOWED_GL_SORTS = {
-        "posting_date", "account", "party", "debit", "credit",
-        "voucher_type", "voucher_no", "cost_center", "id",
-    }
-    sort_key = sort_by if sort_by in ALLOWED_GL_SORTS else "posting_date"
-    sort_column = getattr(GLEntry, sort_key, GLEntry.posting_date)
-    if sort_dir == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
+        result = service.list_gl_entries(filters, pagination)
 
-    total, entries = paginate(query, offset, limit)
-
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "data": [
-            {
-                "id": e.id,
-                "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-                "account": e.account,
-                "party_type": e.party_type,
-                "party": e.party,
-                "debit": float(e.debit),
-                "credit": float(e.credit),
-                "voucher_type": e.voucher_type,
-                "voucher_no": e.voucher_no,
-                "cost_center": e.cost_center,
-                "is_cancelled": e.is_cancelled,
-            }
-            for e in entries
-        ],
-    }
+        return {
+            "total": result.total,
+            "limit": limit,
+            "offset": offset,
+            "data": [
+                {
+                    "id": e.id,
+                    "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+                    "account": e.account,
+                    "party_type": e.party_type,
+                    "party": e.party,
+                    "debit": float(e.debit),
+                    "credit": float(e.credit),
+                    "voucher_type": e.voucher_type,
+                    "voucher_no": e.voucher_no,
+                    "cost_center": e.cost_center,
+                    "is_cancelled": e.is_cancelled,
+                }
+                for e in result.items
+            ],
+        }
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# GL ENTRY DETAIL
+# ============= GL ENTRY DETAIL =============
 
-@router.get("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:read"))])
+@router.get(
+    "/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:read"))]
+)
 def get_gl_entry_detail(
     entry_id: int,
+    service: LedgerService = Depends(get_ledger_service),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Get single GL entry detail.
+    """Get single GL entry detail."""
+    from app.models.accounting import Account
 
-    Args:
-        entry_id: GL entry ID
+    try:
+        entry = service.get_gl_entry(entry_id)
 
-    Returns:
-        GL entry with account details
-    """
-    entry = db.query(GLEntry).filter(GLEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="GL entry not found")
+        # Get account details
+        account = db.query(Account).filter(Account.erpnext_id == entry.account).first()
 
-    # Get account details
-    account = db.query(Account).filter(Account.erpnext_id == entry.account).first()
-
-    return {
-        "id": entry.id,
-        "erpnext_id": entry.erpnext_id,
-        "posting_date": entry.posting_date.isoformat() if entry.posting_date else None,
-        "account": entry.account,
-        "account_name": account.account_name if account else None,
-        "root_type": account.root_type.value if account and account.root_type else None,
-        "party_type": entry.party_type,
-        "party": entry.party,
-        "debit": float(entry.debit),
-        "credit": float(entry.credit),
-        "voucher_type": entry.voucher_type,
-        "voucher_no": entry.voucher_no,
-        "cost_center": entry.cost_center,
-        "fiscal_year": entry.fiscal_year,
-        "is_cancelled": entry.is_cancelled,
-        "company": entry.company,
-    }
+        return {
+            "id": entry.id,
+            "erpnext_id": entry.erpnext_id,
+            "posting_date": entry.posting_date.isoformat() if entry.posting_date else None,
+            "account": entry.account,
+            "account_name": account.account_name if account else None,
+            "root_type": account.root_type.value if account and account.root_type else None,
+            "party_type": entry.party_type,
+            "party": entry.party,
+            "debit": float(entry.debit),
+            "credit": float(entry.credit),
+            "voucher_type": entry.voucher_type,
+            "voucher_no": entry.voucher_no,
+            "cost_center": entry.cost_center,
+            "fiscal_year": entry.fiscal_year,
+            "is_cancelled": entry.is_cancelled,
+            "company": entry.company,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# GL ENTRY CRUD
+# ============= GL ENTRY CRUD =============
 
 @router.post("/gl-entries", dependencies=[Depends(Require("accounting:write"))])
 def create_gl_entry(
     payload: GLEntryCreateRequest,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Create a GL entry locally."""
-    entry = GLEntry(
+    data = GLEntryCreateData(
         posting_date=payload.posting_date,
         account=payload.account,
         party_type=payload.party_type,
         party=payload.party,
         debit=payload.debit or Decimal("0"),
         credit=payload.credit or Decimal("0"),
-        debit_in_account_currency=payload.debit_in_account_currency
-        if payload.debit_in_account_currency is not None
-        else payload.debit or Decimal("0"),
-        credit_in_account_currency=payload.credit_in_account_currency
-        if payload.credit_in_account_currency is not None
-        else payload.credit or Decimal("0"),
+        debit_in_account_currency=payload.debit_in_account_currency,
+        credit_in_account_currency=payload.credit_in_account_currency,
         voucher_type=payload.voucher_type,
         voucher_no=payload.voucher_no,
         cost_center=payload.cost_center,
@@ -736,85 +567,69 @@ def create_gl_entry(
         fiscal_year=payload.fiscal_year,
         is_cancelled=payload.is_cancelled,
     )
-    db.add(entry)
+    entry = service.create_gl_entry(data)
     db.commit()
     db.refresh(entry)
     return {"id": entry.id}
 
 
-@router.patch("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))])
+@router.patch(
+    "/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))]
+)
 def update_gl_entry(
     entry_id: int,
     payload: GLEntryUpdateRequest,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Update a GL entry locally."""
-    entry = db.query(GLEntry).filter(GLEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="GL entry not found")
+    try:
+        data = GLEntryUpdateData(
+            posting_date=payload.posting_date,
+            account=payload.account,
+            party_type=payload.party_type,
+            party=payload.party,
+            debit=payload.debit,
+            credit=payload.credit,
+            debit_in_account_currency=payload.debit_in_account_currency,
+            credit_in_account_currency=payload.credit_in_account_currency,
+            voucher_type=payload.voucher_type,
+            voucher_no=payload.voucher_no,
+            cost_center=payload.cost_center,
+            company=payload.company,
+            fiscal_year=payload.fiscal_year,
+            is_cancelled=payload.is_cancelled,
+        )
+        entry = service.update_gl_entry(entry_id, data)
+        db.commit()
+        db.refresh(entry)
+        return {"id": entry.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(entry, key, value)
 
-    db.commit()
-    db.refresh(entry)
-    return {"id": entry.id}
-
-
-@router.delete("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))])
+@router.delete(
+    "/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:write"))]
+)
 def delete_gl_entry(
     entry_id: int,
     db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
     """Delete a GL entry."""
-    entry = db.query(GLEntry).filter(GLEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="GL entry not found")
+    try:
+        service.delete_gl_entry(entry_id)
+        db.commit()
+        return {"status": "deleted", "gl_entry_id": entry_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    db.delete(entry)
-    db.commit()
-    return {"status": "deleted", "gl_entry_id": entry_id}
 
-
-# ACCOUNT TYPES
+# ============= ACCOUNT TYPES =============
 
 @router.get("/account-types", dependencies=[Depends(Require("accounting:read"))])
 def get_account_types(
-    db: Session = Depends(get_db),
+    service: LedgerService = Depends(get_ledger_service),
 ) -> Dict[str, Any]:
-    """Get summary of accounts grouped by account type.
-
-    Returns:
-        Account types with counts
-    """
-    # Query distinct account types with counts
-    type_counts = db.query(
-        Account.account_type,
-        Account.root_type,
-        func.count(Account.id).label("count"),
-    ).filter(
-        Account.disabled == False,
-    ).group_by(Account.account_type, Account.root_type).all()
-
-    by_type: Dict[str, Dict] = {}
-    for row in type_counts:
-        acc_type = row.account_type or "Unspecified"
-        if acc_type not in by_type:
-            by_type[acc_type] = {
-                "count": 0,
-                "root_types": [],
-            }
-        by_type[acc_type]["count"] += row.count
-        rt = row.root_type.value if row.root_type else "unknown"
-        if rt not in by_type[acc_type]["root_types"]:
-            by_type[acc_type]["root_types"].append(rt)
-
-    # Standard root types
-    root_types = [rt.value for rt in AccountType]
-
-    return {
-        "root_types": root_types,
-        "account_types": by_type,
-        "total_types": len(by_type),
-    }
+    """Get summary of accounts grouped by account type."""
+    return service.get_account_types_summary()

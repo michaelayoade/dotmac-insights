@@ -35,7 +35,7 @@ from app.models.project import (
 from app.models.task import Task, TaskStatus, TaskPriority
 
 # Models - Related
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.models.employee import Employee
 
 # Permission dependencies
@@ -151,12 +151,16 @@ def get_milestone_status_options():
 # =============================================================================
 
 def get_customer_options(db):
-    """Get customers for project assignment dropdown."""
-    customers = db.query(Customer).filter(
-        Customer.is_deleted == False
-    ).order_by(Customer.name).limit(100).all()
+    """Get customer accounts for project assignment dropdown."""
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
     return [
-        {"value": str(c.id), "label": c.name}
+        {"value": str(c.id), "label": c.party.name if c.party else f"Account {c.id}"}
         for c in customers
     ]
 

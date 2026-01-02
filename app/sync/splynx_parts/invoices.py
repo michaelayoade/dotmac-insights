@@ -4,7 +4,6 @@ import structlog
 import httpx
 
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
-from app.models.customer import Customer
 from app.models.party import CustomerAccount, PartyExternalId
 from app.sync.splynx_parts.utils import parse_date
 from app.config import settings
@@ -52,17 +51,15 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
         # Track latest update time for cursor (as datetime)
         latest_update: Optional[datetime] = None
 
-        # Pre-fetch customers for faster lookup
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).all()
-        }
         account_by_splynx_id = {
             pe.external_id: ca.id
             for pe, ca in (
                 sync_client.db.query(PartyExternalId, CustomerAccount)
                 .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
-                .filter(PartyExternalId.system == "splynx")
+                .filter(
+                    PartyExternalId.system == "splynx",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
                 .all()
             )
         }
@@ -92,7 +89,6 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
 
             # Find customer using pre-fetched map
             customer_splynx_id = inv_data.get("customer_id")
-            customer_id = customers_by_splynx_id.get(customer_splynx_id)
             customer_account_id = None
             if customer_splynx_id is not None:
                 customer_account_id = account_by_splynx_id.get(str(customer_splynx_id))
@@ -122,7 +118,6 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
             invoice_number = inv_data.get("number", inv_data.get("invoice_number", f"PRO-{splynx_id}"))
 
             if existing:
-                existing.customer_id = customer_id
                 existing.customer_account_id = customer_account_id
                 existing.invoice_number = invoice_number
                 existing.total_amount = total_amount
@@ -143,7 +138,6 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 invoice = Invoice(
                     splynx_id=splynx_id,
                     source=InvoiceSource.SPLYNX,
-                    customer_id=customer_id,
                     customer_account_id=customer_account_id,
                     invoice_number=invoice_number,
                     total_amount=total_amount,

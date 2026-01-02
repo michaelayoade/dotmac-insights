@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, false
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
+from app.services.accounting import ReportsService
+from app.services.accounting.reports_types import TrialBalanceParams, FinancialRatiosParams
 from app.models.accounting import (
     Account,
     AccountType,
@@ -78,6 +80,14 @@ from .validation import (
 )
 
 router = APIRouter()
+
+
+def get_reports_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> ReportsService:
+    """Dependency to get ReportsService instance."""
+    return ReportsService(db, principal)
 
 
 # COMPARATIVES AND CURRENCY HELPERS
@@ -182,90 +192,20 @@ def get_trial_balance(
     fiscal_year: Optional[str] = None,
     cost_center: Optional[str] = None,
     drill: bool = Query(False, description="Include account_id for drill-through to GL details"),
-    db: Session = Depends(get_db),
+    service: ReportsService = Depends(get_reports_service),
 ) -> Dict[str, Any]:
     """Get trial balance report.
 
     Shows debit and credit totals for each account. The trial balance
     should be balanced (total debits = total credits).
-
-    Args:
-        as_of_date: Report as of this date (default: today)
-        fiscal_year: Filter by fiscal year
-        cost_center: Filter by cost center
-        drill: If true, include account_id refs for drill-through to GL
-
-    Returns:
-        Trial balance with account details and totals
     """
-    end_date = parse_date(as_of_date, "as_of_date") or date.today()
-
-    # Get fiscal year start if specified
-    start_date = None
-    if fiscal_year:
-        start_date, _ = get_fiscal_year_dates(db, fiscal_year)
-
-    # Build GL query
-    query = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit).label("total_debit"),
-        func.sum(GLEntry.credit).label("total_credit"),
-    ).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date <= end_date,
+    params = TrialBalanceParams(
+        as_of_date=parse_date(as_of_date, "as_of_date"),
+        fiscal_year=fiscal_year,
+        cost_center=cost_center,
+        drill=drill,
     )
-
-    if start_date:
-        query = query.filter(GLEntry.posting_date >= start_date)
-
-    if cost_center:
-        query = query.filter(GLEntry.cost_center == cost_center)
-
-    query = query.group_by(GLEntry.account)
-    results = query.all()
-
-    # Get account details
-    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
-
-    trial_balance = []
-    total_debit = Decimal("0")
-    total_credit = Decimal("0")
-
-    for row in results:
-        acc = accounts.get(row.account)
-        debit = row.total_debit or Decimal("0")
-        credit = row.total_credit or Decimal("0")
-        balance = debit - credit
-
-        entry = {
-            "account": row.account,
-            "account_name": acc.account_name if acc else row.account,
-            "root_type": acc.root_type.value if acc and acc.root_type else None,
-            "debit": float(debit),
-            "credit": float(credit),
-            "balance": float(balance),
-            "balance_type": "Dr" if balance >= 0 else "Cr",
-        }
-        if drill and acc:
-            entry["account_id"] = acc.id
-            entry["drill_url"] = f"/api/accounting/accounts/{acc.id}/ledger"
-        trial_balance.append(entry)
-
-        total_debit += debit
-        total_credit += credit
-
-    # Sort by account name
-    trial_balance.sort(key=lambda x: x["account_name"])
-
-    return {
-        "as_of_date": end_date.isoformat(),
-        "fiscal_year": fiscal_year,
-        "total_debit": float(total_debit),
-        "total_credit": float(total_credit),
-        "is_balanced": abs(total_debit - total_credit) < Decimal("0.01"),
-        "difference": float(abs(total_debit - total_credit)),
-        "accounts": trial_balance,
-    }
+    return service.get_trial_balance(params)
 
 
 # BALANCE SHEET
@@ -1897,11 +1837,180 @@ def get_cash_flow(
 
 # FINANCIAL RATIOS (Comprehensive)
 
+def _ratio_status(value: float, good_min: float, good_max: float, warning_min: float, warning_max: float) -> str:
+    """Determine status of a ratio based on thresholds."""
+    if value is None:
+        return "info"
+    if good_min <= value <= good_max:
+        return "good"
+    if warning_min <= value <= warning_max:
+        return "warning"
+    return "critical"
+
+
+def _enrich_financial_ratios(raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add interpretations, status, and benchmarks to raw financial ratios."""
+    c = raw_data["components"]
+    liq = raw_data["liquidity"]
+    solv = raw_data["solvency"]
+    eff = raw_data["efficiency"]
+    prof = raw_data["profitability"]
+
+    # Calculate derived values for efficiency
+    ar_days = 365 / eff["ar_turnover"] if eff["ar_turnover"] else 0
+    ap_days = 365 / eff["ap_turnover"] if eff["ap_turnover"] else 0
+    inventory_days = 365 / eff["inventory_turnover"] if eff["inventory_turnover"] else 0
+    working_capital = c["current_assets"] - c["current_liabilities"]
+    shareholders_equity = c["total_equity"] + c["net_income"]
+
+    # Calculate period days
+    period_start = date.fromisoformat(raw_data["period_start"])
+    period_end = date.fromisoformat(raw_data["period_end"])
+    days_in_period = (period_end - period_start).days + 1
+
+    return {
+        "as_of_date": raw_data["as_of_date"],
+        "period": {
+            "start_date": raw_data["period_start"],
+            "end_date": raw_data["period_end"],
+            "days": days_in_period,
+        },
+        "liquidity_ratios": {
+            "current_ratio": {
+                "value": round(liq["current_ratio"] or 0, 2),
+                "interpretation": "Current Assets / Current Liabilities",
+                "status": _ratio_status(liq["current_ratio"] or 0, 1.5, 3.0, 1.0, 4.0),
+                "benchmark": "1.5 - 2.0 is healthy",
+            },
+            "quick_ratio": {
+                "value": round(liq["quick_ratio"] or 0, 2),
+                "interpretation": "(Current Assets - Inventory) / Current Liabilities",
+                "status": _ratio_status(liq["quick_ratio"] or 0, 1.0, 2.0, 0.5, 3.0),
+                "benchmark": "1.0+ is healthy",
+            },
+            "cash_ratio": {
+                "value": round(liq["cash_ratio"] or 0, 2),
+                "interpretation": "Cash / Current Liabilities",
+                "status": _ratio_status(liq["cash_ratio"] or 0, 0.2, 1.0, 0.1, 2.0),
+                "benchmark": "0.2 - 0.5 is typical",
+            },
+            "working_capital": {
+                "value": round(working_capital, 2),
+                "interpretation": "Current Assets - Current Liabilities",
+                "status": "good" if working_capital > 0 else "critical",
+            },
+        },
+        "solvency_ratios": {
+            "debt_to_equity": {
+                "value": round(solv["debt_to_equity"] or 0, 2),
+                "interpretation": "Total Liabilities / Shareholders' Equity",
+                "status": _ratio_status(solv["debt_to_equity"] or 0, 0.0, 1.5, 0.0, 2.5),
+                "benchmark": "< 1.5 is conservative",
+            },
+            "debt_to_assets": {
+                "value": round(solv["debt_to_assets"] or 0, 2),
+                "interpretation": "Total Liabilities / Total Assets",
+                "status": _ratio_status(solv["debt_to_assets"] or 0, 0.0, 0.5, 0.0, 0.7),
+                "benchmark": "< 0.5 is conservative",
+            },
+            "equity_ratio": {
+                "value": round(1 - (solv["debt_to_assets"] or 0), 2),
+                "interpretation": "Shareholders' Equity / Total Assets",
+                "status": _ratio_status(1 - (solv["debt_to_assets"] or 0), 0.4, 1.0, 0.2, 1.0),
+                "benchmark": "> 0.5 is strong",
+            },
+        },
+        "efficiency_ratios": {
+            "receivables_turnover": {
+                "value": round(eff["ar_turnover"] or 0, 2),
+                "days": round(ar_days, 0),
+                "interpretation": "Revenue / Accounts Receivable",
+                "status": _ratio_status(ar_days, 0, 45, 0, 90),
+                "benchmark": "30-45 days is typical",
+            },
+            "payables_turnover": {
+                "value": round(eff["ap_turnover"] or 0, 2),
+                "days": round(ap_days, 0),
+                "interpretation": "COGS / Accounts Payable",
+                "status": "info",
+                "benchmark": "30-60 days is typical",
+            },
+            "inventory_turnover": {
+                "value": round(eff["inventory_turnover"] or 0, 2),
+                "days": round(inventory_days, 0),
+                "interpretation": "COGS / Average Inventory",
+                "status": _ratio_status(eff["inventory_turnover"] or 0, 4, 20, 2, 30),
+                "benchmark": "4-6x per year is typical",
+            },
+            "asset_turnover": {
+                "value": round(eff["asset_turnover"] or 0, 2),
+                "interpretation": "Revenue / Total Assets",
+                "status": _ratio_status(eff["asset_turnover"] or 0, 0.5, 3.0, 0.2, 5.0),
+                "benchmark": "Varies by industry",
+            },
+            "cash_conversion_cycle": {
+                "value": round(ar_days + inventory_days - ap_days, 0),
+                "interpretation": "AR Days + Inventory Days - AP Days",
+                "status": "info",
+                "benchmark": "Lower is better",
+            },
+        },
+        "profitability_ratios": {
+            "gross_margin": {
+                "value": round(prof["gross_margin"] or 0, 2),
+                "interpretation": "Gross Profit / Revenue × 100",
+                "status": _ratio_status(prof["gross_margin"] or 0, 20, 80, 10, 90),
+                "benchmark": "Varies by industry",
+            },
+            "operating_margin": {
+                "value": round(prof["operating_margin"] or 0, 2),
+                "interpretation": "Operating Income / Revenue × 100",
+                "status": _ratio_status(prof["operating_margin"] or 0, 10, 40, 5, 50),
+                "benchmark": "10-20% is healthy",
+            },
+            "net_margin": {
+                "value": round(prof["net_margin"] or 0, 2),
+                "interpretation": "Net Income / Revenue × 100",
+                "status": _ratio_status(prof["net_margin"] or 0, 5, 30, 0, 50),
+                "benchmark": "5-15% is typical",
+            },
+            "return_on_assets": {
+                "value": round(prof["return_on_assets"] or 0, 2),
+                "interpretation": "Net Income / Total Assets × 100",
+                "status": _ratio_status(prof["return_on_assets"] or 0, 5, 20, 0, 30),
+                "benchmark": "5-10% is good",
+            },
+            "return_on_equity": {
+                "value": round(prof["return_on_equity"] or 0, 2),
+                "interpretation": "Net Income / Shareholders' Equity × 100",
+                "status": _ratio_status(prof["return_on_equity"] or 0, 10, 30, 5, 50),
+                "benchmark": "15-20% is excellent",
+            },
+        },
+        "components": {
+            "current_assets": round(c["current_assets"], 2),
+            "current_liabilities": round(c["current_liabilities"], 2),
+            "total_assets": round(c["total_assets"], 2),
+            "total_liabilities": round(c["total_liabilities"], 2),
+            "shareholders_equity": round(shareholders_equity, 2),
+            "revenue": round(c["revenue"], 2),
+            "cogs": round(c["cogs"], 2),
+            "gross_profit": round(c["gross_profit"], 2),
+            "operating_income": round(c["operating_income"], 2),
+            "net_income": round(c["net_income"], 2),
+            "cash": round(c["cash"], 2),
+            "receivables": round(c["ar"], 2),
+            "inventory": round(c["inventory"], 2),
+            "payables": round(c["ap"], 2),
+        },
+    }
+
+
 @router.get("/financial-ratios", dependencies=[Depends(Require("accounting:read"))])
 def get_financial_ratios(
     as_of_date: Optional[str] = None,
     fiscal_year: Optional[str] = None,
-    db: Session = Depends(get_db),
+    service: ReportsService = Depends(get_reports_service),
 ) -> Dict[str, Any]:
     """Get comprehensive financial ratios.
 
@@ -1910,354 +2019,13 @@ def get_financial_ratios(
     - Solvency: Debt-to-Equity, Debt-to-Assets, Interest Coverage
     - Efficiency: AR Turnover, AP Turnover, Inventory Turnover, Asset Turnover
     - Profitability: ROA, ROE, Gross Margin, Operating Margin, Net Margin
-
-    Args:
-        as_of_date: Calculate ratios as of this date (default: today)
-        fiscal_year: Fiscal year for period-based ratios
-
-    Returns:
-        Comprehensive financial ratios with interpretations
     """
-    end_date = parse_date(as_of_date, "as_of_date") or date.today()
-
-    # Get fiscal year dates for P&L ratios
-    if fiscal_year:
-        period_start, period_end = get_fiscal_year_dates(db, fiscal_year)
-    else:
-        period_start = date(end_date.year, 1, 1)
-        period_end = end_date
-
-    # Get all accounts
-    accounts: Dict[str, Account] = get_accounts_by_erpnext_id(db)
-
-    # Get cumulative balances for balance sheet items
-    balances = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit - GLEntry.credit).label("balance"),
-    ).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date <= end_date,
-    ).group_by(GLEntry.account).all()
-
-    balance_map = {r.account: float(r.balance or 0) for r in balances if r.account}
-
-    # Get period data for P&L items
-    period_data = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit).label("debit"),
-        func.sum(GLEntry.credit).label("credit"),
-    ).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date >= period_start,
-        GLEntry.posting_date <= period_end,
-    ).group_by(GLEntry.account).all()
-
-    period_map = {
-        r.account: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)}
-        for r in period_data
-        if r.account
-    }
-
-    # === BALANCE SHEET COMPONENTS ===
-
-    # Current Assets
-    current_asset_types = {"Bank", "Cash", "Receivable", "Stock", "Current Asset"}
-    current_assets = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type in current_asset_types or
-        (get_effective_root_type(acc) == AccountType.ASSET and acc.account_type not in {"Fixed Asset", "Capital Work in Progress"})
+    params = FinancialRatiosParams(
+        as_of_date=parse_date(as_of_date, "as_of_date"),
+        fiscal_year=fiscal_year,
     )
-
-    # Cash and Cash Equivalents
-    cash_types = {"Bank", "Cash"}
-    cash = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type in cash_types
-    )
-
-    # Accounts Receivable
-    ar = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type == "Receivable"
-    )
-
-    # Inventory
-    inventory = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type == "Stock"
-    )
-
-    # Total Assets
-    total_assets = sum(
-        balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.ASSET
-    )
-
-    # Fixed Assets
-    fixed_assets = total_assets - current_assets
-
-    # Current Liabilities
-    current_liability_types = {"Payable", "Current Liability"}
-    current_liabilities = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type in current_liability_types
-    )
-
-    # Accounts Payable
-    ap = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if acc.account_type == "Payable"
-    )
-
-    # Total Liabilities
-    total_liabilities = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.LIABILITY
-    )
-
-    # Total Equity
-    total_equity = sum(
-        -balance_map.get(acc_id, 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EQUITY
-    )
-
-    # Add retained earnings to equity
-    income_total = sum(
-        period_map.get(acc_id, {}).get("credit", 0) - period_map.get(acc_id, {}).get("debit", 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.INCOME
-    )
-    expense_total = sum(
-        period_map.get(acc_id, {}).get("debit", 0) - period_map.get(acc_id, {}).get("credit", 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EXPENSE
-    )
-    retained_earnings = income_total - expense_total
-    shareholders_equity = total_equity + retained_earnings
-
-    # === INCOME STATEMENT COMPONENTS ===
-
-    # Revenue
-    revenue = income_total
-
-    # COGS
-    cogs = sum(
-        period_map.get(acc_id, {}).get("debit", 0) - period_map.get(acc_id, {}).get("credit", 0)
-        for acc_id, acc in accounts.items()
-        if get_effective_root_type(acc) == AccountType.EXPENSE and is_cogs_account(acc)
-    )
-
-    # Operating Expenses
-    opex = expense_total - cogs
-
-    # Gross Profit
-    gross_profit = revenue - cogs
-
-    # Operating Income
-    operating_income = gross_profit - opex
-
-    # Net Income
-    net_income = revenue - expense_total
-
-    # === CALCULATE RATIOS ===
-
-    def safe_divide(numerator: float, denominator: float, default: float = 0) -> float:
-        """Safely divide two numbers, returning default if denominator is zero."""
-        if denominator == 0:
-            return default
-        return numerator / denominator
-
-    def ratio_status(value: float, good_min: float, good_max: float, warning_min: float, warning_max: float) -> str:
-        """Determine status of a ratio based on thresholds."""
-        if good_min <= value <= good_max:
-            return "good"
-        if warning_min <= value <= warning_max:
-            return "warning"
-        return "critical"
-
-    # Days in period for turnover calculations
-    days_in_period = (period_end - period_start).days + 1
-
-    # LIQUIDITY RATIOS
-    current_ratio = safe_divide(current_assets, current_liabilities)
-    quick_ratio = safe_divide(current_assets - inventory, current_liabilities)
-    cash_ratio = safe_divide(cash, current_liabilities)
-    working_capital = current_assets - current_liabilities
-
-    liquidity = {
-        "current_ratio": {
-            "value": round(current_ratio, 2),
-            "interpretation": "Current Assets / Current Liabilities",
-            "status": ratio_status(current_ratio, 1.5, 3.0, 1.0, 4.0),
-            "benchmark": "1.5 - 2.0 is healthy",
-        },
-        "quick_ratio": {
-            "value": round(quick_ratio, 2),
-            "interpretation": "(Current Assets - Inventory) / Current Liabilities",
-            "status": ratio_status(quick_ratio, 1.0, 2.0, 0.5, 3.0),
-            "benchmark": "1.0+ is healthy",
-        },
-        "cash_ratio": {
-            "value": round(cash_ratio, 2),
-            "interpretation": "Cash / Current Liabilities",
-            "status": ratio_status(cash_ratio, 0.2, 1.0, 0.1, 2.0),
-            "benchmark": "0.2 - 0.5 is typical",
-        },
-        "working_capital": {
-            "value": round(working_capital, 2),
-            "interpretation": "Current Assets - Current Liabilities",
-            "status": "good" if working_capital > 0 else "critical",
-        },
-    }
-
-    # SOLVENCY RATIOS
-    debt_to_equity = safe_divide(total_liabilities, shareholders_equity)
-    debt_to_assets = safe_divide(total_liabilities, total_assets)
-    equity_ratio = safe_divide(shareholders_equity, total_assets)
-
-    solvency = {
-        "debt_to_equity": {
-            "value": round(debt_to_equity, 2),
-            "interpretation": "Total Liabilities / Shareholders' Equity",
-            "status": ratio_status(debt_to_equity, 0.0, 1.5, 0.0, 2.5),
-            "benchmark": "< 1.5 is conservative",
-        },
-        "debt_to_assets": {
-            "value": round(debt_to_assets, 2),
-            "interpretation": "Total Liabilities / Total Assets",
-            "status": ratio_status(debt_to_assets, 0.0, 0.5, 0.0, 0.7),
-            "benchmark": "< 0.5 is conservative",
-        },
-        "equity_ratio": {
-            "value": round(equity_ratio, 2),
-            "interpretation": "Shareholders' Equity / Total Assets",
-            "status": ratio_status(equity_ratio, 0.4, 1.0, 0.2, 1.0),
-            "benchmark": "> 0.5 is strong",
-        },
-    }
-
-    # EFFICIENCY RATIOS
-    ar_turnover = safe_divide(revenue, ar) if ar > 0 else 0
-    ar_days = safe_divide(365, ar_turnover) if ar_turnover > 0 else 0
-    ap_turnover = safe_divide(cogs, ap) if ap > 0 else 0
-    ap_days = safe_divide(365, ap_turnover) if ap_turnover > 0 else 0
-    inventory_turnover = safe_divide(cogs, inventory) if inventory > 0 else 0
-    inventory_days = safe_divide(365, inventory_turnover) if inventory_turnover > 0 else 0
-    asset_turnover = safe_divide(revenue, total_assets)
-
-    efficiency = {
-        "receivables_turnover": {
-            "value": round(ar_turnover, 2),
-            "days": round(ar_days, 0),
-            "interpretation": "Revenue / Accounts Receivable",
-            "status": ratio_status(ar_days, 0, 45, 0, 90),
-            "benchmark": "30-45 days is typical",
-        },
-        "payables_turnover": {
-            "value": round(ap_turnover, 2),
-            "days": round(ap_days, 0),
-            "interpretation": "COGS / Accounts Payable",
-            "status": "info",
-            "benchmark": "30-60 days is typical",
-        },
-        "inventory_turnover": {
-            "value": round(inventory_turnover, 2),
-            "days": round(inventory_days, 0),
-            "interpretation": "COGS / Average Inventory",
-            "status": ratio_status(inventory_turnover, 4, 20, 2, 30),
-            "benchmark": "4-6x per year is typical",
-        },
-        "asset_turnover": {
-            "value": round(asset_turnover, 2),
-            "interpretation": "Revenue / Total Assets",
-            "status": ratio_status(asset_turnover, 0.5, 3.0, 0.2, 5.0),
-            "benchmark": "Varies by industry",
-        },
-        "cash_conversion_cycle": {
-            "value": round(ar_days + inventory_days - ap_days, 0),
-            "interpretation": "AR Days + Inventory Days - AP Days",
-            "status": "info",
-            "benchmark": "Lower is better",
-        },
-    }
-
-    # PROFITABILITY RATIOS
-    gross_margin = safe_divide(gross_profit, revenue) * 100
-    operating_margin = safe_divide(operating_income, revenue) * 100
-    net_margin = safe_divide(net_income, revenue) * 100
-    roa = safe_divide(net_income, total_assets) * 100
-    roe = safe_divide(net_income, shareholders_equity) * 100
-
-    profitability = {
-        "gross_margin": {
-            "value": round(gross_margin, 2),
-            "interpretation": "Gross Profit / Revenue × 100",
-            "status": ratio_status(gross_margin, 20, 80, 10, 90),
-            "benchmark": "Varies by industry",
-        },
-        "operating_margin": {
-            "value": round(operating_margin, 2),
-            "interpretation": "Operating Income / Revenue × 100",
-            "status": ratio_status(operating_margin, 10, 40, 5, 50),
-            "benchmark": "10-20% is healthy",
-        },
-        "net_margin": {
-            "value": round(net_margin, 2),
-            "interpretation": "Net Income / Revenue × 100",
-            "status": ratio_status(net_margin, 5, 30, 0, 50),
-            "benchmark": "5-15% is typical",
-        },
-        "return_on_assets": {
-            "value": round(roa, 2),
-            "interpretation": "Net Income / Total Assets × 100",
-            "status": ratio_status(roa, 5, 20, 0, 30),
-            "benchmark": "5-10% is good",
-        },
-        "return_on_equity": {
-            "value": round(roe, 2),
-            "interpretation": "Net Income / Shareholders' Equity × 100",
-            "status": ratio_status(roe, 10, 30, 5, 50),
-            "benchmark": "15-20% is excellent",
-        },
-    }
-
-    return {
-        "as_of_date": end_date.isoformat(),
-        "period": {
-            "start_date": period_start.isoformat(),
-            "end_date": period_end.isoformat(),
-            "days": days_in_period,
-        },
-        "liquidity_ratios": liquidity,
-        "solvency_ratios": solvency,
-        "efficiency_ratios": efficiency,
-        "profitability_ratios": profitability,
-        "components": {
-            "current_assets": round(current_assets, 2),
-            "current_liabilities": round(current_liabilities, 2),
-            "total_assets": round(total_assets, 2),
-            "total_liabilities": round(total_liabilities, 2),
-            "shareholders_equity": round(shareholders_equity, 2),
-            "revenue": round(revenue, 2),
-            "cogs": round(cogs, 2),
-            "gross_profit": round(gross_profit, 2),
-            "operating_income": round(operating_income, 2),
-            "net_income": round(net_income, 2),
-            "cash": round(cash, 2),
-            "receivables": round(ar, 2),
-            "inventory": round(inventory, 2),
-            "payables": round(ap, 2),
-        },
-    }
+    raw_data = service.get_financial_ratios(params)
+    return _enrich_financial_ratios(raw_data)
 
 
 # STATEMENT OF CHANGES IN EQUITY (IAS 1)

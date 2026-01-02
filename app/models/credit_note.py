@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, Index
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Numeric, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
@@ -9,10 +9,9 @@ import enum
 from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
-    from app.models.contact import Contact
     from app.models.invoice import Invoice
     from app.models.document_lines import CreditNoteLine
+    from app.models.party import CustomerAccount
 
 
 class CreditNoteStatus(enum.Enum):
@@ -33,9 +32,13 @@ class CreditNote(SoftDeleteMixin, Base):
     splynx_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
-    # Links (legacy customer_id - use contact_id)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), index=True, nullable=True)
-    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id"), index=True, nullable=True)
+    # Customer account link (party-based identity)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="CASCADE"), index=True, nullable=True)
 
     # Details
@@ -82,8 +85,7 @@ class CreditNote(SoftDeleteMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="credit_notes")
-    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="credit_notes")
     lines: Mapped[List["CreditNoteLine"]] = relationship(
         back_populates="credit_note",

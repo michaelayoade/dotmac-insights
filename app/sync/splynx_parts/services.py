@@ -3,7 +3,7 @@ import structlog
 import httpx
 
 from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionType
-from app.models.customer import Customer
+from app.models.party import PartyExternalId
 from app.models.tariff import Tariff
 from app.models.router import Router
 
@@ -29,9 +29,14 @@ async def sync_services(sync_client, client: httpx.AsyncClient, full_sync: bool)
             r.splynx_id: r.id
             for r in sync_client.db.query(Router).filter(Router.splynx_id.isnot(None)).all()
         }
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
+        parties_by_splynx_id = {
+            mapping.external_id: mapping.party_id
+            for mapping in sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "customer_id",
+            )
+            .all()
         }
 
         # Fetch all services using bulk endpoint (customer_id=0 means all)
@@ -47,8 +52,8 @@ async def sync_services(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 splynx_customer_id = svc_data.get("customer_id")
 
                 # Skip if customer not in our database
-                customer_id = customers_by_splynx_id.get(splynx_customer_id)
-                if not customer_id:
+                party_id = parties_by_splynx_id.get(str(splynx_customer_id)) if splynx_customer_id else None
+                if not party_id:
                     continue
 
                 existing = sync_client.db.query(Subscription).filter(
@@ -84,7 +89,7 @@ async def sync_services(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 geo_address = geo.get("address") if isinstance(geo, dict) else None
 
                 if existing:
-                    existing.customer_id = customer_id
+                    existing.party_id = party_id
                     existing.plan_name = plan_name
                     existing.description = svc_data.get("description")
                     existing.price = price
@@ -116,7 +121,7 @@ async def sync_services(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 else:
                     subscription = Subscription(
                         splynx_id=splynx_id,
-                        customer_id=customer_id,
+                        party_id=party_id,
                         plan_name=plan_name,
                         description=svc_data.get("description"),
                         price=price,

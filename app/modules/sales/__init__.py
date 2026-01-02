@@ -20,6 +20,7 @@ from sqlalchemy import func
 from app.web.dependencies import SessionUser, CSRFToken, DB
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
+from app.web.module_types import ModuleConfig
 
 # Import models for dashboard stats
 from app.models.sales import Quotation, QuotationStatus, SalesOrder, SalesOrderStatus
@@ -27,6 +28,52 @@ from app.models.invoice import Invoice, InvoiceStatus
 from app.models.subscription import Subscription, SubscriptionStatus
 
 from .routes import router as sales_routes_router
+
+# =============================================================================
+# Module Configuration (for auto-discovery)
+# =============================================================================
+
+MODULE_CONFIG = ModuleConfig(
+    id="sales",
+    name="Sales",
+    description="Manage quotations, orders, invoices, and subscriptions",
+    icon="shopping-cart",
+    prefix="/sales",
+    group="Back Office",
+    order=10,
+    scopes=["sales:read"],
+    prefixes=["/sales", "/invoices", "/subscriptions"],  # All related prefixes
+)
+
+NAVIGATION = [
+    {
+        "section": "Sales",
+        "href": "/sales",
+        "icon": "shopping-cart",
+        "scope": "sales:read",
+        "order": 10,
+        "links": [
+            {"label": "Dashboard", "href": "/sales", "icon": "home"},
+            {"label": "Quotations", "href": "/sales/quotations", "icon": "file-text"},
+            {"label": "Orders", "href": "/sales/orders", "icon": "shopping-bag"},
+        ],
+    },
+    {
+        "section": "Billing",
+        "href": "/invoices",
+        "icon": "credit-card",
+        "scope": "sales:read",
+        "order": 20,
+        "links": [
+            {"label": "Invoices", "href": "/invoices", "icon": "credit-card"},
+            {"label": "Subscriptions", "href": "/subscriptions", "icon": "repeat"},
+        ],
+    },
+]
+
+# =============================================================================
+# Router
+# =============================================================================
 
 templates = get_template_env()
 

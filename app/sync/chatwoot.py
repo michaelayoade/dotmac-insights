@@ -10,8 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
 from app.sync.base import BaseSyncClient, CircuitBreakerOpenError
 from app.models.sync_log import SyncSource
-from app.models.customer import Customer
-from app.models.party import Party, PartyExternalId, PartyRole, PartyType
+from app.models.party import Party, PartyExternalId, PartyRole, PartyType, CustomerAccount
 from app.models.conversation import Conversation, Message, ConversationStatus
 from app.models.employee import Employee
 
@@ -329,7 +328,6 @@ class ChatwootSync(BaseSyncClient):
                 phone = contact_data.get("phone_number")
                 _name = contact_data.get("name", "")  # Available for future use
 
-                customer = None
                 party = None
 
                 if chatwoot_id is not None:
@@ -338,20 +336,18 @@ class ChatwootSync(BaseSyncClient):
                         party = self.db.query(Party).get(party_id)
 
                 # Match by email first
-                if email:
-                    customer = self.db.query(Customer).filter(
-                        Customer.email == email
-                    ).first()
-                    if not party:
-                        party = party_by_email.get(email.strip().lower())
+                if email and not party:
+                    party = party_by_email.get(email.strip().lower())
 
                 # Then try by phone
-                if not customer and phone:
+                if not party and phone:
                     # Normalize phone number (remove spaces, dashes)
                     normalized_phone = phone.replace(" ", "").replace("-", "")
-                    customer = self.db.query(Customer).filter(
-                        Customer.phone.ilike(f"%{normalized_phone[-10:]}%")
-                    ).first()
+                    party = (
+                        self.db.query(Party)
+                        .filter(Party.primary_phone.ilike(f"%{normalized_phone[-10:]}%"))
+                        .first()
+                    )
 
                 if not party:
                     party = Party(
@@ -411,14 +407,14 @@ class ChatwootSync(BaseSyncClient):
                     .filter(PartyRole.party_id == party.id, PartyRole.role == "customer", PartyRole.until.is_(None))
                     .first()
                 )
-                if not has_contact_role and customer:
-                    self.db.add(PartyRole(party_id=party.id, role="customer"))
-
-                if customer:
-                    customer.chatwoot_contact_id = chatwoot_id
-                    customer.last_synced_at = datetime.now(timezone.utc)
-                    self.increment_updated()
-                    logger.debug("chatwoot_contact_linked", customer_id=customer.id, chatwoot_id=chatwoot_id)
+                if not has_contact_role:
+                    has_account = (
+                        self.db.query(CustomerAccount)
+                        .filter(CustomerAccount.party_id == party.id)
+                        .first()
+                    )
+                    if has_account:
+                        self.db.add(PartyRole(party_id=party.id, role="customer"))
 
             self.db.commit()
             self.complete_sync()
@@ -473,13 +469,8 @@ class ChatwootSync(BaseSyncClient):
                     Conversation.chatwoot_id == chatwoot_id
                 ).first()
 
-                # Find customer by contact_id (legacy) and customer account via party map
+                # Find party by contact_id and customer account via party map
                 contact_id = conv_data.get("meta", {}).get("sender", {}).get("id")
-                customer = None
-                if contact_id:
-                    customer = self.db.query(Customer).filter(
-                        Customer.chatwoot_contact_id == contact_id
-                    ).first()
                 customer_account_id = None
                 if contact_id:
                     party_ext = (
@@ -573,7 +564,6 @@ class ChatwootSync(BaseSyncClient):
                 labels_str = ",".join(labels) if labels else None
 
                 if existing:
-                    existing.customer_id = customer.id if customer else None
                     existing.customer_account_id = customer_account_id
                     existing.chatwoot_contact_id = contact_id
                     existing.status = status
@@ -603,7 +593,6 @@ class ChatwootSync(BaseSyncClient):
                 else:
                     conversation = Conversation(
                         chatwoot_id=chatwoot_id,
-                        customer_id=customer.id if customer else None,
                         customer_account_id=customer_account_id,
                         chatwoot_contact_id=contact_id,
                         status=status,

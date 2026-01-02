@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import BigInteger, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -52,8 +52,9 @@ class Lead(Base):
     condition = Column(String(50), nullable=True)  # lead condition
     billing_type = Column(String(50), nullable=True)
 
-    # Conversion tracking
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
+    # Identity + conversion tracking
+    party_id = Column(BigInteger, ForeignKey("parties.id"), nullable=True, index=True)
+    customer_account_id = Column(BigInteger, ForeignKey("customer_accounts.id"), nullable=True, index=True)
     conversion_date = Column(DateTime, nullable=True)
 
     # Dates
@@ -67,7 +68,8 @@ class Lead(Base):
     last_synced_at = Column(DateTime, nullable=True)
 
     # Relationships
-    customer = relationship("Customer", backref="lead_records")
+    party = relationship("Party", backref="lead_records")
+    customer_account = relationship("CustomerAccount", backref="lead_records")
 
     def __repr__(self):
         return f"<Lead {self.name} ({self.status})>"

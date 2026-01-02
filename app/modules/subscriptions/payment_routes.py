@@ -31,7 +31,7 @@ from app.models.payment_subscription import (
     PaymentSubscriptionInterval,
 )
 from app.models.gateway_transaction import GatewayProvider, GatewayTransaction
-from app.models.customer import Customer
+from app.models.party import CustomerAccount
 from app.models.subscription import Subscription
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 
@@ -118,7 +118,7 @@ async def payment_subscriptions_list(
     q: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query(None, description="Filter by status"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    customer_id: Optional[int] = Query(None, description="Filter by customer"),
+    party_id: Optional[int] = Query(None, description="Filter by party"),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("created_at", description="Sort field"),
@@ -126,7 +126,7 @@ async def payment_subscriptions_list(
 ):
     """Payment subscriptions list page."""
     query = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.customer),
+        joinedload(PaymentSubscription.party),
     )
 
     # Search
@@ -153,8 +153,8 @@ async def payment_subscriptions_list(
         except ValueError:
             pass
 
-    if customer_id:
-        query = query.filter(PaymentSubscription.customer_id == customer_id)
+    if party_id:
+        query = query.filter(PaymentSubscription.party_id == party_id)
 
     # Count total
     total = query.count()
@@ -186,7 +186,7 @@ async def payment_subscriptions_list(
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_provider"] = provider
-    context["current_customer_id"] = customer_id
+    context["current_party_id"] = party_id
     context["status_options"] = get_status_options()
     context["provider_options"] = get_provider_options()
     context["sort_key"] = sort
@@ -221,7 +221,7 @@ async def payment_subscriptions_table(
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     provider: Optional[str] = Query(None),
-    customer_id: Optional[int] = Query(None),
+    party_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("created_at"),
@@ -230,7 +230,7 @@ async def payment_subscriptions_table(
     """Payment subscriptions table partial for HTMX updates."""
     return await payment_subscriptions_list(
         request, response, user, csrf_token, db,
-        q, status, provider, customer_id, page, per_page, sort, dir
+        q, status, provider, party_id, page, per_page, sort, dir
     )
 
 
@@ -249,7 +249,7 @@ async def payment_subscription_detail(
 ):
     """Payment subscription detail page with transaction history."""
     subscription = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.customer),
+        joinedload(PaymentSubscription.party),
     ).filter(PaymentSubscription.id == subscription_id).first()
 
     if not subscription:
@@ -263,10 +263,21 @@ async def payment_subscription_detail(
         ).first()
 
     # Get recent transactions for this payment subscription
-    transactions = db.query(GatewayTransaction).filter(
-        GatewayTransaction.customer_id == subscription.customer_id,
+    customer_account = db.query(CustomerAccount).filter(
+        CustomerAccount.party_id == subscription.party_id
+    ).first()
+    transactions_query = db.query(GatewayTransaction).filter(
         GatewayTransaction.provider == subscription.provider,
-    ).order_by(GatewayTransaction.created_at.desc()).limit(20).all()
+    )
+    if customer_account:
+        transactions_query = transactions_query.filter(
+            GatewayTransaction.customer_account_id == customer_account.id
+        )
+    transactions = (
+        transactions_query.order_by(GatewayTransaction.created_at.desc())
+        .limit(20)
+        .all()
+    )
 
     # Available actions based on status
     actions = get_available_actions(subscription.status)
@@ -328,7 +339,7 @@ async def payment_subscription_action_modal(
 ):
     """Action confirmation modal."""
     subscription = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.customer),
+        joinedload(PaymentSubscription.party),
     ).filter(PaymentSubscription.id == subscription_id).first()
 
     if not subscription:
@@ -509,7 +520,7 @@ async def payment_subscription_link_modal(
 
     # Get service subscriptions for the same customer
     service_subscriptions = db.query(Subscription).filter(
-        Subscription.customer_id == subscription.customer_id,
+        Subscription.party_id == subscription.party_id,
     ).order_by(Subscription.plan_name).all()
 
     context = get_base_context(request, response, user, csrf_token)
@@ -544,7 +555,7 @@ async def payment_subscription_link(
         # Verify the service subscription belongs to the same customer
         service_sub = db.query(Subscription).filter(
             Subscription.id == int(service_subscription_id),
-            Subscription.customer_id == subscription.customer_id,
+            Subscription.party_id == subscription.party_id,
         ).first()
 
         if not service_sub:

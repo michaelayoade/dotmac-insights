@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
-    String, ForeignKey, Numeric, Index, JSON,
+    BigInteger, String, ForeignKey, Numeric, Index, JSON,
     Enum as SAEnum, UniqueConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,7 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import Party
     from app.models.accounting import BankAccount
 
 
@@ -71,8 +71,8 @@ class OpenBankingConnection(Base):
     currency: Mapped[str] = mapped_column(String(3), default="NGN")
 
     # Customer/Company link
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id"), nullable=True, index=True
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("parties.id"), nullable=True, index=True
     )
     company: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, index=True
@@ -140,9 +140,12 @@ class OpenBankingConnection(Base):
             "provider", "account_id",
             name="uq_open_banking_provider_account"
         ),
-        Index("ix_open_banking_customer", "customer_id", "status"),
+        Index("ix_open_banking_party", "party_id", "status"),
         Index("ix_open_banking_company", "company", "status"),
     )
+
+    party: Mapped[Optional["Party"]] = relationship()
+    bank_account: Mapped[Optional["BankAccount"]] = relationship()
 
     def __repr__(self) -> str:
         return f"<OpenBankingConnection {self.provider.value} {self.account_number}>"

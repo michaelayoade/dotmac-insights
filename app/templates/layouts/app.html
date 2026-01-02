@@ -7,8 +7,12 @@
 </a>
 
 {% set ns = namespace(default_collapsed={}) %}
+{% set visible = namespace(count=0) %}
 {% for section in navigation %}
+{% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
 {% set _ = ns.default_collapsed.update({section.section: True}) %}
+{% set visible.count = visible.count + 1 %}
+{% endif %}
 {% endfor %}
 <div
     class="min-h-full"
@@ -114,6 +118,31 @@
             </a>
         </div>
 
+        {% if module_registry %}
+        <div class="px-6 py-4 border-b border-white/5">
+            <label class="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                Module
+            </label>
+            <div class="mt-2">
+                <select
+                    class="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition"
+                    onchange="if (this.value) window.location = this.value;"
+                    aria-label="Module switcher"
+                    data-testid="module-switcher"
+                >
+                    {% for module in module_registry %}
+                    <option
+                        value="{{ module.href }}"
+                        {% if active_module_id == module.id %}selected{% endif %}
+                    >
+                        {{ module.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Navigation -->
         <nav class="flex-1 overflow-y-auto scrollbar-thin py-6 px-4" aria-label="Main navigation" data-testid="sidebar-nav">
             <div class="px-2 mb-5">
@@ -148,6 +177,7 @@
                 </h3>
                 <ul class="space-y-1">
                     {% for section in navigation %}
+                    {% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
                     {% for item in section.links %}
                     <li x-show="isFavorite({{ item.href | tojson | forceescape }}) && matchesFilter({{ item.label | tojson | forceescape }})" data-nav-item>
                         <div class="flex items-center gap-2">
@@ -184,11 +214,13 @@
                         </div>
                     </li>
                     {% endfor %}
+                    {% endif %}
                     {% endfor %}
                 </ul>
             </div>
 
             {% for section in navigation %}
+            {% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
             <div class="mb-8">
                 <div class="flex items-center justify-between px-3 mb-3">
                     {% if section.href %}
@@ -257,9 +289,10 @@
                     {% endfor %}
                 </ul>
             </div>
+            {% endif %}
             {% endfor %}
 
-            {% if navigation | length <= 1 %}
+            {% if visible.count <= 1 %}
             <!-- Limited access notice -->
             <div class="mt-4 mx-2 p-4 rounded-xl bg-white/5 border border-white/10" data-testid="limited-access-notice">
                 <div class="flex items-start gap-3">

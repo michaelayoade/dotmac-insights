@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict
 from app.database import get_db
 from app.auth import Require
 from app.models.sales import SalesOrder, SalesOrderStatus
-from app.models.contact import Contact
 
 router = APIRouter(prefix="/orders", tags=["crm-sales-orders"])
 
@@ -24,7 +23,6 @@ router = APIRouter(prefix="/orders", tags=["crm-sales-orders"])
 
 class SalesOrderBase(BaseModel):
     """Base schema for sales orders."""
-    contact_id: Optional[int] = None
     customer_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_date: Optional[datetime] = None
@@ -43,7 +41,6 @@ class SalesOrderCreate(SalesOrderBase):
 
 class SalesOrderUpdate(BaseModel):
     """Schema for updating a sales order."""
-    contact_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_date: Optional[datetime] = None
     delivery_date: Optional[datetime] = None
@@ -58,7 +55,6 @@ class SalesOrderResponse(BaseModel):
     """Schema for sales order response."""
     id: int
     erpnext_id: Optional[str]
-    contact_id: Optional[int]
     customer_id: Optional[int]
     customer_name: Optional[str]
     status: str
@@ -97,7 +93,6 @@ def _serialize_order(order: SalesOrder) -> Dict[str, Any]:
     return {
         "id": order.id,
         "erpnext_id": order.erpnext_id,
-        "contact_id": None,
         "customer_id": order.customer_id,
         "customer_name": order.customer_name,
         "status": order.status.value if order.status else None,
@@ -120,7 +115,6 @@ def _serialize_order(order: SalesOrder) -> Dict[str, Any]:
 @router.get("", dependencies=[Depends(Require("crm:read"))])
 async def list_orders(
     status: Optional[str] = None,
-    contact_id: Optional[int] = None,
     customer_id: Optional[int] = None,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
@@ -133,12 +127,6 @@ async def list_orders(
         status_enum = _parse_status(status)
         if status_enum:
             query = query.filter(SalesOrder.status == status_enum)
-
-    if contact_id:
-        contact = db.query(Contact).filter(Contact.id == contact_id).first()
-        if not contact:
-            raise HTTPException(status_code=400, detail="Contact not found")
-        query = query.filter(SalesOrder.customer_name == contact.display_name)
 
     if customer_id:
         query = query.filter(SalesOrder.customer_id == customer_id)
@@ -170,16 +158,9 @@ async def create_order(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new sales order."""
-    customer_name = payload.customer_name
-    if payload.contact_id:
-        contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
-        if not contact:
-            raise HTTPException(status_code=400, detail="Contact not found")
-        customer_name = contact.display_name
-
     order = SalesOrder(
         customer_id=payload.customer_id,
-        customer_name=customer_name,
+        customer_name=payload.customer_name,
         transaction_date=payload.order_date,
         delivery_date=payload.delivery_date,
         currency=payload.currency,
@@ -208,14 +189,6 @@ async def update_order(
         raise HTTPException(status_code=404, detail="Sales order not found")
 
     update_data = payload.model_dump(exclude_unset=True)
-
-    if "contact_id" in update_data:
-        contact_id = update_data.pop("contact_id")
-        if contact_id:
-            contact = db.query(Contact).filter(Contact.id == contact_id).first()
-            if not contact:
-                raise HTTPException(status_code=400, detail="Contact not found")
-            update_data["customer_name"] = contact.display_name
 
     # Handle status conversion
     if "status" in update_data and update_data["status"]:

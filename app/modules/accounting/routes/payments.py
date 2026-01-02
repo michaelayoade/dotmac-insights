@@ -11,10 +11,10 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, validate_csrf, set_flash, form_str, form_int, form_decimal,
-    Payment, PaymentStatus, PaymentMethod, Invoice, InvoiceStatus, BankAccount, Contact,
+    Payment, PaymentStatus, PaymentMethod, Invoice, InvoiceStatus, BankAccount,
     func, or_, datetime, Decimal, timedelta, selectinload,
 )
-from app.models.contact import ContactType
+from app.models.party import CustomerAccount, Party
 
 router = APIRouter()
 
@@ -380,15 +380,18 @@ async def ar_payment_new(
     _: None = RequireAccountingWrite,
 ):
     """New AR payment form."""
-    contacts = db.query(Contact).filter(
-        Contact.contact_type == ContactType.CUSTOMER
-    ).order_by(Contact.name).all()
+    customer_accounts = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .all()
+    )
     bank_accounts = db.query(BankAccount).filter(BankAccount.disabled == False).order_by(BankAccount.account_name).all()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["payment"] = None
-    context["contacts"] = contacts
+    context["customer_accounts"] = customer_accounts
     context["bank_accounts"] = bank_accounts
     context["method_options"] = get_payment_method_options()
 
@@ -423,7 +426,7 @@ async def ar_payment_create(
     payment = Payment(
         receipt_number=form_str(form_data, "receipt_number") or None,
         payment_date=payment_date,
-        contact_id=form_int(form_data, "contact_id"),
+        customer_account_id=form_int(form_data, "customer_account_id"),
         amount=form_decimal(form_data, "amount", Decimal("0")) or Decimal("0"),
         currency=form_str(form_data, "currency", "NGN") or "NGN",
         payment_method=PaymentMethod(method_value) if method_value else PaymentMethod.BANK_TRANSFER,
@@ -454,8 +457,7 @@ async def ar_payment_detail(
 ):
     """AR payment detail page."""
     payment = db.query(Payment).options(
-        selectinload(Payment.contact),
-        selectinload(Payment.customer),
+        selectinload(Payment.customer_account),
         selectinload(Payment.allocations)
     ).filter(Payment.id == payment_id).first()
 
@@ -486,15 +488,18 @@ async def ar_payment_edit(
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
-    contacts = db.query(Contact).filter(
-        Contact.contact_type == ContactType.CUSTOMER
-    ).order_by(Contact.name).all()
+    customer_accounts = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .all()
+    )
     bank_accounts = db.query(BankAccount).filter(BankAccount.disabled == False).order_by(BankAccount.account_name).all()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["payment"] = payment
-    context["contacts"] = contacts
+    context["customer_accounts"] = customer_accounts
     context["bank_accounts"] = bank_accounts
     context["method_options"] = get_payment_method_options()
 
@@ -530,9 +535,9 @@ async def ar_payment_update(
     receipt_number = form_str(form_data, "receipt_number")
     if receipt_number:
         payment.receipt_number = receipt_number
-    contact_id = form_int(form_data, "contact_id")
-    if contact_id is not None:
-        payment.contact_id = contact_id
+    customer_account_id = form_int(form_data, "customer_account_id")
+    if customer_account_id is not None:
+        payment.customer_account_id = customer_account_id
     amount = form_decimal(form_data, "amount", payment.amount)
     if amount is not None:
         payment.amount = amount
@@ -571,7 +576,7 @@ async def ar_payment_allocate_form(
 ):
     """AR payment allocation form."""
     payment = db.query(Payment).options(
-        selectinload(Payment.contact)
+        selectinload(Payment.customer_account)
     ).filter(Payment.id == payment_id).first()
 
     if not payment:
@@ -579,9 +584,9 @@ async def ar_payment_allocate_form(
 
     # Get outstanding invoices for this customer
     outstanding_invoices = []
-    if payment.contact_id:
+    if payment.customer_account_id:
         outstanding_invoices = db.query(Invoice).filter(
-            Invoice.contact_id == payment.contact_id,
+            Invoice.customer_account_id == payment.customer_account_id,
             Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
             Invoice.balance > 0
         ).order_by(Invoice.due_date).all()

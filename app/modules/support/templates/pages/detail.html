@@ -298,9 +298,9 @@
                             <p class="font-medium text-gray-900 font-body" data-testid="contact-name">
                                 {{ ticket.contact_name }}
                             </p>
-                            {% if ticket.unified_contact_id %}
-                            <a href="/crm/contacts/{{ ticket.unified_contact_id }}" class="text-sm text-primary-600 hover:text-primary-700 font-body">
-                                View profile &rarr;
+                            {% if ticket.party_id %}
+                            <a href="/parties/{{ ticket.party_id }}" class="text-sm text-primary-600 hover:text-primary-700 font-body">
+                                View party &rarr;
                             </a>
                             {% endif %}
                         </div>

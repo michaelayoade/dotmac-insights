@@ -2,33 +2,28 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
-from typing import Any, Dict, Optional, List, TypedDict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
-from app.models.accounting import (
-    Account,
-    GLEntry,
-    PurchaseInvoice,
-    PurchaseInvoiceStatus,
-    Supplier,
+from app.models.accounting import PurchaseInvoice
+from app.services.accounting import AccountingSettingsService, PayablesService
+from app.services.accounting.payables_types import (
+    PayablesFilters,
+    SupplierCreateData,
+    SupplierFilters,
+    SupplierUpdateData,
 )
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, resolve_currency_or_raise, paginate
+from .helpers import parse_date, resolve_currency_or_raise
 
 router = APIRouter()
-
-
-class AgingBucket(TypedDict):
-    count: int
-    total: Decimal
-    invoices: List[Dict[str, Any]]
 
 
 class SupplierCreateRequest(BaseModel):
@@ -75,18 +70,24 @@ class SupplierUpdateRequest(BaseModel):
     on_hold: Optional[bool] = None
 
 
-# ACCOUNTS PAYABLE AGING
+def _get_payables_service(db: Session, principal: Optional[Principal] = None) -> PayablesService:
+    """Factory to create PayablesService with dependencies."""
+    settings_service = AccountingSettingsService(db, principal)
+    return PayablesService(db, settings_service, principal)
 
-# Maximum invoices to process for aging report (DoS protection)
-MAX_AGING_INVOICES = 10000
+
+# ACCOUNTS PAYABLE AGING
 
 
 @router.get("/accounts-payable", dependencies=[Depends(Require("accounting:read"))])
 def get_accounts_payable(
     as_of_date: Optional[str] = None,
     supplier: Optional[str] = None,
+    supplier_account_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     currency: Optional[str] = None,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get accounts payable aging report.
 
@@ -94,93 +95,35 @@ def get_accounts_payable(
 
     Args:
         as_of_date: Calculate aging as of this date (default: today)
-        supplier: Filter by supplier name
+        supplier: Filter by supplier name (legacy string filter)
+        supplier_account_id: Filter by supplier account (party-based)
+        party_id: Filter by party (person or organization)
         currency: Currency filter
 
     Returns:
         AP aging with buckets (current, 1-30, 31-60, 61-90, 90+)
     """
-    cutoff = parse_date(as_of_date, "as_of_date") or date.today()
+    cutoff = parse_date(as_of_date, "as_of_date")
     currency = resolve_currency_or_raise(db, PurchaseInvoice.currency, currency)
 
-    query = db.query(PurchaseInvoice).filter(
-        PurchaseInvoice.outstanding_amount > 0,
-        PurchaseInvoice.status.in_([
-            PurchaseInvoiceStatus.SUBMITTED,
-            PurchaseInvoiceStatus.UNPAID,
-            PurchaseInvoiceStatus.OVERDUE,
-        ]),
+    filters = PayablesFilters(
+        as_of_date=cutoff,
+        supplier=supplier,
+        supplier_account_id=supplier_account_id,
+        party_id=party_id,
+        currency=currency,
     )
 
-    if supplier:
-        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
-        if len(supplier) < 2:
-            raise HTTPException(
-                status_code=400,
-                detail="Supplier filter must be at least 2 characters"
-            )
-        query = query.filter(PurchaseInvoice.supplier.ilike(f"%{supplier}%"))
-
-    if currency:
-        query = query.filter(PurchaseInvoice.currency == currency)
-
-    # Apply limit to prevent DoS from large datasets
-    invoices = query.order_by(PurchaseInvoice.due_date.asc()).limit(MAX_AGING_INVOICES).all()
-
-    # Age buckets
-    buckets: Dict[str, AgingBucket] = {
-        "current": {"count": 0, "total": Decimal("0"), "invoices": []},
-        "1_30": {"count": 0, "total": Decimal("0"), "invoices": []},
-        "31_60": {"count": 0, "total": Decimal("0"), "invoices": []},
-        "61_90": {"count": 0, "total": Decimal("0"), "invoices": []},
-        "over_90": {"count": 0, "total": Decimal("0"), "invoices": []},
-    }
-
-    for inv in invoices:
-        due = inv.due_date.date() if inv.due_date else (inv.posting_date.date() if inv.posting_date else cutoff)
-        days_overdue = (cutoff - due).days if cutoff > due else 0
-
-        if days_overdue <= 0:
-            bucket = "current"
-        elif days_overdue <= 30:
-            bucket = "1_30"
-        elif days_overdue <= 60:
-            bucket = "31_60"
-        elif days_overdue <= 90:
-            bucket = "61_90"
-        else:
-            bucket = "over_90"
-
-        buckets[bucket]["count"] += 1
-        buckets[bucket]["total"] += inv.outstanding_amount
-        buckets[bucket]["invoices"].append({
-            "id": inv.id,
-            "invoice_no": inv.erpnext_id,
-            "supplier": inv.supplier_name or inv.supplier,
-            "posting_date": inv.posting_date.isoformat() if inv.posting_date else None,
-            "due_date": inv.due_date.isoformat() if inv.due_date else None,
-            "grand_total": float(inv.grand_total),
-            "outstanding": float(inv.outstanding_amount),
-            "days_overdue": days_overdue,
-        })
-
-    buckets_response: Dict[str, Dict[str, Any]] = {
-        key: {**value, "total": float(value["total"])} for key, value in buckets.items()
-    }
-    total_payable = sum(b["total"] for b in buckets_response.values())
-
-    total_invoices = sum(b["count"] for b in buckets.values())
-    return {
-        "as_of_date": cutoff.isoformat(),
-        "total_payable": total_payable,
-        "total_invoices": total_invoices,
-        "truncated": len(invoices) >= MAX_AGING_INVOICES,
-        "max_invoices": MAX_AGING_INVOICES,
-        "aging": buckets_response,
-    }
+    try:
+        service = _get_payables_service(db, principal)
+        report = service.get_aging_report(filters)
+        return report.to_dict()
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # SUPPLIERS
+
 
 @router.get("/suppliers", dependencies=[Depends(Require("accounting:read"))])
 def get_suppliers(
@@ -189,6 +132,7 @@ def get_suppliers(
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get suppliers list.
 
@@ -201,16 +145,14 @@ def get_suppliers(
     Returns:
         Paginated list of suppliers
     """
-    query = db.query(Supplier).filter(Supplier.disabled == False)
+    filters = SupplierFilters(
+        search=search,
+        supplier_group=supplier_group,
+    )
+    pagination = PaginationParams(limit=limit, offset=offset)
 
-    if search:
-        query = query.filter(Supplier.supplier_name.ilike(f"%{search}%"))
-
-    if supplier_group:
-        query = query.filter(Supplier.supplier_group == supplier_group)
-
-    query = query.order_by(Supplier.supplier_name)
-    total, suppliers = paginate(query, offset, limit)
+    service = _get_payables_service(db, principal)
+    total, suppliers = service.list_suppliers(filters, pagination)
 
     return {
         "total": total,
@@ -220,13 +162,13 @@ def get_suppliers(
             {
                 "id": s.id,
                 "erpnext_id": s.erpnext_id,
-                "name": s.supplier_name,
-                "group": s.supplier_group,
-                "type": s.supplier_type,
+                "name": s.name,
+                "group": s.group,
+                "type": s.type,
                 "country": s.country,
-                "currency": s.default_currency,
-                "email": s.email_id,
-                "mobile": s.mobile_no,
+                "currency": s.currency,
+                "email": s.email,
+                "mobile": s.mobile,
             }
             for s in suppliers
         ],
@@ -237,49 +179,30 @@ def get_suppliers(
 def get_supplier_detail(
     supplier_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get supplier detail."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-
-    return {
-        "id": supplier.id,
-        "erpnext_id": supplier.erpnext_id,
-        "supplier_name": supplier.supplier_name,
-        "supplier_group": supplier.supplier_group,
-        "supplier_type": supplier.supplier_type,
-        "country": supplier.country,
-        "default_currency": supplier.default_currency,
-        "default_bank_account": supplier.default_bank_account,
-        "tax_id": supplier.tax_id,
-        "tax_withholding_category": supplier.tax_withholding_category,
-        "supplier_primary_contact": supplier.supplier_primary_contact,
-        "supplier_primary_address": supplier.supplier_primary_address,
-        "email_id": supplier.email_id,
-        "mobile_no": supplier.mobile_no,
-        "default_price_list": supplier.default_price_list,
-        "payment_terms": supplier.payment_terms,
-        "is_transporter": supplier.is_transporter,
-        "is_internal_supplier": supplier.is_internal_supplier,
-        "disabled": supplier.disabled,
-        "is_frozen": supplier.is_frozen,
-        "on_hold": supplier.on_hold,
-    }
+    try:
+        service = _get_payables_service(db, principal)
+        supplier = service.get_supplier(supplier_id)
+        return supplier.to_dict()
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/suppliers", dependencies=[Depends(Require("accounting:write"))])
 def create_supplier(
     payload: SupplierCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a supplier locally."""
-    supplier = Supplier(
+    data = SupplierCreateData(
         supplier_name=payload.supplier_name,
         supplier_group=payload.supplier_group,
         supplier_type=payload.supplier_type,
         country=payload.country,
-        default_currency=payload.default_currency or "NGN",
+        default_currency=payload.default_currency,
         default_bank_account=payload.default_bank_account,
         tax_id=payload.tax_id,
         tax_withholding_category=payload.tax_withholding_category,
@@ -295,9 +218,10 @@ def create_supplier(
         is_frozen=payload.is_frozen,
         on_hold=payload.on_hold,
     )
-    db.add(supplier)
+
+    service = _get_payables_service(db, principal)
+    supplier = service.create_supplier(data)
     db.commit()
-    db.refresh(supplier)
     return {"id": supplier.id}
 
 
@@ -306,43 +230,46 @@ def update_supplier(
     supplier_id: int,
     payload: SupplierUpdateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a supplier locally."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-
     update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(supplier, key, value)
+    data = SupplierUpdateData(**update_data)
 
-    db.commit()
-    db.refresh(supplier)
-    return {"id": supplier.id}
+    try:
+        service = _get_payables_service(db, principal)
+        supplier = service.update_supplier(supplier_id, data)
+        db.commit()
+        return {"id": supplier.id}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/suppliers/{supplier_id}", dependencies=[Depends(Require("accounting:write"))])
 def delete_supplier(
     supplier_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Disable a supplier."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-
-    supplier.disabled = True
-    db.commit()
-    return {"status": "disabled", "supplier_id": supplier_id}
+    try:
+        service = _get_payables_service(db, principal)
+        service.disable_supplier(supplier_id)
+        db.commit()
+        return {"status": "disabled", "supplier_id": supplier_id}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # OUTSTANDING PAYABLES
+
 
 @router.get("/payables-outstanding", dependencies=[Depends(Require("accounting:read"))])
 def get_payables_outstanding(
     currency: Optional[str] = None,
     top: int = Query(default=5, le=25),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Outstanding payables with top suppliers.
 
@@ -353,61 +280,9 @@ def get_payables_outstanding(
     Returns:
         Outstanding payables summary with top suppliers
     """
-    as_of = date.today()
     currency = resolve_currency_or_raise(db, PurchaseInvoice.currency, currency)
 
-    pi_query = db.query(
-        func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
-        func.count(PurchaseInvoice.id).label("invoice_count"),
-    ).filter(
-        PurchaseInvoice.outstanding_amount > 0,
-        PurchaseInvoice.status.in_([
-            PurchaseInvoiceStatus.SUBMITTED,
-            PurchaseInvoiceStatus.UNPAID,
-            PurchaseInvoiceStatus.OVERDUE,
-        ]),
-    )
-    if currency:
-        pi_query = pi_query.filter(PurchaseInvoice.currency == currency)
-    pi_totals = pi_query.first()
-    total_outstanding = float(pi_totals.outstanding or 0) if pi_totals else 0.0
-    total_invoices = int(pi_totals.invoice_count or 0) if pi_totals else 0
+    service = _get_payables_service(db, principal)
+    summary = service.get_outstanding_summary(currency=currency, top_n=top)
 
-    # Top suppliers by outstanding
-    by_supplier_query = (
-        db.query(
-            PurchaseInvoice.supplier,
-            func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
-        )
-        .filter(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.status.in_([
-                PurchaseInvoiceStatus.SUBMITTED,
-                PurchaseInvoiceStatus.UNPAID,
-                PurchaseInvoiceStatus.OVERDUE,
-            ]),
-        )
-    )
-    if currency:
-        by_supplier_query = by_supplier_query.filter(PurchaseInvoice.currency == currency)
-
-    by_supplier = (
-        by_supplier_query.group_by(PurchaseInvoice.supplier)
-        .order_by(func.sum(PurchaseInvoice.outstanding_amount).desc())
-        .limit(top)
-        .all()
-    )
-
-    return {
-        "as_of_date": as_of.isoformat(),
-        "currency": currency,
-        "total_outstanding": total_outstanding,
-        "total_invoices": total_invoices,
-        "top_suppliers": [
-            {
-                "supplier": row.supplier,
-                "outstanding": float(row.outstanding),
-            }
-            for row in by_supplier
-        ],
-    }
+    return summary.to_dict()

@@ -145,8 +145,8 @@ async def get_data_completeness(
     # Single query for invoice quality
     invoice_stats = db.query(
         func.count(Invoice.id).label("total"),
-        func.count(case((Invoice.customer_id.isnot(None), 1))).label("with_customer"),
-        func.count(case((Invoice.customer_id.is_(None), 1))).label("orphaned"),
+        func.count(case((Invoice.customer_account_id.isnot(None), 1))).label("with_customer"),
+        func.count(case((Invoice.customer_account_id.is_(None), 1))).label("orphaned"),
         func.count(case((Invoice.due_date.isnot(None), 1))).label("with_due_date"),
     ).first()
 
@@ -160,9 +160,9 @@ async def get_data_completeness(
     # Single query for payment quality
     payment_stats = db.query(
         func.count(Payment.id).label("total"),
-        func.count(case((Payment.customer_id.isnot(None), 1))).label("with_customer"),
+        func.count(case((Payment.customer_account_id.isnot(None), 1))).label("with_customer"),
         func.count(case((Payment.invoice_id.isnot(None), 1))).label("with_invoice"),
-        func.count(case((and_(Payment.customer_id.is_(None), Payment.invoice_id.is_(None)), 1))).label("orphaned"),
+        func.count(case((and_(Payment.customer_account_id.is_(None), Payment.invoice_id.is_(None)), 1))).label("orphaned"),
     ).first()
 
     payment_quality = {
@@ -175,8 +175,8 @@ async def get_data_completeness(
     # Single query for support quality (conversations + tickets)
     convo_stats = db.query(
         func.count(Conversation.id).label("total"),
-        func.count(case((Conversation.customer_id.isnot(None), 1))).label("linked"),
-        func.count(case((Conversation.customer_id.is_(None), 1))).label("orphaned"),
+        func.count(case((Conversation.customer_account_id.isnot(None), 1))).label("linked"),
+        func.count(case((Conversation.customer_account_id.is_(None), 1))).label("orphaned"),
     ).first()
 
     ticket_stats = db.query(
@@ -451,8 +451,9 @@ async def get_customer_health(
 
     # Payment behavior analysis
     # Customers with overdue invoices
-    customers_with_overdue = db.query(distinct(Invoice.customer_id)).filter(
-        Invoice.status == InvoiceStatus.OVERDUE
+    customers_with_overdue = db.query(distinct(Invoice.customer_account_id)).filter(
+        Invoice.status == InvoiceStatus.OVERDUE,
+        Invoice.customer_account_id.isnot(None),
     ).count()
 
     # Average payment timing - keep processing in SQL to avoid loading all invoices
@@ -500,15 +501,15 @@ async def get_customer_health(
 
     # Conversation activity
     convos_per_customer = db.query(
-        Conversation.customer_id,
+        Conversation.customer_account_id,
         func.count(Conversation.id).label("convo_count")
     ).filter(
-        Conversation.customer_id.isnot(None),
+        Conversation.customer_account_id.isnot(None),
         Conversation.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
-    ).group_by(Conversation.customer_id).subquery()
+    ).group_by(Conversation.customer_account_id).subquery()
 
     convo_intensity = db.query(
-        func.count(convos_per_customer.c.customer_id).label("customers_with_conversations_30d")
+        func.count(convos_per_customer.c.customer_account_id).label("customers_with_conversations_30d")
     ).one()
     customers_with_conversations_30d = int(convo_intensity.customers_with_conversations_30d or 0)
 
@@ -523,8 +524,9 @@ async def get_customer_health(
     ).count()
 
     # Inactive customers (no recent activity)
-    customers_with_recent_payment = db.query(distinct(Payment.customer_id)).filter(
-        Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=60)
+    customers_with_recent_payment = db.query(distinct(Payment.customer_account_id)).filter(
+        Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=60),
+        Payment.customer_account_id.isnot(None),
     ).count()
 
     return {
@@ -745,20 +747,20 @@ async def get_relationship_map(
             "orphaned": db.query(Subscription).filter(Subscription.tariff_id.is_(None)).count(),
         },
         "invoices_to_customers": {
-            "linked": db.query(Invoice).filter(Invoice.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Invoice).filter(Invoice.customer_id.is_(None)).count(),
+            "linked": db.query(Invoice).filter(Invoice.customer_account_id.isnot(None)).count(),
+            "orphaned": db.query(Invoice).filter(Invoice.customer_account_id.is_(None)).count(),
         },
         "payments_to_customers": {
-            "linked": db.query(Payment).filter(Payment.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Payment).filter(Payment.customer_id.is_(None)).count(),
+            "linked": db.query(Payment).filter(Payment.customer_account_id.isnot(None)).count(),
+            "orphaned": db.query(Payment).filter(Payment.customer_account_id.is_(None)).count(),
         },
         "payments_to_invoices": {
             "linked": db.query(Payment).filter(Payment.invoice_id.isnot(None)).count(),
             "unlinked": db.query(Payment).filter(Payment.invoice_id.is_(None)).count(),
         },
         "conversations_to_customers": {
-            "linked": db.query(Conversation).filter(Conversation.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Conversation).filter(Conversation.customer_id.is_(None)).count(),
+            "linked": db.query(Conversation).filter(Conversation.customer_account_id.isnot(None)).count(),
+            "orphaned": db.query(Conversation).filter(Conversation.customer_account_id.is_(None)).count(),
         },
         "tickets_to_customers": {
             "linked": db.query(Ticket).filter(Ticket.customer_id.isnot(None)).count(),

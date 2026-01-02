@@ -72,7 +72,6 @@ class OmniConversation(Base):
     external_thread_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
 
@@ -130,8 +129,6 @@ class OmniParticipant(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     handle: Mapped[str] = mapped_column(String(255), index=True)  # email/phone/social handle
     channel_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
-
     # Link to party (person or organization)
     party_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("parties.id"),
@@ -161,7 +158,6 @@ class OmniMessage(Base):
     conversation_id: Mapped[int] = mapped_column(ForeignKey("omni_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     conversation: Mapped[OmniConversation] = relationship(back_populates="messages")
 
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     participant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_participants.id"), nullable=True, index=True)
 
@@ -278,7 +274,6 @@ class InboxContact(Base):
     job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Links to other systems (legacy)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
 
     # Link to party (person or organization)

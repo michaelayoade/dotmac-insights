@@ -39,7 +39,7 @@ class NoteLineCreate(BaseModel):
 
 class CreditNoteCreate(BaseModel):
     """Schema for creating a credit note."""
-    customer_id: int
+    customer_account_id: int
     invoice_id: Optional[int] = None
     credit_number: Optional[str] = None
     description: Optional[str] = None
@@ -76,7 +76,7 @@ class NoteUpdate(BaseModel):
 
 @router.get("/credit-notes", dependencies=[Depends(Require("accounting:read"))])
 def list_credit_notes(
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -87,8 +87,8 @@ def list_credit_notes(
     """List credit notes with filters."""
     query = db.query(CreditNote)
 
-    if customer_id:
-        query = query.filter(CreditNote.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(CreditNote.customer_account_id == customer_account_id)
 
     if status:
         try:
@@ -114,7 +114,7 @@ def list_credit_notes(
             {
                 "id": n.id,
                 "credit_number": n.credit_number,
-                "customer_id": n.customer_id,
+                "customer_account_id": n.customer_account_id,
                 "invoice_id": n.invoice_id,
                 "issue_date": n.issue_date.isoformat() if n.issue_date else None,
                 "amount": float(n.amount),
@@ -139,7 +139,7 @@ def get_credit_note(
     return {
         "id": note.id,
         "credit_number": note.credit_number,
-        "customer_id": note.customer_id,
+        "customer_account_id": note.customer_account_id,
         "invoice_id": note.invoice_id,
         "description": note.description,
         "issue_date": note.issue_date.isoformat() if note.issue_date else None,
@@ -199,7 +199,7 @@ def create_credit_note(
 
     note = CreditNote(
         credit_number=credit_number,
-        customer_id=data.customer_id,
+        customer_account_id=data.customer_account_id,
         invoice_id=data.invoice_id,
         description=data.description,
         issue_date=issue_date,

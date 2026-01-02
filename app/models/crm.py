@@ -14,8 +14,6 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.contact import Contact
-    from app.models.customer import Customer
     from app.models.sales import ERPNextLead, Quotation, SalesOrder, SalesPerson
     from app.models.employee import Employee
     from app.models.party import Party
@@ -71,8 +69,6 @@ class Opportunity(Base):
 
     # Source - either a lead or existing customer
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
-
     # Link to party (person or organization)
     party_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("parties.id"),
@@ -125,7 +121,6 @@ class Opportunity(Base):
 
     # Relationships
     lead: Mapped[Optional["ERPNextLead"]] = relationship()
-    customer: Mapped[Optional["Customer"]] = relationship()
     party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     stage_rel: Mapped[Optional["OpportunityStage"]] = relationship(back_populates="opportunities")
     owner: Mapped[Optional["Employee"]] = relationship()
@@ -181,15 +176,15 @@ class Activity(Base):
 
     # Linked entities (at least one should be set)
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     opportunity_id: Mapped[Optional[int]] = mapped_column(ForeignKey("opportunities.id"), nullable=True, index=True)
 
-    # Link to Contact
-    contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("contacts.id"),
+    # Link to Party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
+
 
     # Scheduling
     scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
@@ -219,9 +214,8 @@ class Activity(Base):
 
     # Relationships
     lead: Mapped[Optional["ERPNextLead"]] = relationship()
-    customer: Mapped[Optional["Customer"]] = relationship()
     opportunity: Mapped[Optional["Opportunity"]] = relationship(back_populates="activities")
-    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     owner: Mapped[Optional["Employee"]] = relationship(foreign_keys=[owner_id])
     assigned_to: Mapped[Optional["Employee"]] = relationship(foreign_keys=[assigned_to_id])
 

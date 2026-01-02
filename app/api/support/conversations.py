@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.conversation import Conversation, ConversationStatus
-from app.models.customer import Customer
+from app.models.party import CustomerAccount
 from app.auth import Require
 
 router = APIRouter()
@@ -17,7 +17,8 @@ router = APIRouter()
 @router.get("/conversations", dependencies=[Depends(Require("explorer:read"))])
 def list_conversations(
     status: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     channel: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
@@ -34,8 +35,13 @@ def list_conversations(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-    if customer_id:
-        query = query.filter(Conversation.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(Conversation.customer_account_id == customer_account_id)
+    elif party_id:
+        query = query.join(
+            CustomerAccount,
+            CustomerAccount.id == Conversation.customer_account_id,
+        ).filter(CustomerAccount.party_id == party_id)
 
     if channel:
         query = query.filter(Conversation.channel == channel)
@@ -57,7 +63,8 @@ def list_conversations(
                 "chatwoot_id": c.chatwoot_id,
                 "status": c.status.value if c.status else None,
                 "channel": c.channel,
-                "customer_id": c.customer_id,
+                "customer_account_id": c.customer_account_id,
+                "party_id": c.customer_account.party_id if c.customer_account else None,
                 "message_count": c.message_count,
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "last_activity_at": c.last_activity_at.isoformat() if c.last_activity_at else None,
@@ -78,11 +85,22 @@ def get_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    customer = None
-    if conversation.customer_id:
-        cust = db.query(Customer).filter(Customer.id == conversation.customer_id).first()
-        if cust:
-            customer = {"id": cust.id, "name": cust.name, "email": cust.email}
+    customer_account = None
+    party_id = None
+    party_name = None
+    if conversation.customer_account and conversation.customer_account.party:
+        party = conversation.customer_account.party
+        party_id = party.id
+        party_name = party.name
+        if not party_name:
+            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not party_name:
+            party_name = party.legal_name or party.trading_name
+        customer_account = {
+            "id": conversation.customer_account.id,
+            "party_id": party.id,
+            "name": party_name,
+        }
 
     return {
         "id": conversation.id,
@@ -93,5 +111,8 @@ def get_conversation(
         "message_count": conversation.message_count,
         "created_at": conversation.created_at.isoformat() if conversation.created_at else None,
         "last_activity_at": conversation.last_activity_at.isoformat() if conversation.last_activity_at else None,
-        "customer": customer,
+        "customer_account_id": conversation.customer_account_id,
+        "party_id": party_id,
+        "party_name": party_name,
+        "customer_account": customer_account,
     }

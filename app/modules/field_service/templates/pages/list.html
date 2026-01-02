@@ -21,7 +21,51 @@
 </div>
 {% endblock %}
 
+{% block head %}
+{{ super() }}
+<!-- Leaflet CSS for Map View -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+{% endblock %}
+
 {% block content %}
+<div x-data="{ viewMode: 'list' }">
+    <!-- View Toggle -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex gap-2 p-1 bg-surface-100 rounded-xl">
+            <button
+                @click="viewMode = 'list'"
+                :class="viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-900'"
+                class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                List
+            </button>
+            <button
+                @click="viewMode = 'map'; $nextTick(() => { if (typeof initFieldServiceMap === 'function') initFieldServiceMap(); })"
+                :class="viewMode === 'map' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-900'"
+                class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                </svg>
+                Map
+            </button>
+            <a
+                href="/field-service/dispatch"
+                class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg transition-all"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                </svg>
+                Dispatch Board
+            </a>
+        </div>
+    </div>
+
+    <!-- List View -->
+    <div x-show="viewMode === 'list'" x-cloak>
 <!-- Filters and Search -->
 <div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="orders-filters">
     <div class="flex flex-col sm:flex-row gap-4">
@@ -284,4 +328,119 @@
 <div id="orders-table-container">
     {% include "modules/field_service/templates/partials/orders_table.html" %}
 </div>
+    </div>
+
+    <!-- Map View -->
+    <div x-show="viewMode === 'map'" x-cloak class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="p-4 border-b border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Service Orders Map</h2>
+                    <p class="text-sm text-gray-500">{{ orders | length }} orders with locations</p>
+                </div>
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                    <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span> Emergency
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-orange-500"></span> Urgent
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-amber-500"></span> High
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span> Normal
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div id="field-service-map" class="h-[600px]"></div>
+    </div>
+</div>
+
+{% block scripts %}
+{{ super() }}
+<!-- Leaflet JS for Map View -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// Field Service Map Data from Server
+const fieldServiceOrders = {{ orders | tojson | safe }};
+
+let fieldServiceMap = null;
+
+function initFieldServiceMap() {
+    const mapContainer = document.getElementById('field-service-map');
+    if (!mapContainer || fieldServiceMap) return;
+
+    // Default center (Nigeria)
+    const defaultCenter = [9.082, 8.675];
+    const defaultZoom = 6;
+
+    fieldServiceMap = L.map('field-service-map').setView(defaultCenter, defaultZoom);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(fieldServiceMap);
+
+    // Priority colors
+    const priorityColors = {
+        'emergency': '#ef4444',
+        'urgent': '#f97316',
+        'high': '#f59e0b',
+        'normal': '#3b82f6',
+        'low': '#6b7280'
+    };
+
+    // Add markers for each order
+    const bounds = [];
+    fieldServiceOrders.forEach(order => {
+        // Try to get coordinates from the order
+        const lat = order.latitude || order.service_latitude;
+        const lng = order.longitude || order.service_longitude;
+
+        if (lat && lng) {
+            const color = priorityColors[order.priority] || priorityColors.normal;
+
+            const marker = L.circleMarker([lat, lng], {
+                radius: 10,
+                fillColor: color,
+                color: '#ffffff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(fieldServiceMap);
+
+            // Popup content
+            const statusBadge = order.status ? `<span class="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100">${order.status.replace('_', ' ')}</span>` : '';
+            const popupContent = `
+                <div class="p-2 min-w-[200px]">
+                    <a href="/field-service/${order.id}" class="font-semibold text-primary-600 hover:underline">${order.order_number}</a>
+                    <p class="text-sm text-gray-700 mt-1">${order.title || 'No title'}</p>
+                    <p class="text-xs text-gray-500 mt-1">${order.service_address || ''}</p>
+                    <div class="flex items-center justify-between mt-2">
+                        ${statusBadge}
+                        ${order.technician_name ? `<span class="text-xs text-gray-500">${order.technician_name}</span>` : '<span class="text-xs text-gray-400 italic">Unassigned</span>'}
+                    </div>
+                </div>
+            `;
+            marker.bindPopup(popupContent);
+
+            bounds.push([lat, lng]);
+        }
+    });
+
+    // Fit bounds if we have markers
+    if (bounds.length > 0) {
+        fieldServiceMap.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    // Fix map size on first render
+    setTimeout(() => {
+        fieldServiceMap.invalidateSize();
+    }, 100);
+}
+</script>
+{% endblock %}
 {% endblock %}

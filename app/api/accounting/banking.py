@@ -1,17 +1,13 @@
 """Banking: Bank accounts, bank transactions, CRUD, splits, import, reconciliation."""
 from __future__ import annotations
 
-import csv
-import io
-import re
-import uuid
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, field_validator, ValidationInfo
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
@@ -21,15 +17,33 @@ from app.models.accounting import (
     BankAccount,
     BankTransaction,
     BankTransactionStatus,
-    GLEntry,
     PurchaseInvoice,
 )
-from app.models.bank_transaction_split import BankTransactionSplit
 from app.models.invoice import Invoice
+from app.services.accounting.banking import BankingService
+from app.services.accounting.banking_types import (
+    BankAccountCreateData,
+    BankAccountUpdateData,
+    BankTransactionCreateData,
+    BankTransactionFilters,
+    BankTransactionSplitData,
+    BankTransactionUpdateData,
+    ImportColumnMapping,
+)
+from app.services.errors import NotFoundError, ValidationError as ServiceValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate
+from .helpers import parse_date
 
 router = APIRouter()
+
+
+def get_banking_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> BankingService:
+    """Dependency to get BankingService instance."""
+    return BankingService(db, principal)
 
 
 # PYDANTIC SCHEMAS
@@ -151,7 +165,7 @@ class ReconcileRequest(BaseModel):
 @router.get("/bank-accounts", dependencies=[Depends(Require("accounting:read"))])
 def get_bank_accounts(
     as_of_date: Optional[str] = None,
-    db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Get bank accounts list with current balances.
 
@@ -161,49 +175,26 @@ def get_bank_accounts(
     Returns:
         List of bank accounts with GL-derived balances
     """
-    accounts = db.query(BankAccount).filter(BankAccount.disabled == False).all()
-
-    # Calculate balances from GL entries for each bank's GL account
-    cutoff = parse_date(as_of_date, "as_of_date") or date.today()
-    gl_accounts = [acc.account for acc in accounts if acc.account]
-
-    account_balances: Dict[str, float] = {}
-    if gl_accounts:
-        balance_query = db.query(
-            GLEntry.account,
-            func.sum(GLEntry.debit).label("total_debit"),
-            func.sum(GLEntry.credit).label("total_credit"),
-        ).filter(
-            GLEntry.is_cancelled == False,
-            GLEntry.posting_date <= cutoff,
-            GLEntry.account.in_(gl_accounts),
-        ).group_by(GLEntry.account)
-
-        for row in balance_query.all():
-            debit = row.total_debit or Decimal("0")
-            credit = row.total_credit or Decimal("0")
-            account_balances[row.account] = float(debit - credit)
-
-    total_balance = sum(account_balances.values())
-
+    cutoff = parse_date(as_of_date, "as_of_date")
+    result = service.list_bank_accounts(as_of_date=cutoff)
     return {
-        "total": len(accounts),
-        "total_balance": total_balance,
-        "as_of_date": cutoff.isoformat(),
+        "total": result["total"],
+        "total_balance": result["total_balance"],
+        "as_of_date": result["as_of_date"],
         "accounts": [
             {
                 "id": acc.id,
                 "erpnext_id": acc.erpnext_id,
-                "name": acc.account_name,
+                "name": acc.name,
                 "bank": acc.bank,
-                "account_no": acc.bank_account_no,
-                "gl_account": acc.account,
+                "account_no": acc.account_no,
+                "gl_account": acc.gl_account,
                 "company": acc.company,
                 "currency": acc.currency,
                 "is_default": acc.is_default,
-                "balance": account_balances.get(acc.account or "", 0.0),
+                "balance": acc.balance,
             }
-            for acc in accounts
+            for acc in result["accounts"]
         ],
     }
 
@@ -214,9 +205,10 @@ def get_bank_accounts(
 def create_bank_account(
     payload: BankAccountCreate,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Create a bank account locally."""
-    account = BankAccount(
+    create_data = BankAccountCreateData(
         account_name=payload.account_name,
         bank=payload.bank,
         bank_account_no=payload.bank_account_no,
@@ -227,9 +219,8 @@ def create_bank_account(
         is_default=payload.is_default,
         disabled=payload.disabled,
     )
-    db.add(account)
+    account = service.create_bank_account(create_data)
     db.commit()
-    db.refresh(account)
     return {"id": account.id}
 
 
@@ -238,34 +229,41 @@ def update_bank_account(
     bank_account_id: int,
     payload: BankAccountUpdate,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Update a bank account locally."""
-    account = db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(account, key, value)
-
-    db.commit()
-    db.refresh(account)
-    return {"id": account.id}
+    update_data = BankAccountUpdateData(
+        account_name=payload.account_name,
+        bank=payload.bank,
+        bank_account_no=payload.bank_account_no,
+        account=payload.account,
+        company=payload.company,
+        currency=payload.currency,
+        is_company_account=payload.is_company_account,
+        is_default=payload.is_default,
+        disabled=payload.disabled,
+    )
+    try:
+        account = service.update_bank_account(bank_account_id, update_data)
+        db.commit()
+        return {"id": account.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
 
 @router.delete("/bank-accounts/{bank_account_id}", dependencies=[Depends(Require("accounting:write"))])
 def delete_bank_account(
     bank_account_id: int,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Disable a bank account."""
-    account = db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
-
-    account.disabled = True
-    db.commit()
-    return {"status": "disabled", "bank_account_id": bank_account_id}
+    try:
+        service.disable_bank_account(bank_account_id)
+        db.commit()
+        return {"status": "disabled", "bank_account_id": bank_account_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
 
 # BANK RECONCILIATION
@@ -450,7 +448,7 @@ def list_bank_transactions(
     sort_dir: Optional[str] = Query(default="desc"),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """List bank transactions with filtering.
 
@@ -472,73 +470,28 @@ def list_bank_transactions(
     Returns:
         Paginated bank transactions
     """
-    query = db.query(BankTransaction)
+    filters = BankTransactionFilters(
+        bank_account=bank_account,
+        status=status,
+        transaction_type=transaction_type,
+        start_date=parse_date(start_date, "start_date"),
+        end_date=parse_date(end_date, "end_date"),
+        min_amount=min_amount,
+        max_amount=max_amount,
+        unallocated_only=unallocated_only,
+        search=search,
+        sort_by=sort_by or "date",
+        sort_dir=sort_dir or "desc",
+    )
+    pagination = PaginationParams(limit=limit, offset=offset)
 
-    if bank_account:
-        query = query.filter(BankTransaction.bank_account.ilike(f"%{bank_account}%"))
-
-    if status:
-        try:
-            status_enum = BankTransactionStatus(status.lower())
-            query = query.filter(BankTransaction.status == status_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-
-    if transaction_type:
-        query = query.filter(BankTransaction.transaction_type == transaction_type)
-
-    if start_date:
-        start_dt = parse_date(start_date, "start_date")
-        if start_dt:
-            query = query.filter(BankTransaction.date >= start_dt)
-
-    if end_date:
-        end_dt = parse_date(end_date, "end_date")
-        if end_dt:
-            query = query.filter(BankTransaction.date <= end_dt)
-
-    if min_amount:
-        query = query.filter(
-            or_(
-                BankTransaction.deposit >= min_amount,
-                BankTransaction.withdrawal >= min_amount,
-            )
-        )
-
-    if max_amount:
-        query = query.filter(
-            and_(
-                or_(BankTransaction.deposit <= max_amount, BankTransaction.deposit == 0),
-                or_(BankTransaction.withdrawal <= max_amount, BankTransaction.withdrawal == 0),
-            )
-        )
-
-    if unallocated_only:
-        query = query.filter(BankTransaction.unallocated_amount > 0)
-
-    if search:
-        query = query.filter(
-            or_(
-                BankTransaction.description.ilike(f"%{search}%"),
-                BankTransaction.reference_number.ilike(f"%{search}%"),
-                BankTransaction.bank_party_name.ilike(f"%{search}%"),
-            )
-        )
-
-    # Sorting
-    if sort_by:
-        sort_column = getattr(BankTransaction, sort_by, BankTransaction.date)
-    else:
-        sort_column = BankTransaction.date
-    if sort_dir == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
-
-    total, transactions = paginate(query, offset, limit)
+    try:
+        result = service.list_transactions(filters, pagination)
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "data": [
@@ -558,7 +511,7 @@ def list_bank_transactions(
                 "party": t.party,
                 "party_type": t.party_type,
             }
-            for t in transactions
+            for t in result.items
         ],
     }
 
@@ -566,7 +519,7 @@ def list_bank_transactions(
 @router.get("/bank-transactions/{transaction_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_bank_transaction_detail(
     transaction_id: int,
-    db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Get bank transaction detail.
 
@@ -576,9 +529,10 @@ def get_bank_transaction_detail(
     Returns:
         Full bank transaction details
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
+    try:
+        txn = service.get_transaction(transaction_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
     return {
         "id": txn.id,
@@ -636,6 +590,7 @@ def create_bank_transaction(
     data: BankTransactionCreate,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Create a manual bank transaction.
 
@@ -651,30 +606,25 @@ def create_bank_transaction(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format")
 
-    bank_account = db.query(BankAccount).filter(
-        or_(
-            BankAccount.account_name == data.bank_account,
-            BankAccount.bank_account_no == data.bank_account,
-            BankAccount.account == data.bank_account,
+    # Convert splits
+    splits = [
+        BankTransactionSplitData(
+            amount=Decimal(str(s.amount)),
+            account=s.account,
+            cost_center=s.cost_center,
+            tax_code_id=s.tax_code_id,
+            tax_rate=Decimal(str(s.tax_rate)),
+            tax_amount=Decimal(str(s.tax_amount)),
+            memo=s.memo,
+            party_type=s.party_type,
+            party=s.party,
         )
-    ).first()
-    if not bank_account and settings.e2e_auth_enabled:
-        bank_account = BankAccount(
-            account_name=data.bank_account,
-            currency=data.currency or "NGN",
-            is_company_account=True,
-        )
-        db.add(bank_account)
-        db.flush()
-    if not bank_account:
-        raise HTTPException(status_code=400, detail="Bank account not found")
+        for s in data.splits
+    ]
 
-    # Create transaction
-    txn = BankTransaction(
+    create_data = BankTransactionCreateData(
         date=txn_date,
-        bank_account=bank_account.account_name,
-        bank_account_id=bank_account.id,
-        company=bank_account.company,
+        bank_account=data.bank_account,
         deposit=Decimal(str(data.deposit)),
         withdrawal=Decimal(str(data.withdrawal)),
         currency=data.currency,
@@ -685,39 +635,21 @@ def create_bank_transaction(
         payee_account=data.payee_account,
         party_type=data.party_type,
         party=data.party,
-        status=BankTransactionStatus.UNRECONCILED,
-        is_manual_entry=True,
-        created_by_id=principal.id,
+        splits=splits,
     )
 
-    # Calculate unallocated amount
-    amount = txn.deposit if txn.deposit > 0 else txn.withdrawal
-    txn.unallocated_amount = amount
-    txn.allocated_amount = Decimal("0")
-
-    db.add(txn)
-    db.flush()
-
-    # Add splits if provided
-    for idx, split_data in enumerate(data.splits):
-        split = BankTransactionSplit(
-            bank_transaction_id=txn.id,
-            amount=Decimal(str(split_data.amount)),
-            account=split_data.account,
-            cost_center=split_data.cost_center,
-            tax_code_id=split_data.tax_code_id,
-            tax_rate=Decimal(str(split_data.tax_rate)),
-            tax_amount=Decimal(str(split_data.tax_amount)),
-            memo=split_data.memo,
-            party_type=split_data.party_type,
-            party=split_data.party,
-            idx=idx,
+    try:
+        txn = service.create_transaction(
+            create_data,
+            user_id=principal.id,
+            auto_create_bank_account=settings.e2e_auth_enabled,
         )
-        db.add(split)
+        db.commit()
+    except ServiceValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
-    db.commit()
-    db.refresh(txn)
-
+    amount = txn.deposit if txn.deposit > 0 else txn.withdrawal
     return {
         "message": "Bank transaction created",
         "id": txn.id,
@@ -731,6 +663,7 @@ def update_bank_transaction(
     transaction_id: int,
     data: BankTransactionUpdate,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Update a bank transaction.
 
@@ -743,56 +676,43 @@ def update_bank_transaction(
     Returns:
         Updated transaction info
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status == BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Cannot update reconciled transaction")
-
+    # Parse date if provided
+    txn_date = None
     if data.date is not None:
         try:
-            txn.date = datetime.fromisoformat(data.date)
+            txn_date = datetime.fromisoformat(data.date)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format")
 
-    if data.bank_account is not None:
-        txn.bank_account = data.bank_account
-    if data.deposit is not None:
-        txn.deposit = Decimal(str(data.deposit))
-    if data.withdrawal is not None:
-        txn.withdrawal = Decimal(str(data.withdrawal))
-    if data.description is not None:
-        txn.description = data.description
-    if data.reference_number is not None:
-        txn.reference_number = data.reference_number
-    if data.transaction_type is not None:
-        txn.transaction_type = data.transaction_type
-    if data.payee_name is not None:
-        txn.payee_name = data.payee_name
-    if data.payee_account is not None:
-        txn.payee_account = data.payee_account
-    if data.party_type is not None:
-        txn.party_type = data.party_type
-    if data.party is not None:
-        txn.party = data.party
+    update_data = BankTransactionUpdateData(
+        date=txn_date,
+        bank_account=data.bank_account,
+        deposit=Decimal(str(data.deposit)) if data.deposit is not None else None,
+        withdrawal=Decimal(str(data.withdrawal)) if data.withdrawal is not None else None,
+        description=data.description,
+        reference_number=data.reference_number,
+        transaction_type=data.transaction_type,
+        payee_name=data.payee_name,
+        payee_account=data.payee_account,
+        party_type=data.party_type,
+        party=data.party,
+    )
 
-    # Recalculate unallocated
-    amount = txn.deposit if txn.deposit > 0 else txn.withdrawal
-    txn.unallocated_amount = amount - txn.allocated_amount
-
-    db.commit()
-
-    return {
-        "message": "Bank transaction updated",
-        "id": txn.id,
-    }
+    try:
+        txn = service.update_transaction(transaction_id, update_data)
+        db.commit()
+        return {"message": "Bank transaction updated", "id": txn.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
 
 @router.delete("/bank-transactions/{transaction_id}", dependencies=[Depends(Require("books:write"))])
 def delete_bank_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Delete a bank transaction.
 
@@ -804,25 +724,14 @@ def delete_bank_transaction(
     Returns:
         Deletion confirmation
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status == BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Cannot delete reconciled transaction")
-
-    if not txn.is_manual_entry:
-        raise HTTPException(status_code=400, detail="Cannot delete imported transaction")
-
-    # Delete splits first
-    db.query(BankTransactionSplit).filter(
-        BankTransactionSplit.bank_transaction_id == transaction_id
-    ).delete()
-
-    db.delete(txn)
-    db.commit()
-
-    return {"message": "Bank transaction deleted"}
+    try:
+        service.delete_transaction(transaction_id)
+        db.commit()
+        return {"message": "Bank transaction deleted"}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
 
 # BANK TRANSACTION SPLITS
@@ -832,6 +741,7 @@ def add_transaction_splits(
     transaction_id: int,
     splits: List[BankTransactionSplitCreate],
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Add splits to a bank transaction.
 
@@ -842,43 +752,32 @@ def add_transaction_splits(
     Returns:
         Created splits info
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status == BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Cannot modify reconciled transaction")
-
-    # Get current max idx
-    max_idx = db.query(func.max(BankTransactionSplit.idx)).filter(
-        BankTransactionSplit.bank_transaction_id == transaction_id
-    ).scalar() or -1
-
-    created_ids = []
-    for idx, split_data in enumerate(splits, start=max_idx + 1):
-        split = BankTransactionSplit(
-            bank_transaction_id=transaction_id,
-            amount=Decimal(str(split_data.amount)),
-            account=split_data.account,
-            cost_center=split_data.cost_center,
-            tax_code_id=split_data.tax_code_id,
-            tax_rate=Decimal(str(split_data.tax_rate)),
-            tax_amount=Decimal(str(split_data.tax_amount)),
-            memo=split_data.memo,
-            party_type=split_data.party_type,
-            party=split_data.party,
-            idx=idx,
+    split_data_list = [
+        BankTransactionSplitData(
+            amount=Decimal(str(s.amount)),
+            account=s.account,
+            cost_center=s.cost_center,
+            tax_code_id=s.tax_code_id,
+            tax_rate=Decimal(str(s.tax_rate)),
+            tax_amount=Decimal(str(s.tax_amount)),
+            memo=s.memo,
+            party_type=s.party_type,
+            party=s.party,
         )
-        db.add(split)
-        db.flush()
-        created_ids.append(split.id)
+        for s in splits
+    ]
 
-    db.commit()
-
-    return {
-        "message": f"Added {len(created_ids)} splits",
-        "split_ids": created_ids,
-    }
+    try:
+        created_ids = service.add_splits(transaction_id, split_data_list)
+        db.commit()
+        return {
+            "message": f"Added {len(created_ids)} splits",
+            "split_ids": created_ids,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
 
 @router.delete("/bank-transactions/{transaction_id}/splits/{split_id}", dependencies=[Depends(Require("books:write"))])
@@ -886,6 +785,7 @@ def delete_transaction_split(
     transaction_id: int,
     split_id: int,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Delete a split from a bank transaction.
 
@@ -896,24 +796,14 @@ def delete_transaction_split(
     Returns:
         Deletion confirmation
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status == BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Cannot modify reconciled transaction")
-
-    split = db.query(BankTransactionSplit).filter(
-        BankTransactionSplit.id == split_id,
-        BankTransactionSplit.bank_transaction_id == transaction_id,
-    ).first()
-    if not split:
-        raise HTTPException(status_code=404, detail="Split not found")
-
-    db.delete(split)
-    db.commit()
-
-    return {"message": "Split deleted"}
+    try:
+        service.delete_split(transaction_id, split_id)
+        db.commit()
+        return {"message": "Split deleted"}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
 
 # RECONCILIATION
@@ -922,6 +812,7 @@ def delete_transaction_split(
 def reconcile_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Mark a bank transaction as reconciled.
 
@@ -931,15 +822,13 @@ def reconcile_transaction(
     Returns:
         Reconciliation status
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status == BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Transaction is already reconciled")
-
-    txn.status = BankTransactionStatus.RECONCILED
-    db.commit()
+    try:
+        txn = service.reconcile_transaction(transaction_id)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     return {
         "message": "Transaction reconciled",
@@ -952,6 +841,7 @@ def reconcile_transaction(
 def unreconcile_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Unreconcile a bank transaction.
 
@@ -961,15 +851,13 @@ def unreconcile_transaction(
     Returns:
         Updated status
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
-    if not txn:
-        raise HTTPException(status_code=404, detail="Bank transaction not found")
-
-    if txn.status != BankTransactionStatus.RECONCILED:
-        raise HTTPException(status_code=400, detail="Transaction is not reconciled")
-
-    txn.status = BankTransactionStatus.UNRECONCILED
-    db.commit()
+    try:
+        txn = service.unreconcile_transaction(transaction_id)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     return {
         "message": "Transaction unreconciled",
@@ -980,150 +868,6 @@ def unreconcile_transaction(
 
 # BANK TRANSACTION IMPORT
 
-def _parse_csv_content(content: str, column_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
-    """Parse CSV content into transaction records.
-
-    Args:
-        content: CSV file content
-        column_mapping: Mapping of standard fields to CSV column names
-
-    Returns:
-        List of parsed transaction dicts
-    """
-    transactions = []
-    reader = csv.DictReader(io.StringIO(content))
-
-    for row_num, row in enumerate(reader, start=2):  # Start at 2 (1-indexed, skip header)
-        try:
-            # Parse date
-            date_col = column_mapping.get("date_column", "")
-            date_str = row.get(date_col, "").strip()
-            if not date_str:
-                continue
-
-            # Try multiple date formats
-            txn_date = None
-            for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y"]:
-                try:
-                    txn_date = datetime.strptime(date_str[:10], fmt)
-                    break
-                except ValueError:
-                    continue
-
-            if not txn_date:
-                continue
-
-            # Parse amount
-            deposit = Decimal("0")
-            withdrawal = Decimal("0")
-
-            if column_mapping.get("amount_column"):
-                amount_str = row.get(column_mapping["amount_column"], "0")
-                amount_str = re.sub(r"[^\d.\-]", "", amount_str)
-                amount = Decimal(amount_str) if amount_str else Decimal("0")
-                if amount >= 0:
-                    deposit = amount
-                else:
-                    withdrawal = abs(amount)
-            else:
-                if column_mapping.get("deposit_column"):
-                    dep_str = row.get(column_mapping["deposit_column"], "0")
-                    dep_str = re.sub(r"[^\d.]", "", dep_str)
-                    deposit = Decimal(dep_str) if dep_str else Decimal("0")
-                if column_mapping.get("withdrawal_column"):
-                    with_str = row.get(column_mapping["withdrawal_column"], "0")
-                    with_str = re.sub(r"[^\d.]", "", with_str)
-                    withdrawal = Decimal(with_str) if with_str else Decimal("0")
-
-            # Skip zero transactions
-            if deposit == 0 and withdrawal == 0:
-                continue
-
-            transactions.append({
-                "date": txn_date,
-                "deposit": deposit,
-                "withdrawal": withdrawal,
-                "description": row.get(column_mapping.get("description_column", ""), ""),
-                "reference_number": row.get(column_mapping.get("reference_column", ""), ""),
-                "row_num": row_num,
-            })
-
-        except Exception as e:
-            # Skip invalid rows, will be reported as errors
-            continue
-
-    return transactions
-
-
-def _parse_ofx_content(content: str) -> List[Dict[str, Any]]:
-    """Parse OFX/QFX content into transaction records.
-
-    Args:
-        content: OFX file content
-
-    Returns:
-        List of parsed transaction dicts
-    """
-    transactions = []
-
-    # Extract STMTTRN blocks using regex
-    trn_pattern = re.compile(r"<STMTTRN>(.*?)(?:</STMTTRN>|(?=<STMTTRN>)|(?=</BANKTRANLIST>))", re.DOTALL | re.IGNORECASE)
-
-    def extract_tag(block: str, tag: str) -> str:
-        """Extract a tag value from OFX block."""
-        # Try XML style first
-        xml_match = re.search(rf"<{tag}>([^<]*)</{tag}>", block, re.IGNORECASE)
-        if xml_match:
-            return xml_match.group(1).strip()
-        # Try SGML style
-        sgml_match = re.search(rf"<{tag}>([^<\n\r]+)", block, re.IGNORECASE)
-        if sgml_match:
-            return sgml_match.group(1).strip()
-        return ""
-
-    for row_num, match in enumerate(trn_pattern.finditer(content), start=1):
-        block = match.group(1)
-
-        # Parse date (YYYYMMDD format)
-        date_str = extract_tag(block, "DTPOSTED")
-        if len(date_str) < 8:
-            continue
-        try:
-            txn_date = datetime.strptime(date_str[:8], "%Y%m%d")
-        except ValueError:
-            continue
-
-        # Parse amount
-        amount_str = extract_tag(block, "TRNAMT")
-        try:
-            amount = Decimal(amount_str)
-        except (ValueError, TypeError, InvalidOperation):
-            continue
-
-        deposit = amount if amount >= 0 else Decimal("0")
-        withdrawal = abs(amount) if amount < 0 else Decimal("0")
-
-        # Build description from NAME and MEMO
-        name = extract_tag(block, "NAME")
-        memo = extract_tag(block, "MEMO")
-        description = f"{name} - {memo}".strip(" -") if name or memo else ""
-
-        # Reference from FITID or CHECKNUM
-        reference = extract_tag(block, "CHECKNUM") or extract_tag(block, "FITID")
-
-        transactions.append({
-            "date": txn_date,
-            "deposit": deposit,
-            "withdrawal": withdrawal,
-            "description": description,
-            "reference_number": reference,
-            "row_num": row_num,
-            "fitid": extract_tag(block, "FITID"),
-        })
-
-    return transactions
-
-
 @router.post("/bank-transactions/import", dependencies=[Depends(Require("books:write"))])
 async def import_bank_transactions(
     file: UploadFile = File(...),
@@ -1133,6 +877,7 @@ async def import_bank_transactions(
     skip_duplicates: bool = Form(True),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    service: BankingService = Depends(get_banking_service),
 ) -> Dict[str, Any]:
     """Import bank transactions from CSV or OFX file.
 
@@ -1158,21 +903,29 @@ async def import_bank_transactions(
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to read file. Please ensure it is a valid CSV or OFX file.")
 
-    # Parse transactions based on format
+    # Parse transactions based on format using service
     if format == "csv":
         if not column_mapping:
             raise HTTPException(status_code=400, detail="column_mapping is required for CSV import")
         try:
-            mapping = json.loads(column_mapping)
+            mapping_dict = json.loads(column_mapping)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid column_mapping JSON")
 
-        if not mapping.get("date_column"):
+        if not mapping_dict.get("date_column"):
             raise HTTPException(status_code=400, detail="date_column is required in column_mapping")
 
-        parsed = _parse_csv_content(content, mapping)
+        mapping = ImportColumnMapping(
+            date_column=mapping_dict.get("date_column", ""),
+            amount_column=mapping_dict.get("amount_column"),
+            deposit_column=mapping_dict.get("deposit_column"),
+            withdrawal_column=mapping_dict.get("withdrawal_column"),
+            description_column=mapping_dict.get("description_column"),
+            reference_column=mapping_dict.get("reference_column"),
+        )
+        parsed = service.parse_csv(content, mapping)
     else:
-        parsed = _parse_ofx_content(content)
+        parsed = service.parse_ofx(content)
 
     if not parsed:
         return {
@@ -1182,83 +935,20 @@ async def import_bank_transactions(
             "transaction_ids": [],
         }
 
-    # Import transactions
-    imported_count = 0
-    skipped_count = 0
-    errors = []
-    transaction_ids = []
-
-    for txn_data in parsed:
-        try:
-            # Check for duplicates
-            if skip_duplicates:
-                existing = db.query(BankTransaction).filter(
-                    BankTransaction.bank_account == account,
-                    BankTransaction.date == txn_data["date"],
-                    or_(
-                        and_(
-                            BankTransaction.deposit == txn_data["deposit"],
-                            BankTransaction.withdrawal == txn_data["withdrawal"],
-                        ),
-                    ),
-                ).first()
-
-                # Also check by reference if available
-                if not existing and txn_data.get("reference_number"):
-                    existing = db.query(BankTransaction).filter(
-                        BankTransaction.bank_account == account,
-                        BankTransaction.reference_number == txn_data["reference_number"],
-                    ).first()
-
-                # Check by FITID for OFX
-                if not existing and txn_data.get("fitid"):
-                    existing = db.query(BankTransaction).filter(
-                        BankTransaction.bank_account == account,
-                        BankTransaction.transaction_id == txn_data["fitid"],
-                    ).first()
-
-                if existing:
-                    skipped_count += 1
-                    continue
-
-            # Create transaction
-            amount = txn_data["deposit"] if txn_data["deposit"] > 0 else txn_data["withdrawal"]
-            txn = BankTransaction(
-                date=txn_data["date"],
-                bank_account=account,
-                deposit=txn_data["deposit"],
-                withdrawal=txn_data["withdrawal"],
-                currency="NGN",
-                description=txn_data.get("description", ""),
-                reference_number=txn_data.get("reference_number", ""),
-                transaction_id=txn_data.get("fitid", ""),
-                transaction_type="deposit" if txn_data["deposit"] > 0 else "withdrawal",
-                status=BankTransactionStatus.UNRECONCILED,
-                unallocated_amount=amount,
-                allocated_amount=Decimal("0"),
-                is_manual_entry=False,
-                created_by_id=principal.id,
-            )
-
-            db.add(txn)
-            db.flush()
-
-            imported_count += 1
-            transaction_ids.append(txn.id)
-
-        except Exception as e:
-            errors.append({
-                "row": txn_data.get("row_num", 0),
-                "error": str(e),
-            })
-
+    # Import transactions using service
+    result = service.import_transactions(
+        bank_account=account,
+        transactions=parsed,
+        skip_duplicates=skip_duplicates,
+        user_id=principal.id,
+    )
     db.commit()
 
     return {
-        "imported_count": imported_count,
-        "skipped_count": skipped_count,
-        "errors": errors,
-        "transaction_ids": transaction_ids,
+        "imported_count": result.imported_count,
+        "skipped_count": result.skipped_count,
+        "errors": result.errors,
+        "transaction_ids": result.transaction_ids,
     }
 
 

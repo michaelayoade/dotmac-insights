@@ -28,7 +28,6 @@ from app.core.security import is_htmx_request, htmx_toast, set_flash, validate_c
 # Models - Core
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
-from app.models.contact import Contact
 
 # Models - Accounting
 from app.models.accounting import (

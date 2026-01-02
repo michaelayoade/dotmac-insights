@@ -5,14 +5,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy import BigInteger, String, Text, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.ticket import Ticket
-    from app.models.customer import Customer
+    from app.models.party import Party
     from app.models.agent import Agent
 
 
@@ -96,8 +96,11 @@ class CSATResponse(Base):
     ticket_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     agent_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
@@ -129,7 +132,7 @@ class CSATResponse(Base):
     # Relationships
     survey: Mapped["CSATSurvey"] = relationship(back_populates="responses")
     ticket: Mapped[Optional["Ticket"]] = relationship(foreign_keys=[ticket_id])
-    customer: Mapped[Optional["Customer"]] = relationship(foreign_keys=[customer_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[agent_id])
 
     def __repr__(self) -> str:

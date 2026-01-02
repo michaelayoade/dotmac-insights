@@ -191,27 +191,26 @@
             <div class="border-t border-gray-100 pt-6 mt-6">
                 <h4 class="text-sm font-display font-semibold text-gray-900 mb-4">Contact Information</h4>
 
-                <!-- Contact Search -->
-                <div class="mb-4" x-data="{ showContactSearch: false, selectedContact: null }">
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 font-body mb-1.5">
-                        Link to Contact
+                        Link to Party
                     </label>
+                    <input
+                        type="hidden"
+                        name="party_id"
+                        id="party_id"
+                        value="{{ form_data.party_id if form_data else (ticket.party_id if ticket else '') }}"
+                    >
                     <div class="relative">
                         <input
-                            type="hidden"
-                            name="unified_contact_id"
-                            :value="selectedContact?.id"
-                            value="{{ ticket.unified_contact_id if ticket and ticket.unified_contact_id else '' }}"
-                        >
-                        <input
                             type="text"
-                            placeholder="Search for a contact..."
+                            name="q"
+                            placeholder="Search by name, email, or phone..."
                             class="block w-full pl-11 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
-                            @focus="showContactSearch = true"
-                            hx-get="/crm/contacts/search"
+                            hx-get="/support/parties/search"
                             hx-trigger="input changed delay:300ms"
-                            hx-target="#contact-search-results"
-                            data-testid="contact-search-input"
+                            hx-target="#party-search-results"
+                            data-testid="party-search-input"
                         >
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,7 +218,10 @@
                             </svg>
                         </div>
                     </div>
-                    <div id="contact-search-results" class="mt-2"></div>
+                    {% if errors.party_id %}
+                    <p class="mt-2 text-xs text-red-600">{{ errors.party_id }}</p>
+                    {% endif %}
+                    <div id="party-search-results" class="mt-2"></div>
                 </div>
 
                 <p class="text-xs text-gray-500 font-body mb-4">Or enter contact details manually:</p>
@@ -273,6 +275,36 @@
                         >
                     </div>
                 </div>
+                <script>
+                    document.addEventListener("click", function (event) {
+                        const button = event.target.closest("[data-party-id]");
+                        if (!button) {
+                            return;
+                        }
+                        const partyId = button.getAttribute("data-party-id") || "";
+                        const name = button.getAttribute("data-party-name") || "";
+                        const email = button.getAttribute("data-party-email") || "";
+                        const phone = button.getAttribute("data-party-phone") || "";
+
+                        const partyInput = document.getElementById("party_id");
+                        const nameInput = document.getElementById("contact_name");
+                        const emailInput = document.getElementById("contact_email");
+                        const phoneInput = document.getElementById("contact_phone");
+
+                        if (partyInput) {
+                            partyInput.value = partyId;
+                        }
+                        if (nameInput) {
+                            nameInput.value = name;
+                        }
+                        if (emailInput && email) {
+                            emailInput.value = email;
+                        }
+                        if (phoneInput && phone) {
+                            phoneInput.value = phone;
+                        }
+                    });
+                </script>
             </div>
 
             <!-- Assignment Section -->

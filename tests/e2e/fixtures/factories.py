@@ -554,6 +554,199 @@ def add_ticket_comment(
     return ticket_comment
 
 
+def create_unified_ticket(
+    db: Session,
+    subject: str = None,
+    status: str = "open",
+    priority: str = "medium",
+    ticket_type: str = "support",
+    party_id: int = None,
+    contact_name: str = None,
+    contact_email: str = None,
+    assigned_to_id: int = None,
+    created_by_id: int = None,
+    **kwargs
+) -> "UnifiedTicket":
+    """
+    Create a unified ticket for SSR support module testing.
+
+    This uses the UnifiedTicket model which is the primary ticket model
+    for the SSR web routes.
+    """
+    from app.models.unified_ticket import (
+        UnifiedTicket, TicketStatus, TicketPriority, TicketType, TicketSource
+    )
+
+    # Generate unique ticket number with timestamp + UUID
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    suffix = random_string(4).upper()
+
+    ticket = UnifiedTicket(
+        ticket_number=f"TKT-{timestamp}-{suffix}",
+        subject=subject or f"Test Unified Ticket {random_string(6)}",
+        description="This is a test unified ticket for E2E testing",
+        status=TicketStatus(status),
+        priority=TicketPriority(priority),
+        ticket_type=TicketType(ticket_type),
+        source=TicketSource.INTERNAL,
+        party_id=party_id,
+        contact_name=contact_name or f"Contact {random_string(4)}",
+        contact_email=contact_email or random_email(),
+        assigned_to_id=assigned_to_id,
+        created_by_id=created_by_id,
+        updated_by_id=created_by_id,
+        **kwargs
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+# =============================================================================
+# OMNICHANNEL FACTORIES
+# =============================================================================
+
+
+def create_omni_channel(
+    db: Session,
+    name: str = None,
+    channel_type: str = "email",
+    is_active: bool = True,
+    **kwargs
+) -> "OmniChannel":
+    """Create an omnichannel channel for testing."""
+    from app.models.omni import OmniChannel, ChannelType
+
+    channel = OmniChannel(
+        name=name or f"Test Channel {random_string(4)}",
+        type=ChannelType(channel_type),
+        is_active=is_active,
+        **kwargs
+    )
+    db.add(channel)
+    db.commit()
+    db.refresh(channel)
+    return channel
+
+
+def create_omni_conversation(
+    db: Session,
+    channel_id: int = None,
+    subject: str = None,
+    status: str = "open",
+    priority: str = "medium",
+    party_id: int = None,
+    contact_name: str = None,
+    contact_email: str = None,
+    assigned_agent_id: int = None,
+    assigned_team_id: int = None,
+    is_starred: bool = False,
+    tags: list = None,
+    **kwargs
+) -> "OmniConversation":
+    """
+    Create an omnichannel conversation for testing.
+
+    If channel_id is not provided, creates a default email channel.
+    """
+    from app.models.omni import OmniConversation, ConversationStatus, ConversationPriority
+
+    # Create a default channel if not provided
+    if channel_id is None:
+        channel = create_omni_channel(db)
+        channel_id = channel.id
+
+    conversation = OmniConversation(
+        channel_id=channel_id,
+        subject=subject or f"Test Conversation {random_string(6)}",
+        status=ConversationStatus(status),
+        priority=ConversationPriority(priority),
+        party_id=party_id,
+        contact_name=contact_name or f"Contact {random_string(4)}",
+        contact_email=contact_email or random_email(),
+        assigned_agent_id=assigned_agent_id,
+        assigned_team_id=assigned_team_id,
+        is_starred=is_starred,
+        tags=tags or [],
+        unread_count=0,
+        message_count=0,
+        **kwargs
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def create_omni_message(
+    db: Session,
+    conversation_id: int,
+    body: str = None,
+    direction: str = "inbound",
+    sender_name: str = None,
+    sender_email: str = None,
+    agent_id: int = None,
+    **kwargs
+) -> "OmniMessage":
+    """Create an omnichannel message for testing."""
+    from app.models.omni import OmniMessage, MessageDirection
+
+    message = OmniMessage(
+        conversation_id=conversation_id,
+        direction=MessageDirection(direction),
+        body=body or f"Test message {random_string(8)}",
+        sender_name=sender_name or "Test Sender",
+        sender_email=sender_email or random_email(),
+        agent_id=agent_id,
+        **kwargs
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return message
+
+
+def setup_omni_conversation_with_messages(
+    db: Session,
+    message_count: int = 5,
+    **conversation_kwargs
+) -> dict:
+    """
+    Setup a conversation with messages for testing.
+
+    Returns dict with: channel, conversation, messages
+    """
+    channel = create_omni_channel(db)
+    conversation = create_omni_conversation(
+        db,
+        channel_id=channel.id,
+        **conversation_kwargs
+    )
+
+    messages = []
+    for i in range(message_count):
+        direction = "inbound" if i % 2 == 0 else "outbound"
+        message = create_omni_message(
+            db,
+            conversation_id=conversation.id,
+            body=f"Message {i + 1}",
+            direction=direction,
+        )
+        messages.append(message)
+
+    # Update conversation message count
+    conversation.message_count = len(messages)
+    db.commit()
+    db.refresh(conversation)
+
+    return {
+        "channel": channel,
+        "conversation": conversation,
+        "messages": messages,
+    }
+
+
 # =============================================================================
 # PROJECT FACTORIES
 # =============================================================================

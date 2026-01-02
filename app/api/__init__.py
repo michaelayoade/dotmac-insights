@@ -38,6 +38,7 @@ from app.api.migration import router as migration_router
 from app.api.admin_sync import router as admin_sync_router
 from app.api.reports import router as reports_router
 from app.api.search import router as search_router
+from app.api.subscriptions import router as subscriptions_router
 
 api_router = APIRouter()
 
@@ -54,6 +55,7 @@ api_router.include_router(settings.router, prefix="/v1", tags=["settings"])
 api_router.include_router(expenses.router, prefix="/v1", tags=["expenses"])
 api_router.include_router(support.router, prefix="/v1/support", tags=["support"])
 api_router.include_router(network.router, prefix="/v1/network", tags=["network"])
+api_router.include_router(subscriptions_router, prefix="/v1")
 api_router.include_router(inventory.router, prefix="/v1", tags=["inventory"])
 api_router.include_router(assets_router, prefix="/v1", tags=["assets"])
 api_router.include_router(asset_settings_router, prefix="/v1", tags=["asset-settings"])

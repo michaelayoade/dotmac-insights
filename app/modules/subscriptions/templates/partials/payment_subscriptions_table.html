@@ -122,9 +122,9 @@
 
                 <!-- Customer -->
                 <td class="px-3 py-4 hidden sm:table-cell">
-                    {% if sub.customer %}
-                    <a href="/customers/{{ sub.customer.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors">
-                        {{ sub.customer.name }}
+                    {% if sub.party %}
+                    <a href="/parties/{{ sub.party.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors">
+                        {{ sub.party.name }}
                     </a>
                     {% else %}
                     <span class="text-sm text-gray-500">{{ sub.customer_email or '-' }}</span>

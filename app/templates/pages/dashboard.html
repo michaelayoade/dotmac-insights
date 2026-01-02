@@ -23,7 +23,16 @@
 
 {% block content %}
 <!-- Stats Grid -->
-<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-10" data-testid="stats-grid">
+<div id="dashboard-stats"
+     class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-10"
+     data-testid="stats-grid"
+     hx-get="/dashboard/stats"
+     hx-trigger="every 60s"
+     hx-swap="innerHTML"
+     hx-indicator="#stats-refresh-indicator">
+    <div id="stats-refresh-indicator" class="htmx-indicator absolute top-2 right-2">
+        <span class="text-xs text-gray-400 animate-pulse">Updating...</span>
+    </div>
     {% if stats %}
         {% for stat in stats %}
         <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
@@ -207,27 +216,6 @@
             <p class="mt-0.5 text-sm text-gray-500 font-body">Jump into common tasks</p>
         </div>
         <div class="p-4 space-y-2">
-            {% if has_scope('crm:write') %}
-            <a
-                href="/crm/contacts/new"
-                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
-                data-testid="quick-action-new-contact"
-            >
-                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100 group-hover:scale-105 transition-all duration-200">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                    </svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 font-body">New Contact</p>
-                    <p class="text-xs text-gray-500 font-body">Add a lead or customer</p>
-                </div>
-                <svg class="w-4 h-4 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
-            </a>
-            {% endif %}
-
             {% if has_scope('support:write') %}
             <a
                 href="/support/tickets/new"
@@ -291,7 +279,7 @@
             </a>
             {% endif %}
 
-            {% if not has_scope('crm:write') and not has_scope('support:write') and not has_scope('accounting:write') and not has_scope('expenses:write') %}
+            {% if not has_scope('support:write') and not has_scope('accounting:write') and not has_scope('expenses:write') %}
             <!-- No quick actions available -->
             <div class="py-8 text-center" data-testid="no-quick-actions">
                 <div class="mx-auto w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
@@ -306,7 +294,7 @@
 
             <!-- View all link -->
             <div class="pt-2 mt-2 border-t border-gray-100">
-                <a href="/crm/contacts" class="flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">
+                <a href="/" class="flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-500 transition-colors">
                     <span>Browse all modules</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>

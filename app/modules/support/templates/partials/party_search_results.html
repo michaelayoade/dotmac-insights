@@ -1,0 +1,30 @@
+{% if parties %}
+<div class="rounded-xl border border-gray-100 bg-white shadow-warm-sm overflow-hidden">
+    <ul class="divide-y divide-gray-100">
+        {% for party in parties %}
+        <li>
+            <button
+                type="button"
+                class="w-full text-left px-4 py-3 hover:bg-surface-50 transition-colors"
+                data-party-id="{{ party.id }}"
+                data-party-name="{{ party.name }}"
+                data-party-email="{{ party.primary_email or '' }}"
+                data-party-phone="{{ party.primary_phone or '' }}"
+            >
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ party.name }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ party.primary_email or party.primary_phone or "No contact info" }}
+                        </p>
+                    </div>
+                    <span class="text-xs text-gray-400">{{ party.type }}</span>
+                </div>
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% elif query %}
+<p class="text-xs text-gray-500 font-body">No parties found.</p>
+{% endif %}

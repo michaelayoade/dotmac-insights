@@ -1,0 +1,108 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <p class="text-sm text-gray-500">Party</p>
+            <h1 class="text-2xl font-display font-semibold text-gray-900">
+                {{ party.name or ("Party #" ~ party.id) }}
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                {{ party.type }} · {{ party.status }}
+            </p>
+        </div>
+        <div class="text-xs text-gray-500">
+            ID: {{ party.id }}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-sm font-display font-semibold text-gray-900 mb-4">Contact</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500">Primary Email</p>
+                        <p class="text-gray-900">{{ party.primary_email or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Primary Phone</p>
+                        <p class="text-gray-900">{{ party.primary_phone or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Timezone</p>
+                        <p class="text-gray-900">{{ party.timezone or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Locale</p>
+                        <p class="text-gray-900">{{ party.locale or "-" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-sm font-display font-semibold text-gray-900 mb-4">Details</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500">First Name</p>
+                        <p class="text-gray-900">{{ party.first_name or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Last Name</p>
+                        <p class="text-gray-900">{{ party.last_name or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Legal Name</p>
+                        <p class="text-gray-900">{{ party.legal_name or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Trading Name</p>
+                        <p class="text-gray-900">{{ party.trading_name or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Tax ID</p>
+                        <p class="text-gray-900">{{ party.tax_id or "-" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Created</p>
+                        <p class="text-gray-900">{{ party.created_at | datetime }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-sm font-display font-semibold text-gray-900 mb-4">Roles</h2>
+                {% if party.roles %}
+                <div class="flex flex-wrap gap-2">
+                    {% for role in party.roles %}
+                    <span class="inline-flex items-center rounded-full bg-surface-100 px-2.5 py-1 text-xs text-gray-700">
+                        {{ role.role }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">No roles assigned.</p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-sm font-display font-semibold text-gray-900 mb-4">Tags</h2>
+                {% if party.tags %}
+                <div class="flex flex-wrap gap-2">
+                    {% for tag in party.tags %}
+                    <span class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs text-primary-700">
+                        {{ tag }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">No tags.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

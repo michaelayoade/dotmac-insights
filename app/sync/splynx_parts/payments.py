@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 import structlog
 
 from app.models.payment import Payment, PaymentMethod, PaymentSource
-from app.models.customer import Customer
 from app.models.party import CustomerAccount, PartyExternalId
 from app.models.invoice import Invoice, InvoiceSource
 from app.config import settings
@@ -19,11 +18,7 @@ async def sync_payments(sync_client, client, full_sync: bool):
         payments = await sync_client._fetch_paginated(client, "/admin/finance/payments")
         logger.info("splynx_payments_fetched", count=len(payments))
 
-        # Pre-fetch customers and invoices for faster lookup
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).all()
-        }
+        # Pre-fetch invoices and customer accounts for faster lookup
         invoices_by_splynx_id = {
             inv.splynx_id: inv.id
             for inv in sync_client.db.query(Invoice).filter(Invoice.source == InvoiceSource.SPLYNX).all()
@@ -33,7 +28,10 @@ async def sync_payments(sync_client, client, full_sync: bool):
             for pe, ca in (
                 sync_client.db.query(PartyExternalId, CustomerAccount)
                 .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
-                .filter(PartyExternalId.system == "splynx")
+                .filter(
+                    PartyExternalId.system == "splynx",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
                 .all()
             )
         }
@@ -47,7 +45,6 @@ async def sync_payments(sync_client, client, full_sync: bool):
 
             # Find customer using pre-fetched map
             customer_splynx_id = pay_data.get("customer_id")
-            customer_id = customers_by_splynx_id.get(customer_splynx_id)
             customer_account_id = None
             if customer_splynx_id is not None:
                 customer_account_id = account_by_splynx_id.get(str(customer_splynx_id))
@@ -73,7 +70,6 @@ async def sync_payments(sync_client, client, full_sync: bool):
             payment_method = payment_type_map.get(payment_type, PaymentMethod.OTHER)
 
             if existing:
-                existing.customer_id = customer_id
                 existing.customer_account_id = customer_account_id
                 existing.invoice_id = invoice_id
                 existing.amount = amount
@@ -94,7 +90,6 @@ async def sync_payments(sync_client, client, full_sync: bool):
                 payment = Payment(
                     splynx_id=splynx_id,
                     source=PaymentSource.SPLYNX,
-                    customer_id=customer_id,
                     customer_account_id=customer_account_id,
                     invoice_id=invoice_id,
                     amount=amount,

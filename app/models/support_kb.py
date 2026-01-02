@@ -5,14 +5,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy import BigInteger, String, Text, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
     from app.models.agent import Agent
+    from app.models.party import Party
 
 
 class ArticleStatus(str, Enum):
@@ -201,8 +201,11 @@ class KBArticleFeedback(Base):
     feedback_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Who gave feedback (one of these, or anonymous)
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     agent_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True

@@ -32,7 +32,7 @@ from ._deps import (
     CannedResponse, CannedResponseScope,
     SLAPolicy, SLATarget, BusinessCalendar,
     Employee, EmploymentStatus,
-    Contact,
+    Party,
     # Permission dependencies
     RequireSupportRead, RequireSupportWrite,
     # Helper functions
@@ -43,6 +43,8 @@ from ._deps import (
     get_agent_options, get_team_options, get_sla_policy_options,
     # Entity lists for forms
     get_agents, get_teams,
+    # Party resolution
+    resolve_party_for_ticket,
     # Date utilities
     datetime, timedelta,
     # Typing
@@ -73,7 +75,7 @@ async def support_dashboard(
     db: DB,
 ):
     """Support Dashboard with ticket overview stats."""
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Get stats from service
@@ -98,12 +100,6 @@ async def support_dashboard(
         for priority, count in stats["priority_distribution"].items()
     ]
 
-    # Created today (additional stat not in service)
-    created_today = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.created_at >= today
-    ).scalar() or 0
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Support Dashboard"
@@ -115,7 +111,7 @@ async def support_dashboard(
         "total_open": stats["total_open"],
         "urgent_tickets": stats["urgent_tickets"],
         "resolved_today": stats["resolved_today"],
-        "created_today": created_today,
+        "created_today": stats["created_today"],
     }
     context["status_distribution"] = status_distribution
     context["priority_distribution"] = priority_distribution
@@ -152,19 +148,14 @@ async def tickets_list(
 
     Returns full page for normal requests, table partial for HTMX requests.
     """
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
 
-    # Handle special assignment filter
-    assigned_to_id = None
-    if assigned == "unassigned":
-        # Will be handled in service - pass None and filter after
-        pass
-
-    # Get tickets using service
+    # Get tickets using service - unassigned filter handled at DB level for correct pagination
     result = service.list_tickets(
         q=q,
         status=status,
         priority=priority,
+        unassigned_only=(assigned == "unassigned"),
         page=page,
         per_page=per_page,
         sort=sort,
@@ -173,10 +164,6 @@ async def tickets_list(
 
     tickets = result["items"]
     total = result["total"]
-
-    # Filter unassigned if needed (service doesn't handle this special case)
-    if assigned == "unassigned":
-        tickets = [t for t in tickets if t.assigned_to_id is None]
 
     # Get dashboard stats for the quick filters
     dashboard_stats = service.get_dashboard_stats()
@@ -287,11 +274,27 @@ async def ticket_create(
     errors = {}
     subject = _form_str(form, "subject")
     description = _form_str(form, "description")
+    party_id = _form_int(form, "party_id")
+    contact_email = _form_str(form, "contact_email")
+    contact_phone = _form_str(form, "contact_phone")
+    contact_name = _form_str(form, "contact_name")
+
+    # Resolve party - either from explicit ID or auto-resolve from contact info
+    party = None
+    if party_id:
+        party = db.query(Party).filter(Party.id == party_id).first()
+    elif contact_email or contact_phone:
+        # Auto-resolve party from contact email/phone
+        party = resolve_party_for_ticket(db, email=contact_email, phone=contact_phone, name=contact_name)
 
     if not subject:
         errors["subject"] = "Subject is required"
     if len(subject) > 500:
         errors["subject"] = "Subject must be 500 characters or less"
+    if not party and not party_id and not contact_email:
+        errors["party_id"] = "Party or contact email is required"
+    elif party_id and not party:
+        errors["party_id"] = "Party not found"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -316,12 +319,11 @@ async def ticket_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Handle FK fields
-    unified_contact_id = _form_str(form, "unified_contact_id")
     assigned_to_id = _form_str(form, "assigned_to_id")
     assigned_team = _form_str(form, "assigned_team")
 
     # Create ticket using service
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
     ticket_data = {
         "subject": subject,
         "description": description or None,
@@ -330,17 +332,40 @@ async def ticket_create(
         "status": TicketStatus.OPEN.value if hasattr(TicketStatus.OPEN, 'value') else "open",
         "source": TicketSource.INTERNAL.value if hasattr(TicketSource.INTERNAL, 'value') else "internal",
         "channel": form.get("channel") or None,
-        "contact_name": _form_str(form, "contact_name") or None,
-        "contact_email": _form_str(form, "contact_email") or None,
-        "contact_phone": _form_str(form, "contact_phone") or None,
-        "unified_contact_id": int(unified_contact_id) if unified_contact_id else None,
+        "party_id": party.id if party else None,
+        "contact_name": contact_name or (party.name if party else None),
+        "contact_email": contact_email or (party.primary_email if party else None),
+        "contact_phone": contact_phone or (party.primary_phone if party else None),
         "assigned_to_id": int(assigned_to_id) if assigned_to_id else None,
         "assigned_team": assigned_team or None,
     }
     ticket = service.create_ticket(ticket_data)
+    db.commit()
 
     set_flash(response, f"Ticket '{ticket.ticket_number}' created successfully.", "success")
     return RedirectResponse(url=f"/support/tickets/{ticket.id}", status_code=303)
+
+
+@router.get("/parties/search", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def party_search(
+    db: DB,
+    q: str = Query(default=""),
+):
+    """Search parties for ticket contact linking."""
+    query = (q or "").strip()
+    parties = []
+    if len(query) >= 2:
+        search = f"%{query}%"
+        parties = db.query(Party).filter(
+            or_(
+                Party.name.ilike(search),
+                Party.primary_email.ilike(search),
+                Party.primary_phone.ilike(search),
+            )
+        ).order_by(Party.name.asc()).limit(10).all()
+
+    template = templates.get_template("modules/support/templates/partials/party_search_results.html")
+    return HTMLResponse(template.render({"parties": parties, "query": query}))
 
 
 @router.get("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportRead])
@@ -353,8 +378,8 @@ async def ticket_detail(
     ticket_id: int,
 ):
     """Ticket detail page."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -404,8 +429,8 @@ async def ticket_edit(
     ticket_id: int,
 ):
     """Ticket edit form page."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -444,8 +469,8 @@ async def ticket_update(
     ticket_id: int,
 ):
     """Update a ticket."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -455,9 +480,17 @@ async def ticket_update(
     # Basic validation
     errors = {}
     subject = _form_str(form, "subject")
+    party_id = _form_int(form, "party_id")
+    party = None
+    if party_id:
+        party = db.query(Party).filter(Party.id == party_id).first()
 
     if not subject:
         errors["subject"] = "Subject is required"
+    if not party_id:
+        errors["party_id"] = "Party is required"
+    elif not party:
+        errors["party_id"] = "Party not found"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -483,7 +516,6 @@ async def ticket_update(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Handle FK fields
-    unified_contact_id = _form_str(form, "unified_contact_id")
     assigned_to_id = _form_str(form, "assigned_to_id")
     assigned_team = _form_str(form, "assigned_team")
 
@@ -495,18 +527,16 @@ async def ticket_update(
         "priority": form.get("priority"),
         "status": form.get("status"),
         "channel": form.get("channel") or None,
-        "contact_name": _form_str(form, "contact_name") or None,
-        "contact_email": _form_str(form, "contact_email") or None,
-        "contact_phone": _form_str(form, "contact_phone") or None,
+        "party_id": party.id if party else None,
+        "contact_name": _form_str(form, "contact_name") or (party.name if party else None),
+        "contact_email": _form_str(form, "contact_email") or (party.primary_email if party else None),
+        "contact_phone": _form_str(form, "contact_phone") or (party.primary_phone if party else None),
         "resolution": _form_str(form, "resolution") or None,
-        "unified_contact_id": int(unified_contact_id) if unified_contact_id else None,
         "assigned_to_id": int(assigned_to_id) if assigned_to_id else None,
         "assigned_team": assigned_team or None,
     }
     ticket = service.update_ticket(ticket_id, update_data)
-
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
+    db.commit()
 
     set_flash(response, f"Ticket '{ticket.ticket_number}' updated successfully.", "success")
     return RedirectResponse(url=f"/support/tickets/{ticket.id}", status_code=303)
@@ -522,14 +552,15 @@ async def ticket_delete(
     ticket_id: int,
 ):
     """Delete a ticket (soft delete)."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     ticket_number = ticket.ticket_number
     service.delete_ticket(ticket_id)
+    db.commit()
 
     # For HTMX, return empty response with toast trigger
     if is_htmx_request(request):
@@ -550,8 +581,8 @@ async def ticket_update_status(
     ticket_id: int,
 ):
     """Quick status update via HTMX."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -560,12 +591,21 @@ async def ticket_update_status(
     new_status = _form_str(form, "status")
 
     if new_status:
+        # Validate status value
+        valid_statuses = [s.value for s in TicketStatus]
+        if new_status not in valid_statuses:
+            htmx_toast(response, f"Invalid status: {new_status}", "error")
+            return HTMLResponse("", status_code=400, headers=dict(response.headers))
+
         ticket = service.update_ticket(ticket_id, {"status": new_status})
+        db.commit()
         htmx_toast(response, f"Status updated to {new_status.replace('_', ' ').title()}", "success")
 
     # Return updated ticket row
     context = get_base_context(request, response, user, "")
     context["ticket"] = ticket
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
 
     template = templates.get_template("modules/support/templates/partials/ticket_row.html")
     return HTMLResponse(template.render(context), headers=dict(response.headers))
@@ -581,17 +621,645 @@ async def ticket_row(
     ticket_id: int,
 ):
     """Single ticket row partial for HTMX updates."""
-    service = SupportWebService(db, user_id=user.id)
-    ticket = service.get_ticket(ticket_id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
 
     if not ticket:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
     context["ticket"] = ticket
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
 
     template = templates.get_template("modules/support/templates/partials/ticket_row.html")
     return HTMLResponse(template.render(context))
+
+
+@router.patch("/{ticket_id}/inline/{field}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_inline_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    ticket_id: int,
+    field: str,
+):
+    """Inline field update via HTMX PATCH - returns just the updated inline component."""
+    from app.services.errors import NotFoundError, ValidationError as SvcValidationError
+
+    service = SupportWebService(db, user_id=user.id, principal=user)
+
+    # Get the new value from form data
+    form = await request.form()
+    new_value = _form_str(form, field)
+
+    if not new_value:
+        raise HTTPException(status_code=400, detail=f"Missing {field} value")
+
+    # Use service layer for inline field update with validation
+    try:
+        ticket = service.update_field(ticket_id, field, new_value)
+        db.commit()
+    except SvcValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    htmx_toast(response, f"{field.title()} updated", "success")
+
+    # Return the updated inline component
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
+
+    template = templates.get_template(f"modules/support/templates/partials/inline_{field}.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
+
+
+# =============================================================================
+# BULK OPERATIONS
+# =============================================================================
+
+@router.post("/bulk-status", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def tickets_bulk_status(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    status: str = Query(..., description="Target status"),
+):
+    """Bulk update ticket status."""
+    import json
+    body = await request.body()
+    try:
+        data = json.loads(body) if body else {}
+        ids = data.get("ids", [])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    if not ids:
+        raise HTTPException(status_code=400, detail="No ticket IDs provided")
+
+    # Validate status
+    try:
+        target_status = TicketStatus(status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    # Use service layer for bulk update
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    updated = service.bulk_update_status(ids, target_status)
+    db.commit()
+
+    htmx_toast(response, f"Updated {updated} tickets to {status.replace('_', ' ').title()}", "success")
+    return HTMLResponse("", headers=dict(response.headers))
+
+
+@router.delete("/bulk", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def tickets_bulk_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+):
+    """Bulk delete tickets."""
+    import json
+    body = await request.body()
+    try:
+        data = json.loads(body) if body else {}
+        ids = data.get("ids", [])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    if not ids:
+        raise HTTPException(status_code=400, detail="No ticket IDs provided")
+
+    # Use service layer for bulk delete
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    deleted = service.bulk_delete(ids)
+    db.commit()
+
+    htmx_toast(response, f"Deleted {deleted} tickets", "success")
+    return HTMLResponse("", headers=dict(response.headers))
+
+
+@router.get("/export", dependencies=[RequireSupportRead])
+async def tickets_export(
+    request: Request,
+    db: DB,
+    ids: list[int] = Query(None, description="Ticket IDs to export"),
+):
+    """Export tickets to CSV."""
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+
+    # Build query
+    query = db.query(UnifiedTicket)
+    if ids:
+        query = query.filter(UnifiedTicket.id.in_(ids))
+    tickets = query.order_by(UnifiedTicket.created_at.desc()).all()
+
+    # Generate CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Ticket Number", "Subject", "Status", "Priority", "Party ID", "Contact", "Assigned To", "Created At"])
+
+    for ticket in tickets:
+        writer.writerow([
+            ticket.ticket_number,
+            ticket.subject,
+            ticket.status.value if ticket.status else "",
+            ticket.priority.value if ticket.priority else "",
+            ticket.party_id or "",
+            ticket.contact_name or "",
+            f"{ticket.assigned_to.first_name} {ticket.assigned_to.last_name}" if ticket.assigned_to else "",
+            ticket.created_at.isoformat() if ticket.created_at else "",
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tickets.csv"}
+    )
+
+
+# =============================================================================
+# TICKET ASSIGNMENT ROUTES
+# =============================================================================
+
+
+@router.get("/{ticket_id}/assign-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_assign_modal(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    ticket_id: int,
+):
+    """Return assignment modal content with agent/team selects."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Get available agents and teams
+    agents = get_agents(db)
+    teams = get_teams(db)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["ticket"] = ticket
+    context["agents"] = agents
+    context["teams"] = teams
+
+    template = templates.get_template("modules/support/templates/partials/assign_modal.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{ticket_id}/assign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_assign(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    ticket_id: int,
+):
+    """Assign ticket to an agent and/or team."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    form = await request.form()
+    agent_id = _form_int(form, "agent_id")
+    team_id = _form_int(form, "team_id")
+
+    # Update assignment
+    update_data = {}
+    if agent_id is not None:
+        update_data["assigned_to_id"] = agent_id if agent_id > 0 else None
+    if team_id is not None:
+        update_data["assigned_team_id"] = team_id if team_id > 0 else None
+
+    if update_data:
+        ticket = service.update_ticket(ticket_id, update_data)
+        db.commit()
+
+        # Get agent name for toast message
+        if agent_id and agent_id > 0:
+            agent = service.get_agent(agent_id)
+            name = agent.display_name if agent else "an agent"
+        else:
+            name = "a team" if team_id else "unassigned"
+        htmx_toast(response, f"Ticket assigned to {name}", "success")
+
+    # Return updated ticket row
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
+
+    template = templates.get_template("modules/support/templates/partials/ticket_row.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
+
+
+@router.post("/{ticket_id}/unassign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_unassign(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    ticket_id: int,
+):
+    """Unassign ticket from agent and team."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket = service.update_ticket(ticket_id, {
+        "assigned_to_id": None,
+        "assigned_team_id": None,
+    })
+    db.commit()
+
+    htmx_toast(response, "Ticket unassigned", "success")
+
+    # Return updated ticket row
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
+
+    template = templates.get_template("modules/support/templates/partials/ticket_row.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
+
+
+# =============================================================================
+# TICKET COMMENT/REPLY ROUTES
+# =============================================================================
+
+
+@router.post("/{ticket_id}/comment", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_add_comment(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    ticket_id: int,
+):
+    """Add a comment/reply to a ticket."""
+    from app.models.unified_ticket import HDTicketComment
+
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    form = await request.form()
+    body = _form_str(form, "body")
+    is_public = _form_str(form, "is_public") == "true"
+
+    if not body or not body.strip():
+        htmx_toast(response, "Comment body is required", "error")
+        return HTMLResponse("", status_code=400, headers=dict(response.headers))
+
+    # Create comment
+    comment = HDTicketComment(
+        ticket_id=ticket_id,
+        comment=body.strip(),
+        is_public=is_public,
+        commented_by_id=user.id,
+        commented_by_name=user.display_name if hasattr(user, 'display_name') else None,
+    )
+    db.add(comment)
+    db.commit()
+
+    htmx_toast(response, "Comment added", "success")
+
+    # Return updated activity timeline
+    return await ticket_activity(request, response, user, "", db, ticket_id)
+
+
+@router.get("/{ticket_id}/comments", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def ticket_comments(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    ticket_id: int,
+):
+    """Get ticket comments as HTML partial."""
+    from app.models.unified_ticket import HDTicketComment
+
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    comments = db.query(HDTicketComment).filter(
+        HDTicketComment.ticket_id == ticket_id
+    ).order_by(HDTicketComment.created_at.desc()).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["ticket"] = ticket
+    context["comments"] = comments
+
+    template = templates.get_template("modules/support/templates/partials/comment_list.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# TICKET ACTIVITY TIMELINE
+# =============================================================================
+
+
+@router.get("/{ticket_id}/activity", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def ticket_activity(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    ticket_id: int,
+):
+    """Get ticket activity timeline as HTML partial."""
+    from app.models.unified_ticket import HDTicketComment, TicketActivity
+
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Get comments and activities, combine into timeline
+    comments = db.query(HDTicketComment).filter(
+        HDTicketComment.ticket_id == ticket_id
+    ).all()
+
+    activities = db.query(TicketActivity).filter(
+        TicketActivity.ticket_id == ticket_id
+    ).all() if hasattr(db, 'query') else []
+
+    # Combine into timeline items
+    timeline = []
+    for c in comments:
+        timeline.append({
+            "type": "comment",
+            "created_at": c.created_at,
+            "author": c.commented_by_name or "Unknown",
+            "content": c.comment,
+            "is_public": c.is_public,
+        })
+
+    for a in activities:
+        timeline.append({
+            "type": "activity",
+            "created_at": a.created_at,
+            "author": getattr(a, 'performed_by_name', None) or "System",
+            "content": getattr(a, 'description', None) or f"{a.action_type}: {a.field_name}",
+        })
+
+    # Sort by created_at descending
+    timeline.sort(key=lambda x: x["created_at"] or datetime.min, reverse=True)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["ticket"] = ticket
+    context["timeline"] = timeline
+
+    template = templates.get_template("modules/support/templates/partials/activity_timeline.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# BULK PRIORITY UPDATE
+# =============================================================================
+
+
+@router.post("/bulk-priority", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def tickets_bulk_priority(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    priority: str = Query(..., description="Target priority"),
+):
+    """Bulk update ticket priority."""
+    import json
+    body = await request.body()
+    try:
+        data = json.loads(body) if body else {}
+        ids = data.get("ids", [])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request body")
+
+    if not ids:
+        raise HTTPException(status_code=400, detail="No ticket IDs provided")
+
+    # Validate priority
+    try:
+        target_priority = TicketPriority(priority)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid priority: {priority}")
+
+    # Use service layer for bulk update
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    updated = service.bulk_update_priority(ids, target_priority)
+    db.commit()
+
+    htmx_toast(response, f"Updated {updated} tickets to {priority.replace('_', ' ').title()} priority", "success")
+    return HTMLResponse("", headers=dict(response.headers))
+
+
+# =============================================================================
+# TICKET TAGS ROUTES
+# =============================================================================
+
+
+@router.get("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def ticket_tags(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    ticket_id: int,
+):
+    """Get ticket tags as HTML partial."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["ticket"] = ticket
+    context["tags"] = ticket.tags or []
+
+    template = templates.get_template("modules/support/templates/partials/ticket_tags.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_add_tag(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    ticket_id: int,
+):
+    """Add a tag to a ticket."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    form = await request.form()
+    tag = _form_str(form, "tag")
+
+    if not tag or not tag.strip():
+        htmx_toast(response, "Tag name is required", "error")
+        return HTMLResponse("", status_code=400, headers=dict(response.headers))
+
+    tag = tag.strip().lower()
+
+    # Add tag if not exists
+    current_tags = ticket.tags or []
+    if tag not in current_tags:
+        ticket = service.update_ticket(ticket_id, {"tags": current_tags + [tag]})
+        db.commit()
+        htmx_toast(response, f"Tag '{tag}' added", "success")
+
+    # Return updated tags partial
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+    context["tags"] = ticket.tags or []
+
+    template = templates.get_template("modules/support/templates/partials/ticket_tags.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
+
+
+@router.delete("/{ticket_id}/tags/{tag_name}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_remove_tag(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    ticket_id: int,
+    tag_name: str,
+):
+    """Remove a tag from a ticket."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Remove tag if exists
+    current_tags = ticket.tags or []
+    if tag_name in current_tags:
+        new_tags = [t for t in current_tags if t != tag_name]
+        ticket = service.update_ticket(ticket_id, {"tags": new_tags})
+        db.commit()
+        htmx_toast(response, f"Tag '{tag_name}' removed", "success")
+
+    # Return updated tags partial
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+    context["tags"] = ticket.tags or []
+
+    template = templates.get_template("modules/support/templates/partials/ticket_tags.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
+
+
+# =============================================================================
+# SLA OVERRIDE ROUTES
+# =============================================================================
+
+
+@router.get("/{ticket_id}/sla-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_sla_modal(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    ticket_id: int,
+):
+    """Return SLA override modal content."""
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["ticket"] = ticket
+
+    template = templates.get_template("modules/support/templates/partials/sla_modal.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{ticket_id}/sla", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+async def ticket_update_sla(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    ticket_id: int,
+):
+    """Override ticket SLA dates."""
+    from dateutil.parser import parse as parse_date
+
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    ticket = service.get_ticket_or_none(ticket_id)
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    form = await request.form()
+    response_by_str = _form_str(form, "response_by")
+    resolution_by_str = _form_str(form, "resolution_by")
+    reason = _form_str(form, "reason")
+
+    update_data = {}
+
+    try:
+        if response_by_str:
+            update_data["response_by"] = parse_date(response_by_str)
+        if resolution_by_str:
+            update_data["resolution_by"] = parse_date(resolution_by_str)
+    except Exception:
+        htmx_toast(response, "Invalid date format", "error")
+        return HTMLResponse("", status_code=400, headers=dict(response.headers))
+
+    if update_data:
+        ticket = service.update_ticket(ticket_id, update_data)
+        db.commit()
+        htmx_toast(response, "SLA dates updated", "success")
+
+    # Return updated ticket detail SLA section
+    context = get_base_context(request, response, user, "")
+    context["ticket"] = ticket
+
+    template = templates.get_template("modules/support/templates/partials/ticket_sla.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
 
 
 # =============================================================================
@@ -1129,7 +1797,7 @@ async def agents_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Support agents list page."""
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
 
     # Use service to list agents
     active_only = status != "inactive" if status else None
@@ -1199,7 +1867,7 @@ async def agent_detail(
     agent_id: int,
 ):
     """Agent detail page."""
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
     agent = service.get_agent(agent_id)
 
     if not agent:
@@ -1282,7 +1950,7 @@ async def canned_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Canned responses list page."""
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
 
     # Use service to list canned responses
     result = service.list_canned_responses(
@@ -1597,7 +2265,7 @@ async def sla_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """SLA policies list page."""
-    service = SupportWebService(db, user_id=user.id)
+    service = SupportWebService(db, user_id=user.id, principal=user)
 
     # Use service to list SLA policies
     result = service.list_sla_policies(
@@ -2413,7 +3081,7 @@ async def conversation_detail(
 ):
     """Conversation detail page."""
     from app.models.conversation import Conversation, ConversationStatus
-    from app.models.customer import Customer
+    from app.models.party import CustomerAccount, Party
 
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
 
@@ -2425,8 +3093,13 @@ async def conversation_detail(
 
     # Get customer if linked
     customer = None
-    if conversation.customer_id:
-        customer = db.query(Customer).filter(Customer.id == conversation.customer_id).first()
+    if conversation.customer_account_id:
+        customer = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .filter(CustomerAccount.id == conversation.customer_account_id)
+            .first()
+        )
 
     # Status labels
     status_labels = {s.value: s.value.title() for s in ConversationStatus}

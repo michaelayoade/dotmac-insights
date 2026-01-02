@@ -1,38 +1,21 @@
 """
-CRM API Module - Unified Customer Relationship Management
+CRM API Module - Party-based Customer Relationship Management
 
-Consolidates all CRM functionality:
-- Contacts (leads, prospects, customers, churned, persons)
-- Lifecycle management (lead → prospect → customer → churned)
+Core CRM functionality now centers on Parties:
+- Parties (persons + organizations) with roles and relations
 - Opportunities and pipeline
 - Activities (calls, meetings, tasks, notes)
-- Bulk operations
-- Analytics
 
 Routes:
 ========
 
-Contacts (/crm/contacts):
-- GET /contacts - List contacts with filters
-- GET /contacts/leads - List leads only
-- GET /contacts/customers - List customers only
-- GET /contacts/organizations - List organizations
-- POST /contacts - Create contact
-- GET /contacts/{id} - Get contact details
-- GET /contacts/{id}/persons - Get person contacts for organization
-- PATCH /contacts/{id} - Update contact
-- DELETE /contacts/{id} - Delete contact
-- GET /contacts/search/full-text - Full-text search
-
-Lifecycle (/crm/contacts):
-- POST /contacts/{id}/qualify - Qualify a lead
-- POST /contacts/{id}/convert-to-prospect - Convert lead to prospect
-- POST /contacts/{id}/convert-to-customer - Convert to customer
-- POST /contacts/{id}/mark-churned - Mark customer as churned
-- POST /contacts/{id}/reactivate - Reactivate churned customer
-- POST /contacts/{id}/assign - Assign to owner
-- POST /contacts/{id}/suspend - Suspend contact
-- POST /contacts/{id}/activate - Activate contact
+Parties (/crm/parties):
+- GET /parties - List parties with filters
+- POST /parties - Create party
+- GET /parties/{id} - Get party details
+- PATCH /parties/{id} - Update party
+- POST /parties/{id}/roles - Add party role
+- GET /parties/{id}/roles - List party roles
 
 Opportunities (/crm/opportunities):
 - GET /opportunities - List opportunities
@@ -57,28 +40,20 @@ Activities (/crm/activities):
 from fastapi import APIRouter
 
 # Import routers
-from .contacts_crud import router as contacts_crud_router
-from .lifecycle import router as lifecycle_router
-from .leads import router as leads_router
+from .parties import router as parties_router
 from .opportunities import router as opportunities_router
 from .activities import router as activities_router
 from .pipeline import router as pipeline_router
 from .sales import router as sales_router
 from .config import router as config_router
-from .customers import router as customers_router
 
 # Create main CRM router
 router = APIRouter(prefix="/crm", tags=["crm"])
 
-# Contact management endpoints - mount at /crm/contacts
-contacts_router = APIRouter(prefix="/contacts", tags=["crm-contacts"])
-contacts_router.include_router(contacts_crud_router)
-contacts_router.include_router(lifecycle_router)
-
-router.include_router(contacts_router)
+# Party-based identity endpoints
+router.include_router(parties_router, prefix="/parties", tags=["crm-parties"])
 
 # Include other CRM routers
-router.include_router(leads_router)
 router.include_router(opportunities_router)
 router.include_router(activities_router)
 router.include_router(pipeline_router)
@@ -88,6 +63,3 @@ router.include_router(sales_router)
 
 # Configuration sub-module (territories, sales-persons, customer-groups)
 router.include_router(config_router)
-
-# Customer master data (source of truth for customer entity)
-router.include_router(customers_router)

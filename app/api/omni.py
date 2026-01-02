@@ -130,7 +130,7 @@ def _get_or_create_conversation(
     db: Session,
     channel: OmniChannel,
     external_thread_id: Optional[str],
-    customer_id: Optional[int],
+    party_id: Optional[int],
     ticket_id: Optional[int],
     subject: Optional[str],
 ) -> OmniConversation:
@@ -148,7 +148,7 @@ def _get_or_create_conversation(
         conv = OmniConversation(
             channel_id=channel.id,
             external_thread_id=external_thread_id,
-            customer_id=customer_id,
+            party_id=party_id,
             ticket_id=ticket_id,
             subject=subject,
             status="open",
@@ -163,7 +163,7 @@ def _get_or_create_participant(
     handle: str,
     channel_type: str,
     display_name: Optional[str],
-    customer_id: Optional[int],
+    party_id: Optional[int],
 ) -> OmniParticipant:
     participant = (
         db.query(OmniParticipant)
@@ -175,7 +175,7 @@ def _get_or_create_participant(
             handle=handle,
             channel_type=channel_type,
             display_name=display_name,
-            customer_id=customer_id,
+            party_id=party_id,
         )
         db.add(participant)
         db.flush()
@@ -189,7 +189,6 @@ def _persist_message(
     body: Optional[str],
     subject: Optional[str],
     participant: Optional[OmniParticipant],
-    customer_id: Optional[int],
     ticket_id: Optional[int],
     channel: Optional[OmniChannel],
     agent: Optional[Agent],
@@ -202,7 +201,6 @@ def _persist_message(
         body=body,
         subject=subject,
         participant_id=participant.id if participant else None,
-        customer_id=customer_id,
         ticket_id=ticket_id,
         channel_id=channel.id if channel else None,
         agent_id=agent.id if agent else None,
@@ -404,14 +402,14 @@ async def ingest_webhook(
             handle=sender,
             channel_type=channel.type,
             display_name=payload_json.get("sender_name"),
-            customer_id=None,
+            party_id=None,
         )
 
     conv = _get_or_create_conversation(
         db,
         channel=channel,
         external_thread_id=thread_id,
-        customer_id=None,
+        party_id=None,
         ticket_id=None,
         subject=subject,
     )
@@ -423,7 +421,6 @@ async def ingest_webhook(
         body=body_text,
         subject=subject,
         participant=participant,
-        customer_id=None,
         ticket_id=None,
         channel=channel,
         agent=None,
@@ -795,7 +792,7 @@ async def send_message(
         conv = OmniConversation(
             channel_id=channel.id,
             external_thread_id=None,
-            customer_id=None,
+            party_id=None,
             ticket_id=payload.get("ticket_id"),
             subject=payload.get("subject"),
             status="open",
@@ -808,7 +805,7 @@ async def send_message(
         handle=payload["to"],
         channel_type=channel.type,
         display_name=None,
-        customer_id=None,
+        party_id=None,
     )
 
     msg = _persist_message(
@@ -818,7 +815,6 @@ async def send_message(
         body=payload["body"],
         subject=payload.get("subject"),
         participant=participant,
-        customer_id=None,
         ticket_id=payload.get("ticket_id"),
         channel=channel,
         agent=agent,
@@ -866,7 +862,7 @@ async def send_message(
 )
 async def list_conversations(
     ticket_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     channel: Optional[str] = None,
     status: Optional[str] = None,
     agent_id: Optional[int] = None,
@@ -880,8 +876,8 @@ async def list_conversations(
     query = db.query(OmniConversation)
     if ticket_id:
         query = query.filter(OmniConversation.ticket_id == ticket_id)
-    if customer_id:
-        query = query.filter(OmniConversation.customer_id == customer_id)
+    if party_id:
+        query = query.filter(OmniConversation.party_id == party_id)
     if channel:
         ch = db.query(OmniChannel.id).filter(OmniChannel.name == channel).first()
         if not ch:
@@ -931,7 +927,7 @@ async def list_conversations(
                 "channel_id": c.channel_id,
                 "external_thread_id": c.external_thread_id,
                 "ticket_id": c.ticket_id,
-                "customer_id": c.customer_id,
+                "party_id": c.party_id,
                 "status": c.status,
                 "subject": c.subject,
                 "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,

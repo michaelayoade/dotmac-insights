@@ -267,23 +267,23 @@
         </div>
 
         <!-- Customer Card -->
-        {% if subscription.customer %}
+        {% if subscription.party %}
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="customer-info">
             <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Customer</h2>
             </div>
             <div class="p-6">
-                <a href="/customers/{{ subscription.customer.id }}" class="block group">
+                <a href="/parties/{{ subscription.party.id }}" class="block group">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-lg ring-2 ring-primary-200/50">
-                            {{ subscription.customer.name[:1] | upper }}
+                            {{ subscription.party.name[:1] | upper }}
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
-                                {{ subscription.customer.name }}
+                                {{ subscription.party.name }}
                             </p>
-                            {% if subscription.customer.email %}
-                            <p class="text-xs text-gray-500 truncate">{{ subscription.customer.email }}</p>
+                            {% if subscription.party.primary_email %}
+                            <p class="text-xs text-gray-500 truncate">{{ subscription.party.primary_email }}</p>
                             {% endif %}
                         </div>
                         <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">

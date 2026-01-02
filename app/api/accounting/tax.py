@@ -1,21 +1,36 @@
 """Tax: Tax categories, templates, withholding, rules, and tax filing."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.accounting_ext import AuditAction
+from app.services.accounting.tax_service import TaxService
+from app.services.accounting.tax_types import (
+    TaxFilingCreateData,
+    TaxFilingFilters,
+    TaxPaymentCreateData,
+)
+from app.services.errors import NotFoundError, ValidationError as ServiceValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate
+from .helpers import parse_date
 
 router = APIRouter()
+
+
+def get_tax_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> TaxService:
+    """Dependency to get TaxService instance."""
+    return TaxService(db, principal)
 
 
 # TAX CATEGORIES
@@ -437,7 +452,7 @@ def list_tax_filing_periods(
     year: Optional[int] = Query(None, description="Filter by year"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """List tax filing periods with optional filters.
 
@@ -451,32 +466,20 @@ def list_tax_filing_periods(
     Returns:
         Paginated tax filing periods
     """
-    from app.models.tax import TaxFilingPeriod, TaxFilingStatus, TaxFilingType
+    filters = TaxFilingFilters(
+        tax_type=tax_type,
+        status=status,
+        year=year,
+    )
+    pagination = PaginationParams(limit=limit, offset=offset)
 
-    query = db.query(TaxFilingPeriod)
-
-    if tax_type:
-        try:
-            tax_type_enum = TaxFilingType(tax_type.lower())
-            query = query.filter(TaxFilingPeriod.tax_type == tax_type_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid tax type: {tax_type}")
-
-    if status:
-        try:
-            status_enum = TaxFilingStatus(status.lower())
-            query = query.filter(TaxFilingPeriod.status == status_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-
-    if year:
-        query = query.filter(func.extract('year', TaxFilingPeriod.period_start) == year)
-
-    query = query.order_by(TaxFilingPeriod.due_date.desc())
-    total, periods = paginate(query, offset, limit)
+    try:
+        result = service.list_filing_periods(filters, pagination)
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "periods": [
@@ -494,7 +497,7 @@ def list_tax_filing_periods(
                 "outstanding": float(p.outstanding_amount),
                 "is_overdue": p.is_overdue,
             }
-            for p in periods
+            for p in result.items
         ],
     }
 
@@ -510,6 +513,7 @@ def create_tax_filing_period(
     tax_amount: float = Query(0, description="Tax amount due"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """Create a new tax filing period.
 
@@ -525,26 +529,29 @@ def create_tax_filing_period(
     Returns:
         Created tax filing period info
     """
-    from app.models.tax import TaxFilingPeriod, TaxFilingType
     from app.services.audit_logger import AuditLogger, serialize_for_audit
 
-    try:
-        tax_type_enum = TaxFilingType(tax_type.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid tax type: {tax_type}")
+    parsed_start = parse_date(period_start, "period_start")
+    parsed_end = parse_date(period_end, "period_end")
+    parsed_due = parse_date(due_date, "due_date")
 
-    period = TaxFilingPeriod(
-        tax_type=tax_type_enum,
+    if not all([parsed_start, parsed_end, parsed_due]):
+        raise HTTPException(status_code=400, detail="Invalid date format")
+
+    create_data = TaxFilingCreateData(
+        tax_type=tax_type,
         period_name=period_name,
-        period_start=parse_date(period_start, "period_start"),
-        period_end=parse_date(period_end, "period_end"),
-        due_date=parse_date(due_date, "due_date"),
+        period_start=parsed_start,
+        period_end=parsed_end,
+        due_date=parsed_due,
         tax_base=Decimal(str(tax_base)),
         tax_amount=Decimal(str(tax_amount)),
-        created_by_id=principal.id,
     )
-    db.add(period)
-    db.flush()
+
+    try:
+        period = service.create_filing_period(create_data, user_id=principal.id)
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     audit = AuditLogger(db)
     audit.log_create(
@@ -568,7 +575,7 @@ def create_tax_filing_period(
 @router.get("/tax/filing-periods/{period_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_filing_period(
     period_id: int,
-    db: Session = Depends(get_db),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """Get tax filing period details with payments.
 
@@ -578,15 +585,11 @@ def get_tax_filing_period(
     Returns:
         Filing period details with payments
     """
-    from app.models.tax import TaxFilingPeriod, TaxPayment
-
-    period = db.query(TaxFilingPeriod).filter(TaxFilingPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(status_code=404, detail="Tax filing period not found")
-
-    payments = db.query(TaxPayment).filter(
-        TaxPayment.filing_period_id == period_id
-    ).order_by(TaxPayment.payment_date.desc()).all()
+    try:
+        period = service.get_filing_period(period_id)
+        payments = service.get_period_payments(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
     return {
         "id": period.id,
@@ -622,6 +625,7 @@ def file_tax_period(
     filing_reference: Optional[str] = Query(None, description="Filing reference number"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """Mark a tax filing period as filed.
 
@@ -632,21 +636,14 @@ def file_tax_period(
     Returns:
         Filing status
     """
-    from app.models.tax import TaxFilingPeriod, TaxFilingStatus
     from app.services.audit_logger import AuditLogger
 
-    period = db.query(TaxFilingPeriod).filter(TaxFilingPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(status_code=404, detail="Tax filing period not found")
-
-    if period.status != TaxFilingStatus.OPEN:
-        raise HTTPException(status_code=400, detail=f"Period is already {period.status.value}")
-
-    old_status = period.status.value
-    period.status = TaxFilingStatus.FILED
-    period.filed_at = datetime.now(timezone.utc)
-    period.filed_by_id = principal.id
-    period.filing_reference = filing_reference
+    try:
+        period = service.file_period(period_id, filing_reference, user_id=principal.id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
+    except ServiceValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message) from exc
 
     audit = AuditLogger(db)
     audit.log(
@@ -655,7 +652,7 @@ def file_tax_period(
         action=AuditAction.UPDATE,
         user_id=principal.id,
         document_name=f"{period.tax_type.value} {period.period_name}",
-        old_values={"status": old_status},
+        old_values={"status": "open"},
         new_values={"status": "filed", "filing_reference": filing_reference},
     )
     db.commit()
@@ -678,6 +675,7 @@ def record_tax_payment(
     bank_account: Optional[str] = Query(None, description="Bank account used"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """Record a tax payment for a filing period.
 
@@ -692,28 +690,25 @@ def record_tax_payment(
     Returns:
         Payment confirmation
     """
-    from app.models.tax import TaxFilingPeriod, TaxPayment, TaxFilingStatus
     from app.services.audit_logger import AuditLogger
 
-    period = db.query(TaxFilingPeriod).filter(TaxFilingPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(status_code=404, detail="Tax filing period not found")
+    parsed_date = parse_date(payment_date, "payment_date")
+    if not parsed_date:
+        raise HTTPException(status_code=400, detail="Invalid payment date")
 
-    payment = TaxPayment(
-        filing_period_id=period_id,
-        payment_date=parse_date(payment_date, "payment_date"),
+    payment_data = TaxPaymentCreateData(
+        payment_date=parsed_date,
         amount=Decimal(str(amount)),
         payment_reference=payment_reference,
         payment_method=payment_method,
         bank_account=bank_account,
-        created_by_id=principal.id,
     )
-    db.add(payment)
 
-    # Update period totals
-    period.amount_paid += Decimal(str(amount))
-    if period.amount_paid >= period.tax_amount:
-        period.status = TaxFilingStatus.PAID
+    try:
+        payment = service.record_payment(period_id, payment_data, user_id=principal.id)
+        period = service.get_filing_period(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
     audit = AuditLogger(db)
     audit.log(
@@ -740,77 +735,20 @@ def record_tax_payment(
 
 @router.get("/tax/dashboard", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_dashboard(
-    db: Session = Depends(get_db),
+    service: TaxService = Depends(get_tax_service),
 ) -> Dict[str, Any]:
     """Get tax obligations dashboard summary.
 
     Returns:
         Summary of tax obligations by type with upcoming and overdue filings
     """
-    from app.models.tax import TaxFilingPeriod, TaxFilingStatus, TaxFilingType
-
-    today = date.today()
-
-    # Get summary by tax type
-    summary_by_type = {}
-    for tax_type in TaxFilingType:
-        open_periods = db.query(TaxFilingPeriod).filter(
-            and_(
-                TaxFilingPeriod.tax_type == tax_type,
-                TaxFilingPeriod.status.in_([TaxFilingStatus.OPEN, TaxFilingStatus.FILED]),
-            )
-        ).all()
-
-        total_outstanding = sum(p.outstanding_amount for p in open_periods)
-        overdue_count = sum(1 for p in open_periods if p.is_overdue)
-
-        if open_periods or total_outstanding > 0:
-            summary_by_type[tax_type.value] = {
-                "open_periods": len(open_periods),
-                "total_outstanding": float(total_outstanding),
-                "overdue_count": overdue_count,
-            }
-
-    # Get upcoming due dates
-    upcoming = db.query(TaxFilingPeriod).filter(
-        and_(
-            TaxFilingPeriod.status == TaxFilingStatus.OPEN,
-            TaxFilingPeriod.due_date >= today,
-        )
-    ).order_by(TaxFilingPeriod.due_date).limit(5).all()
-
-    # Get overdue filings
-    overdue = db.query(TaxFilingPeriod).filter(
-        and_(
-            TaxFilingPeriod.status == TaxFilingStatus.OPEN,
-            TaxFilingPeriod.due_date < today,
-        )
-    ).order_by(TaxFilingPeriod.due_date).all()
+    summary = service.get_dashboard_summary()
 
     return {
-        "as_of_date": today.isoformat(),
-        "summary_by_type": summary_by_type,
-        "total_outstanding": sum(s["total_outstanding"] for s in summary_by_type.values()),
-        "total_overdue_count": sum(s["overdue_count"] for s in summary_by_type.values()),
-        "upcoming_due": [
-            {
-                "id": p.id,
-                "tax_type": p.tax_type.value,
-                "period_name": p.period_name,
-                "due_date": p.due_date.isoformat(),
-                "outstanding": float(p.outstanding_amount),
-            }
-            for p in upcoming
-        ],
-        "overdue": [
-            {
-                "id": p.id,
-                "tax_type": p.tax_type.value,
-                "period_name": p.period_name,
-                "due_date": p.due_date.isoformat(),
-                "days_overdue": (today - p.due_date).days,
-                "outstanding": float(p.outstanding_amount),
-            }
-            for p in overdue
-        ],
+        "as_of_date": summary.as_of_date.isoformat(),
+        "summary_by_type": summary.summary_by_type,
+        "total_outstanding": summary.total_outstanding,
+        "total_overdue_count": summary.total_overdue_count,
+        "upcoming_due": summary.upcoming_due,
+        "overdue": summary.overdue,
     }

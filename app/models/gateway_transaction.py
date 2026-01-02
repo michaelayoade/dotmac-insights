@@ -12,14 +12,14 @@ from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
-    String, Text, ForeignKey, Enum, Index, Numeric, JSON, Boolean
+    BigInteger, String, Text, ForeignKey, Enum, Index, Numeric, JSON, Boolean
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import CustomerAccount
     from app.models.invoice import Invoice
     from app.models.payment import Payment
     from app.models.accounting import BankTransaction
@@ -101,8 +101,8 @@ class GatewayTransaction(Base):
     customer_code: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
     )  # Provider customer ID
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id"), nullable=True, index=True
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("customer_accounts.id"), nullable=True, index=True
     )
 
     # Linked documents
@@ -168,10 +168,15 @@ class GatewayTransaction(Base):
 
     __table_args__ = (
         Index("ix_gateway_transactions_provider_status", "provider", "status"),
-        Index("ix_gateway_transactions_customer_status", "customer_id", "status"),
+        Index("ix_gateway_transactions_customer_account_status", "customer_account_id", "status"),
         Index("ix_gateway_transactions_invoice", "invoice_id"),
         Index("ix_gateway_transactions_initiated", "initiated_at"),
     )
+
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship()
+    invoice: Mapped[Optional["Invoice"]] = relationship()
+    payment: Mapped[Optional["Payment"]] = relationship()
+    bank_transaction: Mapped[Optional["BankTransaction"]] = relationship()
 
     def __repr__(self) -> str:
         return f"<GatewayTransaction {self.reference} {self.status.value}>"

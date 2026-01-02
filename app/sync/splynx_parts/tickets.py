@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import structlog
 
 from app.models.ticket import Ticket, TicketStatus, TicketPriority, TicketSource
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyExternalId
 from app.models.administrator import Administrator
 from app.models.employee import Employee
 from app.config import settings
@@ -19,10 +19,18 @@ async def sync_tickets(sync_client, client, full_sync: bool):
         tickets = await sync_client._fetch_paginated(client, "/admin/support/tickets")
         logger.info("splynx_tickets_fetched", count=len(tickets))
 
-        # Pre-fetch customers for FK lookup
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
+        # Pre-fetch parties/accounts for FK lookup
+        customer_links = {
+            mapping.external_id: (mapping.party_id, account.id if account else None)
+            for mapping, account in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .outerjoin(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(
+                    PartyExternalId.system == "splynx",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
+                .all()
+            )
         }
 
         # Pre-fetch administrators and build admin_splynx_id -> employee_id map
@@ -56,7 +64,10 @@ async def sync_tickets(sync_client, client, full_sync: bool):
 
             # Find customer
             customer_splynx_id = ticket_data.get("customer_id")
-            customer_id = customers_by_splynx_id.get(customer_splynx_id) if customer_splynx_id else None
+            party_id = None
+            customer_account_id = None
+            if customer_splynx_id:
+                party_id, customer_account_id = customer_links.get(str(customer_splynx_id), (None, None))
 
             # Find assigned employee from admin
             assign_to_id = ticket_data.get("assign_to")
@@ -106,7 +117,8 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                     pass
 
             if existing:
-                existing.customer_id = customer_id
+                existing.party_id = party_id
+                existing.customer_account_id = customer_account_id
                 existing.subject = ticket_data.get("subject")
                 existing.status = status
                 existing.priority = priority
@@ -120,7 +132,8 @@ async def sync_tickets(sync_client, client, full_sync: bool):
                 ticket = Ticket(
                     splynx_id=splynx_id,
                     source=TicketSource.SPLYNX,
-                    customer_id=customer_id,
+                    party_id=party_id,
+                    customer_account_id=customer_account_id,
                     ticket_number=f"SPL-{splynx_id}",
                     subject=ticket_data.get("subject"),
                     description=ticket_data.get("note"),

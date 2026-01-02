@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict
 from app.database import get_db
 from app.auth import Require
 from app.models.sales import Quotation, QuotationStatus
-from app.models.contact import Contact
 
 router = APIRouter(prefix="/quotations", tags=["crm-sales-quotations"])
 
@@ -24,7 +23,6 @@ router = APIRouter(prefix="/quotations", tags=["crm-sales-quotations"])
 
 class QuotationBase(BaseModel):
     """Base schema for quotations."""
-    contact_id: Optional[int] = None
     customer_name: Optional[str] = None
     quotation_date: Optional[date] = None
     valid_till: Optional[date] = None
@@ -42,7 +40,6 @@ class QuotationCreate(QuotationBase):
 
 class QuotationUpdate(BaseModel):
     """Schema for updating a quotation."""
-    contact_id: Optional[int] = None
     customer_name: Optional[str] = None
     quotation_date: Optional[date] = None
     valid_till: Optional[date] = None
@@ -57,7 +54,6 @@ class QuotationResponse(BaseModel):
     """Schema for quotation response."""
     id: int
     erpnext_id: Optional[str]
-    contact_id: Optional[int]
     customer_name: Optional[str]
     status: str
     quotation_date: Optional[date]
@@ -95,7 +91,6 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
     return {
         "id": quote.id,
         "erpnext_id": quote.erpnext_id,
-        "contact_id": None,
         "customer_name": quote.customer_name,
         "status": quote.status.value if quote.status else None,
         "quotation_date": quote.transaction_date.isoformat() if quote.transaction_date else None,
@@ -117,7 +112,6 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
 @router.get("", dependencies=[Depends(Require("crm:read"))])
 async def list_quotations(
     status: Optional[str] = None,
-    contact_id: Optional[int] = None,
     customer_name: Optional[str] = None,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
@@ -130,12 +124,6 @@ async def list_quotations(
         status_enum = _parse_status(status)
         if status_enum:
             query = query.filter(Quotation.status == status_enum)
-
-    if contact_id:
-        contact = db.query(Contact).filter(Contact.id == contact_id).first()
-        if not contact:
-            raise HTTPException(status_code=400, detail="Contact not found")
-        query = query.filter(Quotation.party_name == contact.display_name)
 
     if customer_name:
         query = query.filter(Quotation.customer_name.ilike(f"%{customer_name}%"))
@@ -170,15 +158,8 @@ async def create_quotation(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new quotation."""
-    party_name = payload.customer_name
-    if payload.contact_id:
-        contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
-        if not contact:
-            raise HTTPException(status_code=400, detail="Contact not found")
-        party_name = contact.display_name
-
     quote = Quotation(
-        party_name=party_name,
+        party_name=payload.customer_name,
         customer_name=payload.customer_name,
         transaction_date=payload.quotation_date,
         valid_till=payload.valid_till,
@@ -211,14 +192,6 @@ async def update_quotation(
         raise HTTPException(status_code=404, detail="Quotation not found")
 
     update_data = payload.model_dump(exclude_unset=True)
-
-    if "contact_id" in update_data:
-        contact_id = update_data.pop("contact_id")
-        if contact_id:
-            contact = db.query(Contact).filter(Contact.id == contact_id).first()
-            if not contact:
-                raise HTTPException(status_code=400, detail="Contact not found")
-            update_data["party_name"] = contact.display_name
 
     # Handle status conversion
     if "status" in update_data and update_data["status"]:

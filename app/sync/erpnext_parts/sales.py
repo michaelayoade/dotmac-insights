@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import httpx
 import structlog
 
-from app.models.customer import Customer
 from app.models.party import (
     CustomerAccount,
     Party,
@@ -63,11 +62,6 @@ async def sync_customers(
             filters=filters,
         )
 
-        # Pre-fetch existing customers by splynx_id for efficient matching
-        customers_by_splynx_id = {
-            c.splynx_id: c
-            for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
-        }
         # Pre-fetch party external IDs for erpnext/splynx lookups
         party_ext_ids = (
             sync_client.db.query(PartyExternalId)
@@ -96,6 +90,7 @@ async def sync_customers(
 
             # Ensure party-based identity records exist
             party = None
+            created = False
             if erpnext_id:
                 party_id = party_by_ext.get(("erpnext", str(erpnext_id)))
                 if party_id:
@@ -122,6 +117,7 @@ async def sync_customers(
                 )
                 sync_client.db.add(party)
                 sync_client.db.flush()
+                created = True
 
             email = cust_data.get("email_id")
             if email:
@@ -137,6 +133,7 @@ async def sync_customers(
                         }
                     )
                     party.emails = emails
+                    party_email_index[email_norm] = party
 
             phone = cust_data.get("mobile_no") or cust_data.get("custom_phone_numbers")
             if phone:
@@ -207,73 +204,39 @@ async def sync_customers(
                     billing_email=cust_data.get("email_id"),
                 )
                 sync_client.db.add(account)
+                created = True
             else:
                 if cust_data.get("disabled"):
                     account.status = "suspended"
                 if not account.billing_email:
                     account.billing_email = cust_data.get("email_id")
 
-            # Priority 1: Match by erpnext_id
-            existing = sync_client.db.query(Customer).filter(
-                Customer.erpnext_id == erpnext_id
-            ).first()
+            custom_fields = dict(party.custom_fields or {})
+            custom_fields.update(
+                {
+                    "erpnext_customer_type": cust_data.get("customer_type"),
+                    "custom_gps": cust_data.get("custom_gps"),
+                    "custom_city": cust_data.get("custom_city"),
+                    "custom_region": cust_data.get("custom_region"),
+                    "custom_building_type": cust_data.get("custom_building_type"),
+                    "custom_notes": cust_data.get("custom_notes"),
+                }
+            )
+            party.custom_fields = custom_fields
 
-            # Priority 2: Match by splynx_id from ERPNext custom field
-            if not existing and splynx_id:
-                existing = customers_by_splynx_id.get(splynx_id)
+            if cust_data.get("customer_name") and not party.name:
+                party.name = cust_data.get("customer_name")
 
-            # Priority 3: Match by email
-            if not existing:
-                email = cust_data.get("email_id")
-                if email:
-                    existing = sync_client.db.query(Customer).filter(
-                        Customer.email == email
-                    ).first()
+            account.external_ids = {
+                **(account.external_ids or {}),
+                "erpnext_id": erpnext_id,
+                "splynx_id": splynx_id,
+            }
 
-            if existing:
-                # Update existing customer with ERPNext data
-                existing.erpnext_id = erpnext_id
-
-                # Update fields from ERPNext if not already set from Splynx
-                if not existing.name or existing.name == "":
-                    existing.name = cust_data.get("customer_name", "")
-                if not existing.email:
-                    existing.email = cust_data.get("email_id")
-                if not existing.phone:
-                    existing.phone = cust_data.get("mobile_no") or cust_data.get("custom_phone_numbers")
-
-                # Update custom fields
-                if cust_data.get("custom_gps") and not existing.gps:
-                    existing.gps = cust_data.get("custom_gps")
-                if cust_data.get("custom_city") and not existing.city:
-                    existing.city = cust_data.get("custom_city")
-                if cust_data.get("custom_region") and not existing.state:
-                    existing.state = cust_data.get("custom_region")
-                if cust_data.get("custom_building_type") and not existing.building_type:
-                    existing.building_type = cust_data.get("custom_building_type")
-                if cust_data.get("custom_notes") and not existing.notes:
-                    existing.notes = cust_data.get("custom_notes")
-
-                existing.last_synced_at = datetime.now(timezone.utc)
-                sync_client.increment_updated()
-            else:
-                # Create new customer record with all available data
-                customer = Customer(
-                    erpnext_id=erpnext_id,
-                    splynx_id=splynx_id,
-                    name=cust_data.get("customer_name", ""),
-                    email=cust_data.get("email_id"),
-                    phone=cust_data.get("mobile_no") or cust_data.get("custom_phone_numbers"),
-                    gps=cust_data.get("custom_gps"),
-                    city=cust_data.get("custom_city"),
-                    state=cust_data.get("custom_region"),
-                    building_type=cust_data.get("custom_building_type"),
-                    notes=cust_data.get("custom_notes"),
-                )
-                sync_client.db.add(customer)
-                if splynx_id:
-                    customers_by_splynx_id[splynx_id] = customer
+            if created:
                 sync_client.increment_created()
+            else:
+                sync_client.increment_updated()
 
             # Batch commit
             if i % batch_size == 0:
@@ -689,10 +652,18 @@ async def sync_sales_orders(
             fields=["*"],
         )
 
-        # Pre-fetch customers by erpnext_id for FK linking
-        customers_by_erpnext_id = {
-            c.erpnext_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.erpnext_id.isnot(None)).all()
+        # Pre-fetch customer accounts by erpnext_id for FK linking
+        accounts_by_erpnext_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(
+                    PartyExternalId.system == "erpnext",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
+                .all()
+            )
         }
 
         batch_size = 500
@@ -716,14 +687,18 @@ async def sync_sales_orders(
             }
             status = status_map.get(status_str, SalesOrderStatus.DRAFT)
 
-            # Link to customer
+            # Link to customer account
             erpnext_customer = order_data.get("customer")
-            customer_id = customers_by_erpnext_id.get(erpnext_customer) if erpnext_customer else None
+            customer_account_id = (
+                accounts_by_erpnext_id.get(str(erpnext_customer))
+                if erpnext_customer
+                else None
+            )
 
             if existing:
                 existing.customer = erpnext_customer
                 existing.customer_name = order_data.get("customer_name")
-                existing.customer_id = customer_id
+                existing.customer_account_id = customer_account_id
                 existing.order_type = order_data.get("order_type")
                 existing.company = order_data.get("company")
                 existing.currency = order_data.get("currency", "NGN")
@@ -763,7 +738,7 @@ async def sync_sales_orders(
                     erpnext_id=erpnext_id,
                     customer=erpnext_customer,
                     customer_name=order_data.get("customer_name"),
-                    customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     order_type=order_data.get("order_type"),
                     company=order_data.get("company"),
                     currency=order_data.get("currency", "NGN"),

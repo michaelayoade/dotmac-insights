@@ -51,9 +51,9 @@
             {{ payment.customer.name }}
         </a>
         {% elif payment.contact %}
-        <a href="/crm/contacts/{{ payment.contact.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
+        <span class="text-sm text-gray-700 font-body">
             {{ payment.contact.name }}
-        </a>
+        </span>
         {% else %}
         <span class="text-sm text-gray-400 italic font-body">No customer</span>
         {% endif %}

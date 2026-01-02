@@ -80,7 +80,7 @@ class DocumentPostingService:
             entries.append({
                 "account": self._get_ar_account(invoice),
                 "party_type": "Customer",
-                "party": str(invoice.customer_id),
+                "party": str(invoice.customer_account_id),
                 "debit": invoice.total_amount,
                 "credit": Decimal("0"),
             })
@@ -240,7 +240,7 @@ class DocumentPostingService:
             entries.append({
                 "account": self._get_ar_account(None, company=company),
                 "party_type": "Customer",
-                "party": str(payment.customer_id),
+                "party": str(payment.customer_account_id),
                 "debit": Decimal("0"),
                 "credit": payment.amount,
             })
@@ -367,7 +367,7 @@ class DocumentPostingService:
             entries.append({
                 "account": self._get_ar_account(None, company=cn.company),
                 "party_type": "Customer",
-                "party": str(cn.customer_id),
+                "party": str(cn.customer_account_id),
                 "debit": Decimal("0"),
                 "credit": cn.amount,
             })

@@ -3,7 +3,7 @@ import structlog
 import httpx
 
 from app.models.customer_usage import CustomerUsage
-from app.models.customer import Customer
+from app.models.party import PartyExternalId
 from app.models.subscription import Subscription
 
 logger = structlog.get_logger()
@@ -18,15 +18,9 @@ async def sync_customer_usage(sync_client, client: httpx.AsyncClient, full_sync:
     sync_client.start_sync("customer_usage", "full" if full_sync else "incremental")
 
     try:
-        # Pre-fetch lookup maps for FK resolution
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
-        }
-
         # Map subscriptions by splynx service_id
         subscriptions_by_splynx_id = {
-            s.splynx_id: (s.id, s.customer_id)
+            s.splynx_id: (s.id, s.party_id)
             for s in sync_client.db.query(Subscription).filter(Subscription.splynx_id.isnot(None)).all()
         }
 
@@ -61,20 +55,29 @@ async def sync_customer_usage(sync_client, client: httpx.AsyncClient, full_sync:
                     skipped += 1
                     continue
 
-                # Resolve subscription and customer
+                # Resolve subscription and party
                 sub_info = subscriptions_by_splynx_id.get(splynx_service_id)
                 if sub_info:
-                    subscription_id, customer_id = sub_info
+                    subscription_id, party_id = sub_info
                 else:
-                    # No subscription found - try to get customer_id from record if available
-                    customer_id = None
+                    # No subscription found - try to get party_id from record if available
+                    party_id = None
                     subscription_id = None
                     splynx_customer_id = usage_data.get("customer_id")
                     if splynx_customer_id:
-                        customer_id = customers_by_splynx_id.get(splynx_customer_id)
+                        party_ext = (
+                            sync_client.db.query(PartyExternalId)
+                            .filter(
+                                PartyExternalId.system == "splynx",
+                                PartyExternalId.external_id == str(splynx_customer_id),
+                                PartyExternalId.external_key_type == "customer_id",
+                            )
+                            .first()
+                        )
+                        party_id = party_ext.party_id if party_ext else None
 
-                # Skip if we can't link to a customer
-                if not customer_id:
+                # Skip if we can't link to a party
+                if not party_id:
                     skipped += 1
                     continue
 
@@ -91,13 +94,13 @@ async def sync_customer_usage(sync_client, client: httpx.AsyncClient, full_sync:
                     # Update existing record
                     existing.upload_bytes = upload_bytes
                     existing.download_bytes = download_bytes
-                    existing.customer_id = customer_id
+                    existing.party_id = party_id
                     existing.subscription_id = subscription_id
                     sync_client.increment_updated()
                 else:
                     # Create new record
                     usage_record = CustomerUsage(
-                        customer_id=customer_id,
+                        party_id=party_id,
                         subscription_id=subscription_id,
                         splynx_service_id=splynx_service_id,
                         usage_date=usage_date,

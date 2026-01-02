@@ -37,7 +37,6 @@ from app.models.accounting import (
     PurchaseInvoiceStatus,
     Supplier,
 )
-from app.models.customer import Customer
 from app.models.party import CustomerAccount, PartyExternalId
 from app.models.employee import Employee
 from app.models.expense import Expense, ExpenseStatus
@@ -888,12 +887,8 @@ async def sync_invoices(
                 Invoice.erpnext_id == erpnext_id
             ).first()
 
-            # Find customer (legacy) and customer account (party-based)
+            # Find customer account (party-based)
             customer_erpnext_id = inv_data.get("customer")
-            customer = sync_client.db.query(Customer).filter(
-                Customer.erpnext_id == customer_erpnext_id
-            ).first()
-            customer_id = customer.id if customer else None
             customer_account_id = None
             if customer_erpnext_id:
                 party_ext = (
@@ -901,6 +896,7 @@ async def sync_invoices(
                     .filter(
                         PartyExternalId.system == "erpnext",
                         PartyExternalId.external_id == str(customer_erpnext_id),
+                        PartyExternalId.external_key_type == "customer_id",
                     )
                     .first()
                 )
@@ -960,13 +956,13 @@ async def sync_invoices(
             # Fallback soft match if the custom field is missing
             if not target_invoice:
                 posting_dt = sync_client._parse_iso_date(inv_data.get("posting_date"))
-                if posting_dt and customer_id:
+                if posting_dt and customer_account_id:
                     # Exclude invoices already assigned in this transaction or already having an erpnext_id
                     target_invoice = (
                         sync_client.db.query(Invoice)
                         .filter(
                             Invoice.source == InvoiceSource.SPLYNX,
-                            Invoice.customer_id == customer_id,
+                            Invoice.customer_account_id == customer_account_id,
                             Invoice.total_amount == Decimal(str(total_amount)),
                             func.date(Invoice.invoice_date) == posting_dt.date(),
                             Invoice.erpnext_id.is_(None),
@@ -985,7 +981,6 @@ async def sync_invoices(
                     sync_client.db.flush()  # Flush the NULL assignment before setting the new value
 
                 target_invoice.erpnext_id = erpnext_id
-                target_invoice.customer_id = customer_id
                 target_invoice.customer_account_id = customer_account_id
                 target_invoice.total_amount = Decimal(str(total_amount))
                 target_invoice.amount = Decimal(str(total_amount))
@@ -1016,7 +1011,6 @@ async def sync_invoices(
                 invoice = Invoice(
                     erpnext_id=erpnext_id,
                     source=InvoiceSource.ERPNEXT,
-                    customer_id=customer_id,
                     customer_account_id=customer_account_id,
                     invoice_number=erpnext_id,
                     total_amount=total_amount,
@@ -1102,12 +1096,8 @@ async def sync_payments(
                 Payment.erpnext_id == erpnext_id
             ).first()
 
-            # Find customer (legacy) and customer account (party-based)
+            # Find customer account (party-based)
             customer_erpnext_id = pay_data.get("party")
-            customer = sync_client.db.query(Customer).filter(
-                Customer.erpnext_id == customer_erpnext_id
-            ).first()
-            customer_id = customer.id if customer else None
             customer_account_id = None
             if customer_erpnext_id:
                 party_ext = (
@@ -1115,6 +1105,7 @@ async def sync_payments(
                     .filter(
                         PartyExternalId.system == "erpnext",
                         PartyExternalId.external_id == str(customer_erpnext_id),
+                        PartyExternalId.external_key_type == "customer_id",
                     )
                     .first()
                 )
@@ -1174,13 +1165,13 @@ async def sync_payments(
             # Soft-match if custom link missing: same amount, customer, and date
             if not target_payment:
                 posting_dt = sync_client._parse_iso_date(pay_data.get("posting_date"))
-                if posting_dt and customer_id:
+                if posting_dt and customer_account_id:
                     # Exclude payments already assigned in this transaction or already having an erpnext_id
                     target_payment = (
                         sync_client.db.query(Payment)
                         .filter(
                             Payment.source == PaymentSource.SPLYNX,
-                            Payment.customer_id == customer_id,
+                            Payment.customer_account_id == customer_account_id,
                             Payment.amount == Decimal(str(amount)),
                             func.date(Payment.payment_date) == posting_dt.date(),
                             Payment.erpnext_id.is_(None),
@@ -1199,7 +1190,6 @@ async def sync_payments(
                     sync_client.db.flush()  # Flush the NULL assignment before setting the new value
 
                 target_payment.erpnext_id = erpnext_id
-                target_payment.customer_id = customer_id
                 target_payment.customer_account_id = customer_account_id
                 target_payment.amount = Decimal(str(amount))
                 target_payment.payment_method = payment_method
@@ -1231,7 +1221,6 @@ async def sync_payments(
                 payment = Payment(
                     erpnext_id=erpnext_id,
                     source=PaymentSource.ERPNEXT,
-                    customer_id=customer_id,
                     customer_account_id=customer_account_id,
                     amount=amount,
                     payment_method=payment_method,

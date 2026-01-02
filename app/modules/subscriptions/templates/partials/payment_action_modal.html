@@ -121,7 +121,7 @@
                         <p class="text-sm font-semibold text-gray-900">{{ subscription.plan_name }}</p>
                         <p class="text-xs text-gray-500">
                             {{ subscription.currency or '₦' }} {{ "{:,.0f}".format(subscription.amount) }} / {{ subscription.interval.value | lower }}
-                            {% if subscription.customer %} · {{ subscription.customer.name }}{% endif %}
+                            {% if subscription.party %} · {{ subscription.party.name }}{% endif %}
                         </p>
                     </div>
                 </div>

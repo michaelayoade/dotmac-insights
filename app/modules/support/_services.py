@@ -1,13 +1,19 @@
 """
-Support Web Service - Encapsulates business logic for support UI.
+Support Web Service - Business logic for the support web UI.
 
-This service wraps database operations and provides a clean interface
-for support routes, reducing direct DB queries in route handlers.
+This service wraps database operations for the support module,
+providing a clean interface for route handlers. It operates on
+UnifiedTicket (the consolidated support ticket model).
+
+All mutating methods do NOT commit the transaction. The caller
+(route handler) is responsible for calling db.commit() after
+the operation succeeds.
 """
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 from datetime import datetime, timedelta
+import uuid
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_, and_
 
@@ -23,15 +29,21 @@ from app.models.agent import Agent, Team, TeamMember
 from app.models.support_canned import CannedResponse
 from app.models.support_sla import SLAPolicy
 from app.models.employee import Employee
-from app.models.contact import Contact
+from app.services.errors import NotFoundError, ValidationError
+
+if TYPE_CHECKING:
+    from app.auth import Principal
 
 
 class SupportWebService:
     """
-    Service class for support UI operations.
+    Service class for support UI operations on UnifiedTicket.
 
     Encapsulates all database operations for the support module,
     providing a clean interface for route handlers.
+
+    All mutating methods do NOT commit. The caller (route handler)
+    is responsible for calling db.commit() after the operation succeeds.
     """
 
     # Allowed sort columns to prevent SQL injection via getattr
@@ -40,9 +52,15 @@ class SupportWebService:
         "status", "priority", "ticket_type", "due_date",
     }
 
-    def __init__(self, db: Session, user_id: Optional[int] = None):
+    def __init__(
+        self,
+        db: Session,
+        user_id: Optional[int] = None,
+        principal: Optional["Principal"] = None,
+    ):
         self.db = db
         self.user_id = user_id
+        self.principal = principal
 
     # =========================================================================
     # DASHBOARD STATISTICS
@@ -83,6 +101,11 @@ class SupportWebService:
             UnifiedTicket.updated_at >= week_ago
         ).scalar() or 0
 
+        created_today = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.created_at >= today
+        ).scalar() or 0
+
         # Status distribution
         status_counts = self.db.query(
             UnifiedTicket.status,
@@ -109,6 +132,7 @@ class SupportWebService:
             "urgent_tickets": urgent_tickets,
             "resolved_today": resolved_today,
             "resolved_week": resolved_week,
+            "created_today": created_today,
             "status_distribution": status_distribution,
             "priority_distribution": priority_distribution,
         }
@@ -174,6 +198,7 @@ class SupportWebService:
         type: Optional[str] = None,
         channel: Optional[str] = None,
         assigned_to_id: Optional[int] = None,
+        unassigned_only: bool = False,
         page: int = 1,
         per_page: int = 25,
         sort: str = "created_at",
@@ -181,6 +206,9 @@ class SupportWebService:
     ) -> Dict[str, Any]:
         """
         List tickets with filtering, search, and pagination.
+
+        Args:
+            unassigned_only: If True, only return tickets with no assigned agent.
 
         Returns:
             Dict with 'items', 'total', 'page', 'per_page', 'pages'
@@ -208,15 +236,20 @@ class SupportWebService:
             query = query.filter(UnifiedTicket.ticket_type == type)
         if channel:
             query = query.filter(UnifiedTicket.channel == channel)
-        if assigned_to_id:
+        if unassigned_only:
+            query = query.filter(UnifiedTicket.assigned_to_id.is_(None))
+        elif assigned_to_id:
             query = query.filter(UnifiedTicket.assigned_to_id == assigned_to_id)
 
         # Count total
         total = query.count()
 
-        # Sorting - validate sort column against whitelist to prevent SQL injection
+        # Sorting - validate sort column and direction
         if sort not in self.ALLOWED_TICKET_SORTS:
             sort = "created_at"
+        if dir not in ("asc", "desc"):
+            dir = "desc"
+
         sort_column = getattr(UnifiedTicket, sort, UnifiedTicket.created_at)
         if dir == "desc":
             sort_column = sort_column.desc()
@@ -239,8 +272,28 @@ class SupportWebService:
     # TICKET CRUD
     # =========================================================================
 
-    def get_ticket(self, ticket_id: int) -> Optional[UnifiedTicket]:
-        """Get a single ticket by ID."""
+    def get_ticket(self, ticket_id: int) -> UnifiedTicket:
+        """Get a single ticket by ID.
+
+        Args:
+            ticket_id: The ticket ID.
+
+        Returns:
+            The UnifiedTicket instance.
+
+        Raises:
+            NotFoundError: If ticket not found.
+        """
+        ticket = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.id == ticket_id,
+            UnifiedTicket.is_deleted == False
+        ).first()
+        if not ticket:
+            raise NotFoundError(f"Ticket {ticket_id} not found")
+        return ticket
+
+    def get_ticket_or_none(self, ticket_id: int) -> Optional[UnifiedTicket]:
+        """Get a single ticket by ID, returning None if not found."""
         return self.db.query(UnifiedTicket).filter(
             UnifiedTicket.id == ticket_id,
             UnifiedTicket.is_deleted == False
@@ -254,52 +307,231 @@ class SupportWebService:
         ).first()
 
     def create_ticket(self, data: Dict[str, Any]) -> UnifiedTicket:
-        """Create a new ticket."""
-        # Generate ticket number if not provided
+        """Create a new ticket.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            data: Ticket data dict.
+
+        Returns:
+            The created UnifiedTicket (not yet committed).
+        """
+        # Generate unique ticket number using timestamp + random suffix
+        # This avoids race conditions from max(id) + 1 approach
         if "ticket_number" not in data or not data["ticket_number"]:
-            max_id = self.db.query(func.max(UnifiedTicket.id)).scalar() or 0
-            data["ticket_number"] = f"TKT-{max_id + 1:06d}"
+            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            suffix = uuid.uuid4().hex[:4].upper()
+            data["ticket_number"] = f"TKT-{timestamp}-{suffix}"
 
         # Set defaults
         data.setdefault("status", TicketStatus.OPEN.value if hasattr(TicketStatus, 'OPEN') else "open")
         data.setdefault("priority", TicketPriority.MEDIUM.value if hasattr(TicketPriority, 'MEDIUM') else "medium")
         data.setdefault("created_at", datetime.utcnow())
+        if self.user_id:
+            data.setdefault("created_by_id", self.user_id)
+            data.setdefault("updated_by_id", self.user_id)
 
         ticket = UnifiedTicket(**data)
         self.db.add(ticket)
-        self.db.commit()
-        self.db.refresh(ticket)
+        # Flush to get the ID without committing
+        self.db.flush()
 
         return ticket
 
-    def update_ticket(self, ticket_id: int, data: Dict[str, Any]) -> Optional[UnifiedTicket]:
-        """Update an existing ticket."""
+    def update_ticket(self, ticket_id: int, data: Dict[str, Any]) -> UnifiedTicket:
+        """Update an existing ticket.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ticket_id: The ticket ID.
+            data: Fields to update.
+
+        Returns:
+            The updated UnifiedTicket (not yet committed).
+
+        Raises:
+            NotFoundError: If ticket not found.
+        """
         ticket = self.get_ticket(ticket_id)
-        if not ticket:
-            return None
 
         data["updated_at"] = datetime.utcnow()
+        if self.user_id:
+            data["updated_by_id"] = self.user_id
 
         for key, value in data.items():
             if hasattr(ticket, key) and value is not None:
                 setattr(ticket, key, value)
 
-        self.db.commit()
-        self.db.refresh(ticket)
-
         return ticket
 
-    def delete_ticket(self, ticket_id: int) -> bool:
-        """Soft delete a ticket."""
+    def delete_ticket(self, ticket_id: int) -> UnifiedTicket:
+        """Soft delete a ticket.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ticket_id: The ticket ID.
+
+        Returns:
+            The deleted UnifiedTicket (not yet committed).
+
+        Raises:
+            NotFoundError: If ticket not found.
+        """
         ticket = self.get_ticket(ticket_id)
-        if not ticket:
-            return False
 
         ticket.is_deleted = True
         ticket.deleted_at = datetime.utcnow()
-        self.db.commit()
+        if self.user_id:
+            ticket.deleted_by_id = self.user_id
 
-        return True
+        return ticket
+
+    # =========================================================================
+    # BULK OPERATIONS
+    # =========================================================================
+
+    def bulk_update_status(self, ids: List[int], status: TicketStatus) -> int:
+        """Bulk update status for multiple tickets.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ids: List of ticket IDs to update.
+            status: Target status value.
+
+        Returns:
+            Number of tickets updated.
+        """
+        if not ids:
+            return 0
+
+        now = datetime.utcnow()
+        updates = {
+            "status": status.value if hasattr(status, 'value') else status,
+            "updated_at": now,
+        }
+        if self.user_id:
+            updates["updated_by_id"] = self.user_id
+
+        # Auto-set resolution date for resolved/closed
+        if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
+            updates["resolution_date"] = now
+
+        updated = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.id.in_(ids),
+            UnifiedTicket.is_deleted == False,
+        ).update(updates, synchronize_session=False)
+
+        return updated
+
+    def bulk_update_priority(self, ids: List[int], priority: TicketPriority) -> int:
+        """Bulk update priority for multiple tickets.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ids: List of ticket IDs to update.
+            priority: Target priority value.
+
+        Returns:
+            Number of tickets updated.
+        """
+        if not ids:
+            return 0
+
+        updated = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.id.in_(ids),
+            UnifiedTicket.is_deleted == False,
+        ).update(
+            {
+                "priority": priority.value if hasattr(priority, 'value') else priority,
+                "updated_at": datetime.utcnow(),
+                "updated_by_id": self.user_id if self.user_id else None,
+            },
+            synchronize_session=False,
+        )
+
+        return updated
+
+    def bulk_delete(self, ids: List[int]) -> int:
+        """Bulk soft-delete multiple tickets.
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ids: List of ticket IDs to delete.
+
+        Returns:
+            Number of tickets deleted.
+        """
+        if not ids:
+            return 0
+
+        now = datetime.utcnow()
+        deleted = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.id.in_(ids),
+            UnifiedTicket.is_deleted == False,
+        ).update(
+            {
+                "is_deleted": True,
+                "deleted_at": now,
+                "updated_at": now,
+                "deleted_by_id": self.user_id if self.user_id else None,
+                "updated_by_id": self.user_id if self.user_id else None,
+            },
+            synchronize_session=False,
+        )
+
+        return deleted
+
+    def update_field(self, ticket_id: int, field: str, value: str) -> UnifiedTicket:
+        """Update a single field on a ticket (for inline editing).
+
+        Does NOT commit - caller must call db.commit().
+
+        Args:
+            ticket_id: The ticket ID.
+            field: The field name to update (status, priority).
+            value: The new value as string.
+
+        Returns:
+            The updated ticket (not yet committed).
+
+        Raises:
+            NotFoundError: If ticket not found.
+            ValidationError: If field is not allowed or value is invalid.
+        """
+        allowed_fields = {"status", "priority"}
+        if field not in allowed_fields:
+            raise ValidationError(f"Field '{field}' is not allowed for inline editing")
+
+        ticket = self.get_ticket(ticket_id)
+
+        if field == "status":
+            try:
+                status = TicketStatus(value)
+                ticket.status = status.value
+                # Auto-set resolution date for resolved/closed
+                if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
+                    if ticket.resolution_date is None:
+                        ticket.resolution_date = datetime.utcnow()
+            except ValueError:
+                raise ValidationError(f"Invalid status value: {value}")
+
+        elif field == "priority":
+            try:
+                ticket.priority = TicketPriority(value).value
+            except ValueError:
+                raise ValidationError(f"Invalid priority value: {value}")
+
+        ticket.updated_at = datetime.utcnow()
+        if self.user_id:
+            ticket.updated_by_id = self.user_id
+
+        return ticket
 
     # =========================================================================
     # RELATED DATA
@@ -320,25 +552,14 @@ class SupportWebService:
 
         return query.order_by(UnifiedTicket.created_at.desc()).limit(limit).all()
 
-    def get_tickets_for_contact(
+    def get_tickets_for_party(
         self,
-        contact_id: int,
+        party_id: int,
         limit: int = 10
     ) -> List[UnifiedTicket]:
-        """Get tickets associated with a contact."""
+        """Get tickets associated with a party."""
         return self.db.query(UnifiedTicket).filter(
-            UnifiedTicket.unified_contact_id == contact_id,
-            UnifiedTicket.is_deleted == False
-        ).order_by(UnifiedTicket.created_at.desc()).limit(limit).all()
-
-    def get_tickets_for_customer(
-        self,
-        customer_id: int,
-        limit: int = 10
-    ) -> List[UnifiedTicket]:
-        """Get tickets associated with a customer."""
-        return self.db.query(UnifiedTicket).filter(
-            UnifiedTicket.unified_contact_id == customer_id,
+            UnifiedTicket.party_id == party_id,
             UnifiedTicket.is_deleted == False
         ).order_by(UnifiedTicket.created_at.desc()).limit(limit).all()
 

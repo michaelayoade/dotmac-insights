@@ -111,10 +111,10 @@
                             Customer
                         </dt>
                         <dd class="mt-1.5 text-sm text-gray-900 font-body">
-                            {% if project.customer %}
-                            <a href="/crm/contacts/{{ project.customer.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
-                                {{ project.customer.customer_name }}
-                            </a>
+                            {% if project.customer_account %}
+                            <span class="text-gray-900 font-body">
+                                {{ project.customer_account.party.name if project.customer_account.party else ("Account " ~ project.customer_account.id) }}
+                            </span>
                             {% else %}
                             <span class="text-gray-400 italic">No customer linked</span>
                             {% endif %}

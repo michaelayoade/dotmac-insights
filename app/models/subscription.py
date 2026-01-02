@@ -9,7 +9,7 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import Party
 
 
 class SubscriptionStatus(enum.Enum):
@@ -36,8 +36,8 @@ class Subscription(Base):
     # External ID
     splynx_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
-    # Customer link
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    # Party link (unified identity - replaces customer_id)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False, index=True)
 
     # Tariff/Plan link
     tariff_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tariffs.id"), nullable=True, index=True)
@@ -97,7 +97,7 @@ class Subscription(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Customer] = relationship(back_populates="subscriptions")
+    party: Mapped[Party] = relationship(backref="subscriptions")
     tariff = relationship("Tariff", backref="subscriptions")
     router = relationship("Router", backref="subscriptions")
 
@@ -106,7 +106,7 @@ class Subscription(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Subscription {self.plan_name} - {self.customer_id}>"
+        return f"<Subscription {self.plan_name} - {self.party_id}>"
 
     @property
     def mrr(self) -> float:

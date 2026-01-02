@@ -26,7 +26,7 @@ from app.models.field_service import (
     ServiceOrder, ServiceOrderType, ServiceOrderStatus, ServiceOrderPriority,
     FieldTeam, FieldTeamMember, ServiceZone, TechnicianSkill
 )
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.models.employee import Employee, EmploymentStatus
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 
@@ -338,7 +338,13 @@ async def service_order_new(
     db: DB,
 ):
     """New service order form page."""
-    customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
     technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
     teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
 
@@ -379,17 +385,23 @@ async def service_order_create(
     errors = {}
     title = _form_str(form, "title")
     service_address = _form_str(form, "service_address")
-    customer_id = _form_int(form, "customer_id")
+    customer_account_id = _form_int(form, "customer_id")
 
     if not title:
         errors["title"] = "Title is required"
     if not service_address:
         errors["service_address"] = "Service address is required"
-    if customer_id is None:
+    if customer_account_id is None:
         errors["customer_id"] = "Customer is required"
 
     if errors:
-        customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+        customers = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .order_by(Party.name)
+            .limit(100)
+            .all()
+        )
         technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
         teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
 
@@ -431,7 +443,7 @@ async def service_order_create(
         order_type=_form_enum(ServiceOrderType, form, "order_type", ServiceOrderType.REPAIR),
         status=_form_enum(ServiceOrderStatus, form, "status", ServiceOrderStatus.DRAFT),
         priority=_form_enum(ServiceOrderPriority, form, "priority", ServiceOrderPriority.MEDIUM),
-        customer_id=customer_id,
+        customer_account_id=customer_account_id,
         service_address=service_address,
         city=_form_str(form, "city") or None,
         state=_form_str(form, "state") or None,
@@ -479,8 +491,13 @@ async def service_order_detail(
 
     # Load customer details
     customer = None
-    if order.customer_id:
-        customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
+    if order.customer_account_id:
+        customer = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .filter(CustomerAccount.id == order.customer_account_id)
+            .first()
+        )
 
     # Load technician (employee) details
     technician = None
@@ -540,7 +557,13 @@ async def service_order_edit(
     if not order:
         raise HTTPException(status_code=404, detail="Service order not found")
 
-    customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
     technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
     teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
 
@@ -597,7 +620,13 @@ async def service_order_update(
         errors["service_address"] = "Service address is required"
 
     if errors:
-        customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+        customers = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .order_by(Party.name)
+            .limit(100)
+            .all()
+        )
         technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
         teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
 

@@ -25,7 +25,7 @@ from app.web.context import (
 from app.templates.environment import get_template_env
 from app.models.project import Project, ProjectStatus, ProjectPriority, ProjectType, Milestone, MilestoneStatus
 from app.models.task import Task, TaskStatus, TaskPriority
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.models.employee import Employee
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from datetime import timedelta
@@ -200,8 +200,14 @@ async def project_new(
     db: DB,
 ):
     """New project form page."""
-    # Get customers for dropdown
-    customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+    # Get customer accounts for dropdown
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -242,7 +248,13 @@ async def project_create(
         errors["project_name"] = "Project name is required"
 
     if errors:
-        customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+        customers = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .order_by(Party.name)
+            .limit(100)
+            .all()
+        )
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -279,10 +291,10 @@ async def project_create(
         notes=_form_str(form, "notes") or None,
     )
 
-    # Link customer if provided
-    customer_id = _form_int(form, "customer_id", 0)
-    if customer_id:
-        project.customer_id = customer_id
+    # Link customer account if provided
+    customer_account_id = _form_int(form, "customer_id", 0)
+    if customer_account_id:
+        project.customer_account_id = customer_account_id
 
     db.add(project)
     db.commit()
@@ -393,7 +405,13 @@ async def project_edit(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+    customers = (
+        db.query(CustomerAccount)
+        .join(Party, CustomerAccount.party_id == Party.id)
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -444,7 +462,13 @@ async def project_update(
         errors["project_name"] = "Project name is required"
 
     if errors:
-        customers = db.query(Customer).filter(Customer.is_deleted == False).limit(100).all()
+        customers = (
+            db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .order_by(Party.name)
+            .limit(100)
+            .all()
+        )
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -483,9 +507,9 @@ async def project_update(
     project.expected_end_date = expected_end
     project.notes = _form_str(form, "notes") or None
 
-    # Link customer if provided
-    customer_id = _form_int(form, "customer_id", 0)
-    project.customer_id = customer_id or None
+    # Link customer account if provided
+    customer_account_id = _form_int(form, "customer_id", 0)
+    project.customer_account_id = customer_account_id or None
 
     db.commit()
 

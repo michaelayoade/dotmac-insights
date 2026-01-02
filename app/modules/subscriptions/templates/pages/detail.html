@@ -464,7 +464,7 @@
     <!-- Sidebar -->
     <div class="space-y-6">
         <!-- Customer Card -->
-        {% if subscription.customer %}
+        {% if subscription.party %}
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="customer-card">
             <div class="px-6 py-5 border-b border-gray-100">
                 <h3 class="text-base font-display font-semibold text-gray-900">Customer</h3>
@@ -473,15 +473,15 @@
                 <div class="flex items-center gap-4">
                     <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center ring-2 ring-primary-200/50">
                         <span class="text-lg font-display font-bold text-primary-700">
-                            {{ subscription.customer.name[:2] | upper }}
+                            {{ subscription.party.name[:2] | upper }}
                         </span>
                     </div>
                     <div class="min-w-0">
-                        <a href="/customers/{{ subscription.customer.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block">
-                            {{ subscription.customer.name }}
+                        <a href="/parties/{{ subscription.party.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block">
+                            {{ subscription.party.name }}
                         </a>
-                        {% if subscription.customer.email %}
-                        <p class="text-xs text-gray-500 truncate">{{ subscription.customer.email }}</p>
+                        {% if subscription.party.primary_email %}
+                        <p class="text-xs text-gray-500 truncate">{{ subscription.party.primary_email }}</p>
                         {% endif %}
                     </div>
                 </div>
@@ -568,9 +568,9 @@
                     </div>
                     <span>Edit Subscription</span>
                 </a>
-                {% if subscription.customer %}
+                {% if subscription.party %}
                 <a
-                    href="/customers/{{ subscription.customer.id }}"
+                    href="/parties/{{ subscription.party.id }}"
                     class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-xl hover:bg-surface-50 transition-colors font-body"
                 >
                     <div class="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">

@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 from app.utils.datetime_utils import utc_now, ensure_utc
 
 if TYPE_CHECKING:
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from app.models.ticket import Ticket
     from app.models.conversation import Conversation
     from app.models.agent import Team
+    from app.models.auth import User
 
 
 # =============================================================================
@@ -94,7 +95,7 @@ class TicketChannel(enum.Enum):
 # UNIFIED TICKET MODEL
 # =============================================================================
 
-class UnifiedTicket(Base):
+class UnifiedTicket(SoftDeleteMixin, Base):
     """
     Unified ticket record - single source of truth for all support data.
 
@@ -192,8 +193,14 @@ class UnifiedTicket(Base):
 
     # Creator (if internal)
     created_by_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("employees.id"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    updated_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # ==========================================================================
@@ -241,7 +248,11 @@ class UnifiedTicket(Base):
     chatwoot_conversation_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
     # Legacy table links (for migration/backfill)
-    legacy_ticket_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+    legacy_ticket_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tickets.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True
+    )
     legacy_conversation_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
     legacy_omni_conversation_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
 
@@ -312,9 +323,6 @@ class UnifiedTicket(Base):
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
-    is_deleted: Mapped[bool] = mapped_column(default=False, index=True)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     # ==========================================================================
     # RELATIONSHIPS
@@ -332,9 +340,11 @@ class UnifiedTicket(Base):
         foreign_keys=[assigned_team_id],
         backref="unified_tickets"
     )
-    created_by: Mapped[Optional["Employee"]] = relationship(
-        back_populates="created_unified_tickets",
+    created_by: Mapped[Optional["User"]] = relationship(
         foreign_keys=[created_by_id]
+    )
+    updated_by: Mapped[Optional["User"]] = relationship(
+        foreign_keys=[updated_by_id]
     )
 
     # Self-referential relationships

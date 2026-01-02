@@ -12,6 +12,7 @@ from app.models.document_lines import BillLine
 
 if TYPE_CHECKING:
     from app.models.bank_transaction_split import BankTransactionSplit
+    from app.models.party import SupplierAccount
 
 
 # ============= SUPPLIER =============
@@ -369,6 +370,9 @@ class PurchaseInvoice(Base):
     supplier_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    supplier_account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("supplier_accounts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Supplier info (denormalized)
@@ -422,6 +426,7 @@ class PurchaseInvoice(Base):
         back_populates="purchase_invoice",
         cascade="all, delete-orphan",
     )
+    supplier_account: Mapped[Optional["SupplierAccount"]] = relationship()
 
     __table_args__ = (
         Index(

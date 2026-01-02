@@ -24,7 +24,7 @@
             </div>
             <p class="text-sm text-gray-500">
                 {% if payment.contact %}
-                <a href="/crm/contacts/{{ payment.contact.id }}" class="text-primary-600 hover:text-primary-700">{{ payment.contact.name }}</a>
+                {{ payment.contact.name }}
                 {% elif payment.customer %}
                 {{ payment.customer.customer_name }}
                 {% else %}

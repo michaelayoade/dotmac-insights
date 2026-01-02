@@ -246,108 +246,6 @@ def escalate_approval(
         )
         raise self.retry(exc=e)
 
-
-@celery_app.task(
-    name="scheduled.followup_lead",
-    bind=True,
-    max_retries=2,
-    default_retry_delay=60,
-)
-def followup_lead(
-    self,
-    contact_id: int,
-    user_id: int,
-    notes: str,
-    create_activity: bool = True,
-) -> Dict[str, Any]:
-    """
-    Create a follow-up reminder/activity for a lead.
-
-    Args:
-        contact_id: Contact ID
-        user_id: User to notify
-        notes: Follow-up notes
-        create_activity: If True, also create a CRM activity
-
-    Returns:
-        Result summary
-    """
-    try:
-        from app.models.contact import Contact
-        from app.models.crm import Activity, ActivityType, ActivityStatus
-        from app.services.notification_service import NotificationService
-        from app.models.notification import NotificationEventType
-
-        with SessionLocal() as db:
-            contact = db.query(Contact).filter(Contact.id == contact_id).first()
-
-            if not contact:
-                result = {"status": "not_found", "contact_id": contact_id}
-                _update_scheduled_task_status(self.request.id, result=result)
-                return result
-
-            contact_name = contact.full_name or contact.name or f"Contact #{contact_id}"
-
-            # Send notification
-            notification_service = NotificationService(db)
-            notification_service.emit_event(
-                event_type=NotificationEventType.CUSTOM,
-                payload={
-                    "title": f"Follow-up: {contact_name}",
-                    "message": notes,
-                    "entity_type": "contact",
-                    "entity_id": contact_id,
-                    "action_url": f"/crm/contacts/{contact_id}",
-                },
-                entity_type="contact",
-                entity_id=contact_id,
-                user_ids=[user_id],
-            )
-
-            # Optionally create activity record
-            activity_id = None
-            if create_activity:
-                activity = Activity(
-                    contact_id=contact_id,
-                    activity_type=ActivityType.FOLLOW_UP.value if hasattr(ActivityType, 'FOLLOW_UP') else "follow_up",
-                    subject=f"Scheduled follow-up with {contact_name}",
-                    description=notes,
-                    status=ActivityStatus.SCHEDULED.value if hasattr(ActivityStatus, 'SCHEDULED') else "scheduled",
-                    scheduled_at=datetime.utcnow(),
-                    owner_id=user_id,
-                )
-                db.add(activity)
-                db.flush()
-                activity_id = activity.id
-
-            db.commit()
-
-            result = {
-                "status": "created",
-                "contact_id": contact_id,
-                "contact_name": contact_name,
-                "user_id": user_id,
-                "activity_id": activity_id,
-                "created_at": datetime.utcnow().isoformat(),
-            }
-
-        _update_scheduled_task_status(self.request.id, result=result)
-        logger.info("followup_lead_result", **result)
-        return result
-
-    except Exception as e:
-        error = str(e)
-        _update_scheduled_task_status(self.request.id, error=error)
-        logger.error(
-            "followup_lead_failed",
-            contact_id=contact_id,
-            user_id=user_id,
-            error=error,
-            exc_info=True,
-        )
-        raise self.retry(exc=e)
-
-
 @celery_app.task(
     name="scheduled.expire_workflow_task",
     bind=True,
@@ -410,8 +308,6 @@ def expire_workflow_task(
 def _get_entity_url(entity_type: str, entity_id: int) -> str:
     """Generate URL for an entity."""
     url_map = {
-        "lead": f"/crm/contacts/{entity_id}",
-        "contact": f"/crm/contacts/{entity_id}",
         "ticket": f"/support/tickets/{entity_id}",
         "approval": f"/accounting/approvals/{entity_id}",
         "invoice": f"/sales/invoices/{entity_id}",

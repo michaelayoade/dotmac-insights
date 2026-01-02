@@ -9,7 +9,7 @@
     {'key': 'status', 'label': 'Status'},
     {'key': 'created', 'label': 'Created'},
 ] %}
-<div class="space-y-6 flex flex-col" x-data="columnPicker('tickets-table', {{ ticket_columns  | tojson | e }})">
+<div class="space-y-6 flex flex-col" x-data="{ ...columnPicker('tickets-table', {{ ticket_columns  | tojson | e }}), ...bulkSelect() }">
     <!-- Page Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -370,8 +370,21 @@
     </div>
 
     <!-- Table Container -->
-    <div id="tickets-table-container">
+    <div id="tickets-table-container"
+         hx-trigger="bulkActionComplete from:body"
+         hx-get="/support/tickets/table"
+         hx-include="[name='q'], [name='status'], [name='priority'], [name='assigned']">
         {% include "modules/support/templates/partials/tickets_table.html" %}
     </div>
+
+    <!-- Bulk Actions Bar -->
+    {% set bulk_delete_url = "/support/tickets/bulk" %}
+    {% set bulk_export_url = "/support/tickets/export" %}
+    {% set item_name = "tickets" %}
+    {% set actions = [
+        {'label': 'Close', 'url': '/support/tickets/bulk-status?status=closed', 'method': 'POST'},
+        {'label': 'Resolve', 'url': '/support/tickets/bulk-status?status=resolved', 'method': 'POST'},
+    ] %}
+    {% include "components/ui/bulk_actions.html" %}
 </div>
 {% endblock %}

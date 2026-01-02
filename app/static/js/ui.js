@@ -317,4 +317,161 @@
             }
         }
     });
+
+    // Inbox WebSocket Component
+    window.inboxWebSocket = function(options = {}) {
+        return {
+            ws: null,
+            connected: false,
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            reconnectDelay: 3000,
+            channel: options.channel || 'conversations',
+            agentId: options.agentId || null,
+            onMessage: options.onMessage || null,
+
+            init() {
+                this.connect();
+                // Reconnect on visibility change
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible' && !this.connected) {
+                        this.connect();
+                    }
+                });
+            },
+
+            connect() {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                let url = `${protocol}//${location.host}/ws/inbox?channel=${this.channel}`;
+                if (this.agentId) url += `&agent_id=${this.agentId}`;
+
+                try {
+                    this.ws = new WebSocket(url);
+
+                    this.ws.onopen = () => {
+                        this.connected = true;
+                        this.reconnectAttempts = 0;
+                        console.log('[Inbox WS] Connected to', this.channel);
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (e) {
+                            console.error('[Inbox WS] Parse error:', e);
+                        }
+                    };
+
+                    this.ws.onclose = (event) => {
+                        this.connected = false;
+                        console.log('[Inbox WS] Disconnected:', event.code);
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('[Inbox WS] Error:', error);
+                    };
+                } catch (e) {
+                    console.error('[Inbox WS] Connection failed:', e);
+                    this.scheduleReconnect();
+                }
+            },
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('[Inbox WS] Max reconnect attempts reached');
+                    return;
+                }
+                this.reconnectAttempts++;
+                const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
+                console.log(`[Inbox WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+                setTimeout(() => this.connect(), delay);
+            },
+
+            handleMessage(data) {
+                // Call custom handler if provided
+                if (this.onMessage) {
+                    this.onMessage(data);
+                }
+
+                // Handle specific event types
+                switch (data.event || data.type) {
+                    case 'connected':
+                        console.log('[Inbox WS] Connection confirmed');
+                        break;
+
+                    case 'stats_update':
+                        // Update stats badges
+                        this.updateStats(data.data || data);
+                        break;
+
+                    case 'new_message':
+                        // Trigger HTMX refresh of messages
+                        htmx.trigger('#messages-container', 'ws-new-message');
+                        // Show notification
+                        if (data.data?.preview) {
+                            showToast(`New message: ${data.data.preview.substring(0, 50)}...`, 'info');
+                        }
+                        break;
+
+                    case 'conversation_update':
+                        // Trigger HTMX refresh of conversation list
+                        htmx.trigger('#conversations-container', 'ws-conversation-update');
+                        break;
+
+                    case 'assignment':
+                        // Trigger refresh and show notification
+                        htmx.trigger('#conversations-container', 'ws-conversation-update');
+                        if (data.data?.conversation_id) {
+                            showToast('New conversation assigned to you', 'info');
+                        }
+                        break;
+
+                    case 'pong':
+                        // Heartbeat response
+                        break;
+
+                    default:
+                        console.log('[Inbox WS] Unknown event:', data);
+                }
+            },
+
+            updateStats(stats) {
+                // Update open count
+                const openEl = document.querySelector('[data-stat="open-count"]');
+                if (openEl && stats.open_count !== undefined) {
+                    openEl.textContent = stats.open_count;
+                }
+
+                // Update pending count
+                const pendingEl = document.querySelector('[data-stat="pending-count"]');
+                if (pendingEl && stats.pending_count !== undefined) {
+                    pendingEl.textContent = stats.pending_count;
+                }
+
+                // Update unread count in navbar badge
+                const unreadBadge = document.querySelector('[data-inbox-unread]');
+                if (unreadBadge && stats.unread_count !== undefined) {
+                    unreadBadge.textContent = stats.unread_count;
+                    unreadBadge.classList.toggle('hidden', stats.unread_count === 0);
+                }
+            },
+
+            send(data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify(data));
+                }
+            },
+
+            destroy() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+            }
+        };
+    };
 })();

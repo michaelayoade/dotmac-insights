@@ -1,12 +1,18 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-auto">
+<div class="max-w-screen-2xl mx-auto" x-data="inboxWebSocket({ channel: 'conversations' })" x-init="init()">
     {# Page Header #}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Inbox</h1>
-            <p class="mt-1 text-sm text-gray-500 font-body">Manage all customer conversations across channels</p>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                Manage all customer conversations across channels
+                <span x-show="connected" class="inline-flex items-center ml-2">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span class="ml-1 text-xs text-emerald-600">Live</span>
+                </span>
+            </p>
         </div>
     </div>
 
@@ -20,7 +26,7 @@
                     </svg>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-900">{{ stats.open_count }}</p>
+                    <p class="text-2xl font-bold text-gray-900" data-stat="open-count">{{ stats.open_count }}</p>
                     <p class="text-xs text-gray-500 font-body">Open</p>
                 </div>
             </div>
@@ -34,7 +40,7 @@
                     </svg>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-900">{{ stats.pending_count }}</p>
+                    <p class="text-2xl font-bold text-gray-900" data-stat="pending-count">{{ stats.pending_count }}</p>
                     <p class="text-xs text-gray-500 font-body">Pending</p>
                 </div>
             </div>
@@ -152,7 +158,10 @@
         </div>
 
         {# Conversations List #}
-        <div id="conversations-container">
+        <div id="conversations-container"
+             hx-get="/inbox/table"
+             hx-trigger="ws-conversation-update from:body"
+             hx-include="[name='q'], [name='status'], [name='channel'], [name='priority']">
             {% include "modules/omnichannel/templates/partials/conversations_list.html" %}
         </div>
     </div>

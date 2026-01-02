@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date, ForeignKey
+from sqlalchemy import BigInteger, String, Text, Enum, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List
@@ -38,7 +38,11 @@ class SalesOrder(Base):
     # Customer
     customer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=True,
+    )
 
     # Order details
     order_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -251,8 +255,11 @@ class ERPNextLead(Base):
 
     # Conversion tracking
     converted: Mapped[bool] = mapped_column(default=False)
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Sync metadata

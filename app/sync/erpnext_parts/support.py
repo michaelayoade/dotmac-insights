@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import structlog
 
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party, PartyExternalId
 from app.models.employee import Employee
 from app.models.project import Project, ProjectPriority, ProjectStatus
 from app.models.ticket import Ticket, TicketPriority, TicketSource, TicketStatus
@@ -42,15 +42,22 @@ async def sync_hd_tickets(
             filters=filters,
         )
 
-        # Pre-fetch customers by email and erpnext_id for linking
-        customers_by_email = {
-            c.email.lower(): c.id
-            for c in sync_client.db.query(Customer).filter(Customer.email.isnot(None)).all()
-            if c.email
+        # Pre-fetch parties/accounts by email and erpnext_id for linking
+        parties_by_email = {
+            (p.primary_email or "").lower(): p.id
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
         }
-        customers_by_erpnext_id = {
-            c.erpnext_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.erpnext_id.isnot(None)).all()
+        accounts_by_erpnext_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(
+                    PartyExternalId.system == "erpnext",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
+                .all()
+            )
         }
 
         # Pre-fetch employees by email for linking
@@ -64,6 +71,20 @@ async def sync_hd_tickets(
         projects_by_erpnext_id = {
             p.erpnext_id: p.id
             for p in sync_client.db.query(Project).filter(Project.erpnext_id.isnot(None)).all()
+        }
+
+        # Pre-fetch customer accounts by erpnext_id for linking
+        accounts_by_erpnext_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(
+                    PartyExternalId.system == "erpnext",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
+                .all()
+            )
         }
 
         batch_size = 500
@@ -107,12 +128,29 @@ async def sync_hd_tickets(
             resolution_team = ticket_data.get("custom_resolution_team")
             agent_email = ticket_data.get("agent")
 
-            # Link to customer
-            customer_id = None
+            # Link to party/customer account
+            party_id = None
+            customer_account_id = None
             if erpnext_customer:
-                customer_id = customers_by_erpnext_id.get(erpnext_customer)
-            if not customer_id and customer_email:
-                customer_id = customers_by_email.get(customer_email.lower())
+                customer_account_id = accounts_by_erpnext_id.get(str(erpnext_customer))
+            if customer_account_id:
+                account = (
+                    sync_client.db.query(CustomerAccount)
+                    .filter(CustomerAccount.id == customer_account_id)
+                    .first()
+                )
+                if account:
+                    party_id = account.party_id
+            if not party_id and customer_email:
+                party_id = parties_by_email.get(customer_email.lower())
+            if party_id and not customer_account_id:
+                account = (
+                    sync_client.db.query(CustomerAccount)
+                    .filter(CustomerAccount.party_id == party_id)
+                    .first()
+                )
+                if account:
+                    customer_account_id = account.id
 
             # Link to employee
             employee_id = None
@@ -137,7 +175,8 @@ async def sync_hd_tickets(
                 existing.status = status
                 existing.priority = priority
 
-                existing.customer_id = customer_id
+                existing.party_id = party_id
+                existing.customer_account_id = customer_account_id
                 existing.employee_id = employee_id
                 existing.assigned_employee_id = assigned_employee_id
                 existing.project_id = project_id
@@ -191,7 +230,8 @@ async def sync_hd_tickets(
                     issue_type=ticket_data.get("ticket_type"),
                     status=status,
                     priority=priority,
-                    customer_id=customer_id,
+                    party_id=party_id,
+                    customer_account_id=customer_account_id,
                     employee_id=employee_id,
                     assigned_employee_id=assigned_employee_id,
                     project_id=project_id,
@@ -263,10 +303,18 @@ async def sync_projects(
             fields=["*"],
         )
 
-        # Pre-fetch customers
-        customers_by_erpnext_id = {
-            c.erpnext_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.erpnext_id.isnot(None)).all()
+        # Pre-fetch customer accounts by erpnext_id
+        accounts_by_erpnext_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(
+                    PartyExternalId.system == "erpnext",
+                    PartyExternalId.external_key_type == "customer_id",
+                )
+                .all()
+            )
         }
 
         # Pre-fetch employees by email for project manager FK
@@ -305,9 +353,13 @@ async def sync_projects(
             }
             priority = priority_map.get(priority_str, ProjectPriority.MEDIUM)
 
-            # Link to customer
+            # Link to customer account
             erpnext_customer = proj_data.get("customer")
-            customer_id = customers_by_erpnext_id.get(erpnext_customer) if erpnext_customer else None
+            customer_account_id = (
+                accounts_by_erpnext_id.get(str(erpnext_customer))
+                if erpnext_customer
+                else None
+            )
 
             # Link to project manager
             project_manager_email = proj_data.get("project_manager") or proj_data.get("owner")
@@ -322,7 +374,7 @@ async def sync_projects(
                 existing.company = proj_data.get("company")
                 existing.cost_center = proj_data.get("cost_center")
 
-                existing.customer_id = customer_id
+                existing.customer_account_id = customer_account_id
                 existing.erpnext_customer = erpnext_customer
                 existing.erpnext_sales_order = proj_data.get("sales_order")
                 existing.project_manager_id = project_manager_id
@@ -379,7 +431,7 @@ async def sync_projects(
                     department=proj_data.get("department"),
                     company=proj_data.get("company"),
                     cost_center=proj_data.get("cost_center"),
-                    customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     erpnext_customer=erpnext_customer,
                     erpnext_sales_order=proj_data.get("sales_order"),
                     project_manager_id=project_manager_id,

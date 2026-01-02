@@ -27,7 +27,7 @@ from app.models.field_service import (
     ServiceOrder,
     ServiceOrderStatus,
 )
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.models.ticket import Ticket
 from app.models.project import Project
 from app.models.invoice import Invoice
@@ -77,12 +77,12 @@ class CustomerNotificationService:
 
     def get_customer_preferences(
         self,
-        customer_id: int,
+        customer_account_id: int,
         notification_type: CustomerNotificationType
     ) -> Dict[str, bool]:
         """Get customer's notification preferences for a given type."""
         pref = self.db.query(CustomerNotificationPreference).filter(
-            CustomerNotificationPreference.customer_id == customer_id,
+            CustomerNotificationPreference.customer_account_id == customer_account_id,
             CustomerNotificationPreference.notification_type == notification_type
         ).first()
 
@@ -159,7 +159,7 @@ class CustomerNotificationService:
 
     def create_notification(
         self,
-        customer_id: int,
+        customer_account_id: int,
         notification_type: CustomerNotificationType,
         data: Dict[str, Any],
         channel: CustomerNotificationChannel = CustomerNotificationChannel.EMAIL,
@@ -171,12 +171,18 @@ class CustomerNotificationService:
     ) -> CustomerNotification:
         """Create a single notification record."""
         # Get customer info
-        customer = self.db.query(Customer).filter(Customer.id == customer_id).first()
-        if not customer:
-            raise ValueError(f"Customer {customer_id} not found")
+        customer_account = (
+            self.db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .filter(CustomerAccount.id == customer_account_id)
+            .first()
+        )
+        if not customer_account:
+            raise ValueError(f"Customer account {customer_account_id} not found")
 
         # Format message
-        data["customer_name"] = customer.name or "Valued Customer"
+        party = customer_account.party
+        data["customer_name"] = party.name if party else "Valued Customer"
         formatted = self.format_message(notification_type, data)
 
         # Determine recipient based on channel
@@ -184,12 +190,12 @@ class CustomerNotificationService:
         recipient_phone = None
 
         if channel == CustomerNotificationChannel.EMAIL:
-            recipient_email = customer.email
+            recipient_email = party.primary_email if party else None
         elif channel in [CustomerNotificationChannel.SMS, CustomerNotificationChannel.WHATSAPP]:
-            recipient_phone = customer.phone
+            recipient_phone = party.primary_phone if party else None
 
         notification = CustomerNotification(
-            customer_id=customer_id,
+            customer_account_id=customer_account_id,
             notification_type=notification_type,
             channel=channel,
             status=CustomerNotificationStatus.PENDING,
@@ -202,7 +208,7 @@ class CustomerNotificationService:
             invoice_id=invoice_id,
             recipient_email=recipient_email,
             recipient_phone=recipient_phone,
-            recipient_name=customer.name,
+            recipient_name=party.name if party else None,
             extra_data=data,
             scheduled_at=schedule_at,
         )
@@ -212,7 +218,7 @@ class CustomerNotificationService:
 
     def notify_customer(
         self,
-        customer_id: int,
+        customer_account_id: int,
         notification_type: CustomerNotificationType,
         data: Dict[str, Any],
         service_order_id: Optional[int] = None,
@@ -227,7 +233,7 @@ class CustomerNotificationService:
         Returns list of created notification records.
         """
         # Get customer preferences
-        preferences = self.get_customer_preferences(customer_id, notification_type)
+        preferences = self.get_customer_preferences(customer_account_id, notification_type)
 
         # Determine which channels to use
         if channels is None:
@@ -249,7 +255,7 @@ class CustomerNotificationService:
         for channel in channels:
             try:
                 notification = self.create_notification(
-                    customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     notification_type=notification_type,
                     data=data,
                     channel=channel,
@@ -392,7 +398,7 @@ class CustomerNotificationService:
             scheduled_time = service_order.scheduled_start_time.strftime("%I:%M %p")
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.SERVICE_SCHEDULED,
             data={
                 "order_number": service_order.order_number,
@@ -416,7 +422,7 @@ class CustomerNotificationService:
             scheduled_time = service_order.scheduled_start_time.strftime("%I:%M %p")
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.SERVICE_RESCHEDULED,
             data={
                 "order_number": service_order.order_number,
@@ -440,7 +446,7 @@ class CustomerNotificationService:
             scheduled_time = service_order.scheduled_start_time.strftime("%I:%M %p")
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.TECHNICIAN_ASSIGNED,
             data={
                 "order_number": service_order.order_number,
@@ -463,7 +469,7 @@ class CustomerNotificationService:
             technician_name = service_order.technician.name or "Your technician"
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.TECHNICIAN_EN_ROUTE,
             data={
                 "order_number": service_order.order_number,
@@ -483,7 +489,7 @@ class CustomerNotificationService:
         arrival_time = service_order.arrival_time or datetime.now(timezone.utc)
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.TECHNICIAN_ARRIVED,
             data={
                 "order_number": service_order.order_number,
@@ -503,7 +509,7 @@ class CustomerNotificationService:
         estimated_duration = f"{float(service_order.estimated_duration_hours)} hours"
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.SERVICE_STARTED,
             data={
                 "order_number": service_order.order_number,
@@ -527,7 +533,7 @@ class CustomerNotificationService:
                 actual_duration = f"{hours:.1f} hours"
 
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.SERVICE_COMPLETED,
             data={
                 "order_number": service_order.order_number,
@@ -547,7 +553,7 @@ class CustomerNotificationService:
     ) -> List[CustomerNotification]:
         """Notify customer that service has been cancelled."""
         return self.notify_customer(
-            customer_id=service_order.customer_id,
+            customer_account_id=service_order.customer_account_id,
             notification_type=CustomerNotificationType.SERVICE_CANCELLED,
             data={
                 "order_number": service_order.order_number,
@@ -562,10 +568,10 @@ class CustomerNotificationService:
 
     def notify_ticket_created(self, ticket: Ticket) -> List[CustomerNotification]:
         """Notify customer that their ticket was created."""
-        if not ticket.customer_id:
+        if not ticket.customer_account_id:
             return []
         return self.notify_customer(
-            customer_id=ticket.customer_id,
+            customer_account_id=ticket.customer_account_id,
             notification_type=CustomerNotificationType.TICKET_CREATED,
             data={
                 "ticket_id": ticket.id,
@@ -581,10 +587,10 @@ class CustomerNotificationService:
         notes: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer of ticket status update."""
-        if not ticket.customer_id:
+        if not ticket.customer_account_id:
             return []
         return self.notify_customer(
-            customer_id=ticket.customer_id,
+            customer_account_id=ticket.customer_account_id,
             notification_type=CustomerNotificationType.TICKET_UPDATED,
             data={
                 "ticket_id": ticket.id,
@@ -600,10 +606,10 @@ class CustomerNotificationService:
         reply: str
     ) -> List[CustomerNotification]:
         """Notify customer of new reply on their ticket."""
-        if not ticket.customer_id:
+        if not ticket.customer_account_id:
             return []
         return self.notify_customer(
-            customer_id=ticket.customer_id,
+            customer_account_id=ticket.customer_account_id,
             notification_type=CustomerNotificationType.TICKET_REPLY,
             data={
                 "ticket_id": ticket.id,
@@ -619,10 +625,10 @@ class CustomerNotificationService:
         resolution: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer that their ticket was resolved."""
-        if not ticket.customer_id:
+        if not ticket.customer_account_id:
             return []
         return self.notify_customer(
-            customer_id=ticket.customer_id,
+            customer_account_id=ticket.customer_account_id,
             notification_type=CustomerNotificationType.TICKET_RESOLVED,
             data={
                 "ticket_id": ticket.id,
@@ -638,7 +644,7 @@ class CustomerNotificationService:
 
     def notify_project_started(self, project: Project) -> List[CustomerNotification]:
         """Notify customer that their project has started."""
-        if not project.customer_id:
+        if not project.customer_account_id:
             return []
 
         manager_name = "Our team"
@@ -646,7 +652,7 @@ class CustomerNotificationService:
             manager_name = project.project_manager.name or "Our team"
 
         return self.notify_customer(
-            customer_id=project.customer_id,
+            customer_account_id=project.customer_account_id,
             notification_type=CustomerNotificationType.PROJECT_STARTED,
             data={
                 "project_name": project.project_name,
@@ -664,11 +670,11 @@ class CustomerNotificationService:
         notes: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer of project milestone."""
-        if not project.customer_id:
+        if not project.customer_account_id:
             return []
 
         return self.notify_customer(
-            customer_id=project.customer_id,
+            customer_account_id=project.customer_account_id,
             notification_type=CustomerNotificationType.PROJECT_MILESTONE,
             data={
                 "project_name": project.project_name,
@@ -685,11 +691,11 @@ class CustomerNotificationService:
         summary: str = ""
     ) -> List[CustomerNotification]:
         """Notify customer that project is completed."""
-        if not project.customer_id:
+        if not project.customer_account_id:
             return []
 
         return self.notify_customer(
-            customer_id=project.customer_id,
+            customer_account_id=project.customer_account_id,
             notification_type=CustomerNotificationType.PROJECT_COMPLETED,
             data={
                 "project_name": project.project_name,
@@ -705,12 +711,12 @@ class CustomerNotificationService:
 
     def notify_invoice_generated(self, invoice: Invoice) -> List[CustomerNotification]:
         """Notify customer of new invoice."""
-        if not invoice.customer_id:
+        if not invoice.customer_account_id:
             return []
         amount = f"₦{float(invoice.total_amount):,.2f}" if invoice.total_amount else "₦0.00"
 
         return self.notify_customer(
-            customer_id=invoice.customer_id,
+            customer_account_id=invoice.customer_account_id,
             notification_type=CustomerNotificationType.INVOICE_GENERATED,
             data={
                 "invoice_number": invoice.invoice_number or str(invoice.id),
@@ -723,7 +729,7 @@ class CustomerNotificationService:
 
     def notify_payment_received(
         self,
-        customer_id: int,
+        customer_account_id: int,
         amount: Decimal,
         reference: str,
         invoice_id: Optional[int] = None,
@@ -731,7 +737,7 @@ class CustomerNotificationService:
     ) -> List[CustomerNotification]:
         """Notify customer of payment receipt."""
         return self.notify_customer(
-            customer_id=customer_id,
+            customer_account_id=customer_account_id,
             notification_type=CustomerNotificationType.PAYMENT_RECEIVED,
             data={
                 "amount": f"₦{float(amount):,.2f}",
@@ -747,12 +753,12 @@ class CustomerNotificationService:
         days_until_due: int
     ) -> List[CustomerNotification]:
         """Notify customer of upcoming payment due."""
-        if not invoice.customer_id:
+        if not invoice.customer_account_id:
             return []
         amount = f"₦{float(invoice.balance):,.2f}" if invoice.balance else "₦0.00"
 
         return self.notify_customer(
-            customer_id=invoice.customer_id,
+            customer_account_id=invoice.customer_account_id,
             notification_type=CustomerNotificationType.PAYMENT_DUE,
             data={
                 "invoice_number": invoice.invoice_number or str(invoice.id),

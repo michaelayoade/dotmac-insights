@@ -33,6 +33,9 @@ def get_base_context(
     # Get and clear flash message
     flash = get_flash(request, response)
 
+    module_registry = get_module_registry(user)
+    active_module = resolve_active_module(request.url.path, module_registry)
+
     return {
         # Request info
         "request": request,
@@ -61,6 +64,11 @@ def get_base_context(
         # Environment
         "is_production": settings.is_production,
         "environment": settings.environment,
+
+        # Modules
+        "module_registry": module_registry,
+        "active_module": active_module,
+        "active_module_id": active_module["id"] if active_module else None,
     }
 
 
@@ -122,29 +130,90 @@ def build_pagination_context(
 # Navigation structure for sidebar - Comprehensive navigation with all pages
 # Note: Using "links" instead of "items" to avoid conflict with dict.items()
 # Section can have optional "href" for clickable module landing pages
+MODULE_REGISTRY: List[Dict[str, Any]] = [
+    {
+        "id": "network",
+        "label": "Network",
+        "href": "/network",
+        "icon": "globe",
+        "scopes": ["network:read", "subscriptions:read"],
+        "prefixes": [
+            "/network",
+            "/subscriptions",
+        ],
+        "group": "Infrastructure",
+    },
+    {
+        "id": "accounting",
+        "label": "Accounting",
+        "href": "/accounting",
+        "icon": "book",
+        "scopes": ["accounting:read", "sales:read", "reports:read", "purchasing:read"],
+        "prefixes": [
+            "/sales",
+            "/accounting",
+            "/reports",
+            "/purchasing",
+            "/invoices",
+            "/suppliers",
+            "/expenses",
+        ],
+        "group": "Back Office",
+    },
+    {
+        "id": "hr",
+        "label": "Human Resources",
+        "href": "/hr",
+        "icon": "users",
+        "scopes": ["hr:read", "performance:read"],
+        "prefixes": [
+            "/hr",
+            "/performance",
+        ],
+        "group": "People Ops",
+    },
+    {
+        "id": "operations",
+        "label": "Operations",
+        "href": "/operations",
+        "icon": "truck",
+        "scopes": [
+            "support:read",
+            "operations:read",
+            "projects:read",
+            "field_service:read",
+            "inventory:read",
+            "assets:read",
+            "vehicles:read",
+            "analytics:read",
+        ],
+        "prefixes": [
+            "/support",
+            "/operations",
+            "/projects",
+            "/field-service",
+            "/inventory",
+            "/assets",
+            "/vehicles",
+            "/analytics",
+            "/inbox",
+        ],
+        "group": "Operations",
+    },
+]
+
 NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     {
         "section": "Main",
+        "module": "global",
         "links": [
             {"label": "Dashboard", "href": "/", "icon": "home", "scope": None},
             {"label": "Tasks", "href": "/tasks", "icon": "check-square", "scope": "tasks:read"},
         ],
     },
     {
-        "section": "CRM",
-        "href": "/crm",
-        "scope": "crm:read",
-        "links": [
-            {"label": "Contacts", "href": "/crm/contacts", "icon": "users", "scope": "crm:read"},
-            {"label": "Leads", "href": "/crm/leads", "icon": "user-plus", "scope": "crm:read"},
-            {"label": "Customers", "href": "/customers", "icon": "building", "scope": "customers:read"},
-            {"label": "Opportunities", "href": "/crm/opportunities", "icon": "trending-up", "scope": "crm:read"},
-            {"label": "Pipeline", "href": "/crm/pipeline", "icon": "git-branch", "scope": "crm:read"},
-            {"label": "Activities", "href": "/crm/activities", "icon": "activity", "scope": "crm:read"},
-        ],
-    },
-    {
         "section": "Sales",
+        "module": "accounting",
         "href": "/sales",
         "scope": "sales:read",
         "links": [
@@ -152,12 +221,11 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
             {"label": "Orders", "href": "/sales/orders", "icon": "shopping-cart", "scope": "sales:read"},
             {"label": "Invoices", "href": "/invoices", "icon": "credit-card", "scope": "accounting:read"},
             {"label": "Credit Notes", "href": "/invoices/credit-notes", "icon": "file-minus", "scope": "accounting:read"},
-            {"label": "Subscriptions", "href": "/subscriptions", "icon": "repeat", "scope": "subscriptions:read"},
-            {"label": "Tariffs", "href": "/subscriptions/tariffs", "icon": "list", "scope": "subscriptions:read"},
         ],
     },
     {
         "section": "Finance",
+        "module": "accounting",
         "href": "/accounting",
         "scope": "accounting:read",
         "links": [
@@ -180,6 +248,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Reports",
+        "module": "accounting",
         "href": "/reports",
         "scope": "reports:read",
         "links": [
@@ -202,6 +271,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Purchasing",
+        "module": "accounting",
         "href": "/purchasing",
         "scope": "purchasing:read",
         "links": [
@@ -215,6 +285,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "HR",
+        "module": "hr",
         "href": "/hr",
         "scope": "hr:read",
         "links": [
@@ -250,6 +321,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Support",
+        "module": "operations",
         "href": "/support",
         "scope": "support:read",
         "links": [
@@ -270,6 +342,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Operations",
+        "module": "operations",
         "href": "/operations",
         "scope": "operations:read",
         "links": [
@@ -288,6 +361,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Network",
+        "module": "network",
         "href": "/network",
         "scope": "network:read",
         "links": [
@@ -299,7 +373,19 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "section": "Subscriptions",
+        "module": "network",
+        "href": "/subscriptions",
+        "scope": "subscriptions:read",
+        "links": [
+            {"label": "Subscriptions", "href": "/subscriptions", "icon": "repeat", "scope": "subscriptions:read"},
+            {"label": "Tariffs", "href": "/subscriptions/tariffs", "icon": "list", "scope": "subscriptions:read"},
+            {"label": "Payments", "href": "/subscriptions/payments", "icon": "credit-card", "scope": "payments:read"},
+        ],
+    },
+    {
         "section": "Analytics",
+        "module": "operations",
         "href": "/analytics",
         "scope": "analytics:read",
         "links": [
@@ -313,6 +399,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Settings",
+        "module": "global",
         "href": "/settings",
         "scope": "settings:read",
         "links": [
@@ -328,6 +415,7 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
     },
     {
         "section": "Admin",
+        "module": "global",
         "href": "/settings/admin",
         "scope": "admin:read",
         "links": [
@@ -344,17 +432,98 @@ NAVIGATION_ITEMS: List[Dict[str, Any]] = [
 ]
 
 
+def get_module_registry(user: Optional[Principal]) -> List[Dict[str, Any]]:
+    """Filter modules based on user scopes.
+
+    Combines:
+    1. Hardcoded MODULE_REGISTRY (legacy modules)
+    2. Auto-discovered modules from ModuleRegistry (new modular system)
+
+    Auto-discovered modules take precedence if they have the same ID.
+    """
+    from app.web.modules import ModuleRegistry
+
+    if not user:
+        return []
+
+    user_scopes = list(user.scopes) if user.scopes else []
+    seen_ids = set()
+    visible = []
+
+    # First, add auto-discovered modules (they take precedence)
+    for module_dict in ModuleRegistry.get_module_registry(user_scopes):
+        module_id = module_dict.get("id")
+        if module_id:
+            seen_ids.add(module_id)
+        visible.append(module_dict)
+
+    # Then, add legacy hardcoded modules (if not already added)
+    for module in MODULE_REGISTRY:
+        module_id = module.get("id")
+        if module_id and module_id in seen_ids:
+            continue  # Already added from auto-discovery
+
+        scopes = module.get("scopes") or []
+        if not scopes or any(user.has_scope(scope) for scope in scopes):
+            visible.append(module)
+
+    return visible
+
+
+def resolve_active_module(
+    current_path: str,
+    modules: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Pick the best matching module based on URL prefixes."""
+    best_match = None
+    best_len = 0
+
+    for module in modules:
+        for prefix in module.get("prefixes", []):
+            if current_path == prefix or current_path.startswith(prefix.rstrip("/") + "/"):
+                if len(prefix) > best_len:
+                    best_match = module
+                    best_len = len(prefix)
+
+    if best_match:
+        return best_match
+
+    return modules[0] if modules else None
+
+
 def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
     """Get filtered navigation based on user permissions.
+
+    Combines:
+    1. Auto-discovered module navigation (new modular system)
+    2. Hardcoded NAVIGATION_ITEMS (legacy modules)
 
     Removes sections where user has no access to any links.
     Includes section href for clickable module landing pages.
     """
+    from app.web.modules import ModuleRegistry
+
     if not user:
         return []
 
+    user_scopes = list(user.scopes) if user.scopes else []
     result = []
+    seen_sections = set()
+
+    # First, add navigation from auto-discovered modules
+    # These take precedence over hardcoded navigation
+    for nav_item in ModuleRegistry.get_navigation(user_scopes):
+        section_key = nav_item.get("section", "")
+        if section_key:
+            seen_sections.add(section_key)
+        result.append(nav_item)
+
+    # Then, add legacy hardcoded navigation (if section not already added)
     for section in NAVIGATION_ITEMS:
+        section_key = section.get("section", "")
+        if section_key in seen_sections:
+            continue  # Already added from auto-discovery
+
         filtered_links = []
         for link in section["links"]:
             # No scope required or user has scope
@@ -366,6 +535,7 @@ def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
             section_data = {
                 "section": section["section"],
                 "links": filtered_links,
+                "module": section.get("module", "global"),
             }
             # Include section href if user has permission
             if section.get("href"):

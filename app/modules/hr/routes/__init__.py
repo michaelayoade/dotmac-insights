@@ -19,11 +19,14 @@ from .appraisal import router as appraisal_router
 from .recruitment import router as recruitment_router
 from .lifecycle import router as lifecycle_router
 from .holidays import router as holidays_router
+from .my import router as my_router
 
 router = APIRouter(prefix="/hr", tags=["hr"])
 
 # Dashboard first (matches /hr path)
 router.include_router(dashboard_router)
+# Self-service routes (before other routes to avoid conflicts)
+router.include_router(my_router)
 router.include_router(employees_router)
 router.include_router(departments_router)
 router.include_router(designations_router)

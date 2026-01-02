@@ -1,7 +1,6 @@
 """Fiscal: Fiscal years, fiscal periods, cost centers."""
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any, Dict, Optional
 from datetime import date
 
@@ -11,17 +10,27 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
-from app.models.accounting import (
-    Account,
-    AccountType,
-    CostCenter,
-    FiscalYear,
-    GLEntry,
+from app.models.accounting import FiscalYear
+from app.services.accounting.fiscal import FiscalService
+from app.services.accounting.fiscal_types import (
+    CostCenterCreateData,
+    CostCenterUpdateData,
+    FiscalYearCreateData,
+    FiscalYearUpdateData,
 )
+from app.services.errors import NotFoundError
 
-from .helpers import parse_date, invalidate_report_cache, get_accounts_by_erpnext_id
+from .helpers import parse_date, invalidate_report_cache
 
 router = APIRouter()
+
+
+def get_fiscal_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> FiscalService:
+    """Dependency to get FiscalService instance."""
+    return FiscalService(db, principal)
 
 
 class FiscalYearCreateRequest(BaseModel):
@@ -68,14 +77,14 @@ class CostCenterUpdateRequest(BaseModel):
 
 @router.get("/fiscal-years", dependencies=[Depends(Require("accounting:read"))])
 def get_fiscal_years(
-    db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Get fiscal years list.
 
     Returns:
         List of fiscal years ordered by most recent first
     """
-    years = db.query(FiscalYear).filter(FiscalYear.disabled == False).order_by(FiscalYear.year.desc()).all()
+    years = service.list_fiscal_years()
 
     return {
         "total": len(years),
@@ -96,9 +105,10 @@ def get_fiscal_years(
 def create_fiscal_year(
     payload: FiscalYearCreateRequest,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Create a fiscal year locally."""
-    fiscal_year = FiscalYear(
+    create_data = FiscalYearCreateData(
         year=payload.year,
         year_start_date=payload.year_start_date,
         year_end_date=payload.year_end_date,
@@ -106,9 +116,8 @@ def create_fiscal_year(
         disabled=payload.disabled,
         auto_created=payload.auto_created,
     )
-    db.add(fiscal_year)
+    fiscal_year = service.create_fiscal_year(create_data)
     db.commit()
-    db.refresh(fiscal_year)
     return {"id": fiscal_year.id}
 
 
@@ -117,34 +126,38 @@ def update_fiscal_year(
     fiscal_year_id: int,
     payload: FiscalYearUpdateRequest,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Update a fiscal year locally."""
-    fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
-    if not fiscal_year:
-        raise HTTPException(status_code=404, detail="Fiscal year not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(fiscal_year, key, value)
-
-    db.commit()
-    db.refresh(fiscal_year)
-    return {"id": fiscal_year.id}
+    update_data = FiscalYearUpdateData(
+        year=payload.year,
+        year_start_date=payload.year_start_date,
+        year_end_date=payload.year_end_date,
+        is_short_year=payload.is_short_year,
+        disabled=payload.disabled,
+        auto_created=payload.auto_created,
+    )
+    try:
+        fiscal_year = service.update_fiscal_year(fiscal_year_id, update_data)
+        db.commit()
+        return {"id": fiscal_year.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
 
 @router.delete("/fiscal-years/{fiscal_year_id}", dependencies=[Depends(Require("accounting:write"))])
 def delete_fiscal_year(
     fiscal_year_id: int,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Disable a fiscal year."""
-    fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
-    if not fiscal_year:
-        raise HTTPException(status_code=404, detail="Fiscal year not found")
-
-    fiscal_year.disabled = True
-    db.commit()
-    return {"status": "disabled", "fiscal_year_id": fiscal_year_id}
+    try:
+        service.disable_fiscal_year(fiscal_year_id)
+        db.commit()
+        return {"status": "disabled", "fiscal_year_id": fiscal_year_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
 
 # FISCAL PERIODS
@@ -398,14 +411,14 @@ async def generate_closing_entries(
 
 @router.get("/cost-centers", dependencies=[Depends(Require("accounting:read"))])
 def get_cost_centers(
-    db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Get cost centers list.
 
     Returns:
         List of cost centers
     """
-    centers = db.query(CostCenter).filter(CostCenter.disabled == False).all()
+    centers = service.list_cost_centers()
 
     return {
         "total": len(centers),
@@ -429,7 +442,7 @@ def get_cost_center_detail(
     cost_center_id: int,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Get cost center detail with expense breakdown.
 
@@ -441,62 +454,30 @@ def get_cost_center_detail(
     Returns:
         Cost center details with expense breakdown
     """
-    from sqlalchemy import func
-
-    cc = db.query(CostCenter).filter(CostCenter.id == cost_center_id).first()
-    if not cc:
-        raise HTTPException(status_code=404, detail="Cost center not found")
-
-    # Get expenses by account for this cost center
-    query = db.query(
-        GLEntry.account,
-        func.sum(GLEntry.debit).label("debit"),
-        func.sum(GLEntry.credit).label("credit"),
-    ).filter(
-        GLEntry.cost_center == cc.erpnext_id,
-        GLEntry.is_cancelled == False,
-    )
-
     start_dt = parse_date(start_date, "start_date")
     end_dt = parse_date(end_date, "end_date")
 
-    if start_dt:
-        query = query.filter(GLEntry.posting_date >= start_dt)
-    if end_dt:
-        query = query.filter(GLEntry.posting_date <= end_dt)
-
-    results = query.group_by(GLEntry.account).all()
-
-    accounts = get_accounts_by_erpnext_id(db)
-    breakdown = []
-    total = Decimal("0")
-
-    for row in results:
-        acc = accounts.get(row.account)
-        amount = (row.debit or Decimal("0")) - (row.credit or Decimal("0"))
-        if acc and acc.root_type == AccountType.EXPENSE:
-            breakdown.append({
-                "account": row.account,
-                "account_name": acc.account_name if acc else row.account,
-                "amount": float(amount),
-            })
-            total += amount
-
-    breakdown.sort(key=lambda x: -abs(x["amount"]))
+    try:
+        result = service.get_cost_center_expenses(cost_center_id, start_dt, end_dt)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
     return {
-        "id": cc.id,
-        "erpnext_id": cc.erpnext_id,
-        "name": cc.cost_center_name,
-        "number": cc.cost_center_number,
-        "parent": cc.parent_cost_center,
-        "company": cc.company,
+        "id": result.id,
+        "erpnext_id": result.erpnext_id,
+        "name": result.name,
+        "number": result.number,
+        "parent": result.parent,
+        "company": result.company,
         "period": {
-            "start_date": start_dt.isoformat() if start_dt else None,
-            "end_date": end_dt.isoformat() if end_dt else None,
+            "start_date": result.start_date.isoformat() if result.start_date else None,
+            "end_date": result.end_date.isoformat() if result.end_date else None,
         },
-        "total_expenses": float(total),
-        "breakdown": breakdown,
+        "total_expenses": result.total_expenses,
+        "breakdown": [
+            {"account": e.account, "account_name": e.account_name, "amount": e.amount}
+            for e in result.breakdown
+        ],
     }
 
 
@@ -504,9 +485,10 @@ def get_cost_center_detail(
 def create_cost_center(
     payload: CostCenterCreateRequest,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Create a cost center locally."""
-    center = CostCenter(
+    create_data = CostCenterCreateData(
         cost_center_name=payload.cost_center_name,
         cost_center_number=payload.cost_center_number,
         parent_cost_center=payload.parent_cost_center,
@@ -516,9 +498,8 @@ def create_cost_center(
         lft=payload.lft,
         rgt=payload.rgt,
     )
-    db.add(center)
+    center = service.create_cost_center(create_data)
     db.commit()
-    db.refresh(center)
     return {"id": center.id}
 
 
@@ -527,31 +508,37 @@ def update_cost_center(
     cost_center_id: int,
     payload: CostCenterUpdateRequest,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Update a cost center locally."""
-    center = db.query(CostCenter).filter(CostCenter.id == cost_center_id).first()
-    if not center:
-        raise HTTPException(status_code=404, detail="Cost center not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(center, key, value)
-
-    db.commit()
-    db.refresh(center)
-    return {"id": center.id}
+    update_data = CostCenterUpdateData(
+        cost_center_name=payload.cost_center_name,
+        cost_center_number=payload.cost_center_number,
+        parent_cost_center=payload.parent_cost_center,
+        company=payload.company,
+        is_group=payload.is_group,
+        disabled=payload.disabled,
+        lft=payload.lft,
+        rgt=payload.rgt,
+    )
+    try:
+        center = service.update_cost_center(cost_center_id, update_data)
+        db.commit()
+        return {"id": center.id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc
 
 
 @router.delete("/cost-centers/{cost_center_id}", dependencies=[Depends(Require("accounting:write"))])
 def delete_cost_center(
     cost_center_id: int,
     db: Session = Depends(get_db),
+    service: FiscalService = Depends(get_fiscal_service),
 ) -> Dict[str, Any]:
     """Disable a cost center."""
-    center = db.query(CostCenter).filter(CostCenter.id == cost_center_id).first()
-    if not center:
-        raise HTTPException(status_code=404, detail="Cost center not found")
-
-    center.disabled = True
-    db.commit()
-    return {"status": "disabled", "cost_center_id": cost_center_id}
+    try:
+        service.disable_cost_center(cost_center_id)
+        db.commit()
+        return {"status": "disabled", "cost_center_id": cost_center_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=exc.message) from exc

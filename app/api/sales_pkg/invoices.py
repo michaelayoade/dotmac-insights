@@ -21,7 +21,7 @@ from typing import Dict, Any, Optional
 from app.database import get_db
 from app.auth import Require
 from app.models.invoice import Invoice, InvoiceStatus
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.api.sales_pkg.common import (
     _parse_iso_utc,
     _resolve_currency_or_raise,
@@ -34,7 +34,8 @@ router = APIRouter()
 @router.get("/invoices", dependencies=[Depends(Require("explorer:read"))])
 async def list_invoices(
     status: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     min_amount: Optional[float] = None,
@@ -42,7 +43,7 @@ async def list_invoices(
     currency: Optional[str] = None,
     overdue_only: bool = False,
     search: Optional[str] = None,
-    sort_by: Optional[str] = Query(default=None, description="invoice_date,due_date,total_amount,amount_paid,customer_id,status"),
+    sort_by: Optional[str] = Query(default=None, description="invoice_date,due_date,total_amount,amount_paid,customer_account_id,status"),
     sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
@@ -58,8 +59,13 @@ async def list_invoices(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-    if customer_id:
-        query = query.filter(Invoice.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(Invoice.customer_account_id == customer_account_id)
+    elif party_id:
+        query = query.join(
+            CustomerAccount,
+            CustomerAccount.id == Invoice.customer_account_id,
+        ).filter(CustomerAccount.party_id == party_id)
 
     start_dt = _parse_iso_utc(start_date, "start_date")
     end_dt = _parse_iso_utc(end_date, "end_date")
@@ -92,7 +98,7 @@ async def list_invoices(
         "due_date": Invoice.due_date,
         "total_amount": Invoice.total_amount,
         "amount_paid": Invoice.amount_paid,
-        "customer_id": Invoice.customer_id,
+        "customer_account_id": Invoice.customer_account_id,
         "status": Invoice.status,
     }
     if sort_by and sort_by not in sort_map:
@@ -107,8 +113,9 @@ async def list_invoices(
 
     total = query.count()
     invoice_rows = (
-        query.outerjoin(Customer, Invoice.customer_id == Customer.id)
-        .add_columns(Customer.name.label("customer_name"))
+        query.outerjoin(CustomerAccount, Invoice.customer_account_id == CustomerAccount.id)
+        .outerjoin(Party, CustomerAccount.party_id == Party.id)
+        .add_columns(Party.name.label("party_name"), CustomerAccount.party_id.label("party_id"))
         .order_by(order_clause, Invoice.id.desc())
         .offset(offset)
         .limit(limit)
@@ -123,8 +130,9 @@ async def list_invoices(
             {
                 "id": inv.id,
                 "invoice_number": inv.invoice_number,
-                "customer_id": inv.customer_id,
-                "customer_name": customer_name,
+                "customer_account_id": inv.customer_account_id,
+                "party_id": party_id,
+                "party_name": party_name,
                 "total_amount": float(inv.total_amount),
                 "amount_paid": float(inv.amount_paid or 0),
                 "balance": float(inv.total_amount - (inv.amount_paid or 0)),
@@ -135,7 +143,7 @@ async def list_invoices(
                 "days_overdue": inv.days_overdue,
                 "source": inv.source.value if inv.source else None,
             }
-            for inv, customer_name in invoice_rows
+            for inv, party_name, party_id in invoice_rows
         ],
     }
 

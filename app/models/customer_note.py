@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
+from sqlalchemy import BigInteger, Column, Integer, String, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -15,7 +15,7 @@ class CustomerNote(Base):
     splynx_id = Column(Integer, unique=True, index=True, nullable=False)
 
     # Customer link
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
+    party_id = Column(BigInteger, ForeignKey("parties.id"), nullable=True, index=True)
     splynx_customer_id = Column(Integer, index=True, nullable=True)
 
     # Administrator who created the note
@@ -44,7 +44,7 @@ class CustomerNote(Base):
     last_synced_at = Column(DateTime, nullable=True)
 
     # Relationships
-    customer = relationship("Customer", backref="customer_notes")
+    party = relationship("Party", backref="customer_notes")
 
     def __repr__(self):
         return f"<CustomerNote {self.splynx_id} - {self.note_type}>"

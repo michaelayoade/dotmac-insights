@@ -8,7 +8,6 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
     from app.models.employee import Employee
     from app.models.party import CustomerAccount
     from app.models.unified_ticket import UnifiedTicket
@@ -38,8 +37,7 @@ class Conversation(Base):
     # External ID
     chatwoot_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
-    # Customer link
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    # Chatwoot contact link
     chatwoot_contact_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
     customer_account_id: Mapped[Optional[int]] = mapped_column(
         BigInteger,
@@ -95,7 +93,6 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="conversations")
     customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     messages: Mapped[List[Message]] = relationship(back_populates="conversation")
     employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])

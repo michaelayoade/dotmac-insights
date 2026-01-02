@@ -618,15 +618,28 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
     payments = db.query(Payment).filter(Payment.invoice_id == invoice.id).all()
     items = db.query(InvoiceLine).filter(InvoiceLine.invoice_id == invoice.id).all()
 
-    customer = None
-    if invoice.customer_id:
-        cust = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
-        if cust:
-            customer = {"id": cust.id, "name": cust.name, "email": cust.email}
+    customer_account = None
+    party_id = None
+    party_name = None
+    if invoice.customer_account and invoice.customer_account.party:
+        party = invoice.customer_account.party
+        party_id = party.id
+        party_name = party.name
+        if not party_name:
+            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not party_name:
+            party_name = party.legal_name or party.trading_name
+        customer_account = {
+            "id": invoice.customer_account.id,
+            "party_id": party.id,
+            "name": party_name,
+        }
 
     return {
         "id": invoice.id,
-        "customer_id": invoice.customer_id,
+        "customer_account_id": invoice.customer_account_id,
+        "party_id": party_id,
+        "party_name": party_name,
         "invoice_number": invoice.invoice_number,
         "description": invoice.description,
         "amount": float(invoice.amount),
@@ -647,7 +660,7 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
             "splynx_id": invoice.splynx_id,
             "erpnext_id": invoice.erpnext_id,
         },
-        "customer": customer,
+        "customer_account": customer_account,
         "payments": [
             {
                 "id": p.id,
@@ -688,10 +701,23 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
 
 
 def _serialize_payment(payment: Payment) -> Dict[str, Any]:
+    party_id = None
+    party_name = None
+    if payment.customer_account and payment.customer_account.party:
+        party = payment.customer_account.party
+        party_id = party.id
+        party_name = party.name
+        if not party_name:
+            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not party_name:
+            party_name = party.legal_name or party.trading_name
+
     return {
         "id": payment.id,
         "receipt_number": payment.receipt_number,
-        "customer_id": payment.customer_id,
+        "customer_account_id": payment.customer_account_id,
+        "party_id": party_id,
+        "party_name": party_name,
         "invoice_id": payment.invoice_id,
         "amount": float(payment.amount),
         "currency": payment.currency,
@@ -858,5 +884,4 @@ def _serialize_customer(customer: Customer) -> Dict[str, Any]:
         "splynx_id": customer.splynx_id,
         "erpnext_id": customer.erpnext_id,
     }
-
 

@@ -26,7 +26,7 @@ from app.web.context import (
 from app.templates.environment import get_template_env
 from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionType
 from app.models.tariff import Tariff, TariffType
-from app.models.customer import Customer
+from app.models.party import Party, PartyRole, PartyStatus
 from app.models.router import Router
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.integrations.mikrotik.access_methods import ACCESS_METHODS, get_access_method_options
@@ -138,7 +138,7 @@ async def subscriptions_list(
     q: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query(None, description="Filter by status"),
     service_type: Optional[str] = Query(None, description="Filter by service type"),
-    customer_id: Optional[int] = Query(None, description="Filter by customer"),
+    party_id: Optional[int] = Query(None, description="Filter by party"),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("created_at", description="Sort field"),
@@ -146,7 +146,7 @@ async def subscriptions_list(
 ):
     """Subscriptions list page with stats and filters."""
     query = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
         joinedload(Subscription.tariff),
         joinedload(Subscription.router),
     )
@@ -157,7 +157,7 @@ async def subscriptions_list(
             Subscription.plan_name.ilike(f"%{q}%"),
             Subscription.ipv4_address.ilike(f"%{q}%"),
             Subscription.mac_address.ilike(f"%{q}%"),
-            Subscription.customer.has(Customer.name.ilike(f"%{q}%")),
+            Subscription.party.has(Party.name.ilike(f"%{q}%")),
         )
         query = query.filter(search_filter)
 
@@ -176,8 +176,8 @@ async def subscriptions_list(
         except ValueError:
             pass
 
-    if customer_id:
-        query = query.filter(Subscription.customer_id == customer_id)
+    if party_id:
+        query = query.filter(Subscription.party_id == party_id)
 
     # Count total
     total = query.count()
@@ -208,7 +208,7 @@ async def subscriptions_list(
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_service_type"] = service_type
-    context["current_customer_id"] = customer_id
+    context["current_party_id"] = party_id
     context["status_options"] = get_status_options()
     context["service_type_options"] = get_service_type_options()
     context["sort_key"] = sort
@@ -243,7 +243,7 @@ async def subscriptions_table(
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     service_type: Optional[str] = Query(None),
-    customer_id: Optional[int] = Query(None),
+    party_id: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("created_at"),
@@ -252,7 +252,7 @@ async def subscriptions_table(
     """Subscriptions table partial for HTMX updates."""
     return await subscriptions_list(
         request, response, user, csrf_token, db,
-        q, status, service_type, customer_id, page, per_page, sort, dir
+        q, status, service_type, party_id, page, per_page, sort, dir
     )
 
 
@@ -271,7 +271,7 @@ async def subscription_detail(
 ):
     """Subscription detail page with usage stats and actions."""
     subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
         joinedload(Subscription.tariff),
         joinedload(Subscription.router),
     ).filter(Subscription.id == subscription_id).first()
@@ -329,7 +329,7 @@ async def subscription_new(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    customer_id: Optional[int] = Query(None),
+    party_id: Optional[int] = Query(None),
 ):
     """New subscription form page."""
     # Get tariffs for selection
@@ -343,15 +343,24 @@ async def subscription_new(
         Router.status == "active",
     ).order_by(Router.title).all()
 
-    # Get customers for selection
-    customers = db.query(Customer).filter(
-        Customer.status == "active",
-    ).order_by(Customer.name).limit(100).all()
+    # Get customer parties for selection
+    customers = (
+        db.query(Party)
+        .join(PartyRole, PartyRole.party_id == Party.id)
+        .filter(
+            Party.status == PartyStatus.ACTIVE,
+            PartyRole.role == "customer",
+            PartyRole.until.is_(None),
+        )
+        .order_by(Party.name)
+        .limit(100)
+        .all()
+    )
 
-    # Pre-selected customer if provided
+    # Pre-selected party if provided
     selected_customer = None
-    if customer_id:
-        selected_customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if party_id:
+        selected_customer = db.query(Party).filter(Party.id == party_id).first()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -389,14 +398,14 @@ async def subscription_create(
 
     # Validation
     errors = {}
-    customer_id = _form_str(form, "customer_id")
+    party_id = _form_str(form, "party_id")
     plan_name = _form_str(form, "plan_name")
     price_str = _form_str(form, "price")
 
-    if not customer_id:
-        errors["customer_id"] = "Customer is required"
-    elif not customer_id.isdigit():
-        errors["customer_id"] = "Invalid customer"
+    if not party_id:
+        errors["party_id"] = "Customer is required"
+    elif not party_id.isdigit():
+        errors["party_id"] = "Invalid customer"
 
     if not plan_name:
         errors["plan_name"] = "Plan name is required"
@@ -422,9 +431,18 @@ async def subscription_create(
             Router.status == "active",
         ).order_by(Router.title).all()
 
-        customers = db.query(Customer).filter(
-            Customer.status == "active",
-        ).order_by(Customer.name).limit(100).all()
+        customers = (
+            db.query(Party)
+            .join(PartyRole, PartyRole.party_id == Party.id)
+            .filter(
+                Party.status == PartyStatus.ACTIVE,
+                PartyRole.role == "customer",
+                PartyRole.until.is_(None),
+            )
+            .order_by(Party.name)
+            .limit(100)
+            .all()
+        )
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -497,7 +515,7 @@ async def subscription_create(
 
     # Create subscription
     subscription = Subscription(
-        customer_id=int(customer_id),
+        party_id=int(party_id),
         tariff_id=tariff_id,
         service_type=service_type,
         plan_name=plan_name,
@@ -537,7 +555,7 @@ async def subscription_edit(
 ):
     """Subscription edit form page."""
     subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
         joinedload(Subscription.tariff),
         joinedload(Subscription.router),
     ).filter(Subscription.id == subscription_id).first()
@@ -744,7 +762,7 @@ async def subscription_status_modal(
 ):
     """Status change confirmation modal."""
     subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
     ).filter(Subscription.id == subscription_id).first()
 
     if not subscription:
@@ -832,7 +850,7 @@ async def subscription_network_modal(
 ):
     """Network assignment modal."""
     subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
         joinedload(Subscription.router),
     ).filter(Subscription.id == subscription_id).first()
 
@@ -945,7 +963,7 @@ async def subscription_row(
 ):
     """Single subscription row partial for HTMX updates."""
     subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
+        joinedload(Subscription.party),
         joinedload(Subscription.tariff),
         joinedload(Subscription.router),
     ).filter(Subscription.id == subscription_id).first()

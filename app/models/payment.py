@@ -9,8 +9,6 @@ import enum
 from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
-    from app.models.contact import Contact
     from app.models.party import CustomerAccount
     from app.models.invoice import Invoice
     from app.models.payment_allocation import PaymentAllocation
@@ -55,9 +53,6 @@ class Payment(SoftDeleteMixin, Base):
     # Source system
     source: Mapped[PaymentSource] = mapped_column(Enum(PaymentSource), nullable=False, index=True)
 
-    # Links (legacy customer_id - use contact_id)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
-    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, index=True)
     customer_account_id: Mapped[Optional[int]] = mapped_column(
         BigInteger,
@@ -117,8 +112,6 @@ class Payment(SoftDeleteMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
-    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
     customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     allocations: Mapped[List["PaymentAllocation"]] = relationship(

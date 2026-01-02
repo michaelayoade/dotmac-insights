@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
@@ -9,6 +9,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.expense import Expense
+    from app.models.party import Party
 
 
 class Pop(Base):
@@ -35,6 +36,11 @@ class Pop(Base):
     # Status
     is_active: Mapped[bool] = mapped_column(default=True)
 
+    # Optional: link to Party (organization) for vendor/location tracking
+    org_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"), nullable=True, index=True
+    )
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -42,6 +48,7 @@ class Pop(Base):
     # Relationships
     customers: Mapped[List[Customer]] = relationship(back_populates="pop")
     expenses: Mapped[List[Expense]] = relationship(back_populates="pop")
+    org_party: Mapped[Optional[Party]] = relationship(backref="pops")
 
     def __repr__(self) -> str:
         return f"<Pop {self.name}>"

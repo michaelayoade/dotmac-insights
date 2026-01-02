@@ -1,7 +1,11 @@
-"""AP Payments: Supplier payment CRUD and workflow."""
+"""AP Payments: Supplier payment API endpoints.
+
+This module provides the REST API for supplier payment management.
+Business logic is delegated to APPaymentService.
+"""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -11,24 +15,37 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
-from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
-from app.models.payment_allocation import PaymentAllocation
-from app.services.payment_allocation_service import (
-    PaymentAllocationService,
-    AllocationRequest,
-    PaymentAllocationError,
+from app.services.accounting import APPaymentService
+from app.services.accounting.ap_payment_types import (
+    APAllocationData,
+    APPaymentCreateData,
+    APPaymentFilters,
+    APPaymentUpdateData,
 )
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate
+from .helpers import parse_date
 from .schemas.allocation import AllocationCreate
 
 router = APIRouter()
 
 
-# PYDANTIC SCHEMAS
+# ============= SERVICE DEPENDENCY =============
+
+def get_ap_payment_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> APPaymentService:
+    """Create an APPaymentService instance for dependency injection."""
+    return APPaymentService(db, principal)
+
+
+# ============= PYDANTIC SCHEMAS =============
 
 class SupplierPaymentCreate(BaseModel):
     """Schema for creating a supplier payment."""
+
     supplier_id: int
     supplier_name: Optional[str] = None
     payment_date: str
@@ -37,7 +54,9 @@ class SupplierPaymentCreate(BaseModel):
     bank_account_id: Optional[int] = None
     currency: str = "NGN"
     paid_amount: float = Field(..., gt=0, description="Payment amount must be positive")
-    conversion_rate: float = Field(default=1, gt=0, description="Conversion rate must be positive")
+    conversion_rate: float = Field(
+        default=1, gt=0, description="Conversion rate must be positive"
+    )
     reference_number: Optional[str] = None
     reference_date: Optional[str] = None
     remarks: Optional[str] = None
@@ -47,18 +66,90 @@ class SupplierPaymentCreate(BaseModel):
 
 class SupplierPaymentUpdate(BaseModel):
     """Schema for updating a supplier payment."""
+
     payment_date: Optional[str] = None
     posting_date: Optional[str] = None
     mode_of_payment: Optional[str] = None
     bank_account_id: Optional[int] = None
-    paid_amount: Optional[float] = Field(default=None, gt=0, description="Payment amount must be positive")
-    conversion_rate: Optional[float] = Field(default=None, gt=0, description="Conversion rate must be positive")
+    paid_amount: Optional[float] = Field(
+        default=None, gt=0, description="Payment amount must be positive"
+    )
+    conversion_rate: Optional[float] = Field(
+        default=None, gt=0, description="Conversion rate must be positive"
+    )
     reference_number: Optional[str] = None
     reference_date: Optional[str] = None
     remarks: Optional[str] = None
 
 
-# AP PAYMENTS LIST & DETAIL
+# ============= HELPER FUNCTIONS =============
+
+def _payment_to_dict(p) -> Dict[str, Any]:
+    """Convert SupplierPayment to response dict."""
+    return {
+        "id": p.id,
+        "payment_number": p.payment_number,
+        "supplier_id": p.supplier_id,
+        "supplier_name": p.supplier_name,
+        "payment_date": p.payment_date.isoformat() if p.payment_date else None,
+        "paid_amount": float(p.paid_amount),
+        "currency": p.currency,
+        "status": p.status.value,
+        "total_allocated": float(p.total_allocated) if p.total_allocated else 0,
+        "unallocated_amount": float(p.unallocated_amount) if p.unallocated_amount else 0,
+    }
+
+
+def _payment_detail_to_dict(p, allocations) -> Dict[str, Any]:
+    """Convert SupplierPayment with allocations to detailed response dict."""
+    return {
+        "id": p.id,
+        "payment_number": p.payment_number,
+        "supplier_id": p.supplier_id,
+        "supplier_name": p.supplier_name,
+        "payment_date": p.payment_date.isoformat() if p.payment_date else None,
+        "posting_date": p.posting_date.isoformat() if p.posting_date else None,
+        "mode_of_payment": p.mode_of_payment,
+        "bank_account_id": p.bank_account_id,
+        "currency": p.currency,
+        "paid_amount": float(p.paid_amount),
+        "conversion_rate": float(p.conversion_rate) if p.conversion_rate else 1,
+        "base_paid_amount": float(p.base_paid_amount) if p.base_paid_amount else 0,
+        "total_allocated": float(p.total_allocated) if p.total_allocated else 0,
+        "unallocated_amount": float(p.unallocated_amount) if p.unallocated_amount else 0,
+        "total_discount": float(p.total_discount) if p.total_discount else 0,
+        "total_write_off": float(p.total_write_off) if p.total_write_off else 0,
+        "total_withholding_tax": (
+            float(p.total_withholding_tax) if p.total_withholding_tax else 0
+        ),
+        "reference_number": p.reference_number,
+        "reference_date": p.reference_date.isoformat() if p.reference_date else None,
+        "remarks": p.remarks,
+        "status": p.status.value,
+        "workflow_status": p.workflow_status,
+        "docstatus": p.docstatus,
+        "company": p.company,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "allocations": [
+            {
+                "id": a.id,
+                "document_type": a.allocation_type.value,
+                "document_id": a.document_id,
+                "allocated_amount": float(a.allocated_amount),
+                "discount_amount": float(a.discount_amount) if a.discount_amount else 0,
+                "write_off_amount": (
+                    float(a.write_off_amount) if a.write_off_amount else 0
+                ),
+                "exchange_gain_loss": (
+                    float(a.exchange_gain_loss) if a.exchange_gain_loss else 0
+                ),
+            }
+            for a in allocations
+        ],
+    }
+
+
+# ============= LIST & DETAIL ENDPOINTS =============
 
 @router.get("/ap-payments", dependencies=[Depends(Require("accounting:read"))])
 def list_ap_payments(
@@ -68,161 +159,198 @@ def list_ap_payments(
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """List supplier payments with filters."""
-    query = db.query(SupplierPayment)
+    from app.models.supplier_payment import SupplierPaymentStatus
 
-    if supplier_id:
-        query = query.filter(SupplierPayment.supplier_id == supplier_id)
-
+    # Build filters
+    status_enum = None
     if status:
         try:
             status_enum = SupplierPaymentStatus(status.lower())
-            query = query.filter(SupplierPayment.status == status_enum)
         except ValueError:
             valid_statuses = [s.value for s in SupplierPaymentStatus]
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid status '{status}'. Valid values: {valid_statuses}"
+                detail=f"Invalid status '{status}'. Valid values: {valid_statuses}",
             )
 
-    if start_date:
-        query = query.filter(SupplierPayment.payment_date >= parse_date(start_date, "start_date"))
+    filters = APPaymentFilters(
+        supplier_id=supplier_id,
+        status=status_enum,
+        start_date=parse_date(start_date, "start_date") if start_date else None,
+        end_date=parse_date(end_date, "end_date") if end_date else None,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
 
-    if end_date:
-        query = query.filter(SupplierPayment.payment_date <= parse_date(end_date, "end_date"))
-
-    query = query.order_by(SupplierPayment.payment_date.desc(), SupplierPayment.id.desc())
-    total, payments = paginate(query, offset, limit)
+    result = service.list_payments(filters, pagination)
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "payments": [
-            {
-                "id": p.id,
-                "payment_number": p.payment_number,
-                "supplier_id": p.supplier_id,
-                "supplier_name": p.supplier_name,
-                "payment_date": p.payment_date.isoformat() if p.payment_date else None,
-                "paid_amount": float(p.paid_amount),
-                "currency": p.currency,
-                "status": p.status.value,
-                "total_allocated": float(p.total_allocated) if p.total_allocated else 0,
-                "unallocated_amount": float(p.unallocated_amount) if p.unallocated_amount else 0,
-            }
-            for p in payments
-        ],
+        "payments": [_payment_to_dict(p) for p in result.items],
     }
 
 
-@router.get("/ap-payments/{payment_id}", dependencies=[Depends(Require("accounting:read"))])
+@router.get(
+    "/ap-payments/{payment_id}", dependencies=[Depends(Require("accounting:read"))]
+)
 def get_ap_payment(
     payment_id: int,
-    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Get supplier payment detail with allocations."""
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    allocations = db.query(PaymentAllocation).filter(
-        PaymentAllocation.supplier_payment_id == payment_id
-    ).all()
-
-    return {
-        "id": payment.id,
-        "payment_number": payment.payment_number,
-        "supplier_id": payment.supplier_id,
-        "supplier_name": payment.supplier_name,
-        "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
-        "posting_date": payment.posting_date.isoformat() if payment.posting_date else None,
-        "mode_of_payment": payment.mode_of_payment,
-        "bank_account_id": payment.bank_account_id,
-        "currency": payment.currency,
-        "paid_amount": float(payment.paid_amount),
-        "conversion_rate": float(payment.conversion_rate) if payment.conversion_rate else 1,
-        "base_paid_amount": float(payment.base_paid_amount) if payment.base_paid_amount else 0,
-        "total_allocated": float(payment.total_allocated) if payment.total_allocated else 0,
-        "unallocated_amount": float(payment.unallocated_amount) if payment.unallocated_amount else 0,
-        "total_discount": float(payment.total_discount) if payment.total_discount else 0,
-        "total_write_off": float(payment.total_write_off) if payment.total_write_off else 0,
-        "total_withholding_tax": float(payment.total_withholding_tax) if payment.total_withholding_tax else 0,
-        "reference_number": payment.reference_number,
-        "reference_date": payment.reference_date.isoformat() if payment.reference_date else None,
-        "remarks": payment.remarks,
-        "status": payment.status.value,
-        "workflow_status": payment.workflow_status,
-        "docstatus": payment.docstatus,
-        "company": payment.company,
-        "created_at": payment.created_at.isoformat() if payment.created_at else None,
-        "allocations": [
-            {
-                "id": a.id,
-                "document_type": a.allocation_type.value,
-                "document_id": a.document_id,
-                "allocated_amount": float(a.allocated_amount),
-                "discount_amount": float(a.discount_amount) if a.discount_amount else 0,
-                "write_off_amount": float(a.write_off_amount) if a.write_off_amount else 0,
-                "exchange_gain_loss": float(a.exchange_gain_loss) if a.exchange_gain_loss else 0,
-            }
-            for a in allocations
-        ],
-    }
+    try:
+        payment = service.get_payment(payment_id)
+        allocations = service.get_payment_allocations(payment_id)
+        return _payment_detail_to_dict(payment, allocations)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# AP PAYMENTS CRUD
+# ============= CRUD ENDPOINTS =============
 
 @router.post("/ap-payments", dependencies=[Depends(Require("books:write"))])
 def create_ap_payment(
     data: SupplierPaymentCreate,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Create a new supplier payment."""
-    # Generate payment number
-    from app.services.number_generator import generate_voucher_number
-    payment_number = generate_voucher_number(db, "supplier_payment")
+    try:
+        # Convert Pydantic to service data type
+        create_data = APPaymentCreateData(
+            supplier_id=data.supplier_id,
+            supplier_name=data.supplier_name,
+            payment_date=date.fromisoformat(data.payment_date),
+            posting_date=(
+                date.fromisoformat(data.posting_date) if data.posting_date else None
+            ),
+            mode_of_payment=data.mode_of_payment,
+            bank_account_id=data.bank_account_id,
+            currency=data.currency,
+            paid_amount=Decimal(str(data.paid_amount)),
+            conversion_rate=Decimal(str(data.conversion_rate)),
+            reference_number=data.reference_number,
+            reference_date=(
+                date.fromisoformat(data.reference_date) if data.reference_date else None
+            ),
+            remarks=data.remarks,
+            company=data.company,
+            allocations=[
+                APAllocationData(
+                    document_type=a.document_type,
+                    document_id=a.document_id,
+                    allocated_amount=Decimal(str(a.allocated_amount)),
+                    discount_amount=Decimal(str(a.discount_amount)),
+                    write_off_amount=Decimal(str(a.write_off_amount)),
+                    discount_type=a.discount_type,
+                    discount_account=a.discount_account,
+                    write_off_account=a.write_off_account,
+                    write_off_reason=a.write_off_reason,
+                )
+                for a in data.allocations
+            ],
+        )
 
-    # Parse dates
-    payment_date = date.fromisoformat(data.payment_date)
-    posting_date = date.fromisoformat(data.posting_date) if data.posting_date else payment_date
-    reference_date = date.fromisoformat(data.reference_date) if data.reference_date else None
+        payment = service.create_payment(create_data)
+        db.commit()
+        db.refresh(payment)
 
-    payment = SupplierPayment(
-        payment_number=payment_number,
-        supplier_id=data.supplier_id,
-        supplier_name=data.supplier_name,
-        payment_date=payment_date,
-        posting_date=posting_date,
-        mode_of_payment=data.mode_of_payment,
-        bank_account_id=data.bank_account_id,
-        currency=data.currency,
-        paid_amount=Decimal(str(data.paid_amount)),
-        conversion_rate=Decimal(str(data.conversion_rate)),
-        reference_number=data.reference_number,
-        reference_date=reference_date,
-        remarks=data.remarks,
-        company=data.company,
-        status=SupplierPaymentStatus.DRAFT,
-        created_by_id=principal.id,
-    )
+        return {
+            "message": "Supplier payment created",
+            "id": payment.id,
+            "payment_number": payment.payment_number,
+        }
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    # Calculate base amount
-    payment.base_paid_amount = payment.paid_amount * payment.conversion_rate
-    payment.unallocated_amount = payment.paid_amount
-    payment.total_allocated = Decimal("0")
 
-    db.add(payment)
-    db.flush()
+@router.patch(
+    "/ap-payments/{payment_id}", dependencies=[Depends(Require("books:write"))]
+)
+def update_ap_payment(
+    payment_id: int,
+    data: SupplierPaymentUpdate,
+    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
+) -> Dict[str, Any]:
+    """Update a draft supplier payment."""
+    try:
+        update_data = APPaymentUpdateData(
+            payment_date=(
+                date.fromisoformat(data.payment_date) if data.payment_date else None
+            ),
+            posting_date=(
+                date.fromisoformat(data.posting_date) if data.posting_date else None
+            ),
+            mode_of_payment=data.mode_of_payment,
+            bank_account_id=data.bank_account_id,
+            paid_amount=(
+                Decimal(str(data.paid_amount)) if data.paid_amount is not None else None
+            ),
+            conversion_rate=(
+                Decimal(str(data.conversion_rate))
+                if data.conversion_rate is not None
+                else None
+            ),
+            reference_number=data.reference_number,
+            reference_date=(
+                date.fromisoformat(data.reference_date)
+                if data.reference_date
+                else None
+            ),
+            remarks=data.remarks,
+        )
 
-    # Process allocations if provided
-    if data.allocations:
-        alloc_service = PaymentAllocationService(db)
-        alloc_requests = [
-            AllocationRequest(
+        service.update_payment(payment_id, update_data)
+        db.commit()
+
+        return {"message": "Payment updated", "id": payment_id}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+@router.delete(
+    "/ap-payments/{payment_id}", dependencies=[Depends(Require("books:write"))]
+)
+def delete_ap_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
+) -> Dict[str, Any]:
+    """Delete a draft supplier payment."""
+    try:
+        service.delete_payment(payment_id)
+        db.commit()
+        return {"message": "Payment deleted"}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+# ============= ALLOCATION ENDPOINTS =============
+
+@router.post(
+    "/ap-payments/{payment_id}/allocations",
+    dependencies=[Depends(Require("books:write"))],
+)
+def add_payment_allocations(
+    payment_id: int,
+    allocations: List[AllocationCreate],
+    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
+) -> Dict[str, Any]:
+    """Add allocations to a supplier payment."""
+    try:
+        alloc_data = [
+            APAllocationData(
                 document_type=a.document_type,
                 document_id=a.document_id,
                 allocated_amount=Decimal(str(a.allocated_amount)),
@@ -233,328 +361,152 @@ def create_ap_payment(
                 write_off_account=a.write_off_account,
                 write_off_reason=a.write_off_reason,
             )
-            for a in data.allocations
+            for a in allocations
         ]
-        try:
-            alloc_service.allocate_payment(
-                payment_id=payment.id,
-                allocations=alloc_requests,
-                user_id=principal.id,
-                is_supplier_payment=True,
-            )
-        except PaymentAllocationError as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
 
-    db.commit()
-    db.refresh(payment)
-
-    return {
-        "message": "Supplier payment created",
-        "id": payment.id,
-        "payment_number": payment.payment_number,
-    }
-
-
-@router.patch("/ap-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
-def update_ap_payment(
-    payment_id: int,
-    data: SupplierPaymentUpdate,
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Update a draft supplier payment."""
-    # Use SELECT FOR UPDATE to prevent race conditions on concurrent updates
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).with_for_update().first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status != SupplierPaymentStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Can only update draft payments")
-
-    if data.payment_date:
-        payment.payment_date = date.fromisoformat(data.payment_date)
-    if data.posting_date:
-        payment.posting_date = date.fromisoformat(data.posting_date)
-    if data.mode_of_payment is not None:
-        payment.mode_of_payment = data.mode_of_payment
-    if data.bank_account_id is not None:
-        payment.bank_account_id = data.bank_account_id
-    if data.paid_amount is not None:
-        payment.paid_amount = Decimal(str(data.paid_amount))
-        payment.unallocated_amount = payment.paid_amount - payment.total_allocated
-    if data.conversion_rate is not None:
-        payment.conversion_rate = Decimal(str(data.conversion_rate))
-        payment.base_paid_amount = payment.paid_amount * payment.conversion_rate
-    if data.reference_number is not None:
-        payment.reference_number = data.reference_number
-    if data.reference_date is not None:
-        payment.reference_date = date.fromisoformat(data.reference_date) if data.reference_date else None
-    if data.remarks is not None:
-        payment.remarks = data.remarks
-
-    db.commit()
-
-    return {
-        "message": "Payment updated",
-        "id": payment.id,
-    }
-
-
-@router.delete("/ap-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
-def delete_ap_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Delete a draft supplier payment."""
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status != SupplierPaymentStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Can only delete draft payments")
-
-    # Remove allocations first
-    db.query(PaymentAllocation).filter(
-        PaymentAllocation.supplier_payment_id == payment_id
-    ).delete()
-
-    payment.is_deleted = True
-    payment.deleted_at = datetime.now(timezone.utc)
-    payment.deleted_by_id = principal.id
-    db.commit()
-
-    return {"message": "Payment deleted"}
-
-
-# ALLOCATIONS
-
-@router.post("/ap-payments/{payment_id}/allocations", dependencies=[Depends(Require("books:write"))])
-def add_payment_allocations(
-    payment_id: int,
-    allocations: List[AllocationCreate],
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Add allocations to a supplier payment."""
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status not in [SupplierPaymentStatus.DRAFT, SupplierPaymentStatus.SUBMITTED]:
-        raise HTTPException(status_code=400, detail="Cannot allocate on this payment status")
-
-    alloc_service = PaymentAllocationService(db)
-    alloc_requests = [
-        AllocationRequest(
-            document_type=a.document_type,
-            document_id=a.document_id,
-            allocated_amount=Decimal(str(a.allocated_amount)),
-            discount_amount=Decimal(str(a.discount_amount)),
-            write_off_amount=Decimal(str(a.write_off_amount)),
-            discount_type=a.discount_type,
-            discount_account=a.discount_account,
-            write_off_account=a.write_off_account,
-            write_off_reason=a.write_off_reason,
-        )
-        for a in allocations
-    ]
-
-    try:
-        created = alloc_service.allocate_payment(
-            payment_id=payment_id,
-            allocations=alloc_requests,
-            user_id=principal.id,
-            is_supplier_payment=True,
-        )
+        service.add_allocations(payment_id, alloc_data)
         db.commit()
-        return {
-            "message": f"Added {len(created)} allocations",
-            "allocation_ids": [a.id for a in created],
-        }
-    except PaymentAllocationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
+        return {"message": f"Added {len(allocations)} allocations"}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.delete("/ap-payments/{payment_id}/allocations/{allocation_id}", dependencies=[Depends(Require("books:write"))])
+@router.delete(
+    "/ap-payments/{payment_id}/allocations/{allocation_id}",
+    dependencies=[Depends(Require("books:write"))],
+)
 def remove_payment_allocation(
     payment_id: int,
     allocation_id: int,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Remove an allocation from a supplier payment."""
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status not in [SupplierPaymentStatus.DRAFT, SupplierPaymentStatus.SUBMITTED]:
-        raise HTTPException(status_code=400, detail="Cannot modify allocations on this payment status")
-
-    alloc_service = PaymentAllocationService(db)
     try:
-        alloc_service.remove_allocation(allocation_id, principal.id)
+        service.remove_allocation(payment_id, allocation_id)
         db.commit()
         return {"message": "Allocation removed"}
-    except PaymentAllocationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# WORKFLOW
+# ============= WORKFLOW ENDPOINTS =============
 
-@router.post("/ap-payments/{payment_id}/submit", dependencies=[Depends(Require("books:write"))])
+@router.post(
+    "/ap-payments/{payment_id}/submit", dependencies=[Depends(Require("books:write"))]
+)
 def submit_ap_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Submit a supplier payment for approval."""
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status != SupplierPaymentStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Can only submit draft payments")
-
-    engine = ApprovalEngine(db)
     try:
-        approval = engine.submit_document(
-            doctype="supplier_payment",
-            document_id=payment_id,
-            user_id=principal.id,
-            amount=payment.paid_amount,
-            document_name=payment.payment_number,
-        )
-        payment.status = SupplierPaymentStatus.SUBMITTED
-        payment.workflow_status = "pending_approval"
+        payment = service.submit_payment(payment_id)
         db.commit()
         return {
             "message": "Payment submitted for approval",
-            "approval_id": approval.id,
             "status": payment.status.value,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/ap-payments/{payment_id}/approve", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/ap-payments/{payment_id}/approve",
+    dependencies=[Depends(Require("books:approve"))],
+)
 def approve_ap_payment(
     payment_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Approve a supplier payment."""
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    engine = ApprovalEngine(db)
     try:
-        approval = engine.approve_document(
-            doctype="supplier_payment",
-            document_id=payment_id,
-            user_id=principal.id,
-            remarks=remarks,
-        )
-        payment.status = SupplierPaymentStatus.APPROVED
-        payment.workflow_status = "approved"
+        payment = service.approve_payment(payment_id, remarks)
         db.commit()
         return {
             "message": "Payment approved",
-            "approval_id": approval.id,
             "status": payment.status.value,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/ap-payments/{payment_id}/reject", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/ap-payments/{payment_id}/reject",
+    dependencies=[Depends(Require("books:approve"))],
+)
 def reject_ap_payment(
     payment_id: int,
     reason: str = Query(..., description="Reason for rejection"),
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Reject a supplier payment."""
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    engine = ApprovalEngine(db)
     try:
-        approval = engine.reject_document(
-            doctype="supplier_payment",
-            document_id=payment_id,
-            user_id=principal.id,
-            reason=reason,
-        )
-        payment.status = SupplierPaymentStatus.DRAFT
-        payment.workflow_status = "rejected"
+        payment = service.reject_payment(payment_id, reason)
         db.commit()
         return {
             "message": "Payment rejected",
-            "approval_id": approval.id,
             "status": payment.status.value,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/ap-payments/{payment_id}/post", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/ap-payments/{payment_id}/post", dependencies=[Depends(Require("books:approve"))]
+)
 async def post_ap_payment(
     payment_id: int,
-    remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Post an approved supplier payment to the GL."""
-    from app.services.document_posting import DocumentPostingService, PostingError
     from .helpers import invalidate_report_cache
 
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status != SupplierPaymentStatus.APPROVED:
-        raise HTTPException(status_code=400, detail="Can only post approved payments")
-
-    posting_service = DocumentPostingService(db)
     try:
-        je = posting_service.post_supplier_payment(payment_id, principal.id)
-        payment.status = SupplierPaymentStatus.POSTED
-        payment.workflow_status = "posted"
+        payment = service.post_payment(payment_id)
         db.commit()
 
         await invalidate_report_cache()
 
         return {
             "message": "Payment posted",
-            "journal_entry_id": je.id,
+            "journal_entry_id": payment.journal_entry_id,
             "status": payment.status.value,
         }
-    except PostingError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# OUTSTANDING BILLS
+# ============= OUTSTANDING BILLS =============
 
-@router.get("/ap-payments/outstanding-bills", dependencies=[Depends(Require("accounting:read"))])
+@router.get(
+    "/ap-payments/outstanding-bills", dependencies=[Depends(Require("accounting:read"))]
+)
 def get_outstanding_bills(
     supplier_id: int,
     currency: Optional[str] = None,
-    db: Session = Depends(get_db),
+    service: APPaymentService = Depends(get_ap_payment_service),
 ) -> Dict[str, Any]:
     """Get outstanding bills available for payment."""
-    alloc_service = PaymentAllocationService(db)
-    docs = alloc_service.get_outstanding_documents("supplier", supplier_id, currency)
+    docs = service.get_outstanding_bills(supplier_id, currency)
 
     return {
         "total": len(docs),

@@ -18,7 +18,6 @@ from app.templates.environment import get_template_env
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
 from app.models.payment_allocation import PaymentAllocation
-from app.models.contact import Contact
 from app.models.customer import Customer
 
 router = APIRouter(prefix="/payments", tags=["payments-web"])

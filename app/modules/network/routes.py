@@ -28,7 +28,7 @@ from app.models.pop import Pop
 from app.models.router import Router
 from app.models.ipv4_network import IPv4Network
 from app.models.ipv4_address import IPv4Address
-from app.models.customer import Customer, CustomerStatus
+from app.models.party import Party
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.ticket import Ticket, TicketStatus
 from app.core.security import is_htmx_request
@@ -67,25 +67,41 @@ async def network_dashboard(
     total_ips = db.query(func.count(IPv4Address.id)).scalar() or 0
     used_ips = db.query(func.count(IPv4Address.id)).filter(IPv4Address.is_used.is_(True)).scalar() or 0
 
-    # Customer distribution
-    customers_with_pop = db.query(func.count(Customer.id)).filter(
-        Customer.pop_id.isnot(None),
-        Customer.status == CustomerStatus.ACTIVE
-    ).scalar() or 0
+    # Customer distribution (via active subscriptions)
+    active_subscriptions = db.query(Subscription).filter(
+        Subscription.status == SubscriptionStatus.ACTIVE
+    ).subquery()
 
-    total_customers = db.query(func.count(Customer.id)).filter(
-        Customer.status == CustomerStatus.ACTIVE
-    ).scalar() or 0
+    customers_with_pop = (
+        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
+        .join(Router, active_subscriptions.c.router_id == Router.id)
+        .filter(Router.pop_id.isnot(None))
+        .scalar()
+        or 0
+    )
 
-    customers_without_pop = total_customers - customers_with_pop
+    total_customers = (
+        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
+        .scalar()
+        or 0
+    )
+
+    customers_without_pop = (
+        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
+        .filter(active_subscriptions.c.router_id.is_(None))
+        .scalar()
+        or 0
+    )
 
     # Top 10 POPs by customer count
     customer_counts = db.query(
-        Customer.pop_id,
-        func.count(Customer.id).label("customer_count")
+        Router.pop_id.label("pop_id"),
+        func.count(func.distinct(Subscription.party_id)).label("customer_count")
+    ).join(
+        Router, Subscription.router_id == Router.id
     ).filter(
-        Customer.status == CustomerStatus.ACTIVE
-    ).group_by(Customer.pop_id).subquery()
+        Subscription.status == SubscriptionStatus.ACTIVE
+    ).group_by(Router.pop_id).subquery()
 
     top_pops = db.query(
         Pop.id,
@@ -189,11 +205,13 @@ async def pops_list(
     """POP list page with customer and router counts."""
     # Subquery for customer counts
     customer_counts = db.query(
-        Customer.pop_id,
-        func.count(Customer.id).label("customer_count")
+        Router.pop_id.label("pop_id"),
+        func.count(func.distinct(Subscription.party_id)).label("customer_count")
+    ).join(
+        Router, Subscription.router_id == Router.id
     ).filter(
-        Customer.status == CustomerStatus.ACTIVE
-    ).group_by(Customer.pop_id).subquery()
+        Subscription.status == SubscriptionStatus.ACTIVE
+    ).group_by(Router.pop_id).subquery()
 
     # Subquery for router counts
     router_counts = db.query(
@@ -294,11 +312,22 @@ async def pop_detail(
     if not pop:
         raise HTTPException(status_code=404, detail="POP not found")
 
+    active_party_ids = (
+        db.query(Subscription.party_id.label("party_id"))
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(
+            Router.pop_id == pop_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .subquery()
+    )
+
     # Customer stats
-    customer_count = db.query(func.count(Customer.id)).filter(
-        Customer.pop_id == pop_id,
-        Customer.status == CustomerStatus.ACTIVE
-    ).scalar() or 0
+    customer_count = (
+        db.query(func.count(func.distinct(active_party_ids.c.party_id)))
+        .scalar()
+        or 0
+    )
 
     # MRR calculation
     mrr_case = case(
@@ -306,29 +335,45 @@ async def pop_detail(
         (Subscription.billing_cycle == "yearly", Subscription.price / 12),
         else_=Subscription.price
     )
-    pop_mrr = db.query(func.sum(mrr_case)).join(
-        Customer, Subscription.customer_id == Customer.id
-    ).filter(
-        Customer.pop_id == pop_id,
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).scalar() or 0
+    pop_mrr = (
+        db.query(func.sum(mrr_case))
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(
+            Router.pop_id == pop_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .scalar()
+        or 0
+    )
 
     # Routers at this POP
     routers = db.query(Router).filter(Router.pop_id == pop_id).all()
 
     # Open tickets for this POP's customers
-    open_tickets = db.query(func.count(Ticket.id)).join(
-        Customer, Ticket.customer_id == Customer.id
-    ).filter(
-        Customer.pop_id == pop_id,
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
-    ).scalar() or 0
+    open_tickets = (
+        db.query(func.count(Ticket.id))
+        .filter(
+            Ticket.party_id.in_(active_party_ids),
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
+        )
+        .scalar()
+        or 0
+    )
 
     # Recent customers (top 10)
-    recent_customers = db.query(Customer).filter(
-        Customer.pop_id == pop_id,
-        Customer.status == CustomerStatus.ACTIVE
-    ).order_by(Customer.created_at.desc()).limit(10).all()
+    recent_customers = (
+        db.query(Party)
+        .join(Subscription, Subscription.party_id == Party.id)
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(
+            Router.pop_id == pop_id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .order_by(Party.created_at.desc())
+        .distinct(Party.id)
+        .limit(10)
+        .all()
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -662,7 +707,7 @@ async def ip_addresses_list(
     per_page: int = Query(50, ge=10, le=200),
 ):
     """IPv4 addresses list."""
-    query = db.query(IPv4Address).outerjoin(Customer, IPv4Address.customer_id == Customer.id)
+    query = db.query(IPv4Address).outerjoin(Party, IPv4Address.party_id == Party.id)
 
     if q:
         search_term = f"%{q}%"
@@ -726,29 +771,42 @@ async def network_analytics(
         else_=Subscription.price
     )
 
-    # Customer counts by POP
+    # Customer counts by POP (via subscriptions)
     customer_data = db.query(
-        Customer.pop_id,
-        func.count(Customer.id).label("customer_count"),
-        func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active"),
-        func.sum(case((Customer.status == CustomerStatus.INACTIVE, 1), else_=0)).label("churned"),
-    ).group_by(Customer.pop_id).subquery()
+        Router.pop_id.label("pop_id"),
+        func.count(func.distinct(Subscription.party_id)).label("customer_count"),
+        func.count(func.distinct(case((Subscription.status == SubscriptionStatus.ACTIVE, Subscription.party_id)))).label("active"),
+        func.count(func.distinct(case((Subscription.status != SubscriptionStatus.ACTIVE, Subscription.party_id)))).label("churned"),
+    ).join(
+        Router, Subscription.router_id == Router.id
+    ).group_by(Router.pop_id).subquery()
 
     # MRR by POP
     mrr_data = db.query(
-        Customer.pop_id,
+        Router.pop_id.label("pop_id"),
         func.sum(mrr_case).label("mrr"),
-    ).join(Subscription, Subscription.customer_id == Customer.id).filter(
+    ).join(
+        Router, Subscription.router_id == Router.id
+    ).filter(
         Subscription.status == SubscriptionStatus.ACTIVE
-    ).group_by(Customer.pop_id).subquery()
+    ).group_by(Router.pop_id).subquery()
 
     # Tickets by POP
+    party_by_pop = db.query(
+        Subscription.party_id.label("party_id"),
+        Router.pop_id.label("pop_id"),
+    ).join(
+        Router, Subscription.router_id == Router.id
+    ).subquery()
+
     ticket_data = db.query(
-        Customer.pop_id,
+        party_by_pop.c.pop_id,
         func.count(Ticket.id).label("ticket_count"),
-    ).join(Ticket, Ticket.customer_id == Customer.id).filter(
+    ).join(
+        Ticket, Ticket.party_id == party_by_pop.c.party_id
+    ).filter(
         Ticket.created_at >= thirty_days_ago
-    ).group_by(Customer.pop_id).subquery()
+    ).group_by(party_by_pop.c.pop_id).subquery()
 
     # Router counts by POP
     router_data = db.query(
@@ -785,10 +843,15 @@ async def network_analytics(
     total_tickets = sum(p.tickets_30d for p in pops)
 
     # Customers without POP
-    customers_without_pop = db.query(func.count(Customer.id)).filter(
-        Customer.status == CustomerStatus.ACTIVE,
-        Customer.pop_id.is_(None)
-    ).scalar() or 0
+    customers_without_pop = (
+        db.query(func.count(func.distinct(Subscription.party_id)))
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            Subscription.router_id.is_(None),
+        )
+        .scalar()
+        or 0
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -854,14 +917,23 @@ async def network_health(
     ).all()
 
     # POPs with high ticket counts (potential issues)
+    party_by_pop = db.query(
+        Subscription.party_id.label("party_id"),
+        Router.pop_id.label("pop_id"),
+    ).join(
+        Router, Subscription.router_id == Router.id
+    ).subquery()
+
     high_ticket_pops = db.query(
         Pop.id,
         Pop.name,
         Pop.city,
         func.count(Ticket.id).label("ticket_count"),
-        func.count(Customer.id).label("customer_count"),
-    ).outerjoin(Customer, Customer.pop_id == Pop.id).outerjoin(
-        Ticket, Ticket.customer_id == Customer.id
+        func.count(func.distinct(party_by_pop.c.party_id)).label("customer_count"),
+    ).outerjoin(
+        party_by_pop, party_by_pop.c.pop_id == Pop.id
+    ).outerjoin(
+        Ticket, Ticket.party_id == party_by_pop.c.party_id
     ).filter(
         Pop.is_active.is_(True),
         Ticket.created_at >= thirty_days_ago
@@ -888,10 +960,15 @@ async def network_health(
     ).limit(20).all()
 
     # Customers without POP assignment
-    customers_no_pop = db.query(func.count(Customer.id)).filter(
-        Customer.status == CustomerStatus.ACTIVE,
-        Customer.pop_id.is_(None)
-    ).scalar() or 0
+    customers_no_pop = (
+        db.query(func.count(func.distinct(Subscription.party_id)))
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            Subscription.router_id.is_(None),
+        )
+        .scalar()
+        or 0
+    )
 
     # Overall health score
     issues = []

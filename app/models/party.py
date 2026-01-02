@@ -654,3 +654,63 @@ class Membership(Base):
         Index("uq_memberships_org_person", "org_party_id", "person_party_id", unique=True),
         Index("ix_memberships_person_status", "person_party_id", "status"),
     )
+
+
+class SupplierAccount(Base):
+    """Supplier account linking Party to AP context.
+
+    Mirrors CustomerAccount pattern for accounts payable.
+    Links to Party for identity, optionally to legacy Supplier for migration.
+    """
+    __tablename__ = "supplier_accounts"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    party_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    account_number: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+
+    # Legacy link for migration from Supplier model
+    supplier_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("suppliers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # AP-specific fields
+    payment_terms: Mapped[Optional[str]] = mapped_column(Text)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, server_default="NGN")
+    outstanding_balance: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2))
+
+    external_ids: Mapped[dict] = mapped_column(
+        JSONB,
+        default=dict,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    party: Mapped["Party"] = relationship()
+
+    __table_args__ = (
+        Index("ix_supplier_accounts_party", "party_id"),
+        Index("ix_supplier_accounts_status", "status"),
+        Index("ix_supplier_accounts_supplier", "supplier_id"),
+    )
